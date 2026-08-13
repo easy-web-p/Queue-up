@@ -18,7 +18,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 
-// Firebase App Credentials Configuration (Encrypted & Environment Variable Protected)
+// Firebase App Credentials Configuration (Environment Variable Protected)
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyCWCpdSksHY_mU5rqZWHob1rLRws7RB8nA",
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "queueup-65e82.firebaseapp.com",
