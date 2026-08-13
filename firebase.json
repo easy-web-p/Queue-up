@@ -1,0 +1,10 @@
+{
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "payments",
+      "ignore": ["node_modules", ".git", "firebase-debug.log", "firebase-debug.*.log"]
+    }
+  ],
+  "firestore": { "rules": "firestore.rules" }
+}

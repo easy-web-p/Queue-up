@@ -1,0 +1,522 @@
+/* ==========================================================================
+   QUEUEUP USER ACCOUNT & RESERVATIONS PAGE STYLES
+   Exact layout matching reference mockup design
+   ========================================================================== */
+
+.shopee-profile-page {
+  min-height: 100vh;
+  background-color: #f5f5f5;
+  color: #222222;
+  font-family: -apple-system, BlinkMacSystemFont, "Plus Jakarta Sans", "Segoe UI", Roboto, sans-serif;
+  padding-bottom: 60px;
+}
+
+.shopee-profile-container {
+  max-width: 1140px;
+  margin: 20px auto 0 auto;
+  padding: 0 16px;
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+/* 1. Left Sidebar Navigation Panel */
+.shopee-user-sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  background: #ffffff;
+  border-radius: 4px;
+  padding: 20px 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* User Card inside Sidebar */
+.shopee-sidebar-user-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding-bottom: 20px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.shopee-sidebar-avatar-circle {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: #e0e7ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  margin-bottom: 12px;
+  border: 2px solid #ffffff;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+.shopee-sidebar-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.shopee-sidebar-user-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #1f2937;
+  line-height: 1.35;
+  margin: 0;
+  word-break: break-word;
+}
+
+/* Sidebar Menu Links */
+.shopee-sidebar-nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.shopee-sidebar-nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #374151;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.shopee-sidebar-nav-item:hover {
+  background-color: #f9fafb;
+  color: #dc2626;
+}
+
+.shopee-sidebar-nav-item.active {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.shopee-sidebar-nav-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.shopee-sidebar-nav-icon {
+  font-size: 1.1rem;
+}
+
+.shopee-sidebar-badge-incomplete {
+  background-color: #fce7f3;
+  color: #db2777;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+/* 2. Main Right Content Card */
+.shopee-profile-main-card {
+  flex: 1;
+  background: #ffffff;
+  border-radius: 4px;
+  padding: 28px 36px;
+  min-height: 520px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.shopee-panel-title {
+  font-size: 1.65rem;
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: 24px;
+}
+
+/* Personal Info Rows (Screen 1) */
+.shopee-info-field-row {
+  padding: 18px 0;
+  border-bottom: 1px solid #f3f4f6;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.shopee-info-field-row:last-child {
+  border-bottom: none;
+}
+
+.shopee-field-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.shopee-field-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shopee-field-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.shopee-field-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-top: 2px;
+}
+
+.shopee-field-value.empty {
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.shopee-edit-btn {
+  color: #dc2626;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.shopee-edit-btn:hover {
+  text-decoration: underline;
+}
+
+.shopee-field-hint {
+  font-size: 0.78rem;
+  color: #9ca3af;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.shopee-phone-unverified-warning {
+  color: #dc2626;
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+/* Editable Form Input Box inside row */
+.shopee-inline-edit-input {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.shopee-inline-input {
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.88rem;
+  outline: none;
+  flex: 1;
+  max-width: 320px;
+}
+
+.shopee-inline-input:focus {
+  border-color: #dc2626;
+}
+
+.shopee-save-mini-btn {
+  background: #dc2626;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Coupons Panel Styles (Screen 2) */
+.shopee-coupon-promo-section {
+  margin-bottom: 24px;
+}
+
+.shopee-coupon-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 8px;
+}
+
+.shopee-coupon-input-wrapper {
+  display: flex;
+  gap: 12px;
+  max-width: 420px;
+}
+
+.shopee-coupon-input-box {
+  position: relative;
+  flex: 1;
+}
+
+.shopee-coupon-input-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+}
+
+.shopee-coupon-input {
+  width: 100%;
+  height: 40px;
+  padding-left: 36px;
+  padding-right: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  outline: none;
+}
+
+.shopee-coupon-input:focus {
+  border-color: #dc2626;
+}
+
+.shopee-coupon-btn-claim {
+  background: #fca5a5;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 0 24px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.shopee-coupon-btn-claim.active,
+.shopee-coupon-btn-claim:hover {
+  background: #ef4444;
+}
+
+.shopee-coupon-sub-tabs {
+  display: flex;
+  gap: 24px;
+  border-bottom: 1px solid #f3f4f6;
+  margin-bottom: 30px;
+}
+
+.shopee-coupon-tab-item {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #4b5563;
+  padding-bottom: 10px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+.shopee-coupon-tab-item.active {
+  color: #dc2626;
+  border-bottom-color: #dc2626;
+  font-weight: 700;
+}
+
+/* Empty State Illustration Container */
+.shopee-empty-illustration-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 50px 0;
+  text-align: center;
+}
+
+.shopee-empty-lamp-icon {
+  width: 90px;
+  height: 90px;
+  margin-bottom: 16px;
+  opacity: 0.85;
+}
+
+.shopee-empty-text-main {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.shopee-empty-text-sub {
+  font-size: 0.82rem;
+  color: #9ca3af;
+}
+
+/* Account Settings Panel (Screen 4) */
+.shopee-account-id-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.shopee-copy-icon-btn {
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.shopee-copy-icon-btn:hover {
+  color: #dc2626;
+}
+
+/* Password Verification Security Modal Styles */
+.security-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+  padding: 16px;
+}
+
+.security-modal-card {
+  background: #ffffff;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 440px;
+  padding: 24px 28px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  animation: securityModalSlide 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes securityModalSlide {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.security-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f3f4f6;
+  margin-bottom: 20px;
+}
+
+.security-modal-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #111827;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.security-modal-close-btn {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.security-modal-close-btn:hover {
+  color: #111827;
+}
+
+.security-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.security-modal-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+}
+
+.security-modal-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.security-modal-input:focus {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+.security-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.security-btn-cancel {
+  background: #f3f4f6;
+  color: #4b5563;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.security-btn-confirm {
+  background: #dc2626;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(220, 38, 38, 0.25);
+}
+
+.security-btn-confirm:hover {
+  background: #b91c1c;
+}
+
+/* Responsive Support */
+@media (max-width: 768px) {
+  .shopee-profile-container {
+    flex-direction: column;
+  }
+
+  .shopee-user-sidebar {
+    width: 100%;
+  }
+
+  .shopee-profile-main-card {
+    padding: 20px 16px;
+  }
+}

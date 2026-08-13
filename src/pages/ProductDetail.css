@@ -1,0 +1,334 @@
+/* ==========================================================================
+   QUEUEUP PRODUCT DETAIL & CANTEEN RESERVATION STYLES (MATCHING USER MOCKUP)
+   ========================================================================== */
+
+.shopee-pd-page {
+  min-height: 100vh;
+  background-color: #f4f5f7;
+  color: #222222;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  padding-bottom: 60px;
+}
+
+.shopee-pd-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+/* Breadcrumb Path */
+.shopee-pd-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #64748b;
+  padding: 16px 0;
+  flex-wrap: wrap;
+}
+
+.shopee-pd-breadcrumb a {
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.shopee-pd-breadcrumb a:hover {
+  text-decoration: underline;
+}
+
+.shopee-pd-breadcrumb-active {
+  color: #1e293b;
+  font-weight: 600;
+}
+
+/* Main 2-Column Split Layout */
+.queue-pd-split-layout {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 20px;
+  align-items: start;
+}
+
+/* ==========================================================================
+   LEFT COLUMN: GALLERY & RECOMMENDED MENU BOX
+   ========================================================================== */
+.queue-pd-left-card {
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 16px;
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.queue-pd-main-img-box {
+  position: relative;
+  flex: 1;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  height: 380px;
+}
+
+.queue-pd-main-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.queue-pd-main-img-box:hover .queue-pd-main-img {
+  transform: scale(1.04);
+}
+
+/* Vertical Thumbnails Column (Right of Main Photo) */
+.queue-pd-vertical-thumbs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 76px;
+}
+
+.queue-pd-vthumb-img {
+  width: 76px;
+  height: 68px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.queue-pd-vthumb-img.active,
+.queue-pd-vthumb-img:hover {
+  border-color: #ee4d2d;
+  box-shadow: 0 2px 6px rgba(238, 77, 45, 0.3);
+}
+
+/* Recommended Menu Box (Below Gallery) */
+.queue-pd-recommend-box {
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 20px 24px;
+}
+
+.queue-pd-recommend-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.queue-pd-recommend-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.queue-pd-discount-badge-pink {
+  background: #fff1f2;
+  color: #e11d48;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid #fecdd3;
+  cursor: pointer;
+}
+
+.queue-pd-recommend-desc {
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ==========================================================================
+   RIGHT COLUMN: RESTAURANT INFO & BOOKING SYSTEM
+   ========================================================================== */
+.queue-pd-right-card {
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Shop Atmosphere Banner Photo */
+.queue-pd-shop-banner-box {
+  width: 100%;
+  height: 200px;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.queue-pd-shop-banner-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Shop Information Header */
+.queue-pd-shop-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.35;
+  margin-bottom: 6px;
+}
+
+.queue-pd-shop-address {
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+
+.queue-pd-shop-tags-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 10px;
+}
+
+.queue-pd-shop-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.queue-pd-shop-hours {
+  color: #334155;
+  cursor: pointer;
+}
+
+.queue-pd-shop-rating {
+  color: #f59e0b;
+  font-weight: 700;
+}
+
+/* Booking Control Inputs */
+.queue-pd-booking-inputs-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.queue-pd-input-select {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  outline: none;
+  background: #ffffff;
+  color: #1e293b;
+  font-weight: 500;
+  transition: border-color 0.2s ease;
+}
+
+.queue-pd-input-select:focus {
+  border-color: #ee4d2d;
+}
+
+/* Time Slot Discount Badges Carousel */
+.queue-pd-time-slots-grid {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.queue-pd-time-slot-btn {
+  background: #ef4444;
+  color: #ffffff;
+  border: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.3);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.queue-pd-time-slot-btn:hover {
+  transform: scale(1.1);
+}
+
+.queue-pd-time-slot-btn.active {
+  background: #b91c1c;
+  box-shadow: 0 0 0 3px #fca5a5;
+}
+
+/* Summary Footer & Pink/Orange Next Button */
+.queue-pd-booking-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+  margin-top: 10px;
+}
+
+.queue-pd-booking-summary-text {
+  font-size: 13px;
+  color: #334155;
+  font-weight: 600;
+}
+
+.queue-pd-btn-next {
+  background: linear-gradient(135deg, #f43f5e, #fb7185);
+  color: #ffffff;
+  border: none;
+  padding: 12px 32px;
+  font-size: 15px;
+  font-weight: 700;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(244, 63, 94, 0.35);
+  transition: opacity 0.2s ease, transform 0.15s ease;
+}
+
+.queue-pd-btn-next:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+/* Responsive Media Queries */
+@media (max-width: 992px) {
+  .queue-pd-split-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .queue-pd-left-card {
+    flex-direction: column;
+  }
+
+  .queue-pd-vertical-thumbs {
+    flex-direction: row;
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .queue-pd-vthumb-img {
+    width: 70px;
+    height: 60px;
+  }
+}

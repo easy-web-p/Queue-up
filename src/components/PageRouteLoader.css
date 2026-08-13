@@ -1,0 +1,155 @@
+/* ==========================================================================
+   PAGE ROUTE TRANSITION LOADER STYLES
+   ========================================================================== */
+
+.page-loader-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.4s ease, visibility 0.4s ease;
+  pointer-events: all;
+}
+
+.page-loader-overlay.fade-out {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.page-loader-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 30px;
+  animation: pageLoaderPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes pageLoaderPop {
+  0% {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Pulsing Outer Glowing Ring */
+.page-loader-ring-wrapper {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.page-loader-spinner-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 3.5px solid transparent;
+  border-top-color: #ff5226;
+  border-right-color: #fbbf24;
+  border-bottom-color: #10b981;
+  animation: pageLoaderSpin 1s linear infinite;
+}
+
+@keyframes pageLoaderSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Bouncing Logo Card */
+.page-loader-icon-box {
+  width: 110px;
+  height: 110px;
+  background: #ffffff;
+  border-radius: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 30px rgba(255, 82, 38, 0.4);
+  animation: pageLoaderBounce 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes pageLoaderBounce {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    transform: translateY(-10px) scale(1.04);
+  }
+}
+
+.page-loader-logo-img {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+}
+
+/* Brand Title & Tagline */
+.page-loader-title {
+  font-size: 1.6rem;
+  font-weight: 900;
+  margin-top: 12px;
+  line-height: 1;
+}
+
+.page-loader-title .queue {
+  color: #ffffff;
+}
+
+.page-loader-title .up {
+  color: #ff6b00;
+}
+
+.page-loader-sub {
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: #fbbf24;
+  margin-top: 4px;
+  margin-bottom: 16px;
+}
+
+.page-loader-msg {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  margin-bottom: 16px;
+}
+
+/* Smooth Progress Bar */
+.page-loader-progress-track {
+  width: 200px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+}
+
+.page-loader-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #ff5226, #ff8c00, #fbbf24);
+  border-radius: 10px;
+  transition: width 0.15s ease-out;
+  box-shadow: 0 0 12px rgba(255, 82, 38, 0.8);
+}

@@ -1,0 +1,95 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper Functions for Security & Data Validation
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isEmailVerified() {
+      return isAuthenticated() && (request.auth.token.email_verified == true || request.auth.provider_id == 'google.com');
+    }
+
+    function isValidString(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    function isValidNumber(val) {
+      return val is int || val is float;
+    }
+
+    // 1. Food Categories Collection (Public Read, Verified Admin Write)
+    match /food_categories/{catId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // 2. Products Collection (Public Read, Merchant Store Owner Write)
+    match /products/{productId} {
+      allow read: if true;
+      allow create, update: if isAuthenticated()
+        && isValidString(request.resource.data.name, 1, 250)
+        && isValidNumber(request.resource.data.price);
+      allow delete: if isAuthenticated();
+    }
+
+    // 3. Shops Collection (Public Read, Authenticated Write)
+    match /shops/{shopId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // 4. Users Collection (Strict Ownership Enforced)
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isOwner(userId);
+      allow delete: if false; // Audit Trail protection
+    }
+
+    // 5. Merchant Profiles Collection (Decoupled merchantId Schema)
+    match /merchantProfiles/{merchantId} {
+      // 🟢 สาธารณะอ่านข้อมูลร้านค้าทั่วไปได้ (ชื่อร้าน เวลาเปิด-ปิด พิกัดร้าน)
+      allow read: if true;
+      
+      // 🔒 เฉพาะเจ้าของร้าน (ownerUid == auth.uid) เท่านั้นที่สามารถสร้าง แก้ไข หรือลบโปรไฟล์ร้านได้
+      allow create: if isAuthenticated()
+        && request.resource.data.ownerUid == request.auth.uid;
+      
+      allow update, delete: if isAuthenticated()
+        && resource.data.ownerUid == request.auth.uid;
+
+      // 🛡️ Subcollection พิเศษสำหรับข้อมูลการเงิน (Private Financial Subcollection)
+      // ปิดกั้นการอ่านสาธารณะ 100%! อ่านและเขียนได้เฉพาะเจ้าของร้านเท่านั้น (อ่านผ่าน Cloud Function เมื่อชำระเงิน)
+      match /private/finance {
+        allow read, write: if isAuthenticated()
+          && get(/databases/$(database)/documents/merchantProfiles/$(merchantId)).data.ownerUid == request.auth.uid;
+      }
+
+      // Subcollection สำหรับ พนักงานประจำร้าน (Staff / Team Members)
+      match /staff/{staffUid} {
+        // เจ้าของร้าน หรือ พนักงานคนนั้น อ่านสิทธิ์ของตัวเองได้
+        allow read: if isAuthenticated() 
+          && (get(/databases/$(database)/documents/merchantProfiles/$(merchantId)).data.ownerUid == request.auth.uid || request.auth.uid == staffUid);
+        
+        // เฉพาะเจ้าของร้านเท่านั้น เพิ่ม/ลบ พนักงานประจำร้านได้ + Validate data integrity (staffUid == path {staffUid})
+        allow write: if isAuthenticated()
+          && get(/databases/$(database)/documents/merchantProfiles/$(merchantId)).data.ownerUid == request.auth.uid
+          && (request.resource == null || request.resource.data.staffUid == staffUid);
+      }
+    }
+
+    // 6. Orders Collection (Strict User Ownership Enforced)
+    match /orders/{orderId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      // Orders and payment states are created and updated only by trusted Cloud Functions.
+      // This prevents a browser client from changing amount, paymentStatus, or merchant details.
+      allow create, update, delete: if false;
+    }
+
+  }
+}

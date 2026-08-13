@@ -1,0 +1,348 @@
+/* ==========================================================================
+   PAYMENT GATEWAY MODAL STYLES (Opn/Omise & PromptPay QR Dynamic)
+   ========================================================================== */
+
+.payment-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.payment-modal-card {
+  background: #ffffff;
+  width: 100%;
+  max-width: 520px;
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Header */
+.payment-modal-header {
+  background: linear-gradient(135deg, #ee4d2d, #ff5226);
+  color: #ffffff;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.payment-modal-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.payment-modal-close-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: #ffffff;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.payment-modal-close-btn:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* Environment Banner (Sandbox / Live) */
+.payment-env-badge {
+  background: #fef3c7;
+  color: #92400e;
+  border-bottom: 1px solid #fde68a;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.payment-env-badge.live {
+  background: #dcfce7;
+  color: #166534;
+  border-bottom-color: #bbf7d0;
+}
+
+/* Summary Bar */
+.payment-summary-bar {
+  background: #f8fafc;
+  padding: 14px 24px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.payment-summary-amount {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #ee4d2d;
+}
+
+/* Method Selector Tabs */
+.payment-methods-nav {
+  display: flex;
+  background: #f1f5f9;
+  padding: 4px;
+  gap: 4px;
+  margin: 16px 24px 0 24px;
+  border-radius: 8px;
+}
+
+.payment-method-tab {
+  flex: 1;
+  padding: 10px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.payment-method-tab.active {
+  background: #ffffff;
+  color: #ee4d2d;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+/* Modal Body */
+.payment-modal-body {
+  padding: 24px;
+}
+
+/* PromptPay Dynamic QR Panel */
+.promptpay-qr-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.promptpay-logo-badge {
+  height: 36px;
+  margin-bottom: 12px;
+}
+
+.promptpay-qr-box {
+  background: #ffffff;
+  border: 2px solid #004071;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 4px 12px rgba(0, 64, 113, 0.15);
+  margin-bottom: 16px;
+  position: relative;
+}
+
+.promptpay-qr-img {
+  width: 180px;
+  height: 180px;
+  object-fit: contain;
+}
+
+.promptpay-timer {
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 16px;
+}
+
+/* Credit Card Form Panel */
+.card-form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.card-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.card-input-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.card-input {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.card-input:focus {
+  border-color: #ee4d2d;
+  box-shadow: 0 0 0 3px rgba(238, 77, 45, 0.15);
+}
+
+.card-input-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.card-test-presets {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.card-preset-btn {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-family: monospace;
+  cursor: pointer;
+  margin-left: 6px;
+}
+
+/* Action Buttons Footer */
+.payment-modal-footer {
+  padding: 16px 24px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.btn-pay-now {
+  width: 100%;
+  background: linear-gradient(180deg, #f53d2d, #ee4d2d);
+  color: #ffffff;
+  border: none;
+  padding: 14px;
+  font-size: 16px;
+  font-weight: 700;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(238, 77, 45, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: opacity 0.2s ease;
+}
+
+.btn-pay-now:hover {
+  opacity: 0.92;
+}
+
+.btn-simulate-webhook {
+  width: 100%;
+  background: #10b981;
+  color: #ffffff;
+  border: none;
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* Zero Fee Manual Slip Upload Panel */
+.slip-upload-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.slip-merchant-bank-box {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-size: 13px;
+  color: #166534;
+}
+
+.slip-dropzone {
+  border: 2px dashed #10b981;
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.slip-dropzone:hover {
+  background: #f0fdf4;
+  border-color: #059669;
+}
+
+.slip-preview-img {
+  max-width: 180px;
+  max-height: 220px;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-bottom: 8px;
+}
+
+.slip-ocr-badge {
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

@@ -1,0 +1,634 @@
+/* ==========================================================================
+   QUEUEUP VIBRANT THEME - COLOR PALETTE: ORANGE, GREEN, YELLOW, BLACK, WHITE, RED
+   ========================================================================== */
+
+.yeti-login-page {
+  min-height: 100vh;
+  width: 100%;
+  background: linear-gradient(180deg, #fff7ed 0%, #ffedd5 40%, #fef3c7 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem 1rem;
+  font-family: "Plus Jakarta Sans", "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* Background floating cloud decorations (Yellow & Orange Glow Blobs) */
+.sky-cloud {
+  position: absolute;
+  border-radius: 100px;
+  filter: blur(20px);
+  pointer-events: none;
+  animation: cloud-float 25s ease-in-out infinite alternate;
+}
+
+.sky-cloud-1 {
+  top: 5%;
+  left: 5%;
+  width: 340px;
+  height: 140px;
+  background: rgba(251, 191, 36, 0.35); /* เหลือง Yellow */
+}
+
+.sky-cloud-2 {
+  top: 15%;
+  right: 6%;
+  width: 420px;
+  height: 160px;
+  background: rgba(255, 107, 0, 0.25); /* ส้ม Orange */
+  animation-duration: 30s;
+  animation-delay: -5s;
+}
+
+.sky-cloud-3 {
+  bottom: 8%;
+  left: 15%;
+  width: 480px;
+  height: 180px;
+  background: rgba(16, 185, 129, 0.2); /* เขียว Green */
+  animation-duration: 35s;
+  animation-delay: -10s;
+}
+
+@keyframes cloud-float {
+  0% {
+    transform: translateX(0) translateY(0) scale(1);
+  }
+  50% {
+    transform: translateX(40px) translateY(-15px) scale(1.05);
+  }
+  100% {
+    transform: translateX(-30px) translateY(10px) scale(0.98);
+  }
+}
+
+/* Main Outer Card (White Card with Black/Orange Shadow) */
+.yeti-card {
+  background: #ffffff; /* ขาว White */
+  border-radius: 24px;
+  box-shadow: 0 20px 50px -10px rgba(255, 82, 38, 0.2), 0 10px 25px rgba(0, 0, 0, 0.06);
+  border: 1.5px solid rgba(255, 107, 0, 0.15);
+  width: 100%;
+  max-width: 860px;
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  padding: 12px;
+  gap: 12px;
+  position: relative;
+  z-index: 10;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  box-sizing: border-box;
+}
+
+/* 📱 ซ่อนรูปภาพในหน้าจอเล็ก (< 768px) */
+@media (max-width: 768px) {
+  .yeti-card {
+    grid-template-columns: 1fr;
+    max-width: 420px;
+    padding: 24px 20px;
+    gap: 0;
+  }
+  
+  .yeti-hero {
+    display: none !important;
+  }
+  
+  .yeti-form-container {
+    padding: 8px 12px !important;
+  }
+}
+
+/* Left Hero Banner Section */
+.yeti-hero {
+  position: relative;
+  border-radius: 18px;
+  overflow: hidden;
+  min-height: 440px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background: #ff6b00; /* ส้ม Orange */
+}
+
+.yeti-hero-img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.yeti-hero:hover .yeti-hero-img {
+  transform: scale(1.03);
+}
+
+/* Hero Text Overlay */
+.yeti-hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.4) 40%, rgba(0, 0, 0, 0.85) 100%);
+  pointer-events: none;
+}
+
+.yeti-hero-content {
+  position: relative;
+  z-index: 2;
+  padding: 24px;
+}
+
+.yeti-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  padding: 6px 14px;
+  border-radius: 50px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.badge-pulse {
+  width: 8px;
+  height: 8px;
+  background: #10b981;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: pulse-green 2s infinite;
+}
+
+@keyframes pulse-green {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+.yeti-hero-title {
+  font-family: 'Plus Jakarta Sans', Impact, sans-serif;
+  font-size: 1.75rem;
+  font-weight: 900;
+  line-height: 1.15;
+  color: #ffffff; /* ขาว White */
+  text-transform: uppercase;
+  letter-spacing: -0.3px;
+  margin: 0 0 8px 0;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+}
+
+.yeti-hero-desc {
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.92);
+  line-height: 1.45;
+  margin: 0 0 14px 0;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+.yeti-features {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.feature-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 6px 12px;
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  width: fit-content;
+}
+
+.chip-icon {
+  font-size: 0.85rem;
+}
+
+/* Right Form Section */
+.yeti-form-container {
+  padding: 24px 32px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.yeti-logo-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.yeti-logo-img {
+  height: 120px;
+  width: auto;
+  object-fit: contain;
+  margin-bottom: 6px;
+  filter: drop-shadow(0 4px 10px rgba(255, 107, 0, 0.25));
+}
+
+.yeti-logo-text {
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: #ff5226; /* ส้ม Orange */
+  text-transform: uppercase;
+}
+
+.yeti-title {
+  font-size: 1.55rem;
+  font-weight: 900;
+  color: #0f172a; /* ดำ Black */
+  text-align: center;
+  margin: 0 0 4px 0;
+  letter-spacing: -0.5px;
+  text-transform: uppercase;
+}
+
+.yeti-subtitle {
+  font-size: 0.78rem;
+  color: #64748b;
+  text-align: center;
+  margin-bottom: 22px;
+}
+
+/* Input Styles */
+.yeti-form-group {
+  margin-bottom: 14px;
+}
+
+.yeti-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #0f172a; /* ดำ Black */
+  margin-bottom: 5px;
+}
+
+.yeti-input-wrapper {
+  position: relative;
+}
+
+.yeti-input {
+  width: 100%;
+  height: 42px;
+  background: #fffdfa;
+  border: 1.5px solid #fed7aa; /* ขอบส้มอ่อน */
+  border-radius: 10px;
+  padding: 0 14px;
+  font-size: 0.85rem;
+  color: #0f172a; /* ดำ Black */
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.yeti-input::placeholder {
+  color: #94a3b8;
+}
+
+.yeti-input:focus {
+  background: #ffffff;
+  border-color: #ff5226; /* ส้ม Orange Focus */
+  box-shadow: 0 0 0 3px rgba(255, 82, 38, 0.18);
+}
+
+.yeti-pwd-toggle {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  font-size: 0.95rem;
+}
+
+.yeti-options-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  font-size: 0.78rem;
+}
+
+.yeti-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #334155;
+  cursor: pointer;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.yeti-checkbox {
+  width: 15px;
+  height: 15px;
+  accent-color: #10b981; /* เขียว Green Checkbox */
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.yeti-forgot-link {
+  color: #dc2626; /* แดง Red Forgot Link */
+  font-weight: 700;
+  text-decoration: none;
+  transition: opacity 0.2s ease;
+}
+
+.yeti-forgot-link:hover {
+  opacity: 0.85;
+  text-decoration: underline;
+}
+
+/* Action Buttons (Orange Primary, Black Solid Secondary, Green Links) */
+.yeti-btn-primary {
+  width: 100%;
+  height: 44px;
+  background: linear-gradient(135deg, #ff5226 0%, #ea580c 100%); /* ส้ม Orange Gradient */
+  color: #ffffff; /* ขาว White Text */
+  border: none;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 10px;
+  box-shadow: 0 4px 14px rgba(255, 82, 38, 0.35);
+}
+
+.yeti-btn-primary:hover {
+  background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(255, 82, 38, 0.45);
+}
+
+.yeti-btn-primary:active {
+  transform: translateY(0);
+}
+
+.yeti-btn-google {
+  width: 100%;
+  height: 44px;
+  background: #0f172a; /* ดำ Black Button */
+  color: #ffffff; /* ขาว White Text */
+  border: 1.5px solid #0f172a;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: all 0.2s ease;
+  margin-bottom: 18px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+}
+
+.yeti-btn-google:hover {
+  background: #1e293b;
+  border-color: #1e293b;
+  transform: translateY(-1px);
+}
+
+.google-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.yeti-switch-mode {
+  text-align: center;
+  font-size: 0.85rem;
+  color: #475569;
+  margin-top: 20px;
+}
+
+.yeti-switch-mode p {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.yeti-link-btn,
+.yeti-switch-btn {
+  background: none !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  color: #ff5226 !important;
+  font-weight: 800;
+  font-size: 0.88rem;
+  cursor: pointer;
+  padding: 0 0 0 6px;
+  text-decoration: underline;
+  display: inline-block;
+  transition: color 0.2s ease;
+}
+
+.yeti-link-btn:hover,
+.yeti-switch-btn:hover {
+  color: #ea580c !important;
+  text-decoration: underline;
+}
+
+/* ==========================================================================
+   CREATE PROFILE STEP STYLES
+   ========================================================================== */
+
+.avatar-picker-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin: 16px 0 24px 0;
+}
+
+.avatar-option {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 3px solid #e2e8f0;
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  background: #fffdfa;
+  padding: 2px;
+}
+
+.avatar-option img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.avatar-option:hover {
+  transform: translateY(-3px) scale(1.05);
+  border-color: #ff5226;
+}
+
+.avatar-option.selected {
+  border-color: #ff5226;
+  box-shadow: 0 0 0 4px rgba(255, 82, 38, 0.25);
+  transform: scale(1.1);
+}
+
+.avatar-badge {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  background: #10b981;
+  color: #ffffff;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  border: 2px solid #ffffff;
+}
+
+.avatar-upload-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 2px dashed #ff6b00;
+  background: #fff8f0;
+  color: #ff5226;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.1;
+  padding: 4px;
+}
+
+.avatar-upload-btn:hover {
+  background: #ffe6d5;
+  transform: translateY(-3px) scale(1.05);
+  border-color: #ea580c;
+}
+
+.avatar-upload-btn svg {
+  margin-bottom: 2px;
+}
+
+/* ==========================================================================
+   PASSWORD STRENGTH CHECKLIST STYLES
+   ========================================================================== */
+
+.pwd-strength-container {
+  margin-top: 8px;
+  margin-bottom: 12px;
+  background: #fff8f5;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.pwd-strength-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 6px 0;
+}
+
+.pwd-checklist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 8px;
+}
+
+.pwd-checklist li {
+  font-size: 0.72rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 0.2s ease;
+}
+
+.pwd-checklist li.valid {
+  color: #059669; /* เขียว Green */
+}
+
+.pwd-checklist li.invalid {
+  color: #94a3b8; /* Muted Gray */
+}
+
+/* GPS Location Button */
+.yeti-gps-btn {
+  width: 100%;
+  padding: 10px 14px;
+  background: #f0fdf4;
+  border: 1.5px dashed #10b981;
+  border-radius: 10px;
+  color: #047857;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  margin-top: 4px;
+}
+
+.yeti-gps-btn:hover {
+  background: #dcfce7;
+  border-color: #059669;
+}
+
+.gps-info-badge {
+  font-size: 0.72rem;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-top: 6px;
+  color: #0f172a;
+  font-weight: 600;
+}

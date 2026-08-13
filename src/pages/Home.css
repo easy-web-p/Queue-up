@@ -1,0 +1,419 @@
+/* ==========================================================================
+   QUEUEUP DEFAULT HOMEPAGE STYLES (MATCHING USER SCREENSHOT)
+   ========================================================================== */
+
+.queue-home-container {
+  min-height: 100vh;
+  background-color: #f8fafc;
+  color: #0f172a;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  padding-bottom: 60px;
+}
+
+.queue-home-wrapper {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+/* 1. Yellow Top Announcement Banner (Flush against header, no white borders) */
+.queue-notice-banner {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+  color: #0f172a;
+  padding: 11px 24px;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  margin: 0 0 24px 0;
+  width: 100%;
+  border-radius: 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.queue-notice-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.queue-notice-close {
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: #000000;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+}
+
+.queue-notice-close:hover {
+  opacity: 1;
+}
+
+/* 2. Red Hero Banner Section */
+.queue-hero-banner {
+  background: linear-gradient(135deg, #800000 0%, #990000 50%, #700000 100%);
+  border-radius: 28px;
+  padding: 36px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #ffffff;
+  box-shadow: 0 8px 30px rgba(128, 0, 0, 0.25);
+  margin-bottom: 32px;
+  position: relative;
+  overflow: hidden;
+}
+
+.queue-hero-left {
+  max-width: 550px;
+}
+
+.queue-hero-tag {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #fef08a;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 14px;
+  border-radius: 20px;
+  margin-bottom: 16px;
+}
+
+.queue-hero-title {
+  font-size: 2.2rem;
+  font-weight: 900;
+  line-height: 1.25;
+  margin-bottom: 12px;
+  color: #ffffff;
+  letter-spacing: -0.5px;
+}
+
+.queue-hero-sub {
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.85);
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.queue-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.queue-hero-btn-primary {
+  background: #ff5226;
+  color: #ffffff;
+  border: none;
+  font-size: 14px;
+  font-weight: 800;
+  padding: 12px 24px;
+  border-radius: 30px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 15px rgba(255, 82, 38, 0.4);
+  transition: all 0.25s ease;
+}
+
+.queue-hero-btn-primary:hover {
+  background: #ea580c;
+  transform: translateY(-2px);
+}
+
+.queue-hero-points-badge {
+  background: #500000;
+  border: 1px solid #990000;
+  color: #fef08a;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 10px 18px;
+  border-radius: 30px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.queue-hero-right-img {
+  width: 320px;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 20px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+  border: 3px solid rgba(255, 255, 255, 0.2);
+}
+
+/* 3. Circular Food Category Carousel */
+.queue-category-section {
+  margin-bottom: 36px;
+}
+
+.queue-category-list {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  overflow-x: auto;
+  padding: 10px 4px 16px 4px;
+  scrollbar-width: none; /* Hide scrollbar for Chrome/Firefox */
+}
+
+.queue-category-list::-webkit-scrollbar {
+  display: none;
+}
+
+.queue-category-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  width: 76px;
+  flex-shrink: 0;
+  text-decoration: none;
+  color: inherit;
+}
+
+.queue-category-circle {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 3px solid #e2e8f0;
+  padding: 2px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s ease;
+  margin-bottom: 8px;
+}
+
+.queue-category-item.active .queue-category-circle {
+  border-color: #ff6b00;
+  box-shadow: 0 0 0 3px rgba(255, 107, 0, 0.25);
+  transform: scale(1.08);
+}
+
+.queue-category-item:hover .queue-category-circle {
+  border-color: #ff6b00;
+  transform: scale(1.05);
+}
+
+.queue-category-icon-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.queue-category-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.queue-category-item.active .queue-category-label {
+  color: #ff6b00;
+  font-weight: 800;
+}
+
+/* 4. AI QueueUp Smart Search Navy Box */
+.queue-ai-section {
+  background: #0f172a;
+  border-radius: 24px;
+  padding: 32px 36px;
+  color: #ffffff;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.4);
+  position: relative;
+  margin-bottom: 40px;
+}
+
+.queue-ai-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.queue-ai-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(251, 191, 36, 0.15);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  color: #fbbf24;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 14px;
+  border-radius: 20px;
+  margin-bottom: 10px;
+}
+
+.queue-ai-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.queue-ai-location {
+  font-size: 12px;
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 6px 14px;
+  border-radius: 20px;
+}
+
+/* AI Recommendation Cards Grid */
+.queue-ai-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.queue-ai-shop-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 18px;
+  transition: all 0.25s ease;
+  cursor: pointer;
+}
+
+.queue-ai-shop-card:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: #ff6b00;
+  transform: translateY(-3px);
+}
+
+.queue-ai-badge-rank {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  background: #ff5226;
+  color: #ffffff;
+  padding: 3px 10px;
+  border-radius: 12px;
+  margin-bottom: 10px;
+}
+
+.queue-ai-shop-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 6px;
+}
+
+.queue-ai-shop-meta {
+  font-size: 12px;
+  color: #cbd5e1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 5. Floating Chat Button */
+.queue-floating-chat-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1000;
+  background: #ffffff;
+  color: #ff5226;
+  border: 1px solid #fed7aa;
+  padding: 10px 20px;
+  border-radius: 30px;
+  font-size: 14px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 8px 24px rgba(255, 82, 38, 0.3);
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.queue-floating-chat-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 12px 28px rgba(255, 82, 38, 0.4);
+}
+
+.queue-chat-badge {
+  background: #ff5226;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Responsive Media Queries */
+@media (max-width: 768px) {
+  .queue-hero-banner {
+    flex-direction: column;
+    padding: 24px 20px;
+    align-items: flex-start;
+    gap: 20px;
+  }
+
+  .queue-hero-right-img {
+    width: 100%;
+    height: 160px;
+  }
+
+  .queue-hero-title {
+    font-size: 1.6rem;
+  }
+
+  .queue-hero-actions {
+    flex-wrap: wrap;
+  }
+
+  .queue-ai-header-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .queue-ai-section {
+    padding: 24px 18px;
+  }
+}
+
+/* Explicit Dark Mode Overrides for Home Page */
+html[data-theme="dark"] .queue-home-container {
+  background-color: #0b1020 !important;
+  color: #e7edf8 !important;
+}
+
+html[data-theme="dark"] .queue-category-section {
+  background-color: #151d31 !important;
+  border-color: #28344f !important;
+}
+
+html[data-theme="dark"] .queue-category-label {
+  color: #e7edf8 !important;
+}
+
+html[data-theme="dark"] .queue-category-title {
+  color: #f6f8ff !important;
+}
+
+html[data-theme="dark"] .bg-white.rounded-4.shadow-sm.border {
+  background-color: #151d31 !important;
+  border-color: #28344f !important;
+  color: #e7edf8 !important;
+}
+
+html[data-theme="dark"] .bg-white.rounded-4.shadow-sm.border h5 {
+  color: #f6f8ff !important;
+}
