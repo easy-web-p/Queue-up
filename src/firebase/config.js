@@ -20,13 +20,13 @@ import {
 
 // Firebase App Credentials Configuration (Environment Variable Protected)
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyCWCpdSksHY_mU5rqZWHob1rLRws7RB8nA",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "queueup-65e82.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "queueup-65e82",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "queueup-65e82.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "324920233384",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:324920233384:web:4871f18891e27fbc8f219d",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-JWR7YM7EBS"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 export const app = initializeApp(firebaseConfig);
