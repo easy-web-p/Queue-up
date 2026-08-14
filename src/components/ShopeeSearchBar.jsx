@@ -610,16 +610,6 @@ function ShopeeSearchBar() {
           <span className="shopee-cart-badge-count">4</span>
         </div>
       </div>
-
-      {/* Floating Quick Theme Toggle Button (ปุ่มลอยปรับโหมดขาว/ดำมุมขวาล่าง) */}
-      <div className="shopee-floating-theme-toggle" onClick={toggleTheme} title="คลิกเพื่อสลับโหมดขาว/ดำ">
-        <div className="shopee-floating-theme-inner">
-          <i className={`bi ${theme === "dark" ? "bi-sun-fill text-warning" : "bi-moon-stars-fill"}`} />
-          <span className="shopee-floating-theme-label">
-            {theme === "dark" ? "☀️ โหมดขาว" : "🌙 โหมดดำ"}
-          </span>
-        </div>
-      </div>
     </header>
   );
 }
