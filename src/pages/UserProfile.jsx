@@ -791,14 +791,14 @@ function UserProfile() {
                           <div className="shopee-item-variant">ตัวเลือก: {item.variant}</div>
                           <div className="shopee-item-qty">x{item.qty}</div>
                         </div>
-                        <div className="shopee-item-price">฿{item.price.toFixed(2)}</div>
+                        <div className="shopee-item-price">฿{(Number(item.price) || 0).toFixed(2)}</div>
                       </div>
                     ))}
 
                     <div className="shopee-order-footer">
                       <div className="shopee-order-total">
                         <span>ยอดคำสั่งซื้อทั้งหมด:</span>
-                        <span className="shopee-total-price">฿{order.totalPrice.toFixed(2)}</span>
+                        <span className="shopee-total-price">฿{(Number(order.totalPrice) || 0).toFixed(2)}</span>
                       </div>
 
                       <div className="shopee-order-actions">

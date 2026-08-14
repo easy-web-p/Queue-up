@@ -379,7 +379,7 @@ function MerchantDashboard() {
                   <div className="merchant-order-card-footer">
                     <div>
                       <span className="small text-muted me-2">ราคารวมคำสั่งซื้อ:</span>
-                      <span className="merchant-order-total-price">฿{order.totalPrice.toFixed(2)}</span>
+                      <span className="merchant-order-total-price">฿{(Number(order.totalPrice) || 0).toFixed(2)}</span>
                     </div>
 
                     <div className="merchant-order-actions-row">
