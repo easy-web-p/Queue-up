@@ -63,12 +63,27 @@ function Home() {
     return !localStorage.getItem("queueup_claimed_welcome_coupon");
   });
 
-  // App New Updates & Features Ticker List (Memoized for render safety)
+  // App New Updates & Features Ticker List (Unified Single Bar)
   const [activeUpdateIndex, setActiveUpdateIndex] = useState(0);
-  const appUpdatesList = useMemo(
-    () => [
+  const appUpdatesList = useMemo(() => {
+    const list = [];
+    if (showWelcomeBanner) {
+      list.push({
+        id: "welcome-gift",
+        type: "welcome",
+        badge: language === "en" ? "🎁 NEW MEMBER GIFT" : "🎁 สิทธิพิเศษสมาชิกใหม่",
+        title:
+          language === "en"
+            ? `🎉 Welcome ${user ? user.name || user.email : "Member"}! Claim your ฿50 OFF coupon "WELCOME50" for your first order!`
+            : `🎉 ยินดีต้อนรับคุณ ${user ? user.name || user.email : "anime manga"} เข้าสู่ QueueUp! รับคูปองส่วนลดสมาชิกใหม่ "WELCOME50" ลดทันที 50 บาท!`,
+        actionType: "claim_coupon",
+      });
+    }
+
+    list.push(
       {
         id: "app-v25",
+        type: "feature",
         badge: language === "en" ? "🚀 APP UPDATE v2.5" : "🚀 อัปเดตใหม่ v2.5",
         title:
           language === "en"
@@ -78,6 +93,7 @@ function Home() {
       },
       {
         id: "prog-crm",
+        type: "program",
         badge: language === "en" ? "⚡ NEW PROGRAM" : "⚡ โปรแกรมใหม่",
         title:
           language === "en"
@@ -87,16 +103,18 @@ function Home() {
       },
       {
         id: "shop-pa-daeng",
+        type: "store",
         badge: language === "en" ? "🔔 STORE UPDATE" : "🔔 อัปเดตจากร้านค้าที่ติดตาม",
         title:
           language === "en"
             ? "[Pa Daeng Canteen] Order ahead now & claim free 50 CRM bonus points!"
             : "[ร้านป้าแดง ตามสั่ง] เปิดให้สั่งอาหารล่วงหน้ารับแต้มสะสม CRM ฟรีได้ทันที!",
         targetPath: "/product/m1",
-      },
-    ],
-    [language]
-  );
+      }
+    );
+
+    return list;
+  }, [language, user, showWelcomeBanner]);
 
   const currentUpdate = appUpdatesList[activeUpdateIndex] || appUpdatesList[0];
 
@@ -179,50 +197,7 @@ function Home() {
       <ShopeeSearchBar />
 
       {/* 2. First-Time User Welcome Banner (แสดงความยินดีสมาชิกใหม่ + ชื่อผู้ใช้ + คูปอง 50 บาท) */}
-      {showWelcomeBanner && (
-        <div className="queue-welcome-coupon-banner">
-          <div className="queue-welcome-content">
-            <span className="queue-welcome-badge">
-              {language === "en" ? "🎁 NEW MEMBER GIFT" : "🎁 สิทธิพิเศษสมาชิกใหม่"}
-            </span>
-            <span className="queue-welcome-text">
-              {language === "en" ? "🎉 Welcome " : "🎉 ยินดีต้อนรับคุณ "}
-              <strong className="text-dark fw-bold">
-                {user ? user.name || user.email : "anime manga"}
-              </strong>
-              {language === "en"
-                ? " to QueueUp! Claim your new member coupon "
-                : " เข้าสู่ QueueUp! รับคูปองส่วนลดต้อนรับสมาชิกใหม่ "}
-              <strong className="text-danger fw-bold text-decoration-underline fs-6">"WELCOME50"</strong>
-              {language === "en" ? " for ฿50 OFF your first order!" : " ลดทันที 50 บาท สำหรับออเดอร์แรก!"}
-            </span>
-          </div>
-
-          <div className="d-flex align-items-center gap-2 ms-auto">
-            <button
-              type="button"
-              className="queue-claim-btn"
-              onClick={handleClaimWelcomeCoupon}
-            >
-              <i className="bi bi-gift-fill text-warning me-1" />
-              {language === "en" ? "Claim ฿50 Coupon" : "เก็บคูปอง 50 บาท"}
-            </button>
-            <button
-              type="button"
-              className="queue-notice-close"
-              onClick={() => {
-                localStorage.setItem("queueup_claimed_welcome_coupon", "dismissed");
-                setShowWelcomeBanner(false);
-              }}
-              title="ปิด"
-            >
-              <i className="bi bi-x-lg" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* 3. App New Updates & Features Ticker Banner (แสดงการอัปเดตใหม่ๆ ของแอป / ฟังก์ชันใหม่ / โปรแกรมใหม่) */}
+      {/* 2. Single Unified Announcement Banner (แสดงแค่อันเดียว หมุนเวียนข่าวสารแบบดีไซน์พรีเมียม) */}
       {showNotice && currentUpdate && (
         <div className="queue-notice-banner">
           <div className="queue-notice-content">
@@ -231,42 +206,61 @@ function Home() {
             </span>
             <span
               className="queue-notice-text"
-              onClick={() => navigate(currentUpdate.targetPath)}
+              onClick={() => {
+                if (currentUpdate.actionType === "claim_coupon") {
+                  handleClaimWelcomeCoupon();
+                } else if (currentUpdate.targetPath) {
+                  navigate(currentUpdate.targetPath);
+                }
+              }}
               style={{ cursor: "pointer" }}
-              title="คลิกเพื่อไปดูรายละเอียดอัปเดตนี้"
+              title="คลิกดูรายละเอียดอัปเดตนี้"
             >
               {currentUpdate.title}
             </span>
           </div>
 
-          <div className="d-flex align-items-center gap-2">
-            <div className="queue-ticker-controls">
+          <div className="d-flex align-items-center gap-2 ms-auto">
+            {currentUpdate.actionType === "claim_coupon" && (
               <button
                 type="button"
-                className="queue-ticker-arrow"
-                onClick={() =>
-                  setActiveUpdateIndex(
-                    (prev) => (prev - 1 + appUpdatesList.length) % appUpdatesList.length
-                  )
-                }
-                title="อัปเดตก่อนหน้า"
+                className="queue-claim-btn"
+                onClick={handleClaimWelcomeCoupon}
               >
-                ‹
+                <i className="bi bi-gift-fill text-warning me-1" />
+                {language === "en" ? "Claim ฿50 Coupon" : "เก็บคูปอง 50 บาท"}
               </button>
-              <span className="queue-ticker-count">
-                {activeUpdateIndex + 1}/{appUpdatesList.length}
-              </span>
-              <button
-                type="button"
-                className="queue-ticker-arrow"
-                onClick={() =>
-                  setActiveUpdateIndex((prev) => (prev + 1) % appUpdatesList.length)
-                }
-                title="อัปเดตถัดไป"
-              >
-                ›
-              </button>
-            </div>
+            )}
+
+            {appUpdatesList.length > 1 && (
+              <div className="queue-ticker-controls">
+                <button
+                  type="button"
+                  className="queue-ticker-arrow"
+                  onClick={() =>
+                    setActiveUpdateIndex(
+                      (prev) => (prev - 1 + appUpdatesList.length) % appUpdatesList.length
+                    )
+                  }
+                  title="อัปเดตก่อนหน้า"
+                >
+                  ‹
+                </button>
+                <span className="queue-ticker-count">
+                  {activeUpdateIndex + 1}/{appUpdatesList.length}
+                </span>
+                <button
+                  type="button"
+                  className="queue-ticker-arrow"
+                  onClick={() =>
+                    setActiveUpdateIndex((prev) => (prev + 1) % appUpdatesList.length)
+                  }
+                  title="อัปเดตถัดไป"
+                >
+                  ›
+                </button>
+              </div>
+            )}
 
             <button
               type="button"
