@@ -89,12 +89,31 @@ html[data-theme="dark"] .queue-chat-modal-content {
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
 }
 
-/* Hero Banner Gradient (from-[#7A0000] to-[#B91C1C]) */
-html[data-theme="dark"] .queue-notice-banner,
-html[data-theme="dark"] .shopee-hero-banner {
-  background: linear-gradient(135deg, #7A0000 0%, #B91C1C 100%) !important;
-  border-color: #2A3242 !important;
-  box-shadow: 0 0 20px rgba(255, 90, 54, 0.25) !important;
+/* Announcement Banner Dark Theme Integration */
+html[data-theme="dark"] .queue-notice-banner {
+  background: linear-gradient(90deg, #2D1400 0%, #181C23 100%) !important;
+  color: #FBBF24 !important;
+  border-bottom: 1px solid #2A3242 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+html[data-theme="dark"] .queue-notice-chip {
+  background: #3A1D00 !important;
+  color: #FBBF24 !important;
+  border: 1px solid rgba(245, 158, 11, 0.4) !important;
+}
+
+html[data-theme="dark"] .queue-notice-text {
+  color: #FFFFFF !important;
+}
+
+html[data-theme="dark"] .queue-claim-btn {
+  background: #FF5A36 !important;
+  color: #FFFFFF !important;
+}
+
+html[data-theme="dark"] .queue-claim-btn:hover {
+  background: #FF704D !important;
 }
 
 /* CRM Point Badge (bg: #3A1D00, text: #FBBF24) */
