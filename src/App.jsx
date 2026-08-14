@@ -16,63 +16,60 @@ import CookieConsentBanner from "./components/CookieConsentBanner.jsx";
 import CookieSessionTracker from "./components/CookieSessionTracker.jsx";
 
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
-import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
 function App() {
   return (
-    <ErrorBoundary>
-      <PreferencesProvider>
-        <AuthProvider>
-          <BrowserRouter>
-            {/* Global Page Route Transition Loading Animation Overlay */}
-            <PageRouteLoader />
-            {/* Global Cookie Session Tracker on Every Page */}
-            <CookieSessionTracker />
-            {/* Global PDPA Cookie Consent Banner */}
-            <CookieConsentBanner />
-            <Routes>
-              <Route path="/" element={<Loading />} />
-              <Route path="/queueup" element={<Queueup />} />
-              <Route path="/Queueup" element={<Queueup />} />
-              <Route path="/about" element={<Queueup />} />
-              <Route path="/About" element={<Queueup />} />
+    <PreferencesProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          {/* Global Page Route Transition Loading Animation Overlay */}
+          <PageRouteLoader />
+          {/* Global Cookie Session Tracker on Every Page */}
+          <CookieSessionTracker />
+          {/* Global PDPA Cookie Consent Banner */}
+          <CookieConsentBanner />
+          <Routes>
+            <Route path="/" element={<Loading />} />
+            <Route path="/queueup" element={<Queueup />} />
+            <Route path="/Queueup" element={<Queueup />} />
+            <Route path="/about" element={<Queueup />} />
+            <Route path="/About" element={<Queueup />} />
 
-              <Route path="/login" element={<Login />} />
-              <Route path="/Login" element={<Login />} />
-              <Route path="/LOGIN" element={<Login />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/Login" element={<Login />} />
+            <Route path="/LOGIN" element={<Login />} />
 
-              {/* Home Routes (Supports /home, /Home, /HOME) */}
-              <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-              <Route path="/Home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-              <Route path="/HOME" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+            {/* Home Routes (Supports /home, /Home, /HOME) */}
+            <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+            <Route path="/Home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+            <Route path="/HOME" element={<ProtectedRoute><Home /></ProtectedRoute>} />
 
-              {/* User Orders & Profile Routes */}
-              <Route path="/user/purchase" element={<ProtectedRoute><UserPurchase /></ProtectedRoute>} />
-              <Route path="/User/Purchase" element={<ProtectedRoute><UserPurchase /></ProtectedRoute>} />
-              <Route path="/user/account/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
-              <Route path="/User/Account/Profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
-              <Route path="/user/account/profile/" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
+            {/* User Orders & Profile Routes */}
+            <Route path="/user/purchase" element={<ProtectedRoute><UserPurchase /></ProtectedRoute>} />
+            <Route path="/User/Purchase" element={<ProtectedRoute><UserPurchase /></ProtectedRoute>} />
+            <Route path="/user/account/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
+            <Route path="/User/Account/Profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
+            <Route path="/user/account/profile/" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
 
-              {/* Search & Product Routes */}
-              <Route path="/search" element={<ProtectedRoute><SearchResults /></ProtectedRoute>} />
-              <Route path="/Search" element={<ProtectedRoute><SearchResults /></ProtectedRoute>} />
-              <Route path="/product" element={<ProtectedRoute><ProductDetail /></ProtectedRoute>} />
-              <Route path="/Product" element={<ProtectedRoute><ProductDetail /></ProtectedRoute>} />
-              <Route path="/product/:id" element={<ProtectedRoute><ProductDetail /></ProtectedRoute>} />
-              <Route path="/Product/:id" element={<ProtectedRoute><ProductDetail /></ProtectedRoute>} />
+            {/* Search & Product Routes */}
+            <Route path="/search" element={<ProtectedRoute><SearchResults /></ProtectedRoute>} />
+            <Route path="/Search" element={<ProtectedRoute><SearchResults /></ProtectedRoute>} />
+            <Route path="/product" element={<ProtectedRoute><ProductDetail /></ProtectedRoute>} />
+            <Route path="/Product" element={<ProtectedRoute><ProductDetail /></ProtectedRoute>} />
+            <Route path="/product/:id" element={<ProtectedRoute><ProductDetail /></ProtectedRoute>} />
+            <Route path="/Product/:id" element={<ProtectedRoute><ProductDetail /></ProtectedRoute>} />
 
-              {/* Merchant Dashboard Routes */}
-              <Route path="/merchant/dashboard" element={<ProtectedRoute><MerchantDashboard /></ProtectedRoute>} />
-              <Route path="/Merchant/Dashboard" element={<ProtectedRoute><MerchantDashboard /></ProtectedRoute>} />
-              <Route path="/Merchant/dashboard" element={<ProtectedRoute><MerchantDashboard /></ProtectedRoute>} />
+            {/* Merchant Dashboard Routes */}
+            <Route path="/merchant/dashboard" element={<ProtectedRoute><MerchantDashboard /></ProtectedRoute>} />
+            <Route path="/Merchant/Dashboard" element={<ProtectedRoute><MerchantDashboard /></ProtectedRoute>} />
+            <Route path="/Merchant/dashboard" element={<ProtectedRoute><MerchantDashboard /></ProtectedRoute>} />
 
-              {/* Wildcard Fallback Route: Redirects any unknown URL to /home */}
-              <Route path="*" element={<Navigate to="/home" replace />} />
-            </Routes>
-          </BrowserRouter>
-        </AuthProvider>
-      </PreferencesProvider>
-    </ErrorBoundary>
+            {/* Wildcard Fallback Route: Redirects any unknown URL to /home */}
+            <Route path="*" element={<Navigate to="/home" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </PreferencesProvider>
   );
 }
 
