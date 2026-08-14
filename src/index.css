@@ -95,6 +95,9 @@ html[data-theme="dark"] .queue-notice-banner {
   color: #FBBF24 !important;
   border-bottom: 1px solid #2A3242 !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
+  width: 100% !important;
 }
 
 html[data-theme="dark"] .queue-notice-chip {
