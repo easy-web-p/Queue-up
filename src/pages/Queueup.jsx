@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { fetchEvaluationsFromFirestore, submitEvaluationToFirestore } from "../lib/firebase.js";
+import PdpaPolicyModal from "../components/PdpaPolicyModal.jsx";
 import "./Queueup.css";
 
 /**
@@ -18,6 +19,7 @@ export default function Queueup() {
   const [evaluations, setEvaluations] = useState([]);
   const [isEvalModalOpen, setIsEvalModalOpen] = useState(false);
   const [isCookieModalOpen, setIsCookieModalOpen] = useState(false);
+  const [isPdpaModalOpen, setIsPdpaModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form Inputs for Rating Submission
@@ -574,12 +576,20 @@ export default function Queueup() {
               </p>
             </div>
           </div>
-          <button
-            className="btn btn-warning font-weight-bold shadow-sm"
-            onClick={() => setIsCookieModalOpen(true)}
-          >
-            <i className="bi bi-sliders me-1" /> ปรับเปลี่ยนการตั้งค่าคุกกี้
-          </button>
+          <div className="d-flex align-items-center gap-2">
+            <button
+              className="btn btn-outline-light font-weight-bold btn-sm shadow-sm"
+              onClick={() => setIsPdpaModalOpen(true)}
+            >
+              <i className="bi bi-file-earmark-text me-1" /> อ่านนโยบาย PDPA และเงื่อนไขการใช้งาน
+            </button>
+            <button
+              className="btn btn-warning font-weight-bold shadow-sm"
+              onClick={() => setIsCookieModalOpen(true)}
+            >
+              <i className="bi bi-sliders me-1" /> ปรับเปลี่ยนการตั้งค่าคุกกี้
+            </button>
+          </div>
         </div>
       </section>
 
@@ -804,6 +814,12 @@ export default function Queueup() {
           </div>
         </div>
       )}
+
+      {/* Global Interactive PDPA Policy & Terms Modal */}
+      <PdpaPolicyModal
+        isOpen={isPdpaModalOpen}
+        onClose={() => setIsPdpaModalOpen(false)}
+      />
     </div>
   );
 }

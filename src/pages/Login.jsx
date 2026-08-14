@@ -19,6 +19,7 @@ import {
   generateSecureAccountId,
   validateEmailSyntaxAndDomain,
 } from "../utils/security.js";
+import PdpaPolicyModal from "../components/PdpaPolicyModal.jsx";
 import "./Login.css";
 
 function Login() {
@@ -63,6 +64,8 @@ function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [pdpaAccepted, setPdpaAccepted] = useState(false);
+  const [isPdpaModalOpen, setIsPdpaModalOpen] = useState(false);
+  const [pdpaModalTab, setPdpaModalTab] = useState("privacy");
 
   // Profile Setup State (สำหรับตั้งชื่อเล่นและเลือกอวาตาร์)
   const [selectedAvatar, setSelectedAvatar] = useState("/yeti_mascot.jpg");
@@ -519,7 +522,7 @@ function Login() {
 
                 {isSignUp && (
                   <div className="yeti-options-row my-3">
-                    <label className="yeti-checkbox-label" style={{ fontSize: "0.83rem", lineHeight: "1.4" }}>
+                    <label className="yeti-checkbox-label">
                       <input
                         type="checkbox"
                         className="yeti-checkbox"
@@ -527,7 +530,34 @@ function Login() {
                         onChange={(e) => setPdpaAccepted(e.target.checked)}
                         required
                       />
-                      ฉันได้อ่านและยอมรับ <b>เงื่อนไขการใช้งาน</b> และ <b>นโยบายความเป็นส่วนตัว (PDPA Privacy Policy)</b>
+                      <span>
+                        ฉันได้อ่าน{" "}
+                        <button
+                          type="button"
+                          className="btn btn-link p-0 m-0 align-baseline fw-bold text-decoration-underline text-warning"
+                          style={{ fontSize: "0.82rem" }}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setPdpaModalTab("terms");
+                            setIsPdpaModalOpen(true);
+                          }}
+                        >
+                          เงื่อนไขการใช้งาน
+                        </button>{" "}
+                        และ{" "}
+                        <button
+                          type="button"
+                          className="btn btn-link p-0 m-0 align-baseline fw-bold text-decoration-underline text-warning"
+                          style={{ fontSize: "0.82rem" }}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setPdpaModalTab("privacy");
+                            setIsPdpaModalOpen(true);
+                          }}
+                        >
+                          นโยบายความเป็นส่วนตัว (PDPA Privacy Policy)
+                        </button>
+                      </span>
                     </label>
                   </div>
                 )}
@@ -599,6 +629,13 @@ function Login() {
           </div>
         </div>
       </div>
+
+      {/* Global Interactive PDPA Policy & Terms Modal */}
+      <PdpaPolicyModal
+        isOpen={isPdpaModalOpen}
+        onClose={() => setIsPdpaModalOpen(false)}
+        initialTab={pdpaModalTab}
+      />
     </div>
   );
 }
