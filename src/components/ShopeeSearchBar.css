@@ -679,64 +679,45 @@ body.dark-mode .shopee-header-container {
   transform: translateY(0);
 }
 
-/* High-Visibility Light/Dark Theme Switch Pill Button */
-.shopee-theme-toggle-pill {
-  background: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.4);
+/* Bootstrap 5 Premium Theme Toggle Button */
+.shopee-bs5-theme-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
   border-radius: 20px;
-  padding: 3px 12px;
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  transition: all 0.2s ease;
-  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  backdrop-filter: blur(8px);
+  margin: 0 4px;
 }
 
-.shopee-theme-toggle-pill:hover {
+.shopee-bs5-theme-btn.theme-light {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+.shopee-bs5-theme-btn.theme-light:hover {
   background: #ffffff;
   color: #ee4d2d;
-  transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  border-color: #ffffff;
+  box-shadow: 0 4px 14px rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
 }
 
-/* Floating Quick Theme Toggle Button (มุมขวาล่าง) */
-.shopee-floating-theme-toggle {
-  position: fixed;
-  bottom: 80px;
-  right: 24px;
-  z-index: 9990;
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+.shopee-bs5-theme-btn.theme-dark {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  color: #f8fafc;
+  border-color: #38bdf8;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
 }
 
-.shopee-floating-theme-toggle:hover {
-  transform: scale(1.08) translateY(-2px);
-}
-
-.shopee-floating-theme-inner {
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-  color: #ffffff;
-  border: 2px solid #fbbf24;
-  padding: 8px 16px;
-  border-radius: 30px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-html[data-theme="dark"] .shopee-floating-theme-inner {
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-  color: #0f172a;
-  border-color: #f59e0b;
-}
-
-.shopee-floating-theme-label {
-  letter-spacing: 0.3px;
+.shopee-bs5-theme-btn.theme-dark:hover {
+  background: linear-gradient(135deg, #334155 0%, #1e293b 100%);
+  border-color: #7dd3fc;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.45);
+  transform: translateY(-1px);
 }

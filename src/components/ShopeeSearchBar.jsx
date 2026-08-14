@@ -298,15 +298,15 @@ function ShopeeSearchBar() {
             <i className="bi bi-question-circle" /> {language === "en" ? "Help" : "ช่วยเหลือ"}
           </span>
 
-          {/* High-Visibility Light/Dark Theme Switch Pill Button (ปุ่มปรับโหมดขาว/ดำ) */}
+          {/* Bootstrap 5 Premium Theme Toggle Button */}
           <button
             type="button"
-            className="shopee-theme-toggle-pill ms-1 me-1"
+            className={`shopee-bs5-theme-btn ${theme === "dark" ? "theme-dark" : "theme-light"}`}
             onClick={toggleTheme}
-            title={theme === "dark" ? "คลิกเพื่อสลับเป็นโหมดสว่าง (พื้นหลังขาว)" : "คลิกเพื่อสลับเป็นโหมดมืด (พื้นหลังดำ)"}
+            title={theme === "dark" ? "คลิกเพื่อสลับเป็นโหมดสว่าง (Light Mode)" : "คลิกเพื่อสลับเป็นโหมดกลางคืน (Dark Mode)"}
           >
-            <i className={`bi ${theme === "dark" ? "bi-sun-fill text-warning" : "bi-moon-stars-fill"}`} />
-            <span>{theme === "dark" ? (language === "en" ? "☀️ Light Mode" : "☀️ โหมดขาว") : (language === "en" ? "🌙 Dark Mode" : "🌙 โหมดดำ")}</span>
+            <i className={`bi ${theme === "dark" ? "bi-sun-fill text-warning me-1" : "bi-moon-stars-fill text-info me-1"}`} />
+            <span>{theme === "dark" ? (language === "en" ? "Light Mode" : "โหมดกลางวัน") : (language === "en" ? "Dark Mode" : "โหมดกลางคืน")}</span>
           </button>
           <span className="shopee-nav-divider" />
 
