@@ -51,6 +51,18 @@ function ShopeeSearchBar() {
     return saved ? JSON.parse(saved) : [];
   });
 
+  const getThemeName = (mode) => {
+    if (language === "en") {
+      if (mode === "light") return "Light";
+      if (mode === "dark") return "Dark";
+      return "Auto";
+    } else {
+      if (mode === "light") return "สว่าง";
+      if (mode === "dark") return "มืด";
+      return "ตามระบบ";
+    }
+  };
+
   const TOP_TRENDING_KEYWORDS = [
     "ไก่ทอดซอสเกาหลี",
     "เบอร์เกอร์ไก่กรอบ",
@@ -345,7 +357,7 @@ function ShopeeSearchBar() {
                 <use href={`#${theme === "dark" ? "moon-stars-fill" : theme === "auto" ? "circle-half" : "sun-fill"}`}></use>
               </svg>
               <span className="ms-1 fw-bold">
-                {theme === "dark" ? "Dark" : theme === "auto" ? "Auto" : "Light"}
+                {getThemeName(theme)}
               </span>
             </button>
 
@@ -357,43 +369,43 @@ function ShopeeSearchBar() {
               <li>
                 <button
                   type="button"
-                  className={`dropdown-item d-flex align-items-center ${theme === "light" ? "active fw-bold text-danger" : ""}`}
+                  className={`dropdown-item d-flex align-items-center ${theme === "light" ? "active fw-bold" : ""}`}
                   onClick={() => {
                     setThemeMode("light");
                     setIsThemeOpen(false);
                   }}
                 >
                   <svg className="bi me-2 opacity-75 theme-icon" style={{ width: "16px", height: "16px", fill: "currentColor" }}><use href="#sun-fill"></use></svg>
-                  Light (โหมดสว่าง)
-                  {theme === "light" && <svg className="bi ms-auto text-danger" style={{ width: "14px", height: "14px", fill: "currentColor" }}><use href="#check2"></use></svg>}
+                  {getThemeName("light")}
+                  {theme === "light" && <svg className="bi ms-auto" style={{ width: "14px", height: "14px", fill: "currentColor" }}><use href="#check2"></use></svg>}
                 </button>
               </li>
               <li>
                 <button
                   type="button"
-                  className={`dropdown-item d-flex align-items-center ${theme === "dark" ? "active fw-bold text-danger" : ""}`}
+                  className={`dropdown-item d-flex align-items-center ${theme === "dark" ? "active fw-bold" : ""}`}
                   onClick={() => {
                     setThemeMode("dark");
                     setIsThemeOpen(false);
                   }}
                 >
                   <svg className="bi me-2 opacity-75 theme-icon" style={{ width: "16px", height: "16px", fill: "currentColor" }}><use href="#moon-stars-fill"></use></svg>
-                  Dark (โหมดมืด)
-                  {theme === "dark" && <svg className="bi ms-auto text-danger" style={{ width: "14px", height: "14px", fill: "currentColor" }}><use href="#check2"></use></svg>}
+                  {getThemeName("dark")}
+                  {theme === "dark" && <svg className="bi ms-auto" style={{ width: "14px", height: "14px", fill: "currentColor" }}><use href="#check2"></use></svg>}
                 </button>
               </li>
               <li>
                 <button
                   type="button"
-                  className={`dropdown-item d-flex align-items-center ${theme === "auto" ? "active fw-bold text-danger" : ""}`}
+                  className={`dropdown-item d-flex align-items-center ${theme === "auto" ? "active fw-bold" : ""}`}
                   onClick={() => {
                     setThemeMode("auto");
                     setIsThemeOpen(false);
                   }}
                 >
                   <svg className="bi me-2 opacity-75 theme-icon" style={{ width: "16px", height: "16px", fill: "currentColor" }}><use href="#circle-half"></use></svg>
-                  Auto (ตามระบบ)
-                  {theme === "auto" && <svg className="bi ms-auto text-danger" style={{ width: "14px", height: "14px", fill: "currentColor" }}><use href="#check2"></use></svg>}
+                  {getThemeName("auto")}
+                  {theme === "auto" && <svg className="bi ms-auto" style={{ width: "14px", height: "14px", fill: "currentColor" }}><use href="#check2"></use></svg>}
                 </button>
               </li>
             </ul>
@@ -487,10 +499,12 @@ function ShopeeSearchBar() {
                 >
                   <span>
                     <i className={`bi ${theme === "dark" ? "bi-sun-fill text-warning" : "bi-moon-stars-fill text-primary"} me-2`} />
-                    {theme === "dark" ? "ปรับเป็นโหมดขาว (Light)" : "ปรับเป็นโหมดดำ (Dark)"}
+                    {language === "en"
+                      ? (theme === "dark" ? "Light Mode" : "Dark Mode")
+                      : (theme === "dark" ? "โหมดสว่าง" : "โหมดมืด")}
                   </span>
                   <span className={`badge ${theme === "dark" ? "bg-warning text-dark" : "bg-dark text-white"} text-xs ms-2`}>
-                    {theme === "dark" ? "ขาว" : "ดำ"}
+                    {getThemeName(theme)}
                   </span>
                 </button>
               </li>
