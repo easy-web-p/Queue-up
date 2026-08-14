@@ -31,28 +31,38 @@ html[data-theme="light"] h4,
 html[data-theme="light"] h5,
 html[data-theme="light"] h6 { color: #0f172a !important; }
 
+/* 🌙 QueueUp Premium Dark Mode Design System (Discord / Linear / GitHub Dark Aesthetic) */
 html[data-theme="dark"] { color-scheme: dark; }
+
+/* Main Background (#0F1115) */
 html[data-theme="dark"] body,
 html[data-theme="dark"] #root,
 html[data-theme="dark"] .queue-home-container,
 html[data-theme="dark"] .search-results-page,
 html[data-theme="dark"] .shopee-pd-page,
 html[data-theme="dark"] .user-profile-page,
-html[data-theme="dark"] .merchant-dashboard { background-color: #0b1020 !important; color: #e7edf8 !important; }
+html[data-theme="dark"] .merchant-dashboard {
+  background-color: #0F1115 !important;
+  color: #FFFFFF !important;
+}
 
-html[data-theme="dark"] .shopee-header-container { background: linear-gradient(135deg, #0d152a 0%, #152244 50%, #1a2a54 100%) !important; border-bottom: 1px solid rgba(238, 77, 45, 0.3) !important; }
+/* Header Container Gradient & Border */
+html[data-theme="dark"] .shopee-header-container {
+  background: linear-gradient(135deg, #181C23 0%, #151922 50%, #0F1115 100%) !important;
+  border-bottom: 1px solid #2A3242 !important;
+}
 
+/* Standard Cards & Surfaces (#181C23 / Border #2A3242) */
 html[data-theme="dark"] .bg-light,
 html[data-theme="dark"] .bg-white,
 html[data-theme="dark"] .card,
-html[data-theme="dark"] .modal-content,
 html[data-theme="dark"] .shopee-notification-popover,
 html[data-theme="dark"] .shopee-suggestions-box,
 html[data-theme="dark"] .shopee-user-dropdown-menu,
 html[data-theme="dark"] .shopee-lang-dropdown-menu,
+html[data-theme="dark"] .shopee-bs5-theme-menu,
 html[data-theme="dark"] .queue-pd-right-card,
 html[data-theme="dark"] .queue-pd-left-card,
-html[data-theme="dark"] .payment-modal-card,
 html[data-theme="dark"] .shopee-filter-card,
 html[data-theme="dark"] .food-card-wrapper,
 html[data-theme="dark"] .user-profile-sidebar,
@@ -62,8 +72,41 @@ html[data-theme="dark"] .table,
 html[data-theme="dark"] .queue-category-section,
 html[data-theme="dark"] .queue-bestseller-section,
 html[data-theme="dark"] .shopee-notif-item,
-html[data-theme="dark"] .shopee-notif-header { background-color: #151d31 !important; color: #e7edf8 !important; border-color: #28344f !important; }
+html[data-theme="dark"] .shopee-notif-header {
+  background-color: #181C23 !important;
+  color: #FFFFFF !important;
+  border-color: #2A3242 !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
 
+/* Elevated Cards & Modals (#212734) */
+html[data-theme="dark"] .modal-content,
+html[data-theme="dark"] .payment-modal-card,
+html[data-theme="dark"] .queue-chat-modal-content {
+  background-color: #212734 !important;
+  color: #FFFFFF !important;
+  border-color: #2A3242 !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+}
+
+/* Hero Banner Gradient (from-[#7A0000] to-[#B91C1C]) */
+html[data-theme="dark"] .queue-notice-banner,
+html[data-theme="dark"] .shopee-hero-banner {
+  background: linear-gradient(135deg, #7A0000 0%, #B91C1C 100%) !important;
+  border-color: #2A3242 !important;
+  box-shadow: 0 0 20px rgba(255, 90, 54, 0.25) !important;
+}
+
+/* CRM Point Badge (bg: #3A1D00, text: #FBBF24) */
+html[data-theme="dark"] .crm-point-badge,
+html[data-theme="dark"] .queue-crm-points {
+  background-color: #3A1D00 !important;
+  color: #FBBF24 !important;
+  border: 1px solid rgba(245, 158, 11, 0.4) !important;
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.25) !important;
+}
+
+/* Typography Hierarchy */
 html[data-theme="dark"] .text-dark,
 html[data-theme="dark"] .text-body,
 html[data-theme="dark"] h1,
@@ -74,15 +117,84 @@ html[data-theme="dark"] h5,
 html[data-theme="dark"] h6,
 html[data-theme="dark"] .food-card-title,
 html[data-theme="dark"] .food-card-shop,
-html[data-theme="dark"] .queue-category-title { color: #f6f8ff !important; }
+html[data-theme="dark"] .queue-category-title {
+  color: #FFFFFF !important;
+}
 
-html[data-theme="dark"] .text-muted { color: #aebbd0 !important; }
+html[data-theme="dark"] .text-secondary,
+html[data-theme="dark"] .queue-sub-text {
+  color: #CBD5E1 !important;
+}
+
+html[data-theme="dark"] .text-muted {
+  color: #94A3B8 !important;
+}
+
+/* Search Bar Input (#181C23 / Border #2A3242 / Focus #FF5A36) */
+html[data-theme="dark"] .shopee-search-input,
 html[data-theme="dark"] input,
 html[data-theme="dark"] select,
-html[data-theme="dark"] textarea { background: #10182a !important; color: #edf2ff !important; border-color: #33415e !important; }
+html[data-theme="dark"] textarea {
+  background-color: #181C23 !important;
+  color: #FFFFFF !important;
+  border-color: #2A3242 !important;
+}
 
-html[data-theme="dark"] .shopee-notif-item:hover { background: #202b46 !important; }
-html[data-theme="dark"] .food-card-wrapper:hover { border-color: #ee4d2d !important; box-shadow: 0 8px 24px rgba(238, 77, 45, 0.35) !important; }
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder {
+  color: #94A3B8 !important;
+}
+
+html[data-theme="dark"] .shopee-search-input:focus,
+html[data-theme="dark"] input:focus,
+html[data-theme="dark"] select:focus,
+html[data-theme="dark"] textarea:focus {
+  border-color: #FF5A36 !important;
+  box-shadow: 0 0 0 3px rgba(255, 90, 54, 0.25) !important;
+}
+
+/* Cart Badge & Floating Chat (#FF5A36) */
+html[data-theme="dark"] .shopee-cart-badge-count,
+html[data-theme="dark"] .queue-chat-floating-btn {
+  background-color: #FF5A36 !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 0 20px rgba(255, 90, 54, 0.3) !important;
+}
+
+html[data-theme="dark"] .queue-chat-floating-btn:hover {
+  background-color: #FF704D !important;
+  box-shadow: 0 0 25px rgba(255, 112, 77, 0.45) !important;
+}
+
+/* Favorite Button (Inactive: #64748B, Active: #FF4D6D) */
+html[data-theme="dark"] .food-card-heart-btn {
+  color: #64748B !important;
+}
+
+html[data-theme="dark"] .food-card-heart-btn.active {
+  color: #FF4D6D !important;
+}
+
+/* Category Circle & Pill Buttons */
+html[data-theme="dark"] .queue-cat-pill {
+  background-color: #181C23 !important;
+  border: 1px solid #2A3242 !important;
+  color: #CBD5E1 !important;
+}
+
+html[data-theme="dark"] .queue-cat-pill.active {
+  background-color: #FF5A36 !important;
+  border-color: #FF8A65 !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 0 15px rgba(255, 90, 54, 0.35) !important;
+}
+
+/* Food Card Hover & Premium Glow Effect */
+html[data-theme="dark"] .shopee-notif-item:hover { background: #212734 !important; }
+html[data-theme="dark"] .food-card-wrapper:hover {
+  border-color: #FF5A36 !important;
+  box-shadow: 0 8px 24px rgba(255, 90, 54, 0.25) !important;
+}
 
 /* ---------- Loading screen ---------- */
 #loading-screen {

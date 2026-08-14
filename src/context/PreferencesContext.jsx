@@ -62,8 +62,8 @@ export function PreferencesProvider({ children }) {
       if (effectiveTheme === "dark") {
         document.body.classList.add("dark-mode");
         document.body.classList.remove("light-mode");
-        document.body.style.backgroundColor = "#0b1020";
-        document.body.style.color = "#e7edf8";
+        document.body.style.backgroundColor = "#0F1115";
+        document.body.style.color = "#FFFFFF";
       } else {
         document.body.classList.remove("dark-mode");
         document.body.classList.add("light-mode");
