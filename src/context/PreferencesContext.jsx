@@ -48,11 +48,17 @@ export function PreferencesProvider({ children }) {
   });
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    document.documentElement.setAttribute("data-theme", theme);
+    let effectiveTheme = theme;
+    if (theme === "auto") {
+      const isSystemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      effectiveTheme = isSystemDark ? "dark" : "light";
+    }
+
+    document.documentElement.dataset.theme = effectiveTheme;
+    document.documentElement.setAttribute("data-theme", effectiveTheme);
     document.documentElement.lang = language;
 
-    if (theme === "dark") {
+    if (effectiveTheme === "dark") {
       document.body.classList.add("dark-mode");
       document.body.style.backgroundColor = "#0b1020";
       document.body.style.color = "#e7edf8";
@@ -73,6 +79,11 @@ export function PreferencesProvider({ children }) {
     language,
     t: (key) => (words[language] ? words[language][key] || key : key),
     toggleTheme: () => setTheme((v) => (v === "dark" ? "light" : "dark")),
+    setThemeMode: (newTheme) => {
+      if (newTheme === "light" || newTheme === "dark" || newTheme === "auto") {
+        setTheme(newTheme);
+      }
+    },
     toggleLanguage: (target) =>
       setLanguage((v) => {
         if (target === "th" || target === "en") return target;
@@ -83,8 +94,6 @@ export function PreferencesProvider({ children }) {
   return <PreferencesContext.Provider value={value}>{children}</PreferencesContext.Provider>;
 }
 
-// This hook is exported alongside its provider intentionally for a compact UI-preferences module.
-// eslint-disable-next-line react-refresh/only-export-components
 export function usePreferences() {
   const value = useContext(PreferencesContext);
   if (!value) throw new Error("Missing PreferencesProvider");

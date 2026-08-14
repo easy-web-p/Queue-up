@@ -519,9 +519,16 @@ body.dark-mode .shopee-header-container {
   color: #ffffff;
 }
 
-/* User Profile & Language Hover Popovers */
+/* User Profile, Language & BS5 Theme Hover Popovers */
+.shopee-user-dropdown-container,
+.shopee-lang-dropdown-container,
+.shopee-theme-bs5-dropdown-container {
+  position: relative;
+}
+
 .shopee-user-dropdown-menu,
-.shopee-lang-dropdown-menu {
+.shopee-lang-dropdown-menu,
+.shopee-bs5-theme-menu {
   position: absolute;
   top: 100%;
   right: 0;
@@ -543,7 +550,8 @@ body.dark-mode .shopee-header-container {
 
 /* Mouse Hover Activation (เอาเมาส์ไปใกล้แล้วแสดงป๊อบอัพทันที) */
 .shopee-user-dropdown-container:hover .shopee-user-dropdown-menu,
-.shopee-lang-dropdown-container:hover .shopee-lang-dropdown-menu {
+.shopee-lang-dropdown-container:hover .shopee-lang-dropdown-menu,
+.shopee-theme-bs5-dropdown-container:hover .shopee-bs5-theme-menu {
   opacity: 1;
   visibility: visible;
   transform: translateY(0);
