@@ -1,6 +1,6 @@
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { PreferencesProvider } from "./context/PreferencesContext.jsx";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import Loading from "./pages/Loading.jsx";
 import Login from "./pages/Login.jsx";
@@ -30,69 +30,45 @@ function App() {
             <CookieSessionTracker />
             {/* Global PDPA Cookie Consent Banner */}
             <CookieConsentBanner />
-        <Routes>
-          <Route path="/" element={<Loading />} />
-          <Route path="/queueup" element={<Queueup />} />
-          <Route path="/about" element={<Queueup />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/user/purchase" element={<ProtectedRoute><UserPurchase /></ProtectedRoute>} />
-          <Route
-            path="/home"
-            element={
-              <ProtectedRoute>
-                <Home />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/user/account/profile"
-            element={
-              <ProtectedRoute>
-                <UserProfile />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/user/account/profile/"
-            element={
-              <ProtectedRoute>
-                <UserProfile />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/search"
-            element={
-              <ProtectedRoute>
-                <SearchResults />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/product"
-            element={
-              <ProtectedRoute>
-                <ProductDetail />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/product/:id"
-            element={
-              <ProtectedRoute>
-                <ProductDetail />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/merchant/dashboard"
-            element={
-              <ProtectedRoute>
-                <MerchantDashboard />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
+            <Routes>
+              <Route path="/" element={<Loading />} />
+              <Route path="/queueup" element={<Queueup />} />
+              <Route path="/Queueup" element={<Queueup />} />
+              <Route path="/about" element={<Queueup />} />
+              <Route path="/About" element={<Queueup />} />
+
+              <Route path="/login" element={<Login />} />
+              <Route path="/Login" element={<Login />} />
+              <Route path="/LOGIN" element={<Login />} />
+
+              {/* Home Routes (Supports /home, /Home, /HOME) */}
+              <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+              <Route path="/Home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+              <Route path="/HOME" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+
+              {/* User Orders & Profile Routes */}
+              <Route path="/user/purchase" element={<ProtectedRoute><UserPurchase /></ProtectedRoute>} />
+              <Route path="/User/Purchase" element={<ProtectedRoute><UserPurchase /></ProtectedRoute>} />
+              <Route path="/user/account/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
+              <Route path="/User/Account/Profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
+              <Route path="/user/account/profile/" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
+
+              {/* Search & Product Routes */}
+              <Route path="/search" element={<ProtectedRoute><SearchResults /></ProtectedRoute>} />
+              <Route path="/Search" element={<ProtectedRoute><SearchResults /></ProtectedRoute>} />
+              <Route path="/product" element={<ProtectedRoute><ProductDetail /></ProtectedRoute>} />
+              <Route path="/Product" element={<ProtectedRoute><ProductDetail /></ProtectedRoute>} />
+              <Route path="/product/:id" element={<ProtectedRoute><ProductDetail /></ProtectedRoute>} />
+              <Route path="/Product/:id" element={<ProtectedRoute><ProductDetail /></ProtectedRoute>} />
+
+              {/* Merchant Dashboard Routes */}
+              <Route path="/merchant/dashboard" element={<ProtectedRoute><MerchantDashboard /></ProtectedRoute>} />
+              <Route path="/Merchant/Dashboard" element={<ProtectedRoute><MerchantDashboard /></ProtectedRoute>} />
+              <Route path="/Merchant/dashboard" element={<ProtectedRoute><MerchantDashboard /></ProtectedRoute>} />
+
+              {/* Wildcard Fallback Route: Redirects any unknown URL to /home */}
+              <Route path="*" element={<Navigate to="/home" replace />} />
+            </Routes>
           </BrowserRouter>
         </AuthProvider>
       </PreferencesProvider>
