@@ -548,6 +548,18 @@ body.dark-mode .shopee-header-container {
   pointer-events: none;
 }
 
+/* Hover Bridge (สะพานลอยไร้เงา ป้องกันเมนูปิดกะทันหันเมื่อเลื่อนเมาส์ผ่าน) */
+.shopee-user-dropdown-menu::before,
+.shopee-lang-dropdown-menu::before,
+.shopee-bs5-theme-menu::before {
+  content: "";
+  position: absolute;
+  top: -12px;
+  left: 0;
+  right: 0;
+  height: 12px;
+}
+
 /* Mouse Hover Activation (เอาเมาส์ไปใกล้แล้วแสดงป๊อบอัพทันที) */
 .shopee-user-dropdown-container:hover .shopee-user-dropdown-menu,
 .shopee-lang-dropdown-container:hover .shopee-lang-dropdown-menu,
