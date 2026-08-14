@@ -35,6 +35,15 @@ function ShopeeSearchBar() {
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [isThemeOpen, setIsThemeOpen] = useState(false);
+
+  useEffect(() => {
+    const handleOutsideClick = () => {
+      setIsThemeOpen(false);
+    };
+    document.addEventListener("click", handleOutsideClick);
+    return () => document.removeEventListener("click", handleOutsideClick);
+  }, []);
 
   // Search History State
   const [searchHistory, setSearchHistory] = useState(() => {
@@ -316,14 +325,21 @@ function ShopeeSearchBar() {
           </svg>
 
           {/* Official Bootstrap 5 Theme Dropdown Menu */}
-          <div className="shopee-theme-bs5-dropdown-container me-2">
+          <div
+            className="shopee-theme-bs5-dropdown-container me-2"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
               className="btn btn-link nav-link py-1 px-2 dropdown-toggle d-flex align-items-center shopee-bs5-theme-trigger"
               id="bd-theme"
               type="button"
-              aria-expanded="false"
+              aria-expanded={isThemeOpen}
               aria-label="Toggle theme"
-              style={{ color: "#ffffff", textDecoration: "none", background: "rgba(255, 255, 255, 0.18)", borderRadius: "20px", border: "1px solid rgba(255, 255, 255, 0.4)", fontSize: "13px" }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsThemeOpen((prev) => !prev);
+              }}
+              style={{ color: "#ffffff", textDecoration: "none", background: "rgba(255, 255, 255, 0.18)", borderRadius: "20px", border: "1px solid rgba(255, 255, 255, 0.4)", fontSize: "13px", cursor: "pointer" }}
             >
               <svg className="bi theme-icon-active me-1" style={{ width: "16px", height: "16px", fill: "currentColor" }}>
                 <use href={`#${theme === "dark" ? "moon-stars-fill" : theme === "auto" ? "circle-half" : "sun-fill"}`}></use>
@@ -332,12 +348,20 @@ function ShopeeSearchBar() {
                 {theme === "dark" ? "Dark" : theme === "auto" ? "Auto" : "Light"}
               </span>
             </button>
-            <ul className="dropdown-menu dropdown-menu-end shopee-bs5-theme-menu" aria-labelledby="bd-theme">
+
+            <ul
+              className={`dropdown-menu dropdown-menu-end shopee-bs5-theme-menu ${isThemeOpen ? "show d-block" : ""}`}
+              aria-labelledby="bd-theme"
+              style={isThemeOpen ? { display: "block", opacity: 1, visibility: "visible", transform: "translateY(0)" } : {}}
+            >
               <li>
                 <button
                   type="button"
                   className={`dropdown-item d-flex align-items-center ${theme === "light" ? "active fw-bold text-danger" : ""}`}
-                  onClick={() => setThemeMode("light")}
+                  onClick={() => {
+                    setThemeMode("light");
+                    setIsThemeOpen(false);
+                  }}
                 >
                   <svg className="bi me-2 opacity-75 theme-icon" style={{ width: "16px", height: "16px", fill: "currentColor" }}><use href="#sun-fill"></use></svg>
                   Light (โหมดสว่าง)
@@ -348,7 +372,10 @@ function ShopeeSearchBar() {
                 <button
                   type="button"
                   className={`dropdown-item d-flex align-items-center ${theme === "dark" ? "active fw-bold text-danger" : ""}`}
-                  onClick={() => setThemeMode("dark")}
+                  onClick={() => {
+                    setThemeMode("dark");
+                    setIsThemeOpen(false);
+                  }}
                 >
                   <svg className="bi me-2 opacity-75 theme-icon" style={{ width: "16px", height: "16px", fill: "currentColor" }}><use href="#moon-stars-fill"></use></svg>
                   Dark (โหมดมืด)
@@ -359,7 +386,10 @@ function ShopeeSearchBar() {
                 <button
                   type="button"
                   className={`dropdown-item d-flex align-items-center ${theme === "auto" ? "active fw-bold text-danger" : ""}`}
-                  onClick={() => setThemeMode("auto")}
+                  onClick={() => {
+                    setThemeMode("auto");
+                    setIsThemeOpen(false);
+                  }}
                 >
                   <svg className="bi me-2 opacity-75 theme-icon" style={{ width: "16px", height: "16px", fill: "currentColor" }}><use href="#circle-half"></use></svg>
                   Auto (ตามระบบ)
