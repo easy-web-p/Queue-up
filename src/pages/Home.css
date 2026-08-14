@@ -526,3 +526,64 @@ html[data-theme="dark"] .bg-white.rounded-4.shadow-sm.border {
 html[data-theme="dark"] .bg-white.rounded-4.shadow-sm.border h5 {
   color: #f6f8ff !important;
 }
+
+/* ==========================================================================
+   Bestseller Horizontal Auto-Scrolling Carousel
+   ========================================================================== */
+.queue-bestseller-carousel {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  padding: 8px 4px 16px 4px;
+  scrollbar-width: none; /* Hide scrollbar Firefox */
+  -ms-overflow-style: none; /* Hide scrollbar IE/Edge */
+}
+
+.queue-bestseller-carousel::-webkit-scrollbar {
+  display: none; /* Hide scrollbar Chrome/Safari/Opera */
+}
+
+.queue-bestseller-carousel-item {
+  flex: 0 0 270px;
+  width: 270px;
+  scroll-snap-align: start;
+}
+
+.queue-carousel-arrow-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  font-size: 18px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  padding: 0;
+  line-height: 1;
+}
+
+.queue-carousel-arrow-btn:hover {
+  background: #ff5a36;
+  color: #ffffff;
+  border-color: #ff5a36;
+  transform: scale(1.1);
+}
+
+html[data-theme="dark"] .queue-carousel-arrow-btn {
+  background: #181c23 !important;
+  color: #ffffff !important;
+  border-color: #2a3242 !important;
+}
+
+html[data-theme="dark"] .queue-carousel-arrow-btn:hover {
+  background: #ff5a36 !important;
+  border-color: #ff5a36 !important;
+}

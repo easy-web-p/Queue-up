@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth.js";
@@ -57,6 +57,34 @@ function Home() {
   const [favorites, setFavorites] = useState([]);
   const [showNotice, setShowNotice] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(false);
+
+  // Carousel Horizontal Auto-scroll state & ref
+  const carouselRef = useRef(null);
+  const [isCarouselHovered, setIsCarouselHovered] = useState(false);
+
+  useEffect(() => {
+    if (isCarouselHovered) return;
+
+    const interval = setInterval(() => {
+      if (carouselRef.current) {
+        const { scrollLeft, scrollWidth, clientWidth } = carouselRef.current;
+        if (scrollLeft + clientWidth >= scrollWidth - 15) {
+          carouselRef.current.scrollTo({ left: 0, behavior: "smooth" });
+        } else {
+          carouselRef.current.scrollBy({ left: 280, behavior: "smooth" });
+        }
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [isCarouselHovered]);
+
+  const handleManualScroll = (direction) => {
+    if (carouselRef.current) {
+      const scrollAmount = direction === "left" ? -280 : 280;
+      carouselRef.current.scrollBy({ left: scrollAmount, behavior: "smooth" });
+    }
+  };
 
   // First-time user welcome coupon state
   const [showWelcomeBanner, setShowWelcomeBanner] = useState(() => {
@@ -350,19 +378,49 @@ function Home() {
           </div>
         </section>
 
-        {/* 5. 10 อันดับเมนูขายดีประจำโรงอาหาร (Menu Best-Sellers Grid) */}
-        <section className="bg-white p-4 rounded-4 shadow-sm border mb-4">
+        {/* 5. 10 อันดับเมนูขายดีประจำโรงอาหาร (Horizontal Auto-Scrolling Carousel) */}
+        <section className="bg-white p-4 rounded-4 shadow-sm border mb-4 queue-bestseller-section">
           <div className="d-flex align-items-center justify-content-between mb-3">
-            <h5 className="fw-bold text-dark mb-0">
-              <i className="bi bi-fire text-danger me-1" />{" "}
-              {language === "en" ? "Top 10 Bestselling Canteen Dishes" : "10 อันดับเมนูขายดีประจำโรงอาหาร"}
-            </h5>
-            <span className="badge bg-danger">{language === "en" ? "POPULAR" : "ยอดนิยม"}</span>
+            <div>
+              <h5 className="fw-bold text-dark mb-0">
+                <i className="bi bi-fire text-danger me-1" />{" "}
+                {language === "en" ? "Top 10 Bestselling Canteen Dishes" : "10 อันดับเมนูขายดีประจำโรงอาหาร"}
+              </h5>
+              <p className="text-muted text-xs mb-0 mt-1">
+                {language === "en"
+                  ? "Auto-scrolling popular canteen meals"
+                  : "เลื่อนแนวนอนอัตโนมัติ • วางเมาส์เพื่อหยุดเลื่อน"}
+              </p>
+            </div>
+            <div className="d-flex align-items-center gap-2">
+              <span className="badge bg-danger">{language === "en" ? "POPULAR" : "ยอดนิยม"}</span>
+              <button
+                type="button"
+                className="queue-carousel-arrow-btn"
+                onClick={() => handleManualScroll("left")}
+                title="เลื่อนไปทางซ้าย"
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                className="queue-carousel-arrow-btn"
+                onClick={() => handleManualScroll("right")}
+                title="เลื่อนไปทางขวา"
+              >
+                ›
+              </button>
+            </div>
           </div>
 
-          <div className="row g-3">
+          <div
+            className="queue-bestseller-carousel"
+            ref={carouselRef}
+            onMouseEnter={() => setIsCarouselHovered(true)}
+            onMouseLeave={() => setIsCarouselHovered(false)}
+          >
             {filteredMenuItems.map((item) => (
-              <div key={item.id} className="col-6 col-md-4 col-lg-3">
+              <div key={item.id} className="queue-bestseller-carousel-item">
                 <FoodCard
                   item={item}
                   isFavorite={favorites.includes(item.id)}
