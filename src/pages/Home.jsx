@@ -58,14 +58,80 @@ function Home() {
   const [showNotice, setShowNotice] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(false);
 
-  // ข้อมูลอัปเดตจากร้านค้าที่ติดตาม (แสดงเฉพาะเมื่อมีอัปเดตใหม่)
-  const [followedShopUpdates, setFollowedShopUpdates] = useState([
+  // First-time user welcome coupon state
+  const [showWelcomeBanner, setShowWelcomeBanner] = useState(() => {
+    return !localStorage.getItem("queueup_claimed_welcome_coupon");
+  });
+
+  // App New Updates & Features Ticker List
+  const [activeUpdateIndex, setActiveUpdateIndex] = useState(0);
+  const appUpdatesList = [
     {
-      id: "u1",
-      shopName: "ร้านป้าแดง ตามสั่ง",
-      message: "เปิดให้สั่งอาหารล่วงหน้ารับแต้มสะสม CRM ฟรีได้ทันที!",
+      id: "app-v25",
+      badge: language === "en" ? "🚀 APP UPDATE v2.5" : "🚀 อัปเดตใหม่ v2.5",
+      title:
+        language === "en"
+          ? "QueueUp Canteen Pre-Order, Real-time Queue Tracking & Auto PromptPay QR!"
+          : "เปิดใช้งานระบบสั่งอาหารโรงอาหารล่วงหน้า, ติดตามคิวแบบ real-time และสแกน QR PromptPay!",
+      targetPath: "/search?keyword=อาหาร",
     },
-  ]);
+    {
+      id: "prog-crm",
+      badge: language === "en" ? "⚡ NEW PROGRAM" : "⚡ โปรแกรมใหม่",
+      title:
+        language === "en"
+          ? "New Member Welcome Coupons & Parent Nutrition Spending Tracker!"
+          : "กระเป๋าคูปองส่วนลดสมาชิกใหม่ และระบบติดตามรายจ่ายโภชนาการสำหรับผู้ปกครอง!",
+      targetPath: "/user/account/profile?tab=coupons",
+    },
+    {
+      id: "shop-pa-daeng",
+      badge: language === "en" ? "🔔 STORE UPDATE" : "🔔 อัปเดตจากร้านค้าที่ติดตาม",
+      title:
+        language === "en"
+          ? "[Pa Daeng Canteen] Order ahead now & claim free 50 CRM bonus points!"
+          : "[ร้านป้าแดง ตามสั่ง] เปิดให้สั่งอาหารล่วงหน้ารับแต้มสะสม CRM ฟรีได้ทันที!",
+      targetPath: "/product/m1",
+    },
+  ];
+
+  // Rotate app updates automatically every 4.5 seconds
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveUpdateIndex((prev) => (prev + 1) % appUpdatesList.length);
+    }, 4500);
+    return () => clearInterval(timer);
+  }, [appUpdatesList.length]);
+
+  // Handler for First-Time User Welcome Coupon Claim
+  const handleClaimWelcomeCoupon = () => {
+    const couponCode = "WELCOME50";
+    const userName = user ? user.name || user.email : "สมาชิกใหม่";
+    try {
+      navigator.clipboard.writeText(couponCode);
+    } catch (err) {
+      console.warn("Clipboard copy fallback:", err);
+    }
+    localStorage.setItem("queueup_claimed_welcome_coupon", "true");
+
+    const existingCoupons = JSON.parse(localStorage.getItem("queueup_user_coupons") || "[]");
+    if (!existingCoupons.some((c) => c.code === couponCode)) {
+      existingCoupons.push({
+        code: couponCode,
+        discount: "50 บาท",
+        title: "คูปองส่วนลดสมาชิกใหม่ WELCOME50",
+        expiry: "31 ธ.ค. 2026",
+      });
+      localStorage.setItem("queueup_user_coupons", JSON.stringify(existingCoupons));
+    }
+    setShowWelcomeBanner(false);
+
+    alert(
+      language === "en"
+        ? `🎉 Congratulations ${userName}!\nCoupon code "${couponCode}" (฿50 OFF) saved & copied to clipboard!\nUse it on your first checkout.`
+        : `🎉 ยินดีด้วยคุณ ${userName}!\nคัดลอกรหัสคูปอง "${couponCode}" (ส่วนลด 50 บาท) เรียบร้อยแล้ว!\nสามารถนำไปกรอกใช้เป็นส่วนลดในหน้าชำระเงินได้ทันที`
+    );
+  };
 
   // Firestore Sync Effect
   useEffect(() => {
@@ -107,29 +173,111 @@ function Home() {
       {/* 1. Shopee Header Search Bar */}
       <ShopeeSearchBar />
 
-      {/* 2. Announcement Notice Banner (แสดงเฉพาะเมื่อมีการอัปเดตจากร้านค้าที่ติดตาม) */}
-      {hasNotice && (
-        <div className="queue-notice-banner">
-          <div className="queue-notice-content">
-            <i className="bi bi-bell-fill text-warning me-1" />
-            <span>
-              <strong>อัปเดตจากร้านค้าที่ติดตาม:</strong> [{followedShopUpdates[0].shopName}]{" "}
-              {followedShopUpdates[0].message}
+      {/* 2. First-Time User Welcome Banner (แสดงความยินดีสมาชิกใหม่ + ชื่อผู้ใช้ + คูปอง 50 บาท) */}
+      {showWelcomeBanner && (
+        <div className="queue-welcome-coupon-banner">
+          <div className="queue-welcome-content">
+            <span className="queue-welcome-badge">
+              {language === "en" ? "🎁 NEW MEMBER GIFT" : "🎁 สิทธิพิเศษสมาชิกใหม่"}
+            </span>
+            <span className="queue-welcome-text">
+              {language === "en" ? "🎉 Welcome " : "🎉 ยินดีต้อนรับคุณ "}
+              <strong className="text-dark fw-bold">
+                {user ? user.name || user.email : "anime manga"}
+              </strong>
+              {language === "en"
+                ? " to QueueUp! Claim your new member coupon "
+                : " เข้าสู่ QueueUp! รับคูปองส่วนลดต้อนรับสมาชิกใหม่ "}
+              <strong className="text-danger fw-bold text-decoration-underline fs-6">"WELCOME50"</strong>
+              {language === "en" ? " for ฿50 OFF your first order!" : " ลดทันที 50 บาท สำหรับออเดอร์แรก!"}
             </span>
           </div>
-          <button
-            className="queue-notice-close"
-            onClick={() => setShowNotice(false)}
-            title="ปิดการแจ้งเตือน"
-          >
-            <i className="bi bi-x-lg" />
-          </button>
+
+          <div className="d-flex align-items-center gap-2 ms-auto">
+            <button
+              type="button"
+              className="queue-claim-btn"
+              onClick={handleClaimWelcomeCoupon}
+            >
+              <i className="bi bi-gift-fill text-warning me-1" />
+              {language === "en" ? "Claim ฿50 Coupon" : "เก็บคูปอง 50 บาท"}
+            </button>
+            <button
+              type="button"
+              className="queue-notice-close"
+              onClick={() => {
+                localStorage.setItem("queueup_claimed_welcome_coupon", "dismissed");
+                setShowWelcomeBanner(false);
+              }}
+              title="ปิด"
+            >
+              <i className="bi bi-x-lg" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 3. App New Updates & Features Ticker Banner (แสดงการอัปเดตใหม่ๆ ของแอป / ฟังก์ชันใหม่ / โปรแกรมใหม่) */}
+      {showNotice && appUpdatesList.length > 0 && (
+        <div className="queue-notice-banner">
+          <div className="queue-notice-content">
+            <span className="queue-notice-chip">
+              {appUpdatesList[activeUpdateIndex].badge}
+            </span>
+            <span
+              className="queue-notice-text"
+              onClick={() => navigate(appUpdatesList[activeUpdateIndex].targetPath)}
+              style={{ cursor: "pointer" }}
+              title="คลิกเพื่อไปดูรายละเอียดอัปเดตนี้"
+            >
+              {appUpdatesList[activeUpdateIndex].title}
+            </span>
+          </div>
+
+          <div className="d-flex align-items-center gap-2">
+            <div className="queue-ticker-controls">
+              <button
+                type="button"
+                className="queue-ticker-arrow"
+                onClick={() =>
+                  setActiveUpdateIndex(
+                    (prev) => (prev - 1 + appUpdatesList.length) % appUpdatesList.length
+                  )
+                }
+                title="อัปเดตก่อนหน้า"
+              >
+                ‹
+              </button>
+              <span className="queue-ticker-count">
+                {activeUpdateIndex + 1}/{appUpdatesList.length}
+              </span>
+              <button
+                type="button"
+                className="queue-ticker-arrow"
+                onClick={() =>
+                  setActiveUpdateIndex((prev) => (prev + 1) % appUpdatesList.length)
+                }
+                title="อัปเดตถัดไป"
+              >
+                ›
+              </button>
+            </div>
+
+            <button
+              type="button"
+              className="queue-notice-close"
+              onClick={() => setShowNotice(false)}
+              title="ปิดการแจ้งเตือน"
+            >
+              <i className="bi bi-x-lg" />
+            </button>
+          </div>
         </div>
       )}
 
       <div
         className="queue-home-wrapper"
-        style={{ marginTop: hasNotice ? "0px" : "24px" }}
+        style={{ marginTop: (showNotice || showWelcomeBanner) ? "0px" : "24px" }}
       >
         {/* 3. Red Hero Banner Section */}
         <section className="queue-hero-banner">
