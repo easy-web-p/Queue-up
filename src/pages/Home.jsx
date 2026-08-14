@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth.js";
@@ -171,7 +171,7 @@ function Home() {
     return selectedCategory === "all" || item?.category === selectedCategory;
   });
 
-  const hasNotice = showNotice && followedShopUpdates.length > 0;
+  const hasNotice = showNotice && appUpdatesList.length > 0;
 
   return (
     <div className="queue-home-container">
