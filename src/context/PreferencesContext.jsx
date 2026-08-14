@@ -61,10 +61,12 @@ export function PreferencesProvider({ children }) {
 
       if (effectiveTheme === "dark") {
         document.body.classList.add("dark-mode");
+        document.body.classList.remove("light-mode");
         document.body.style.backgroundColor = "#0b1020";
         document.body.style.color = "#e7edf8";
       } else {
         document.body.classList.remove("dark-mode");
+        document.body.classList.add("light-mode");
         document.body.style.backgroundColor = "#f8fafc";
         document.body.style.color = "#0f172a";
       }

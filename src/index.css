@@ -12,8 +12,25 @@ body {
   width: 100%;
 }
 
-/* App-level dark design system. Existing pages keep their layout while surfaces
-   and controls switch to a consistent, accessible dark palette. */
+/* App-level Light & Dark design system. */
+html[data-theme="light"] { color-scheme: light; }
+html[data-theme="light"] body,
+html[data-theme="light"] #root,
+html[data-theme="light"] .queue-home-container,
+html[data-theme="light"] .search-results-page,
+html[data-theme="light"] .shopee-pd-page,
+html[data-theme="light"] .user-profile-page,
+html[data-theme="light"] .merchant-dashboard { background-color: #f8fafc !important; color: #0f172a !important; }
+
+html[data-theme="light"] .text-dark,
+html[data-theme="light"] .text-body,
+html[data-theme="light"] h1,
+html[data-theme="light"] h2,
+html[data-theme="light"] h3,
+html[data-theme="light"] h4,
+html[data-theme="light"] h5,
+html[data-theme="light"] h6 { color: #0f172a !important; }
+
 html[data-theme="dark"] { color-scheme: dark; }
 html[data-theme="dark"] body,
 html[data-theme="dark"] #root,
