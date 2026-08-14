@@ -298,16 +298,16 @@ function ShopeeSearchBar() {
             <i className="bi bi-question-circle" /> {language === "en" ? "Help" : "ช่วยเหลือ"}
           </span>
 
-          {/* Theme Switcher Button (☀️ Light Mode / 🌙 Dark Mode) */}
-          <span
-            className="shopee-nav-item"
+          {/* High-Visibility Light/Dark Theme Switch Pill Button (ปุ่มปรับโหมดขาว/ดำ) */}
+          <button
+            type="button"
+            className="shopee-theme-toggle-pill ms-1 me-1"
             onClick={toggleTheme}
-            style={{ cursor: "pointer" }}
-            title={theme === "dark" ? "เปลี่ยนเป็นโหมดสว่าง (Light Mode)" : "เปลี่ยนเป็นโหมดมืด (Dark Mode)"}
+            title={theme === "dark" ? "คลิกเพื่อสลับเป็นโหมดสว่าง (พื้นหลังขาว)" : "คลิกเพื่อสลับเป็นโหมดมืด (พื้นหลังดำ)"}
           >
-            <i className={`bi ${theme === "dark" ? "bi-sun-fill text-warning" : "bi-moon-stars-fill"}`} />{" "}
-            {theme === "dark" ? (language === "en" ? "Light Mode" : "โหมดสว่าง") : (language === "en" ? "Dark Mode" : "โหมดมืด")}
-          </span>
+            <i className={`bi ${theme === "dark" ? "bi-sun-fill text-warning" : "bi-moon-stars-fill"}`} />
+            <span>{theme === "dark" ? (language === "en" ? "☀️ Light Mode" : "☀️ โหมดขาว") : (language === "en" ? "🌙 Dark Mode" : "🌙 โหมดดำ")}</span>
+          </button>
           <span className="shopee-nav-divider" />
 
           {/* Interactive Hover Language Selector Popover */}
@@ -388,6 +388,21 @@ function ShopeeSearchBar() {
                   <i className="bi bi-receipt me-2" />
                   {language === "en" ? "My Orders" : "การซื้อของฉัน"}
                 </a>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  className="shopee-dropdown-item d-flex align-items-center justify-content-between"
+                  onClick={toggleTheme}
+                >
+                  <span>
+                    <i className={`bi ${theme === "dark" ? "bi-sun-fill text-warning" : "bi-moon-stars-fill text-primary"} me-2`} />
+                    {theme === "dark" ? "ปรับเป็นโหมดขาว (Light)" : "ปรับเป็นโหมดดำ (Dark)"}
+                  </span>
+                  <span className={`badge ${theme === "dark" ? "bg-warning text-dark" : "bg-dark text-white"} text-xs ms-2`}>
+                    {theme === "dark" ? "ขาว" : "ดำ"}
+                  </span>
+                </button>
               </li>
               <li>
                 <a
@@ -593,6 +608,16 @@ function ShopeeSearchBar() {
         >
           <i className="bi bi-cart3 shopee-cart-icon" />
           <span className="shopee-cart-badge-count">4</span>
+        </div>
+      </div>
+
+      {/* Floating Quick Theme Toggle Button (ปุ่มลอยปรับโหมดขาว/ดำมุมขวาล่าง) */}
+      <div className="shopee-floating-theme-toggle" onClick={toggleTheme} title="คลิกเพื่อสลับโหมดขาว/ดำ">
+        <div className="shopee-floating-theme-inner">
+          <i className={`bi ${theme === "dark" ? "bi-sun-fill text-warning" : "bi-moon-stars-fill"}`} />
+          <span className="shopee-floating-theme-label">
+            {theme === "dark" ? "☀️ โหมดขาว" : "🌙 โหมดดำ"}
+          </span>
         </div>
       </div>
     </header>
