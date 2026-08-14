@@ -98,7 +98,7 @@ function FoodCard({
           <span>{salesCount}</span>
         </div>
 
-        {/* Price & Plus Add Action Button */}
+        {/* Price Box */}
         <div className="shopee-food-footer-row">
           <div className="shopee-food-price-box">
             {originalPrice && (
@@ -106,17 +106,6 @@ function FoodCard({
             )}
             <span className="shopee-food-price-current">฿{price}</span>
           </div>
-
-          <button
-            className="shopee-food-add-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (onClick) onClick();
-            }}
-            title="สั่งซื้อ / เพิ่มไปยังคิวทันที"
-          >
-            +
-          </button>
         </div>
       </div>
     </div>
