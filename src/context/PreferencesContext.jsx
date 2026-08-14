@@ -73,7 +73,11 @@ export function PreferencesProvider({ children }) {
     language,
     t: (key) => (words[language] ? words[language][key] || key : key),
     toggleTheme: () => setTheme((v) => (v === "dark" ? "light" : "dark")),
-    toggleLanguage: () => setLanguage((v) => (v === "th" ? "en" : "th")),
+    toggleLanguage: (target) =>
+      setLanguage((v) => {
+        if (target === "th" || target === "en") return target;
+        return v === "th" ? "en" : "th";
+      }),
   }), [theme, language]);
 
   return <PreferencesContext.Provider value={value}>{children}</PreferencesContext.Provider>;

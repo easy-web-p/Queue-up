@@ -23,7 +23,7 @@ function ShopeeSearchBar() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { logout } = useAuth();
-  const { language, t } = usePreferences();
+  const { language, t, toggleLanguage } = usePreferences();
   const { user } = useSelector((state) => state.auth);
 
   // States
@@ -295,17 +295,45 @@ function ShopeeSearchBar() {
             onClick={() => alert("ศูนย์ช่วยเหลือ QueueUp CRM พร้อมให้บริการตลอด 24 ชั่วโมง")}
             style={{ cursor: "pointer" }}
           >
-            <i className="bi bi-question-circle" /> ช่วยเหลือ
-          </span>
-          <span className="shopee-nav-item">
-            <i className="bi bi-globe me-1" /> ไทย <i className="bi bi-caret-down-fill ms-1" style={{ fontSize: "10px" }} />
+            <i className="bi bi-question-circle" /> {language === "en" ? "Help" : "ช่วยเหลือ"}
           </span>
 
-          {/* User Profile Dropdown Menu */}
+          {/* Interactive Hover Language Selector Popover */}
+          <div className="shopee-lang-dropdown-container">
+            <span className="shopee-nav-item shopee-lang-trigger" style={{ cursor: "pointer" }}>
+              <i className="bi bi-globe me-1" /> {language === "en" ? "English" : "ไทย"}{" "}
+              <i className="bi bi-caret-down-fill ms-1" style={{ fontSize: "10px" }} />
+            </span>
+
+            <ul className="shopee-lang-dropdown-menu">
+              <li>
+                <button
+                  type="button"
+                  className={`shopee-dropdown-item ${language === "th" ? "fw-bold text-danger" : ""}`}
+                  onClick={() => toggleLanguage("th")}
+                >
+                  <span className="me-2">🇹🇭</span> ไทย (Thai){" "}
+                  {language === "th" && <i className="bi bi-check-lg ms-auto text-danger" />}
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  className={`shopee-dropdown-item ${language === "en" ? "fw-bold text-danger" : ""}`}
+                  onClick={() => toggleLanguage("en")}
+                >
+                  <span className="me-2">🇬🇧</span> English (US){" "}
+                  {language === "en" && <i className="bi bi-check-lg ms-auto text-danger" />}
+                </button>
+              </li>
+            </ul>
+          </div>
+
+          {/* User Profile Hover Dropdown Menu */}
           <div className="shopee-user-dropdown-container">
             <div
               className="shopee-user-trigger"
-              onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+              onClick={() => navigate("/user/account/profile")}
             >
               {user && user.photo ? (
                 <img
@@ -317,65 +345,65 @@ function ShopeeSearchBar() {
                 <span style={{ fontSize: "14px" }}>👤</span>
               )}
               <span className="shopee-user-name">
-                {user ? user.name || user.email : "5bdw_e247s"}
+                {user ? user.name || user.email : "anime manga"}
               </span>
               <span style={{ fontSize: "10px", marginLeft: "2px" }}>▾</span>
             </div>
 
-            {isUserMenuOpen && (
-              <ul className="shopee-user-dropdown-menu">
-                <li>
-                  <a
-                    className="shopee-dropdown-item"
-                    href="/user/account/profile"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setIsUserMenuOpen(false);
-                      navigate("/user/account/profile");
-                    }}
-                  >
-                    <i className="bi bi-person-circle me-2" /> บัญชีของฉัน
-                  </a>
-                </li>
-                <li>
-                  <a
-                    className="shopee-dropdown-item"
-                    href="/user/account/profile?tab=bookings"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setIsUserMenuOpen(false);
-                      navigate("/user/account/profile?tab=bookings");
-                    }}
-                  >
-                    <i className="bi bi-receipt me-2" /> การซื้อของฉัน
-                  </a>
-                </li>
-                <li>
-                  <a
-                    className="shopee-dropdown-item"
-                    href="/user/account/profile?tab=settings"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setIsUserMenuOpen(false);
-                      navigate("/user/account/profile?tab=settings");
-                    }}
-                  >
-                    <i className="bi bi-gear me-2" /> ตั้งค่า
-                  </a>
-                </li>
-                <li>
-                  <hr className="shopee-dropdown-divider" />
-                </li>
-                <li>
-                  <button
-                    className="shopee-dropdown-item text-danger"
-                    onClick={handleLogout}
-                  >
-                    <i className="bi bi-box-arrow-right me-2" /> ออกจากระบบ
-                  </button>
-                </li>
-              </ul>
-            )}
+            <ul className="shopee-user-dropdown-menu">
+              <li>
+                <a
+                  className="shopee-dropdown-item"
+                  href="/user/account/profile"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate("/user/account/profile");
+                  }}
+                >
+                  <i className="bi bi-person-circle me-2" />
+                  {language === "en" ? "My Account" : "บัญชีของฉัน"}
+                </a>
+              </li>
+              <li>
+                <a
+                  className="shopee-dropdown-item"
+                  href="/user/account/profile?tab=bookings"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate("/user/account/profile?tab=bookings");
+                  }}
+                >
+                  <i className="bi bi-receipt me-2" />
+                  {language === "en" ? "My Orders" : "การซื้อของฉัน"}
+                </a>
+              </li>
+              <li>
+                <a
+                  className="shopee-dropdown-item"
+                  href="/user/account/profile?tab=settings"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate("/user/account/profile?tab=settings");
+                  }}
+                >
+                  <i className="bi bi-gear me-2" />
+                  {language === "en" ? "Settings" : "ตั้งค่า"}
+                </a>
+              </li>
+              <li>
+                <hr className="shopee-dropdown-divider" />
+              </li>
+              <li>
+                <button
+                  type="button"
+                  className="shopee-dropdown-item text-danger"
+                  onClick={handleLogout}
+                >
+                  <i className="bi bi-box-arrow-right me-2" />
+                  {language === "en" ? "Logout" : "ออกจากระบบ"}
+                </button>
+              </li>
+            </ul>
           </div>
         </div>
       </div>

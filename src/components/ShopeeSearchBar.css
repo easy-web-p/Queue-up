@@ -491,21 +491,19 @@ body.dark-mode .shopee-header-container {
 .shopee-user-dropdown-container {
   position: relative;
   display: inline-block;
+  padding-bottom: 6px;
 }
 
-.shopee-user-trigger {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 4px;
-  transition: background 0.2s ease;
-  user-select: none;
+.shopee-lang-dropdown-container {
+  position: relative;
+  display: inline-block;
+  padding-bottom: 6px;
 }
 
-.shopee-user-trigger:hover {
+.shopee-user-trigger:hover,
+.shopee-lang-trigger:hover {
   background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
 }
 
 .shopee-user-avatar {
@@ -521,19 +519,35 @@ body.dark-mode .shopee-header-container {
   color: #ffffff;
 }
 
-.shopee-user-dropdown-menu {
+/* User Profile & Language Hover Popovers */
+.shopee-user-dropdown-menu,
+.shopee-lang-dropdown-menu {
   position: absolute;
   top: 100%;
   right: 0;
-  margin-top: 6px;
+  margin-top: 2px;
   background: #ffffff;
-  border-radius: 4px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
   border: 1px solid #e8e8e8;
   list-style: none;
   padding: 6px 0;
-  min-width: 170px;
-  z-index: 200;
+  min-width: 175px;
+  z-index: 999;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(6px);
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease;
+  pointer-events: none;
+}
+
+/* Mouse Hover Activation (เอาเมาส์ไปใกล้แล้วแสดงป๊อบอัพทันที) */
+.shopee-user-dropdown-container:hover .shopee-user-dropdown-menu,
+.shopee-lang-dropdown-container:hover .shopee-lang-dropdown-menu {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
 }
 
 .shopee-dropdown-item {
