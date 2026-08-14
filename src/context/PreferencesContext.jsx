@@ -41,7 +41,7 @@ const words = {
 
 export function PreferencesProvider({ children }) {
   const [theme, setTheme] = useState(() => {
-    return getCookie("queueup_theme") || localStorage.getItem("queueup_theme") || "dark";
+    return getCookie("queueup_theme") || localStorage.getItem("queueup_theme") || "light";
   });
   const [language, setLanguage] = useState(() => {
     return getCookie("queueup_language") || localStorage.getItem("queueup_language") || "th";

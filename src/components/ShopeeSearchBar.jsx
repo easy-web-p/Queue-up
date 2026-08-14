@@ -23,7 +23,7 @@ function ShopeeSearchBar() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { logout } = useAuth();
-  const { language, t, toggleLanguage } = usePreferences();
+  const { theme, toggleTheme, language, t, toggleLanguage } = usePreferences();
   const { user } = useSelector((state) => state.auth);
 
   // States
@@ -297,6 +297,18 @@ function ShopeeSearchBar() {
           >
             <i className="bi bi-question-circle" /> {language === "en" ? "Help" : "ช่วยเหลือ"}
           </span>
+
+          {/* Theme Switcher Button (☀️ Light Mode / 🌙 Dark Mode) */}
+          <span
+            className="shopee-nav-item"
+            onClick={toggleTheme}
+            style={{ cursor: "pointer" }}
+            title={theme === "dark" ? "เปลี่ยนเป็นโหมดสว่าง (Light Mode)" : "เปลี่ยนเป็นโหมดมืด (Dark Mode)"}
+          >
+            <i className={`bi ${theme === "dark" ? "bi-sun-fill text-warning" : "bi-moon-stars-fill"}`} />{" "}
+            {theme === "dark" ? (language === "en" ? "Light Mode" : "โหมดสว่าง") : (language === "en" ? "Dark Mode" : "โหมดมืด")}
+          </span>
+          <span className="shopee-nav-divider" />
 
           {/* Interactive Hover Language Selector Popover */}
           <div className="shopee-lang-dropdown-container">
