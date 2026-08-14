@@ -351,14 +351,12 @@ function ShopeeSearchBar() {
                 e.stopPropagation();
                 setIsThemeOpen((prev) => !prev);
               }}
-              style={{ color: "#ffffff", textDecoration: "none", background: "rgba(255, 255, 255, 0.18)", borderRadius: "20px", border: "1px solid rgba(255, 255, 255, 0.4)", fontSize: "13px", cursor: "pointer" }}
+              style={{ color: "#ffffff", textDecoration: "none", background: "rgba(255, 255, 255, 0.18)", borderRadius: "20px", border: "1px solid rgba(255, 255, 255, 0.4)", fontSize: "13px", cursor: "pointer", padding: "4px 8px" }}
+              title={`Toggle theme (${theme})`}
             >
-              <svg className="bi theme-icon-active me-1" style={{ width: "16px", height: "16px", fill: "currentColor" }}>
+              <svg className="bi theme-icon-active" style={{ width: "16px", height: "16px", fill: "currentColor" }}>
                 <use href={`#${theme === "dark" ? "moon-stars-fill" : theme === "auto" ? "circle-half" : "sun-fill"}`}></use>
               </svg>
-              <span className="ms-1 fw-bold">
-                {getThemeName(theme)}
-              </span>
             </button>
 
             <ul
@@ -370,7 +368,8 @@ function ShopeeSearchBar() {
                 <button
                   type="button"
                   className={`dropdown-item d-flex align-items-center ${theme === "light" ? "active fw-bold" : ""}`}
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setThemeMode("light");
                     setIsThemeOpen(false);
                   }}
@@ -384,7 +383,8 @@ function ShopeeSearchBar() {
                 <button
                   type="button"
                   className={`dropdown-item d-flex align-items-center ${theme === "dark" ? "active fw-bold" : ""}`}
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setThemeMode("dark");
                     setIsThemeOpen(false);
                   }}
@@ -398,7 +398,8 @@ function ShopeeSearchBar() {
                 <button
                   type="button"
                   className={`dropdown-item d-flex align-items-center ${theme === "auto" ? "active fw-bold" : ""}`}
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setThemeMode("auto");
                     setIsThemeOpen(false);
                   }}

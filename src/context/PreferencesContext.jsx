@@ -48,30 +48,43 @@ export function PreferencesProvider({ children }) {
   });
 
   useEffect(() => {
-    let effectiveTheme = theme;
-    if (theme === "auto") {
-      const isSystemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      effectiveTheme = isSystemDark ? "dark" : "light";
-    }
+    const updateTheme = () => {
+      let effectiveTheme = theme;
+      if (theme === "auto") {
+        const isSystemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        effectiveTheme = isSystemDark ? "dark" : "light";
+      }
 
-    document.documentElement.dataset.theme = effectiveTheme;
-    document.documentElement.setAttribute("data-theme", effectiveTheme);
-    document.documentElement.lang = language;
+      document.documentElement.dataset.theme = effectiveTheme;
+      document.documentElement.setAttribute("data-theme", effectiveTheme);
+      document.documentElement.lang = language;
 
-    if (effectiveTheme === "dark") {
-      document.body.classList.add("dark-mode");
-      document.body.style.backgroundColor = "#0b1020";
-      document.body.style.color = "#e7edf8";
-    } else {
-      document.body.classList.remove("dark-mode");
-      document.body.style.backgroundColor = "#f8fafc";
-      document.body.style.color = "#0f172a";
-    }
+      if (effectiveTheme === "dark") {
+        document.body.classList.add("dark-mode");
+        document.body.style.backgroundColor = "#0b1020";
+        document.body.style.color = "#e7edf8";
+      } else {
+        document.body.classList.remove("dark-mode");
+        document.body.style.backgroundColor = "#f8fafc";
+        document.body.style.color = "#0f172a";
+      }
+    };
+
+    updateTheme();
 
     localStorage.setItem("queueup_theme", theme);
     localStorage.setItem("queueup_language", language);
     setCookie("queueup_theme", theme, 365);
     setCookie("queueup_language", language, 365);
+
+    if (theme === "auto") {
+      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+      const handleChange = () => updateTheme();
+      if (mediaQuery.addEventListener) {
+        mediaQuery.addEventListener("change", handleChange);
+        return () => mediaQuery.removeEventListener("change", handleChange);
+      }
+    }
   }, [theme, language]);
 
   const value = useMemo(() => ({
