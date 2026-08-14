@@ -63,37 +63,42 @@ function Home() {
     return !localStorage.getItem("queueup_claimed_welcome_coupon");
   });
 
-  // App New Updates & Features Ticker List
+  // App New Updates & Features Ticker List (Memoized for render safety)
   const [activeUpdateIndex, setActiveUpdateIndex] = useState(0);
-  const appUpdatesList = [
-    {
-      id: "app-v25",
-      badge: language === "en" ? "🚀 APP UPDATE v2.5" : "🚀 อัปเดตใหม่ v2.5",
-      title:
-        language === "en"
-          ? "QueueUp Canteen Pre-Order, Real-time Queue Tracking & Auto PromptPay QR!"
-          : "เปิดใช้งานระบบสั่งอาหารโรงอาหารล่วงหน้า, ติดตามคิวแบบ real-time และสแกน QR PromptPay!",
-      targetPath: "/search?keyword=อาหาร",
-    },
-    {
-      id: "prog-crm",
-      badge: language === "en" ? "⚡ NEW PROGRAM" : "⚡ โปรแกรมใหม่",
-      title:
-        language === "en"
-          ? "New Member Welcome Coupons & Parent Nutrition Spending Tracker!"
-          : "กระเป๋าคูปองส่วนลดสมาชิกใหม่ และระบบติดตามรายจ่ายโภชนาการสำหรับผู้ปกครอง!",
-      targetPath: "/user/account/profile?tab=coupons",
-    },
-    {
-      id: "shop-pa-daeng",
-      badge: language === "en" ? "🔔 STORE UPDATE" : "🔔 อัปเดตจากร้านค้าที่ติดตาม",
-      title:
-        language === "en"
-          ? "[Pa Daeng Canteen] Order ahead now & claim free 50 CRM bonus points!"
-          : "[ร้านป้าแดง ตามสั่ง] เปิดให้สั่งอาหารล่วงหน้ารับแต้มสะสม CRM ฟรีได้ทันที!",
-      targetPath: "/product/m1",
-    },
-  ];
+  const appUpdatesList = useMemo(
+    () => [
+      {
+        id: "app-v25",
+        badge: language === "en" ? "🚀 APP UPDATE v2.5" : "🚀 อัปเดตใหม่ v2.5",
+        title:
+          language === "en"
+            ? "QueueUp Canteen Pre-Order, Real-time Queue Tracking & Auto PromptPay QR!"
+            : "เปิดใช้งานระบบสั่งอาหารโรงอาหารล่วงหน้า, ติดตามคิวแบบ real-time และสแกน QR PromptPay!",
+        targetPath: "/search?keyword=อาหาร",
+      },
+      {
+        id: "prog-crm",
+        badge: language === "en" ? "⚡ NEW PROGRAM" : "⚡ โปรแกรมใหม่",
+        title:
+          language === "en"
+            ? "New Member Welcome Coupons & Parent Nutrition Spending Tracker!"
+            : "กระเป๋าคูปองส่วนลดสมาชิกใหม่ และระบบติดตามรายจ่ายโภชนาการสำหรับผู้ปกครอง!",
+        targetPath: "/user/account/profile?tab=coupons",
+      },
+      {
+        id: "shop-pa-daeng",
+        badge: language === "en" ? "🔔 STORE UPDATE" : "🔔 อัปเดตจากร้านค้าที่ติดตาม",
+        title:
+          language === "en"
+            ? "[Pa Daeng Canteen] Order ahead now & claim free 50 CRM bonus points!"
+            : "[ร้านป้าแดง ตามสั่ง] เปิดให้สั่งอาหารล่วงหน้ารับแต้มสะสม CRM ฟรีได้ทันที!",
+        targetPath: "/product/m1",
+      },
+    ],
+    [language]
+  );
+
+  const currentUpdate = appUpdatesList[activeUpdateIndex] || appUpdatesList[0];
 
   // Rotate app updates automatically every 4.5 seconds
   useEffect(() => {
@@ -218,19 +223,19 @@ function Home() {
       )}
 
       {/* 3. App New Updates & Features Ticker Banner (แสดงการอัปเดตใหม่ๆ ของแอป / ฟังก์ชันใหม่ / โปรแกรมใหม่) */}
-      {showNotice && appUpdatesList.length > 0 && (
+      {showNotice && currentUpdate && (
         <div className="queue-notice-banner">
           <div className="queue-notice-content">
             <span className="queue-notice-chip">
-              {appUpdatesList[activeUpdateIndex].badge}
+              {currentUpdate.badge}
             </span>
             <span
               className="queue-notice-text"
-              onClick={() => navigate(appUpdatesList[activeUpdateIndex].targetPath)}
+              onClick={() => navigate(currentUpdate.targetPath)}
               style={{ cursor: "pointer" }}
               title="คลิกเพื่อไปดูรายละเอียดอัปเดตนี้"
             >
-              {appUpdatesList[activeUpdateIndex].title}
+              {currentUpdate.title}
             </span>
           </div>
 

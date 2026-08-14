@@ -16,18 +16,20 @@ import CookieConsentBanner from "./components/CookieConsentBanner.jsx";
 import CookieSessionTracker from "./components/CookieSessionTracker.jsx";
 
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
 function App() {
   return (
-    <PreferencesProvider>
-    <AuthProvider>
-      <BrowserRouter>
-        {/* Global Page Route Transition Loading Animation Overlay */}
-        <PageRouteLoader />
-        {/* Global Cookie Session Tracker on Every Page */}
-        <CookieSessionTracker />
-        {/* Global PDPA Cookie Consent Banner */}
-        <CookieConsentBanner />
+    <ErrorBoundary>
+      <PreferencesProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            {/* Global Page Route Transition Loading Animation Overlay */}
+            <PageRouteLoader />
+            {/* Global Cookie Session Tracker on Every Page */}
+            <CookieSessionTracker />
+            {/* Global PDPA Cookie Consent Banner */}
+            <CookieConsentBanner />
         <Routes>
           <Route path="/" element={<Loading />} />
           <Route path="/queueup" element={<Queueup />} />
@@ -91,9 +93,10 @@ function App() {
             }
           />
         </Routes>
-      </BrowserRouter>
-    </AuthProvider>
-    </PreferencesProvider>
+          </BrowserRouter>
+        </AuthProvider>
+      </PreferencesProvider>
+    </ErrorBoundary>
   );
 }
 
