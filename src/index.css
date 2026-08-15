@@ -31,28 +31,31 @@ html[data-theme="light"] h4,
 html[data-theme="light"] h5,
 html[data-theme="light"] h6 { color: #0f172a !important; }
 
-/* 🌙 QueueUp Premium Dark Mode Design System (Discord / Linear / GitHub Dark Aesthetic) */
-html[data-theme="dark"] { color-scheme: dark; }
+/* 🌙 QueueUp Warm Dark Food Canteen Design System (ดำอมน้ำตาลอุ่น - Warm Food Atmosphere) */
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
 
-/* Main Background (#0F1115) */
+/* 1. Main Background (#16100C - ดำอมน้ำตาลอุ่น แทนกรมท่าเย็น) */
 html[data-theme="dark"] body,
 html[data-theme="dark"] #root,
 html[data-theme="dark"] .queue-home-container,
 html[data-theme="dark"] .search-results-page,
 html[data-theme="dark"] .shopee-pd-page,
 html[data-theme="dark"] .user-profile-page,
-html[data-theme="dark"] .merchant-dashboard {
-  background-color: #0F1115 !important;
-  color: #FFFFFF !important;
+html[data-theme="dark"] .merchant-dashboard,
+html[data-theme="dark"] .queue-notfound-page {
+  background-color: #16100C !important;
+  color: #F3ECE3 !important;
 }
 
-/* Header Container Gradient & Border */
+/* 2. Header Navbar Container (#211710 - ดำอมน้ำตาลเข้ม) */
 html[data-theme="dark"] .shopee-header-container {
-  background: linear-gradient(135deg, #181C23 0%, #151922 50%, #0F1115 100%) !important;
-  border-bottom: 1px solid #2A3242 !important;
+  background: linear-gradient(135deg, #211710 0%, #1A120A 100%) !important;
+  border-bottom: 1px solid #3A2A1E !important;
 }
 
-/* Standard Cards & Surfaces (#181C23 / Border #2A3242) */
+/* 3. Cards & Surfaces (#211710 / Border #3A2A1E) */
 html[data-theme="dark"] .bg-light,
 html[data-theme="dark"] .bg-white,
 html[data-theme="dark"] .card,
@@ -72,63 +75,73 @@ html[data-theme="dark"] .table,
 html[data-theme="dark"] .queue-category-section,
 html[data-theme="dark"] .queue-bestseller-section,
 html[data-theme="dark"] .shopee-notif-item,
-html[data-theme="dark"] .shopee-notif-header {
-  background-color: #181C23 !important;
-  color: #FFFFFF !important;
-  border-color: #2A3242 !important;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+html[data-theme="dark"] .shopee-notif-header,
+html[data-theme="dark"] .queue-notfound-card {
+  background-color: #211710 !important;
+  color: #F3ECE3 !important;
+  border-color: #3A2A1E !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
 }
 
-/* Elevated Cards & Modals (#212734) */
+/* 4. Elevated Cards, Modals & Popovers (#2D2017) */
 html[data-theme="dark"] .modal-content,
 html[data-theme="dark"] .payment-modal-card,
-html[data-theme="dark"] .queue-chat-modal-content {
-  background-color: #212734 !important;
-  color: #FFFFFF !important;
-  border-color: #2A3242 !important;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+html[data-theme="dark"] .queue-chat-modal-content,
+html[data-theme="dark"] .queue-chat-header {
+  background-color: #2D2017 !important;
+  color: #F3ECE3 !important;
+  border-color: #3A2A1E !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55);
 }
 
-/* Announcement Banner Dark Theme Integration */
+/* 5. Announcement Notice Banner (Amber เข้มตระกูลส้ม #3A2410 / Text #FFC978) */
 html[data-theme="dark"] .queue-notice-banner {
-  background: linear-gradient(90deg, #2D1400 0%, #181C23 100%) !important;
-  color: #FBBF24 !important;
-  border-bottom: 1px solid #2A3242 !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+  background: linear-gradient(90deg, #3A2410 0%, #291A0C 100%) !important;
+  color: #FFC978 !important;
+  border-bottom: 1px solid #3A2A1E !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35) !important;
   border-radius: 0 !important;
   margin: 0 !important;
   width: 100% !important;
 }
 
 html[data-theme="dark"] .queue-notice-chip {
-  background: #3A1D00 !important;
-  color: #FBBF24 !important;
-  border: 1px solid rgba(245, 158, 11, 0.4) !important;
+  background: #4A2E14 !important;
+  color: #FFC978 !important;
+  border: 1px solid rgba(255, 201, 120, 0.4) !important;
 }
 
 html[data-theme="dark"] .queue-notice-text {
-  color: #FFFFFF !important;
+  color: #F3ECE3 !important;
 }
 
 html[data-theme="dark"] .queue-claim-btn {
-  background: #FF5A36 !important;
+  background: #FF7A1A !important;
   color: #FFFFFF !important;
 }
 
 html[data-theme="dark"] .queue-claim-btn:hover {
-  background: #FF704D !important;
+  background: #FF8E38 !important;
 }
 
-/* CRM Point Badge (bg: #3A1D00, text: #FBBF24) */
+/* 6. Hero Banner Gradient (#4A1B0C -> #7A2A12 แดงเข้มลึกอบอุ่น) */
+html[data-theme="dark"] .queue-hero-banner,
+html[data-theme="dark"] .shopee-hero-banner {
+  background: linear-gradient(135deg, #4A1B0C 0%, #7A2A12 100%) !important;
+  border: 1px solid #3A2A1E !important;
+  box-shadow: 0 8px 30px rgba(122, 42, 18, 0.35) !important;
+}
+
+/* 7. CRM Points & Loyalty Badges (Amber Gold #3A2410 / Text #FFC978) */
 html[data-theme="dark"] .crm-point-badge,
 html[data-theme="dark"] .queue-crm-points {
-  background-color: #3A1D00 !important;
-  color: #FBBF24 !important;
-  border: 1px solid rgba(245, 158, 11, 0.4) !important;
-  box-shadow: 0 0 15px rgba(245, 158, 11, 0.25) !important;
+  background-color: #3A2410 !important;
+  color: #FFC978 !important;
+  border: 1px solid rgba(255, 201, 120, 0.35) !important;
+  box-shadow: 0 0 15px rgba(255, 201, 120, 0.2) !important;
 }
 
-/* Typography Hierarchy */
+/* 8. Typography Hierarchy (#F3ECE3 / #B8AA98 / #8C7A68) */
 html[data-theme="dark"] .text-dark,
 html[data-theme="dark"] .text-body,
 html[data-theme="dark"] h1,
@@ -139,83 +152,101 @@ html[data-theme="dark"] h5,
 html[data-theme="dark"] h6,
 html[data-theme="dark"] .food-card-title,
 html[data-theme="dark"] .food-card-shop,
-html[data-theme="dark"] .queue-category-title {
-  color: #FFFFFF !important;
+html[data-theme="dark"] .queue-category-title,
+html[data-theme="dark"] .queue-notfound-title {
+  color: #F3ECE3 !important;
 }
 
 html[data-theme="dark"] .text-secondary,
-html[data-theme="dark"] .queue-sub-text {
-  color: #CBD5E1 !important;
+html[data-theme="dark"] .queue-sub-text,
+html[data-theme="dark"] .queue-notfound-desc {
+  color: #B8AA98 !important;
 }
 
 html[data-theme="dark"] .text-muted {
-  color: #94A3B8 !important;
+  color: #8C7A68 !important;
 }
 
-/* Search Bar Input (#181C23 / Border #2A3242 / Focus #FF5A36) */
+/* 9. Search Bar Inputs (#211710 / Border #3A2A1E / Focus #FF7A1A) */
 html[data-theme="dark"] .shopee-search-input,
 html[data-theme="dark"] input,
 html[data-theme="dark"] select,
 html[data-theme="dark"] textarea {
-  background-color: #181C23 !important;
-  color: #FFFFFF !important;
-  border-color: #2A3242 !important;
+  background-color: #211710 !important;
+  color: #F3ECE3 !important;
+  border-color: #3A2A1E !important;
 }
 
 html[data-theme="dark"] input::placeholder,
 html[data-theme="dark"] textarea::placeholder {
-  color: #94A3B8 !important;
+  color: #8C7A68 !important;
 }
 
 html[data-theme="dark"] .shopee-search-input:focus,
 html[data-theme="dark"] input:focus,
 html[data-theme="dark"] select:focus,
 html[data-theme="dark"] textarea:focus {
-  border-color: #FF5A36 !important;
-  box-shadow: 0 0 0 3px rgba(255, 90, 54, 0.25) !important;
+  border-color: #FF7A1A !important;
+  box-shadow: 0 0 0 3px rgba(255, 122, 26, 0.25) !important;
 }
 
-/* Cart Badge & Floating Chat (#FF5A36) */
+/* 10. Primary Brand CTA Buttons, Cart Badge & Floating Chat (#FF7A1A) */
 html[data-theme="dark"] .shopee-cart-badge-count,
-html[data-theme="dark"] .queue-chat-floating-btn {
-  background-color: #FF5A36 !important;
+html[data-theme="dark"] .queue-chat-floating-btn,
+html[data-theme="dark"] .btn-primary,
+html[data-theme="dark"] .shopee-search-button {
+  background-color: #FF7A1A !important;
   color: #FFFFFF !important;
-  box-shadow: 0 0 20px rgba(255, 90, 54, 0.3) !important;
+  border-color: #FF7A1A !important;
+  box-shadow: 0 4px 16px rgba(255, 122, 26, 0.35) !important;
 }
 
-html[data-theme="dark"] .queue-chat-floating-btn:hover {
-  background-color: #FF704D !important;
-  box-shadow: 0 0 25px rgba(255, 112, 77, 0.45) !important;
+html[data-theme="dark"] .queue-chat-floating-btn:hover,
+html[data-theme="dark"] .btn-primary:hover {
+  background-color: #FF8E38 !important;
+  border-color: #FF8E38 !important;
+  box-shadow: 0 6px 20px rgba(255, 142, 56, 0.45) !important;
 }
 
-/* Favorite Button (Inactive: #64748B, Active: #FF4D6D) */
+/* 11. Favorite Heart Button (Inactive: #8C7A68, Active: #FF4D6D) */
 html[data-theme="dark"] .food-card-heart-btn {
-  color: #64748B !important;
+  color: #8C7A68 !important;
 }
 
 html[data-theme="dark"] .food-card-heart-btn.active {
   color: #FF4D6D !important;
 }
 
-/* Category Circle & Pill Buttons */
+/* 12. Category Circle & Pill Buttons */
 html[data-theme="dark"] .queue-cat-pill {
-  background-color: #181C23 !important;
-  border: 1px solid #2A3242 !important;
-  color: #CBD5E1 !important;
+  background-color: #211710 !important;
+  border: 1px solid #3A2A1E !important;
+  color: #B8AA98 !important;
 }
 
 html[data-theme="dark"] .queue-cat-pill.active {
-  background-color: #FF5A36 !important;
-  border-color: #FF8A65 !important;
+  background-color: #FF7A1A !important;
+  border-color: #FF8E38 !important;
   color: #FFFFFF !important;
-  box-shadow: 0 0 15px rgba(255, 90, 54, 0.35) !important;
+  box-shadow: 0 0 15px rgba(255, 122, 26, 0.35) !important;
 }
 
-/* Food Card Hover & Premium Glow Effect */
-html[data-theme="dark"] .shopee-notif-item:hover { background: #212734 !important; }
+/* 13. Food Card Hover & Accent Glow */
+html[data-theme="dark"] .shopee-notif-item:hover { background: #2D2017 !important; }
 html[data-theme="dark"] .food-card-wrapper:hover {
-  border-color: #FF5A36 !important;
-  box-shadow: 0 8px 24px rgba(255, 90, 54, 0.25) !important;
+  border-color: #FF7A1A !important;
+  box-shadow: 0 8px 24px rgba(255, 122, 26, 0.25) !important;
+}
+
+html[data-theme="dark"] .queue-btn-back {
+  background-color: #2D2017 !important;
+  border-color: #3A2A1E !important;
+  color: #F3ECE3 !important;
+}
+
+html[data-theme="dark"] .queue-btn-back:hover {
+  background-color: #3A2A1E !important;
+  border-color: #4D3B2C !important;
 }
 
 /* ---------- Loading screen ---------- */
