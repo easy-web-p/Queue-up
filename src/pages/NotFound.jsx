@@ -9,8 +9,8 @@ function NotFound() {
 
   return (
     <div className="queue-notfound-page">
-      {/* Header Navigation Search Bar */}
-      <ShopeeSearchBar />
+      {/* Header Navigation Search Bar (ปิดระบบประวัติการค้นหาในหน้า 404) */}
+      <ShopeeSearchBar disableHistory={true} />
 
       {/* Main Centered 404 Content */}
       <main className="queue-notfound-container">

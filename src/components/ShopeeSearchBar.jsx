@@ -19,7 +19,7 @@ const MOCK_PRODUCTS = [
   "บิงซูสตรอว์เบอร์รีนมสด",
 ];
 
-function ShopeeSearchBar() {
+function ShopeeSearchBar({ disableHistory = false }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { logout } = useAuth();
@@ -75,7 +75,7 @@ function ShopeeSearchBar() {
   ];
 
   const saveToHistory = (kw) => {
-    if (!kw.trim()) return;
+    if (disableHistory || !kw.trim()) return;
     const newHistory = [kw, ...searchHistory.filter((item) => item !== kw)].slice(0, 8);
     localStorage.setItem("shopee_search_history", JSON.stringify(newHistory));
     setSearchHistory(newHistory);
@@ -627,8 +627,8 @@ function ShopeeSearchBar() {
               </svg>
             </button>
 
-            {/* 1. Popover เมื่อคลิกช่องค้นหาและยังไม่ได้พิมพ์คำ */}
-            {isInputFocused && searchTerm.trim() === "" && (
+            {/* 1. Popover เมื่อคลิกช่องค้นหาและยังไม่ได้พิมพ์คำ (เปิดใช้เมื่อ disableHistory เป็น false เท่านั้น) */}
+            {!disableHistory && isInputFocused && searchTerm.trim() === "" && (
               <div className="shopee-suggestions-box">
                 {searchHistory.length > 0 ? (
                   <>
@@ -691,7 +691,7 @@ function ShopeeSearchBar() {
 
           {/* Dynamic Recent Search History or Top Trending Keywords underneath Search Box */}
           <div className="shopee-trending-links">
-            {(searchHistory.length > 0 ? searchHistory : TOP_TRENDING_KEYWORDS).map(
+            {(!disableHistory && searchHistory.length > 0 ? searchHistory : TOP_TRENDING_KEYWORDS).map(
               (kw, idx) => (
                 <span
                   key={idx}
