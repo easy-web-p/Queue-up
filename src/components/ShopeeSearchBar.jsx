@@ -445,23 +445,17 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
             <div
               className="shopee-user-trigger"
               onClick={() => navigate("/user/account/profile")}
+              title={user ? user.name || user.email : "โปรไฟล์ของฉัน"}
             >
-              {user && user.photo ? (
-                <img
-                  src={user.photo}
-                  alt={user.name || "User"}
-                  className="shopee-user-avatar"
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    e.currentTarget.src = "/yeti_mascot.jpg";
-                  }}
-                />
-              ) : (
-                <i className="bi bi-person-circle text-white me-1" style={{ fontSize: "16px" }} />
-              )}
-              <span className="shopee-user-name">
-                {user ? user.name || user.email : "สมาชิก QueueUp"}
-              </span>
+              <img
+                src={(user && user.photo) || "/yeti_mascot.jpg"}
+                alt="Profile"
+                className="shopee-user-avatar"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "/yeti_mascot.jpg";
+                }}
+              />
               <span style={{ fontSize: "10px", marginLeft: "2px" }}>▾</span>
             </div>
 
