@@ -11,6 +11,7 @@ import UserProfile from "./pages/UserProfile.jsx";
 import Queueup from "./pages/Queueup.jsx";
 import UserPurchase from "./pages/UserPurchase.jsx";
 import MerchantDashboard from "./pages/MerchantDashboard.jsx";
+import NotFound from "./pages/NotFound.jsx";
 import PageRouteLoader from "./components/PageRouteLoader.jsx";
 import CookieConsentBanner from "./components/CookieConsentBanner.jsx";
 import CookieSessionTracker from "./components/CookieSessionTracker.jsx";
@@ -64,8 +65,8 @@ function App() {
             <Route path="/Merchant/Dashboard" element={<ProtectedRoute><MerchantDashboard /></ProtectedRoute>} />
             <Route path="/Merchant/dashboard" element={<ProtectedRoute><MerchantDashboard /></ProtectedRoute>} />
 
-            {/* Wildcard Fallback Route: Redirects any unknown URL to /home */}
-            <Route path="*" element={<Navigate to="/home" replace />} />
+            {/* Wildcard 404 Page Not Found Route */}
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>

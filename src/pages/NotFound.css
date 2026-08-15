@@ -1,0 +1,170 @@
+/* 404 Not Found Page Styles */
+.queue-notfound-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+.queue-notfound-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.queue-notfound-card {
+  max-width: 580px;
+  width: 100%;
+  text-align: center;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 28px;
+  padding: 48px 36px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+}
+
+.queue-notfound-code {
+  font-size: 6.5rem;
+  font-weight: 900;
+  line-height: 1;
+  background: linear-gradient(135deg, #ff5a36 0%, #ff8a65 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 16px;
+  letter-spacing: -2px;
+}
+
+.queue-notfound-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 12px;
+}
+
+.queue-notfound-desc {
+  font-size: 0.95rem;
+  color: #64748b;
+  margin-bottom: 32px;
+  line-height: 1.6;
+}
+
+.queue-notfound-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 36px;
+}
+
+.queue-btn-back {
+  background: #ffffff;
+  color: #334155;
+  border: 1.5px solid #cbd5e1;
+  padding: 12px 24px;
+  border-radius: 30px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+}
+
+.queue-btn-back:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0f172a;
+  transform: translateY(-2px);
+}
+
+.queue-btn-home {
+  background: #ff5a36;
+  color: #ffffff;
+  border: none;
+  padding: 12px 28px;
+  border-radius: 30px;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 14px rgba(255, 90, 54, 0.35);
+  display: inline-flex;
+  align-items: center;
+}
+
+.queue-btn-home:hover {
+  background: #ff704d;
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(255, 90, 54, 0.45);
+}
+
+.queue-notfound-footer {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 20px;
+}
+
+.queue-notfound-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.queue-notfound-links a {
+  color: #ff5a36;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.queue-notfound-links a:hover {
+  color: #ff704d;
+  text-decoration: underline;
+}
+
+.queue-notfound-links span {
+  color: #cbd5e1;
+}
+
+/* Dark Mode Integration */
+html[data-theme="dark"] .queue-notfound-page {
+  background-color: #0f1115 !important;
+  color: #ffffff !important;
+}
+
+html[data-theme="dark"] .queue-notfound-card {
+  background-color: #181c23 !important;
+  border-color: #2a3242 !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+}
+
+html[data-theme="dark"] .queue-notfound-title {
+  color: #ffffff !important;
+}
+
+html[data-theme="dark"] .queue-notfound-desc {
+  color: #cbd5e1 !important;
+}
+
+html[data-theme="dark"] .queue-btn-back {
+  background-color: #212734 !important;
+  border-color: #2a3242 !important;
+  color: #ffffff !important;
+}
+
+html[data-theme="dark"] .queue-btn-back:hover {
+  background-color: #2c3445 !important;
+  border-color: #475569 !important;
+}
+
+html[data-theme="dark"] .queue-notfound-footer {
+  border-top-color: #2a3242 !important;
+}
