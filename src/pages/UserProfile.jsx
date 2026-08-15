@@ -195,6 +195,63 @@ function UserProfile() {
     }
   }, [user]);
 
+  // Handle Avatar Image File Upload & Auto-Save
+  const handleAvatarUpload = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("⚠️ กรุณาเลือกไฟล์รูปภาพเท่านั้น (JPG, PNG, WEBP)");
+      return;
+    }
+
+    if (file.size > 3 * 1024 * 1024) {
+      alert("⚠️ ขนาดไฟล์รูปภาพใหญ่เกินไป (สูงสุด 3MB)");
+      return;
+    }
+
+    setAutoSaveStatus("saving");
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const newAvatarUrl = event.target.result;
+      setAvatar(newAvatarUrl);
+
+      if (user && user.uid) {
+        try {
+          await setDoc(doc(db, "users", user.uid), { photo: newAvatarUrl }, { merge: true });
+        } catch (err) {
+          console.warn("Save avatar error:", err);
+        }
+      }
+
+      dispatch(
+        setUser({
+          uid: user ? user.uid : `user-${Date.now()}`,
+          name: fullName,
+          email: email,
+          photo: newAvatarUrl,
+        })
+      );
+
+      const savedUserData = localStorage.getItem("queueup_user");
+      if (savedUserData) {
+        try {
+          const parsed = JSON.parse(savedUserData);
+          localStorage.setItem("queueup_user", JSON.stringify({ ...parsed, photo: newAvatarUrl }));
+        } catch (err) {
+          console.warn("LocalStorage save error:", err);
+        }
+      }
+
+      setTimeout(() => {
+        setAutoSaveStatus("saved");
+        setTimeout(() => setAutoSaveStatus(""), 2000);
+      }, 300);
+    };
+
+    reader.readAsDataURL(file);
+  };
+
   // Instant Auto-Save Field to Firestore, Redux, and LocalStorage
   const triggerAutoSave = async (fieldKey, value) => {
     setAutoSaveStatus("saving");
@@ -322,16 +379,41 @@ function UserProfile() {
       <div className="shopee-profile-container">
         {/* ==================== LEFT SIDEBAR MENU ==================== */}
         <aside className="shopee-user-sidebar">
-          {/* Top User Card */}
+          {/* Top User Card with Avatar Upload & Image Fallback */}
           <div className="shopee-sidebar-user-card">
-            <div className="shopee-sidebar-avatar-circle">
-              <img
-                src={avatar || "/yeti_mascot.jpg"}
-                alt="Avatar"
-                className="shopee-sidebar-avatar-img"
-              />
+            <div className="shopee-sidebar-avatar-wrapper">
+              <div className="shopee-sidebar-avatar-circle">
+                <img
+                  src={avatar || "/yeti_mascot.jpg"}
+                  alt="Avatar"
+                  className="shopee-sidebar-avatar-img"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = "/yeti_mascot.jpg";
+                  }}
+                />
+                <label className="shopee-avatar-upload-overlay" title="คลิกเพื่อเปลี่ยนรูปโปรไฟล์">
+                  <i className="bi bi-camera-fill" />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarUpload}
+                    style={{ display: "none" }}
+                  />
+                </label>
+              </div>
             </div>
             <div className="shopee-sidebar-user-title">{fullName}</div>
+            <label className="shopee-change-photo-btn">
+              <i className="bi bi-camera-fill me-1" />
+              แก้ไขรูปโปรไฟล์
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarUpload}
+                style={{ display: "none" }}
+              />
+            </label>
           </div>
 
           {/* Navigation Links */}

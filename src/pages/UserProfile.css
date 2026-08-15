@@ -41,7 +41,15 @@
   border-bottom: 1px solid #f0f0f0;
 }
 
+.shopee-sidebar-avatar-wrapper {
+  position: relative;
+  margin: 0 auto 8px auto;
+  width: 90px;
+  height: 90px;
+}
+
 .shopee-sidebar-avatar-circle {
+  position: relative;
   width: 90px;
   height: 90px;
   border-radius: 50%;
@@ -50,7 +58,6 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  margin-bottom: 12px;
   border: 2px solid #ffffff;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
 }
@@ -59,6 +66,50 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.shopee-avatar-upload-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.55);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  border-radius: 50%;
+}
+
+.shopee-sidebar-avatar-circle:hover .shopee-avatar-upload-overlay {
+  opacity: 1;
+}
+
+.shopee-change-photo-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ee4d2d;
+  background: rgba(238, 77, 45, 0.08);
+  border: 1px dashed rgba(238, 77, 45, 0.4);
+  padding: 5px 14px;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.shopee-change-photo-btn:hover {
+  background: #ee4d2d;
+  color: #ffffff;
+  border-style: solid;
 }
 
 .shopee-sidebar-user-title {
@@ -468,6 +519,17 @@
 .security-modal-input:focus {
   border-color: #dc2626;
   box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+html[data-theme="dark"] .shopee-change-photo-btn {
+  background: rgba(255, 122, 26, 0.15) !important;
+  color: #FF7A1A !important;
+  border-color: rgba(255, 122, 26, 0.4) !important;
+}
+
+html[data-theme="dark"] .shopee-change-photo-btn:hover {
+  background: #FF7A1A !important;
+  color: #FFFFFF !important;
 }
 
 .security-modal-actions {
