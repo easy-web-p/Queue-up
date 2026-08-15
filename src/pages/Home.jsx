@@ -105,7 +105,7 @@ function Home() {
         title:
           language === "en"
             ? `🎉 Welcome ${user ? user.name || user.email : "Member"}! Claim your ฿50 OFF coupon "WELCOME50" for your first order!`
-            : `🎉 ยินดีต้อนรับคุณ ${user ? user.name || user.email : "anime manga"} เข้าสู่ QueueUp! รับคูปองส่วนลดสมาชิกใหม่ "WELCOME50" ลดทันที 50 บาท!`,
+            : `🎉 ยินดีต้อนรับคุณ ${user ? user.name || user.email : "สมาชิก QueueUp"} เข้าสู่ QueueUp! รับคูปองส่วนลดสมาชิกใหม่ "WELCOME50" ลดทันที 50 บาท!`,
         actionType: "claim_coupon",
       });
     }

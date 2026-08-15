@@ -451,12 +451,16 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
                   src={user.photo}
                   alt={user.name || "User"}
                   className="shopee-user-avatar"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = "/yeti_mascot.jpg";
+                  }}
                 />
               ) : (
-                <span style={{ fontSize: "14px" }}>👤</span>
+                <i className="bi bi-person-circle text-white me-1" style={{ fontSize: "16px" }} />
               )}
               <span className="shopee-user-name">
-                {user ? user.name || user.email : "anime manga"}
+                {user ? user.name || user.email : "สมาชิก QueueUp"}
               </span>
               <span style={{ fontSize: "10px", marginLeft: "2px" }}>▾</span>
             </div>
