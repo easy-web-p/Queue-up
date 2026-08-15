@@ -39,6 +39,19 @@ const words = {
   },
 };
 
+/**
+ * คำนวณธีมในโหมด Auto ตามเวลาและไทม์โซนเครื่องของผู้ใช้ (Local Time / Timezone)
+ * - ช่วงเวลากลางคืน (18:00 น. - 06:00 น.): ปรับเป็นโหมดมืด (Dark Mode)
+ * - ช่วงเวลากลางวัน (06:00 น. - 18:00 น.): ปรับเป็นโหมดสว่าง (Light Mode)
+ * - หากระบบ OS ตั้งค่าโหมดมืดไว้: สลับเป็นโหมดมืด (Dark Mode)
+ */
+export const getAutoThemeByTimeAndSystem = () => {
+  const currentHour = new Date().getHours();
+  const isNightTime = currentHour >= 18 || currentHour < 6;
+  const isSystemDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  return isSystemDark || isNightTime ? "dark" : "light";
+};
+
 export function PreferencesProvider({ children }) {
   const [theme, setTheme] = useState(() => {
     return getCookie("queueup_theme") || localStorage.getItem("queueup_theme") || "light";
@@ -51,8 +64,7 @@ export function PreferencesProvider({ children }) {
     const updateTheme = () => {
       let effectiveTheme = theme;
       if (theme === "auto") {
-        const isSystemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        effectiveTheme = isSystemDark ? "dark" : "light";
+        effectiveTheme = getAutoThemeByTimeAndSystem();
       }
 
       document.documentElement.dataset.theme = effectiveTheme;
@@ -80,12 +92,22 @@ export function PreferencesProvider({ children }) {
     setCookie("queueup_language", language, 365);
 
     if (theme === "auto") {
+      // 1. ตรวจจับการเปลี่ยนแปลงของระบบปฏิบัติการ (OS prefers-color-scheme)
       const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
       const handleChange = () => updateTheme();
       if (mediaQuery.addEventListener) {
         mediaQuery.addEventListener("change", handleChange);
-        return () => mediaQuery.removeEventListener("change", handleChange);
       }
+
+      // 2. ตั้งเวลาตรวจเช็คเวลาของเครื่องผู้ใช้ (Local Time) ทุกๆ 60 วินาที
+      const timeInterval = setInterval(updateTheme, 60000);
+
+      return () => {
+        if (mediaQuery.removeEventListener) {
+          mediaQuery.removeEventListener("change", handleChange);
+        }
+        clearInterval(timeInterval);
+      };
     }
   }, [theme, language]);
 
