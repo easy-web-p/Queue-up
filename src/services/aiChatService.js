@@ -34,7 +34,7 @@ ${orderContext ? `บริบทออเดอร์ปัจจุบัน: 
           model: OPENAI_MODEL,
           messages: [
             { role: "system", content: systemPrompt },
-            { role: "user", content: userMessage },
+            { role: "user", content: cleanMessage },
           ],
           max_tokens: 150,
           temperature: 0.7,
@@ -52,7 +52,7 @@ ${orderContext ? `บริบทออเดอร์ปัจจุบัน: 
   }
 
   // Smart Context-Aware Local Fallback Response Engine
-  const msg = userMessage.toLowerCase();
+  const msg = cleanMessage.toLowerCase();
   
   if (msg.includes("เสร็จหรือยัง") || msg.includes("กี่นาที") || msg.includes("นานไหม")) {
     return `สวัสดีครับ! ทางร้าน ${storeName} กำลังปรุงอาหารสดใหม่ตามคิว ${orderContext?.queueNo || ""} คาดว่าจะเสร็จพร้อมเสิร์ฟใน 2-4 นาทีครับ 🍳⏱️`;

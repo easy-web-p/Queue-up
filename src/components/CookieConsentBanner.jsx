@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { setCookie, getCookie } from "../utils/cookieManager.js";
 import "./CookieConsentBanner.css";
 
@@ -7,19 +7,12 @@ import "./CookieConsentBanner.css";
  * Displays PDPA Cookie consent bar and allows customizing cookies.
  */
 export default function CookieConsentBanner() {
-  const [isVisible, setIsVisible] = useState(false);
+  const [isVisible, setIsVisible] = useState(() => !getCookie("queueup_cookie_consent"));
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Preference switches
   const [analyticsConsent, setAnalyticsConsent] = useState(true);
   const [marketingConsent, setMarketingConsent] = useState(true);
-
-  useEffect(() => {
-    const consent = getCookie("queueup_cookie_consent");
-    if (!consent) {
-      setIsVisible(true);
-    }
-  }, []);
 
   // Accept All Cookies
   const handleAcceptAll = () => {

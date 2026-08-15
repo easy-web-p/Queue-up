@@ -3,8 +3,9 @@ import { useParams, useNavigate } from "react-router-dom";
 import PaymentModal from "../components/PaymentModal.jsx";
 import ShopeeSearchBar from "../components/ShopeeSearchBar.jsx";
 import ChatModal from "../components/ChatModal.jsx";
+import Footer from "../components/Footer.jsx";
 import { PRODUCTS_BY_ID } from "../data/mockProducts.js";
-import { fetchProductByIdFromFirestore, fetchProductsFromFirestore } from "../lib/firebase.js";
+import { fetchProductByIdFromFirestore } from "../lib/firebase.js";
 import "./ProductDetail.css";
 
 const TIME_SLOTS = [
@@ -33,13 +34,11 @@ function ProductDetail() {
   const [selectedTimeSlot, setSelectedTimeSlot] = useState(TIME_SLOTS[1]);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [loadingFirestore, setLoadingFirestore] = useState(true);
 
   // Fetch product data dynamically from Firebase Firestore
   useEffect(() => {
     let isMounted = true;
     async function loadProductData() {
-      setLoadingFirestore(true);
       const docData = await fetchProductByIdFromFirestore(id);
       if (isMounted) {
         if (docData) {
@@ -50,7 +49,6 @@ function ProductDetail() {
           setProduct(fallback);
           setSelectedImg(fallback.mainImg || fallback.image);
         }
-        setLoadingFirestore(false);
       }
     }
     loadProductData();
@@ -293,6 +291,9 @@ function ProductDetail() {
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
       />
+
+      {/* Global Reusable Premium Footer */}
+      <Footer />
     </div>
   );
 }

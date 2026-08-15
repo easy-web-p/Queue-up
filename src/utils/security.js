@@ -1,4 +1,7 @@
-import { analyzeAndShieldInput, maskSensitiveData, logSecurityEvent } from "../services/aiSecurityShield.js";
+import { analyzeAndShieldInput, maskSensitiveData as maskData, logSecurityEvent as logEvent } from "../services/aiSecurityShield.js";
+
+export const maskSensitiveData = maskData;
+export const logSecurityEvent = logEvent;
 
 // 1. Sanitize text string to prevent Cross-Site Scripting (XSS) & AI Prompt Injections
 export const sanitizeInput = (input) => {

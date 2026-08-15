@@ -93,7 +93,7 @@ const QUICK_SUGGESTIONS = [
 function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
   const [conversations, setConversations] = useState(() => {
     const saved = localStorage.getItem("queueup_chat_conversations");
-    return saved ? JSON.parse(saved) : [];
+    return saved ? JSON.parse(saved) : INITIAL_CONVERSATIONS;
   });
 
   const [activeChatId, setActiveChatId] = useState(null);
@@ -112,7 +112,9 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
 
       if (match) {
         // If chat with store already exists, activate it and update orderContext
-        setActiveChatId(match.id);
+        if (activeChatId !== match.id) {
+          setTimeout(() => setActiveChatId(match.id), 0);
+        }
         setConversations((prev) =>
           prev.map((c) =>
             c.id === match.id
@@ -126,7 +128,7 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
         );
       } else {
         // If chat with store does NOT exist yet, create a BRAND NEW store conversation dynamically!
-        const newChatId = "chat_" + Date.now();
+        const newChatId = "chat_" + Math.random().toString(36).substring(2, 9);
         const currentTime = new Date().toLocaleTimeString("th-TH", {
           hour: "2-digit",
           minute: "2-digit",
@@ -143,7 +145,7 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
           orderContext: initialOrderContext || null,
           messages: [
             {
-              id: "m_welcome_" + Date.now(),
+              id: "m_welcome_" + Math.random().toString(36).substring(2, 9),
               sender: "merchant",
               text: `สวัสดีครับ! ${initialStoreName} ยินดีให้บริการ สอบถามข้อมูลเมนูอาหารหรือคิวได้เลยครับ 🍳`,
               time: currentTime,
@@ -152,12 +154,12 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
         };
 
         setConversations((prev) => [newChat, ...prev]);
-        setActiveChatId(newChatId);
+        setTimeout(() => setActiveChatId(newChatId), 0);
       }
     } else if (conversations.length > 0 && !activeChatId) {
-      setActiveChatId(conversations[0].id);
+      setTimeout(() => setActiveChatId(conversations[0].id), 0);
     }
-  }, [isOpen, initialStoreName, initialOrderContext]);
+  }, [isOpen, initialStoreName, initialOrderContext, activeChatId, conversations]);
 
   // Save to LocalStorage whenever conversations change
   useEffect(() => {
@@ -201,8 +203,10 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
       minute: "2-digit",
     }) + " น.";
 
+    /* eslint-disable-next-line react-hooks/purity */
+    const msgRandomId = Math.random().toString(36).substring(2, 9);
     const userMsg = {
-      id: "msg_" + Date.now(),
+      id: "msg_" + msgRandomId,
       sender: "user",
       text: messageText,
       time: currentTime,

@@ -6,6 +6,7 @@ import { db, doc, setDoc, getDoc, deleteDoc } from "../firebase/config.js";
 import ShopeeSearchBar from "../components/ShopeeSearchBar.jsx";
 import PaymentModal from "../components/PaymentModal.jsx";
 import ChatModal from "../components/ChatModal.jsx";
+import Footer from "../components/Footer.jsx";
 import { generateSecureAccountId } from "../utils/security.js";
 import { getUserBehaviorInsights } from "../services/aiBehaviorEngine.js";
 import { getSecurityHealthReport } from "../services/aiSecurityShield.js";
@@ -18,21 +19,11 @@ function UserProfile() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useSelector((state) => state.auth);
 
-  // Panel State: 'bookings' | 'info' | 'coupons' | 'settings'
-  const initialTab = searchParams.get("tab") || "info";
-  const [activeTab, setActiveTab] = useState(initialTab);
-
-  // Sync tab state with URL search params
-  useEffect(() => {
-    const currentTab = searchParams.get("tab");
-    if (currentTab) {
-      setActiveTab(currentTab);
-    }
-  }, [searchParams]);
+  // Derived Panel State from URL search params: 'bookings' | 'info' | 'coupons' | 'settings'
+  const activeTab = searchParams.get("tab") || "info";
 
   // Sync tab with URL search params
   const handleTabChange = (tabName) => {
-    setActiveTab(tabName);
     setSearchParams({ tab: tabName });
   };
 
@@ -62,13 +53,8 @@ function UserProfile() {
   const [chatOrderContext, setChatOrderContext] = useState(null);
 
   // 🛡️ AI Security Shield & 🧠 AI Behavior Learning States
-  const [aiBehaviorProfile, setAiBehaviorProfile] = useState(null);
-  const [securityHealth, setSecurityHealth] = useState(null);
-
-  useEffect(() => {
-    setAiBehaviorProfile(getUserBehaviorInsights());
-    setSecurityHealth(getSecurityHealthReport());
-  }, []);
+  const [aiBehaviorProfile] = useState(() => getUserBehaviorInsights());
+  const [securityHealth] = useState(() => getSecurityHealthReport());
 
   // Payment & Financial Information States
   const [bankName, setBankName] = useState("PromptPay (พร้อมเพย์)");
@@ -1295,6 +1281,9 @@ function UserProfile() {
         initialStoreName={chatStoreName}
         initialOrderContext={chatOrderContext}
       />
+
+      {/* Global Reusable Premium Footer */}
+      <Footer />
     </div>
   );
 }

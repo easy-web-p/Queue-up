@@ -115,7 +115,7 @@ export function getUserBehaviorInsights() {
         ? `เมนูโปรดของคุณคือ "${topFavoriteDish}" (${frequentVariant ? `ชอบระบุ "${frequentVariant}"` : "ไม่ระบุซอสพิเศษ"}) สั่งซ้ำได้ใน 1 คลิก!`
         : "สั่งซื้อเมนูอร่อยกับเราอย่างต่อเนื่อง เพื่อให้ AI จดจำรสชาติที่คุณชอบที่สุด",
     };
-  } catch (err) {
+  } catch {
     return {
       hasData: false,
       totalOrders: 0,

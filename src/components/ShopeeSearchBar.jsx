@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth.js";
@@ -31,11 +31,9 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [scope, setScope] = useState("shop"); // 'shop' (ในร้านนี้) | 'all' (ทั้งหมด)
   const [isScopeOpen, setIsScopeOpen] = useState(false);
-  const [suggestions, setSuggestions] = useState([]);
   const [isInputFocused, setIsInputFocused] = useState(false);
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isThemeOpen, setIsThemeOpen] = useState(false);
+  const [, setIsNotificationOpen] = useState(false);
 
   useEffect(() => {
     const handleOutsideClick = () => {
@@ -90,16 +88,14 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // 2. Filter Logic (ค้นหาคีย์เวิร์ดเมื่อ debouncedQuery เปลี่ยนแปลง)
-  useEffect(() => {
+  // 2. Filter Logic (ค้นหาคีย์เวิร์ดด้วย useMemo เพื่อหลีกเลี่ยงการ setState ใน useEffect)
+  const suggestions = useMemo(() => {
     if (debouncedQuery.trim().length > 0) {
-      const filtered = MOCK_PRODUCTS.filter((item) =>
+      return MOCK_PRODUCTS.filter((item) =>
         item.toLowerCase().includes(debouncedQuery.toLowerCase())
       );
-      setSuggestions(filtered);
-    } else {
-      setSuggestions([]);
     }
+    return [];
   }, [debouncedQuery]);
 
   const handleSearchSubmit = (e) => {

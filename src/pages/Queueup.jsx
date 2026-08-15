@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { fetchEvaluationsFromFirestore, submitEvaluationToFirestore } from "../lib/firebase.js";
 import PdpaPolicyModal from "../components/PdpaPolicyModal.jsx";
+import Footer from "../components/Footer.jsx";
 import "./Queueup.css";
 
 /**
@@ -13,7 +14,6 @@ export default function Queueup() {
   const navigate = useNavigate();
   const { user } = useSelector((state) => state.auth);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [activeTab, setActiveTab] = useState("story"); // 'story' | 'vision' | 'mission'
 
   // Dynamic Real User Evaluations State
   const [evaluations, setEvaluations] = useState([]);
@@ -820,6 +820,9 @@ export default function Queueup() {
         isOpen={isPdpaModalOpen}
         onClose={() => setIsPdpaModalOpen(false)}
       />
+
+      {/* Global Reusable Premium Footer */}
+      <Footer />
     </div>
   );
 }

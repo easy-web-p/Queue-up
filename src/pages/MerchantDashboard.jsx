@@ -97,17 +97,10 @@ function MerchantDashboard() {
   const [chatOrderContext, setChatOrderContext] = useState(null);
 
   // 🤖 AI Marketing & Security Shield States
-  const [aiMarketingCoupons, setAiMarketingCoupons] = useState([]);
-  const [activeCouponsList, setActiveCouponsList] = useState([]);
-  const [securityReport, setSecurityReport] = useState(null);
+  const [aiMarketingCoupons] = useState(() => generateAIMarketingRecommendations());
+  const [activeCouponsList, setActiveCouponsList] = useState(() => getActiveMerchantCoupons());
+  const [securityReport] = useState(() => getSecurityHealthReport());
   const [marketingSuccessMsg, setMarketingSuccessMsg] = useState("");
-
-  // Initialize AI Marketing & Security Report
-  useEffect(() => {
-    setAiMarketingCoupons(generateAIMarketingRecommendations());
-    setActiveCouponsList(getActiveMerchantCoupons());
-    setSecurityReport(getSecurityHealthReport());
-  }, []);
 
   const handleDeployCoupon = (coupon) => {
     const success = deployAICoupon(coupon);

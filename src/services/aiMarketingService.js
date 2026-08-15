@@ -12,8 +12,7 @@ const ACTIVE_COUPONS_STORAGE_KEY = "queueup_active_merchant_coupons_v1";
  * @param {object} storeMetrics - { totalSalesToday: number, totalOrdersToday: number, topSellerDish: string, currentHour: number }
  * @returns {Array<object>} Array of recommended coupon packages with ROI predictions
  */
-export function generateAIMarketingRecommendations(storeMetrics = {}) {
-  const currentHour = new Date().getHours();
+export function generateAIMarketingRecommendations() {
   const recommendations = [];
 
   // Strategy A: Off-Peak Hours Booster (Happy Hour Coupon)
@@ -88,7 +87,7 @@ export function getActiveMerchantCoupons() {
         deployedAt: new Date().toISOString(),
       },
     ];
-  } catch (err) {
+  } catch {
     return [];
   }
 }
@@ -121,8 +120,7 @@ export function deployAICoupon(couponObj) {
 
     localStorage.setItem(ACTIVE_COUPONS_STORAGE_KEY, JSON.stringify(activeCoupons));
     return true;
-  } catch (err) {
-    console.warn("Deploy AI Coupon error:", err);
+  } catch {
     return false;
   }
 }
@@ -141,7 +139,7 @@ export function toggleCouponState(code) {
     });
     localStorage.setItem(ACTIVE_COUPONS_STORAGE_KEY, JSON.stringify(updated));
     return updated;
-  } catch (err) {
+  } catch {
     return getActiveMerchantCoupons();
   }
 }
@@ -177,15 +175,12 @@ export function applyCouponToOrder(code, totalAmount) {
     };
   }
 
-  let discountAmount = 0;
-  if (target.discountType === "PERCENT") {
-    discountAmount = Math.round((totalAmount * target.discountValue) / 100);
-  } else {
-    discountAmount = target.discountValue;
-  }
+  const calculatedDiscount = target.discountType === "PERCENT"
+    ? Math.round((totalAmount * target.discountValue) / 100)
+    : target.discountValue;
 
   // Ensure discount does not exceed total
-  discountAmount = Math.min(discountAmount, totalAmount);
+  const discountAmount = Math.min(calculatedDiscount, totalAmount);
 
   return {
     valid: true,

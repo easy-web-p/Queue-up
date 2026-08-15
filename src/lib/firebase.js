@@ -218,7 +218,7 @@ export const fetchEvaluationsFromFirestore = async () => {
     try {
       const parsed = JSON.parse(stored);
       if (parsed && parsed.length > 0) return parsed;
-    } catch (e) {
+    } catch {
       // ignore
     }
   }

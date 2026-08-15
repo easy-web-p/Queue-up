@@ -234,7 +234,7 @@ export function getSecurityHealthReport() {
       lastScanTime: new Date().toISOString(),
       recentLogs: logs.slice(0, 5),
     };
-  } catch (err) {
+  } catch {
     return {
       status: "HEALTHY",
       totalLogs: 0,

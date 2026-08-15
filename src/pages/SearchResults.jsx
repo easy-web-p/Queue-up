@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import FoodCard from "../components/FoodCard.jsx";
 import ShopeeSearchBar from "../components/ShopeeSearchBar.jsx";
 import ChatModal from "../components/ChatModal.jsx";
+import Footer from "../components/Footer.jsx";
 import { SHARED_PRODUCTS } from "../data/mockProducts.js";
 import { fetchProductsFromFirestore } from "../lib/firebase.js";
 import "./SearchResults.css";
@@ -376,6 +377,9 @@ function SearchResults() {
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
       />
+
+      {/* Global Reusable Premium Footer */}
+      <Footer />
     </div>
   );
 }

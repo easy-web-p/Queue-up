@@ -57,7 +57,6 @@ function Login() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState("");
-  const [checkingEmail, setCheckingEmail] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
@@ -88,7 +87,7 @@ function Login() {
     hasUpper: /[A-Z]/.test(pwd),
     hasLower: /[a-z]/.test(pwd),
     hasNumber: /[0-9]/.test(pwd),
-    hasSpecial: /[!@#$%^&*_\-]/.test(pwd),
+    hasSpecial: /[!@#$%^&*_-]/.test(pwd),
   });
 
   const pwdValidation = validatePassword(password);

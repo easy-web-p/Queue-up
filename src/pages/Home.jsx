@@ -1,8 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useSelector, useDispatch } from "react-redux";
+import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../context/useAuth.js";
-import { clearUser } from "../store/authSlice.js";
 import {
   fetchFoodCategoriesFromFirestore,
   saveCategoryToFirestore,
@@ -12,9 +10,10 @@ import {
 import FoodCard from "../components/FoodCard.jsx";
 import ShopeeSearchBar from "../components/ShopeeSearchBar.jsx";
 import ChatModal from "../components/ChatModal.jsx";
+import Footer from "../components/Footer.jsx";
 import { usePreferences } from "../context/PreferencesContext.jsx";
 import { SHARED_PRODUCTS } from "../data/mockProducts.js";
-import { INITIAL_PRODUCTS, INITIAL_CATEGORIES } from "../firebase/config.js";
+import { INITIAL_PRODUCTS } from "../firebase/config.js";
 import { getUserBehaviorInsights, predictQueueWaitTime, recordUserOrderBehavior } from "../services/aiBehaviorEngine.js";
 import { getActiveMerchantCoupons } from "../services/aiMarketingService.js";
 import "./Home.css";
@@ -43,33 +42,23 @@ const DEFAULT_CATEGORIES = [
 
 const DEFAULT_MENU_ITEMS = INITIAL_PRODUCTS || SHARED_PRODUCTS;
 
-
-
 function Home() {
-  const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
-  const { logout } = useAuth();
   const navigate = useNavigate();
   const { language } = usePreferences();
 
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
-  const [shops, setShops] = useState([]);
+  const [, setShops] = useState([]);
   const [menuItems, setMenuItems] = useState(DEFAULT_MENU_ITEMS);
   const [favorites, setFavorites] = useState([]);
   const [showNotice, setShowNotice] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(false);
 
   // 🧠 AI User Behavior & Live Merchant Coupons States
-  const [aiInsights, setAiInsights] = useState(null);
-  const [queuePrediction, setQueuePrediction] = useState(null);
-  const [liveCoupons, setLiveCoupons] = useState([]);
-
-  useEffect(() => {
-    setAiInsights(getUserBehaviorInsights());
-    setQueuePrediction(predictQueueWaitTime(3));
-    setLiveCoupons(getActiveMerchantCoupons());
-  }, []);
+  const [aiInsights] = useState(() => getUserBehaviorInsights());
+  const [queuePrediction] = useState(() => predictQueueWaitTime(3));
+  const [liveCoupons] = useState(() => getActiveMerchantCoupons());
 
   // Carousel Horizontal Auto-scroll state & ref
   const carouselRef = useRef(null);
@@ -229,8 +218,6 @@ function Home() {
   const filteredMenuItems = (menuItems || []).filter((item) => {
     return selectedCategory === "all" || item?.category === selectedCategory;
   });
-
-  const hasNotice = showNotice && appUpdatesList.length > 0;
 
   return (
     <div className="queue-home-container">
@@ -512,7 +499,7 @@ function Home() {
                         try {
                           navigator.clipboard.writeText(liveCoupons[0].code);
                           alert(`คัดลอกโค้ดส่วนลด "${liveCoupons[0].code}" เรียบร้อยแล้ว!`);
-                        } catch (e) {
+                        } catch {
                           alert(`รหัสคูปอง: ${liveCoupons[0].code}`);
                         }
                       }}
@@ -612,6 +599,9 @@ function Home() {
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
       />
+
+      {/* Global Reusable Premium Footer */}
+      <Footer />
     </div>
   );
 }
