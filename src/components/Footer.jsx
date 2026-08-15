@@ -1,15 +1,14 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import PdpaPolicyModal from "./PdpaPolicyModal.jsx";
 import { getSecurityHealthReport } from "../services/aiSecurityShield.js";
 import "./Footer.css";
 
 /**
  * QUEUEUP MODERN REUSABLE FOOTER COMPONENT (Footer.jsx)
  * High-converting, accessible, responsive footer with AI Security Shield indicator.
+ * All PDPA and Terms links navigate to standalone /pdpa page.
  */
 export default function Footer() {
-  const [isPdpaOpen, setIsPdpaOpen] = useState(false);
   const [securityReport] = useState(() => getSecurityHealthReport());
 
   return (
@@ -78,18 +77,20 @@ export default function Footer() {
             <h4 className="qup-footer-heading">ศูนย์ช่วยเหลือ (Support)</h4>
             <ul className="qup-footer-links">
               <li className="qup-footer-link-item">
-                <button onClick={() => setIsPdpaOpen(true)}>
+                <Link to="/pdpa?tab=privacy">
                   <i className="bi bi-shield-lock" />
                   <span>นโยบายคุ้มครองข้อมูล PDPA</span>
-                </button>
+                </Link>
               </li>
               <li className="qup-footer-link-item">
-                <button onClick={() => {
-                  try {
-                    localStorage.removeItem("queueup_cookie_consent");
-                    window.location.reload();
-                  } catch {}
-                }}>
+                <button
+                  onClick={() => {
+                    try {
+                      localStorage.removeItem("queueup_cookie_consent");
+                      window.location.reload();
+                    } catch {}
+                  }}
+                >
                   <i className="bi bi-sliders" />
                   <span>ตั้งค่าคุกกี้ (Cookie Settings)</span>
                 </button>
@@ -123,7 +124,7 @@ export default function Footer() {
               <a href="#instagram" className="qup-footer-social-btn" title="Instagram">
                 <i className="bi bi-instagram" />
               </a>
-              <a href="#youtube" className="qup-footer-social-btn" title="YouTube">
+              <a href="#youtube" className="qup-footer-social-btn" title="Youtube">
                 <i className="bi bi-youtube" />
               </a>
             </div>
@@ -160,9 +161,6 @@ export default function Footer() {
           </div>
         </div>
       </div>
-
-      {/* Global PDPA Modal Integration */}
-      <PdpaPolicyModal isOpen={isPdpaOpen} onClose={() => setIsPdpaOpen(false)} />
     </footer>
   );
 }

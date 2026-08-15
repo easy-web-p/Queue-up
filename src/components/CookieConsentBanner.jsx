@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { setCookie, getCookie } from "../utils/cookieManager.js";
 import "./CookieConsentBanner.css";
 
@@ -60,7 +61,10 @@ export default function CookieConsentBanner() {
                 การจัดเก็บคุกกี้บนเว็บไซต์ (PDPA Cookie Compliance)
               </div>
               <p className="qup-cookie-desc">
-                เว็บไซต์ QueueUp ใช้คุกกี้ (Cookies) เพื่อเพิ่มประสิทธิภาพในการใช้งาน ยืนยันตัวตนเซสชันจองคิว จัดเก็บรหัสบัญชีปลอดภัย และนำเสนอคูปองโปรโมชั่นอาหารที่เหมาะกับคุณ คุณสามารถตั้งค่าตัวเลือกคุกกี้ได้ตามความต้องการ
+                เว็บไซต์ QueueUp ใช้คุกกี้ (Cookies) เพื่อเพิ่มประสิทธิภาพในการใช้งาน ยืนยันตัวตนเซสชันจองคิว จัดเก็บรหัสบัญชีปลอดภัย และนำเสนอคูปองโปรโมชั่นอาหารที่เหมาะกับคุณ{" "}
+                <Link to="/pdpa?tab=privacy" className="text-warning text-decoration-underline ms-1">
+                  อ่านนโยบาย PDPA ฉบับเต็ม
+                </Link>
               </p>
             </div>
           </div>
