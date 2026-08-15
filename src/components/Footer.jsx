@@ -11,6 +11,14 @@ import "./Footer.css";
 export default function Footer() {
   const [securityReport] = useState(() => getSecurityHealthReport());
 
+  // Scroll window smooth to top on footer link click
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  };
+
   return (
     <footer className="qup-footer">
       <div className="qup-footer-container">
@@ -40,31 +48,31 @@ export default function Footer() {
             <h4 className="qup-footer-heading">ลิงก์ด่วน (Navigation)</h4>
             <ul className="qup-footer-links">
               <li className="qup-footer-link-item">
-                <Link to="/home">
+                <Link to="/home" onClick={scrollToTop}>
                   <i className="bi bi-house-door" />
                   <span>หน้าหลักโรงอาหาร</span>
                 </Link>
               </li>
               <li className="qup-footer-link-item">
-                <Link to="/search?keyword=ทั้งหมด">
+                <Link to="/search?keyword=ทั้งหมด" onClick={scrollToTop}>
                   <i className="bi bi-search" />
                   <span>เมนูอาหารทั้งหมด</span>
                 </Link>
               </li>
               <li className="qup-footer-link-item">
-                <Link to="/user/account/profile?tab=bookings">
+                <Link to="/user/account/profile?tab=bookings" onClick={scrollToTop}>
                   <i className="bi bi-journal-check" />
                   <span>ตรวจสอบคิวที่จองไว้</span>
                 </Link>
               </li>
               <li className="qup-footer-link-item">
-                <Link to="/merchant/dashboard">
+                <Link to="/merchant/dashboard" onClick={scrollToTop}>
                   <i className="bi bi-shop" />
                   <span>ระบบหลังบ้านร้านค้า</span>
                 </Link>
               </li>
               <li className="qup-footer-link-item">
-                <Link to="/queueup">
+                <Link to="/queueup" onClick={scrollToTop}>
                   <i className="bi bi-award" />
                   <span>เกี่ยวกับโครงการ QueueUp</span>
                 </Link>
@@ -77,7 +85,7 @@ export default function Footer() {
             <h4 className="qup-footer-heading">ศูนย์ช่วยเหลือ (Support)</h4>
             <ul className="qup-footer-links">
               <li className="qup-footer-link-item">
-                <Link to="/pdpa?tab=privacy">
+                <Link to="/pdpa?tab=privacy" onClick={scrollToTop}>
                   <i className="bi bi-shield-lock" />
                   <span>นโยบายคุ้มครองข้อมูล PDPA</span>
                 </Link>
@@ -154,10 +162,16 @@ export default function Footer() {
             © 2026 <strong>QueueUp Canteen CRM & Smart Queue</strong>. สงวนลิขสิทธิ์ตามกฎหมายไทย
           </div>
           <div className="qup-footer-bottom-links">
-            <Link to="/pdpa?tab=terms">ข้อกำหนดเงื่อนไข</Link>
-            <Link to="/pdpa?tab=privacy">ความเป็นส่วนตัว (PDPA)</Link>
+            <Link to="/pdpa?tab=terms" onClick={scrollToTop}>ข้อกำหนดเงื่อนไข</Link>
+            <Link to="/pdpa?tab=privacy" onClick={scrollToTop}>ความเป็นส่วนตัว (PDPA)</Link>
             <span>•</span>
-            <span>ความพร้อมใช้งานระบบ 99.98% ⚡</span>
+            <button
+              onClick={scrollToTop}
+              className="text-slate-400 bg-transparent border-0 p-0 text-decoration-underline"
+              style={{ cursor: "pointer", fontSize: "0.85rem" }}
+            >
+              เลื่อนกลับสู่ด้านบนสุด ⬆️
+            </button>
           </div>
         </div>
       </div>

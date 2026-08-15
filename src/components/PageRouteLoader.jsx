@@ -24,7 +24,8 @@ function PageRouteLoader() {
       return;
     }
 
-    // เมื่อเกิดการเปลี่ยนเส้นทาง (Route Change)
+    // เมื่อเกิดการเปลี่ยนเส้นทาง (Route Change) - Scroll window to top!
+    window.scrollTo(0, 0);
     setIsLoading(true);
     setIsFadingOut(false);
     setProgress(20);
