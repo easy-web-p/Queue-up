@@ -7,6 +7,8 @@ import ShopeeSearchBar from "../components/ShopeeSearchBar.jsx";
 import PaymentModal from "../components/PaymentModal.jsx";
 import ChatModal from "../components/ChatModal.jsx";
 import { generateSecureAccountId } from "../utils/security.js";
+import { getUserBehaviorInsights } from "../services/aiBehaviorEngine.js";
+import { getSecurityHealthReport } from "../services/aiSecurityShield.js";
 import "./UserProfile.css";
 import "./UserPurchase.css";
 
@@ -58,6 +60,15 @@ function UserProfile() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatStoreName, setChatStoreName] = useState("");
   const [chatOrderContext, setChatOrderContext] = useState(null);
+
+  // 🛡️ AI Security Shield & 🧠 AI Behavior Learning States
+  const [aiBehaviorProfile, setAiBehaviorProfile] = useState(null);
+  const [securityHealth, setSecurityHealth] = useState(null);
+
+  useEffect(() => {
+    setAiBehaviorProfile(getUserBehaviorInsights());
+    setSecurityHealth(getSecurityHealthReport());
+  }, []);
 
   // Payment & Financial Information States
   const [bankName, setBankName] = useState("PromptPay (พร้อมเพย์)");
@@ -645,6 +656,67 @@ function UserProfile() {
                   หากมีปัญหาเกี่ยวกับการจอง เราจะติดต่อคุณที่เบอร์นี้
                 </div>
               </div>
+
+              {/* 🛡️ AI SECURITY SENTINEL STATUS CARD */}
+              {securityHealth && (
+                <div className="p-3 rounded-3 mb-3 text-dark border" style={{ background: "#f8fafc", borderColor: "#e2e8f0" }}>
+                  <div className="d-flex align-items-center justify-content-between mb-2">
+                    <div className="fw-bold text-primary">
+                      <i className="bi bi-shield-lock-fill me-2" />
+                      {securityHealth.shieldVersion}
+                    </div>
+                    <span className="badge bg-success">
+                      {securityHealth.status === "HEALTHY" ? "🛡️ เกราะป้องกันสมบูรณ์ 100%" : "⚠️ มีคำขอสุ่มเสี่ยงถูกบล็อก"}
+                    </span>
+                  </div>
+                  <div className="row g-2 text-center text-xs">
+                    <div className="col-4">
+                      <div className="bg-white p-2 rounded border">
+                        <div className="text-muted">ภัยคุกคามที่ถูกบล็อก</div>
+                        <div className="fw-bold text-danger fs-6">{securityHealth.threatsBlocked} ครั้ง</div>
+                      </div>
+                    </div>
+                    <div className="col-4">
+                      <div className="bg-white p-2 rounded border">
+                        <div className="text-muted">Rate Limits ยับยั้ง</div>
+                        <div className="fw-bold text-warning fs-6">{securityHealth.rateLimitsTriggered} ครั้ง</div>
+                      </div>
+                    </div>
+                    <div className="col-4">
+                      <div className="bg-white p-2 rounded border">
+                        <div className="text-muted">การเข้ารหัส PII</div>
+                        <div className="fw-bold text-success fs-6">AES-256-GCM</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 🧠 AI USER BEHAVIOR INTELLIGENCE CARD */}
+              {aiBehaviorProfile && (
+                <div className="p-3 rounded-3 mb-3 border text-dark" style={{ background: "#f0fdf4", borderColor: "#bbf7d0" }}>
+                  <div className="fw-bold text-success mb-1">
+                    <i className="bi bi-brain me-2" />
+                    🧠 AI Behavior Intelligence สรุปพฤติกรรมการใช้งานของคุณ
+                  </div>
+                  <p className="small text-muted mb-2">{aiBehaviorProfile.aiSuggestion}</p>
+                  <div className="d-flex gap-2">
+                    {aiBehaviorProfile.topFavoriteDish && (
+                      <span className="badge bg-white text-success border">
+                        🍲 เมนูโปรด: {aiBehaviorProfile.topFavoriteDish}
+                      </span>
+                    )}
+                    {aiBehaviorProfile.frequentVariant && (
+                      <span className="badge bg-white text-success border">
+                        ✨ ตัวเลือกซ้ำ: {aiBehaviorProfile.frequentVariant}
+                      </span>
+                    )}
+                    <span className="badge bg-white text-dark border">
+                      🛒 สั่งซื้อสะสม: {aiBehaviorProfile.totalOrders} ครั้ง
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

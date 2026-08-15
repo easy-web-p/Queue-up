@@ -15,6 +15,8 @@ import ChatModal from "../components/ChatModal.jsx";
 import { usePreferences } from "../context/PreferencesContext.jsx";
 import { SHARED_PRODUCTS } from "../data/mockProducts.js";
 import { INITIAL_PRODUCTS, INITIAL_CATEGORIES } from "../firebase/config.js";
+import { getUserBehaviorInsights, predictQueueWaitTime, recordUserOrderBehavior } from "../services/aiBehaviorEngine.js";
+import { getActiveMerchantCoupons } from "../services/aiMarketingService.js";
 import "./Home.css";
 
 const DEFAULT_CATEGORIES = [
@@ -57,6 +59,17 @@ function Home() {
   const [favorites, setFavorites] = useState([]);
   const [showNotice, setShowNotice] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(false);
+
+  // 🧠 AI User Behavior & Live Merchant Coupons States
+  const [aiInsights, setAiInsights] = useState(null);
+  const [queuePrediction, setQueuePrediction] = useState(null);
+  const [liveCoupons, setLiveCoupons] = useState([]);
+
+  useEffect(() => {
+    setAiInsights(getUserBehaviorInsights());
+    setQueuePrediction(predictQueueWaitTime(3));
+    setLiveCoupons(getActiveMerchantCoupons());
+  }, []);
 
   // Carousel Horizontal Auto-scroll state & ref
   const carouselRef = useRef(null);
@@ -429,6 +442,89 @@ function Home() {
                 />
               </div>
             ))}
+          </div>
+        </section>
+
+        {/* 5.5 AI SMART BEHAVIOR & CONVENIENCE BAR + LIVE COUPONS TICKER */}
+        <section className="bg-white p-4 rounded-4 shadow-sm border mb-4">
+          <div className="d-flex align-items-center justify-content-between mb-3">
+            <h5 className="fw-bold text-dark mb-0">
+              <i className="bi bi-robot text-primary me-2" />
+              🧠 AI Smart Assistant & คูปองส่วนลดพิเศษประจำวัน
+            </h5>
+            {queuePrediction && (
+              <span className="badge bg-primary-subtle text-primary p-2 fs-6">
+                ⏱️ AI คาดการณ์เวลารอคิวเฉลี่ย: {queuePrediction.formattedRange} ({queuePrediction.statusText})
+              </span>
+            )}
+          </div>
+
+          <div className="row g-3">
+            {/* Quick Re-order Card based on AI Behavior Learning */}
+            {aiInsights && aiInsights.lastOrderedItem ? (
+              <div className="col-md-6">
+                <div className="p-3 rounded-3 border bg-gradient text-dark d-flex align-items-center justify-content-between" style={{ background: "#f0f9ff", borderColor: "#bae6fd" }}>
+                  <div>
+                    <span className="badge bg-primary mb-1">⚡ AI Quick Re-order (สั่งต่อใน 1 คลิก)</span>
+                    <h6 className="fw-bold mb-1">{aiInsights.lastOrderedItem.itemTitle}</h6>
+                    <p className="text-muted small mb-0">
+                      {aiInsights.lastOrderedItem.variant ? `ตัวเลือก: ${aiInsights.lastOrderedItem.variant} • ` : ""}
+                      ราคา ฿{aiInsights.lastOrderedItem.price}
+                    </p>
+                  </div>
+                  <button
+                    className="btn btn-sm btn-primary fw-bold shadow-sm"
+                    onClick={() => {
+                      recordUserOrderBehavior(aiInsights.lastOrderedItem);
+                      navigate(`/product/${aiInsights.lastOrderedItem.itemId || "prod-default"}`);
+                    }}
+                  >
+                    สั่งซ้ำอีกครั้ง 🛒
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="col-md-6">
+                <div className="p-3 rounded-3 border text-dark" style={{ background: "#fafafa" }}>
+                  <span className="badge bg-secondary mb-1">💡 AI Behavioral Learning</span>
+                  <p className="small mb-0 text-muted">
+                    {aiInsights?.aiSuggestion || "ระบบกำลังเรียนรู้พฤติกรรมการสั่งซื้อของคุณ สั่งอาหารมื้อนี้เพื่อเปิดใช้งาน 1-Click Quick Re-order"}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Live Active Merchant Coupons Ticker */}
+            <div className="col-md-6">
+              <div className="p-3 rounded-3 border bg-light">
+                <span className="badge bg-success mb-1">🏷️ คูปองร้านค้าที่เปิดใช้งาน (Live)</span>
+                {liveCoupons && liveCoupons.length > 0 ? (
+                  <div className="d-flex align-items-center justify-content-between">
+                    <div>
+                      <strong className="text-primary">{liveCoupons[0].code}</strong> - {liveCoupons[0].title}
+                      <div className="text-success small fw-bold">
+                        ส่วนลด {liveCoupons[0].discountType === "PERCENT" ? `${liveCoupons[0].discountValue}%` : `฿${liveCoupons[0].discountValue}`} (เมื่อสั่งขั้นต่ำ ฿{liveCoupons[0].minSpend})
+                      </div>
+                    </div>
+                    <button
+                      className="btn btn-sm btn-outline-success fw-bold ms-2"
+                      onClick={() => {
+                        try {
+                          navigator.clipboard.writeText(liveCoupons[0].code);
+                          alert(`คัดลอกโค้ดส่วนลด "${liveCoupons[0].code}" เรียบร้อยแล้ว!`);
+                        } catch (e) {
+                          alert(`รหัสคูปอง: ${liveCoupons[0].code}`);
+                        }
+                      }}
+                    >
+                      คัดลอกโค้ด 📋
+                    </button>
+                  </div>
+                ) : (
+                  <p className="small mb-0 text-muted">ยังไม่มีคูปองเปิดใช้งานอยู่ขณะนี้</p>
+                )}
+              </div>
+            </div>
           </div>
         </section>
 

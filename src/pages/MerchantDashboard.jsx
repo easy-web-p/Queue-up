@@ -5,6 +5,13 @@ import { switchRole } from "../store/authSlice.js";
 import { db, doc, getDoc, setDoc } from "../firebase/config.js";
 import { SHARED_PRODUCTS } from "../data/mockProducts.js";
 import ChatModal from "../components/ChatModal.jsx";
+import {
+  generateAIMarketingRecommendations,
+  getActiveMerchantCoupons,
+  deployAICoupon,
+  toggleCouponState,
+} from "../services/aiMarketingService.js";
+import { getSecurityHealthReport } from "../services/aiSecurityShield.js";
 import "./MerchantDashboard.css";
 
 const MOCK_MERCHANT_ORDERS = [
@@ -88,6 +95,33 @@ function MerchantDashboard() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatCustomerName, setChatCustomerName] = useState("");
   const [chatOrderContext, setChatOrderContext] = useState(null);
+
+  // 🤖 AI Marketing & Security Shield States
+  const [aiMarketingCoupons, setAiMarketingCoupons] = useState([]);
+  const [activeCouponsList, setActiveCouponsList] = useState([]);
+  const [securityReport, setSecurityReport] = useState(null);
+  const [marketingSuccessMsg, setMarketingSuccessMsg] = useState("");
+
+  // Initialize AI Marketing & Security Report
+  useEffect(() => {
+    setAiMarketingCoupons(generateAIMarketingRecommendations());
+    setActiveCouponsList(getActiveMerchantCoupons());
+    setSecurityReport(getSecurityHealthReport());
+  }, []);
+
+  const handleDeployCoupon = (coupon) => {
+    const success = deployAICoupon(coupon);
+    if (success) {
+      setActiveCouponsList(getActiveMerchantCoupons());
+      setMarketingSuccessMsg(`เปิดใช้งานคูปอง "${coupon.code}" เรียบร้อยแล้ว! ลูกค้าสามารถใช้ส่วนลดได้ทันที 🎉`);
+      setTimeout(() => setMarketingSuccessMsg(""), 4000);
+    }
+  };
+
+  const handleToggleCoupon = (code) => {
+    const updated = toggleCouponState(code);
+    setActiveCouponsList(updated);
+  };
 
   // Fetch Firestore Merchant Profile Data on Mount
   useEffect(() => {
@@ -283,6 +317,14 @@ function MerchantDashboard() {
           >
             <i className="bi bi-people-fill fs-5" />
             <span>จัดการพนักงานประจำร้าน</span>
+          </button>
+
+          <button
+            className={`merchant-tab-btn ${activeTab === "marketing" ? "active" : ""}`}
+            onClick={() => setActiveTab("marketing")}
+          >
+            <i className="bi bi-robot fs-5 text-primary" />
+            <span>🤖 AI การตลาด & คูปองส่วนลด</span>
           </button>
         </div>
 
@@ -725,6 +767,164 @@ function MerchantDashboard() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ---------------- 7. TAB 5: AI MARKETING STRATEGIST & COUPON ENGINE ---------------- */}
+        {activeTab === "marketing" && (
+          <div className="merchant-panel-box">
+            <div className="d-flex align-items-center justify-content-between mb-4">
+              <div>
+                <h3 className="merchant-panel-title mb-1 text-primary">
+                  <i className="bi bi-robot me-2" />
+                  ศูนย์วางแผนการตลาด AI & จัดโปรโมชั่นคูปองร้านค้า
+                </h3>
+                <p className="text-secondary small mb-0">
+                  วิเคราะห์ยอดขาย พฤติกรรมนักเรียน และแนะนำคูปองโปรโมชั่นเพิ่มยอดขายแบบอัตโนมัติ (1-Click Deploy)
+                </p>
+              </div>
+              {securityReport && (
+                <div className="badge bg-success-subtle text-success p-2 border border-success-subtle rounded-3 d-flex align-items-center gap-2">
+                  <i className="bi bi-shield-check fs-5" />
+                  <div className="text-start">
+                    <div className="fw-bold small">{securityReport.shieldVersion}</div>
+                    <div className="text-muted" style={{ fontSize: "11px" }}>สถานะเกราะ: {securityReport.status}</div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {marketingSuccessMsg && (
+              <div className="alert alert-success alert-dismissible fade show fw-bold shadow-sm" role="alert">
+                <i className="bi bi-check-circle-fill me-2" />
+                {marketingSuccessMsg}
+              </div>
+            )}
+
+            {/* AI Strategic Marketing Analysis Insights Banner */}
+            <div className="p-4 rounded-3 mb-4 text-white" style={{ background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)", border: "1px solid #334155" }}>
+              <div className="d-flex align-items-center gap-3 mb-3">
+                <div className="rounded-circle bg-primary p-3 d-flex align-items-center justify-content-center" style={{ width: "48px", height: "48px" }}>
+                  <i className="bi bi-graph-up-arrow fs-4 text-white" />
+                </div>
+                <div>
+                  <h5 className="fw-bold mb-1">🤖 AI Marketing Insights บทวิเคราะห์ร้านค้าประจำวัน</h5>
+                  <p className="text-slate-300 small mb-0">
+                    อิงจากข้อมูลการสั่งซื้อย้อนหลัง: ช่วงพักเที่ยงลูกค้าหนาแน่นที่สุด เมนูข้าวกะเพราและไก่ทอดเป็นสินค้าขายดีประจำโรงอาหาร
+                  </p>
+                </div>
+              </div>
+              <div className="row g-3 text-dark">
+                <div className="col-md-4">
+                  <div className="bg-white p-3 rounded-3 shadow-sm">
+                    <div className="text-muted small fw-bold">ช่วงเวลาคนแน่น (Peak Hours)</div>
+                    <div className="fs-5 fw-bold text-danger">11:30 - 12:30 น.</div>
+                    <span className="badge bg-danger-subtle text-danger mt-1">เร่งความเร็วปรุงคิว</span>
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="bg-white p-3 rounded-3 shadow-sm">
+                    <div className="text-muted small fw-bold">ช่วงเวลาชะลอตัว (Off-Peak)</div>
+                    <div className="fs-5 fw-bold text-warning">13:00 - 14:30 น.</div>
+                    <span className="badge bg-warning-subtle text-warning mt-1">ควรเปิดคูปอง Happy Hour</span>
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="bg-white p-3 rounded-3 shadow-sm">
+                    <div className="text-muted small fw-bold">อัตราสั่งซ้ำ (Retention Rate)</div>
+                    <div className="fs-5 fw-bold text-success">78.5% ของนักเรียน</div>
+                    <span className="badge bg-success-subtle text-success mt-1">ความพึงพอใจสูงมาก</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* AI Recommended Coupon Campaign Packages */}
+            <h5 className="fw-bold mb-3 text-dark">
+              💡 แผนโปรโมชั่น & คูปองที่ AI แนะนำสำหรับร้านคุณ (1-Click Deployment)
+            </h5>
+
+            <div className="row g-3 mb-4">
+              {aiMarketingCoupons.map((coupon) => (
+                <div key={coupon.id} className="col-md-4">
+                  <div className="card h-100 border-0 shadow-sm p-3 position-relative" style={{ background: "#f8fafc", borderRadius: "12px", borderLeft: "5px solid #0284c7" }}>
+                    <div className="d-flex justify-content-between align-items-start mb-2">
+                      <span className="badge bg-primary text-white">{coupon.recommendedBadge}</span>
+                      <span className="fw-bold text-primary fs-6">CODE: {coupon.code}</span>
+                    </div>
+
+                    <h6 className="fw-bold text-dark mb-2">{coupon.title}</h6>
+                    <p className="text-muted small mb-3">{coupon.description}</p>
+
+                    <div className="bg-white p-2 rounded-2 border mb-3 small">
+                      <div className="text-slate-600 mb-1">
+                        🎯 <strong>กลุ่มเป้าหมาย:</strong> {coupon.targetAudience}
+                      </div>
+                      <div className="text-success fw-bold">
+                        📈 <strong>คาดการณ์ผลลัพธ์:</strong> {coupon.projectedSalesIncrease}
+                      </div>
+                    </div>
+
+                    <div className="mt-auto">
+                      <button
+                        className="btn btn-primary w-100 fw-bold shadow-sm"
+                        onClick={() => handleDeployCoupon(coupon)}
+                      >
+                        <i className="bi bi-rocket-takeoff-fill me-1" />
+                        เปิดใช้งานโปรโมชั่นนี้ทันที (1-Click)
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Active Live Coupons Management */}
+            <h5 className="fw-bold mb-3 text-dark">
+              🏷️ รายการคูปองส่วนลดที่เปิดใช้งานอยู่ในระบบ (Live Merchant Coupons)
+            </h5>
+
+            <div className="table-responsive bg-white rounded-3 border shadow-sm">
+              <table className="table align-middle mb-0">
+                <thead className="bg-light">
+                  <tr>
+                    <th>รหัสคูปอง (Code)</th>
+                    <th>ชื่อโปรโมชั่น</th>
+                    <th>มูลค่าส่วนลด</th>
+                    <th>ขั้นต่ำ</th>
+                    <th>สถานะ</th>
+                    <th>จัดการ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeCouponsList.map((c) => (
+                    <tr key={c.code}>
+                      <td className="fw-bold text-primary">{c.code}</td>
+                      <td>{c.title}</td>
+                      <td className="fw-bold text-success">
+                        {c.discountType === "PERCENT" ? `${c.discountValue}%` : `฿${c.discountValue}`}
+                      </td>
+                      <td>฿{c.minSpend}</td>
+                      <td>
+                        {c.isActive ? (
+                          <span className="badge bg-success-subtle text-success">ใช้งานอยู่ (Active)</span>
+                        ) : (
+                          <span className="badge bg-secondary-subtle text-secondary">ปิดใช้งาน (Inactive)</span>
+                        )}
+                      </td>
+                      <td>
+                        <button
+                          className={`btn btn-sm ${c.isActive ? "btn-outline-danger" : "btn-outline-success"} fw-bold`}
+                          onClick={() => handleToggleCoupon(c.code)}
+                        >
+                          {c.isActive ? "ระงับคูปอง" : "เปิดใช้งานอีกครั้ง"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>

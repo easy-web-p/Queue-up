@@ -19,7 +19,7 @@ const MOCK_PRODUCTS = [
   "บิงซูสตรอว์เบอร์รีนมสด",
 ];
 
-function ShopeeSearchBar({ disableHistory = false }) {
+function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { logout } = useAuth();
@@ -689,20 +689,22 @@ function ShopeeSearchBar({ disableHistory = false }) {
             )}
           </form>
 
-          {/* Dynamic Recent Search History or Top Trending Keywords underneath Search Box */}
-          <div className="shopee-trending-links">
-            {(!disableHistory && searchHistory.length > 0 ? searchHistory : TOP_TRENDING_KEYWORDS).map(
-              (kw, idx) => (
-                <span
-                  key={idx}
-                  className={`shopee-trending-link item-priority-${idx}`}
-                  onClick={() => handleSelectKeyword(kw)}
-                >
-                  {kw}
-                </span>
-              )
-            )}
-          </div>
+          {/* Dynamic Recent Search History or Top Trending Keywords underneath Search Box (ซ่อนเมื่ออยู่หน้า 404) */}
+          {!hideTrendingLinks && !disableHistory && (
+            <div className="shopee-trending-links">
+              {(searchHistory.length > 0 ? searchHistory : TOP_TRENDING_KEYWORDS).map(
+                (kw, idx) => (
+                  <span
+                    key={idx}
+                    className={`shopee-trending-link item-priority-${idx}`}
+                    onClick={() => handleSelectKeyword(kw)}
+                  >
+                    {kw}
+                  </span>
+                )
+              )}
+            </div>
+          )}
         </div>
 
         {/* Shopping Cart Icon */}

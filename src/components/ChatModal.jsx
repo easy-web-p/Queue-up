@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { getChatGPTResponse } from "../services/aiChatService.js";
+import { analyzeAndShieldInput, checkRateLimit } from "../services/aiSecurityShield.js";
 import "./ChatModal.css";
 
 const INITIAL_CONVERSATIONS = [
@@ -175,8 +176,25 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
   const activeChat = conversations.find((c) => c.id === activeChatId) || conversations[0];
 
   const handleSendMessage = (textToSend) => {
-    const messageText = textToSend || inputText.trim();
-    if (!messageText) return;
+    const rawText = textToSend || inputText.trim();
+    if (!rawText) return;
+
+    // Check Rate Limiting
+    const rateCheck = checkRateLimit("CHAT_MESSAGE", 10, 60000);
+    if (!rateCheck.allowed) {
+      alert(`🛡️ [AI Security Sentinel] ${rateCheck.message}`);
+      return;
+    }
+
+    // Shield & Sanitize Input Text
+    const shieldResult = analyzeAndShieldInput(rawText);
+    if (!shieldResult.safe) {
+      alert(`🛡️ [AI Security Sentinel] ตรวจพบแพทเทิร์นสุ่มเสี่ยง: ${shieldResult.threats[0]} ระบบได้บล็อกข้อความนี้เรียบร้อยแล้ว`);
+      setInputText("");
+      return;
+    }
+
+    const messageText = shieldResult.sanitized;
 
     const currentTime = new Date().toLocaleTimeString("th-TH", {
       hour: "2-digit",

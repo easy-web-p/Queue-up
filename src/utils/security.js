@@ -1,19 +1,12 @@
-/**
- * QUEUEUP SECURITY & INPUT SANITIZATION UTILITIES
- * Protects against XSS, NoSQL/SQL Injection, and Malicious File Uploads.
- */
+import { analyzeAndShieldInput, maskSensitiveData, logSecurityEvent } from "../services/aiSecurityShield.js";
 
-// 1. Sanitize text string to prevent Cross-Site Scripting (XSS)
+// 1. Sanitize text string to prevent Cross-Site Scripting (XSS) & AI Prompt Injections
 export const sanitizeInput = (input) => {
   if (typeof input !== "string") return input;
-  return input
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#x27;")
-    .replace(/\//g, "&#x2F;")
-    .trim();
+  
+  // Pass through AI Threat Engine
+  const shieldResult = analyzeAndShieldInput(input);
+  return shieldResult.sanitized;
 };
 
 // 2. Validate Credit Card Number using Luhn Algorithm

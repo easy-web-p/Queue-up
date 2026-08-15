@@ -1,7 +1,4 @@
-/**
- * AI Chat & ChatGPT Classic Integration Service (aiChatService.js)
- * Connects QueueUp Canteen Chat & Recommendations to ChatGPT Classic API / OpenAI / Firebase AI
- */
+import { analyzeAndShieldInput } from "./aiSecurityShield.js";
 
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY || "";
 const OPENAI_MODEL = import.meta.env.VITE_OPENAI_MODEL || "gpt-3.5-turbo"; // ChatGPT Classic Model
@@ -14,6 +11,12 @@ const OPENAI_MODEL = import.meta.env.VITE_OPENAI_MODEL || "gpt-3.5-turbo"; // Ch
  * @returns {Promise<string>} - Generated AI response string
  */
 export async function getChatGPTResponse(userMessage, storeName = "ร้านค้า QueueUp", orderContext = null) {
+  // Pass message through AI Threat Engine
+  const shield = analyzeAndShieldInput(userMessage);
+  if (!shield.safe) {
+    return `🛡️ [AI Security Sentinel] ตรวจพบข้อความสุ่มเสี่ยงความปลอดภัย (${shield.threats[0]}) ระบบได้ทำการบล็อกและรีเซ็ตการสนทนาเพื่อความปลอดภัยครับ`;
+  }
+  const cleanMessage = shield.sanitized;
   // If OpenAI API key is configured, call ChatGPT Classic API
   if (OPENAI_API_KEY) {
     try {
