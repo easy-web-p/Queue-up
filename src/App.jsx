@@ -12,6 +12,7 @@ import Queueup from "./pages/Queueup.jsx";
 import UserPurchase from "./pages/UserPurchase.jsx";
 import MerchantDashboard from "./pages/MerchantDashboard.jsx";
 import NotFound from "./pages/NotFound.jsx";
+import PdpaPolicy from "./pages/PdpaPolicy.jsx";
 import PageRouteLoader from "./components/PageRouteLoader.jsx";
 import CookieConsentBanner from "./components/CookieConsentBanner.jsx";
 import CookieSessionTracker from "./components/CookieSessionTracker.jsx";
@@ -35,6 +36,11 @@ function App() {
             <Route path="/Queueup" element={<Queueup />} />
             <Route path="/about" element={<Queueup />} />
             <Route path="/About" element={<Queueup />} />
+
+            {/* Standalone Legal & PDPA Policy Routes */}
+            <Route path="/pdpa" element={<PdpaPolicy />} />
+            <Route path="/privacy" element={<PdpaPolicy />} />
+            <Route path="/terms" element={<PdpaPolicy />} />
 
             <Route path="/login" element={<Login />} />
             <Route path="/Login" element={<Login />} />

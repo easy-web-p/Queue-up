@@ -153,8 +153,8 @@ export default function Footer() {
             © 2026 <strong>QueueUp Canteen CRM & Smart Queue</strong>. สงวนลิขสิทธิ์ตามกฎหมายไทย
           </div>
           <div className="qup-footer-bottom-links">
-            <button onClick={() => setIsPdpaOpen(true)}>ข้อกำหนดเงื่อนไข</button>
-            <button onClick={() => setIsPdpaOpen(true)}>ความเป็นส่วนตัว</button>
+            <Link to="/pdpa?tab=terms">ข้อกำหนดเงื่อนไข</Link>
+            <Link to="/pdpa?tab=privacy">ความเป็นส่วนตัว (PDPA)</Link>
             <span>•</span>
             <span>ความพร้อมใช้งานระบบ 99.98% ⚡</span>
           </div>
