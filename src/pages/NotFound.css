@@ -2,13 +2,14 @@
 .queue-notfound-page {
   min-height: 100vh;
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   background-color: #f8fafc;
   color: #0f172a;
 }
 
 .queue-notfound-container {
-  flex: 1;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -134,37 +135,37 @@
   color: #cbd5e1;
 }
 
-/* Dark Mode Integration */
+/* Warm Dark Mode Integration */
 html[data-theme="dark"] .queue-notfound-page {
-  background-color: #0f1115 !important;
-  color: #ffffff !important;
+  background-color: #16100c !important;
+  color: #f3ece3 !important;
 }
 
 html[data-theme="dark"] .queue-notfound-card {
-  background-color: #181c23 !important;
-  border-color: #2a3242 !important;
+  background-color: #211710 !important;
+  border-color: #3a2a1e !important;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
 }
 
 html[data-theme="dark"] .queue-notfound-title {
-  color: #ffffff !important;
+  color: #f3ece3 !important;
 }
 
 html[data-theme="dark"] .queue-notfound-desc {
-  color: #cbd5e1 !important;
+  color: #b8aa98 !important;
 }
 
 html[data-theme="dark"] .queue-btn-back {
-  background-color: #212734 !important;
-  border-color: #2a3242 !important;
-  color: #ffffff !important;
+  background-color: #2d2017 !important;
+  border-color: #3a2a1e !important;
+  color: #f3ece3 !important;
 }
 
 html[data-theme="dark"] .queue-btn-back:hover {
-  background-color: #2c3445 !important;
-  border-color: #475569 !important;
+  background-color: #3a2a1e !important;
+  border-color: #4d3b2c !important;
 }
 
 html[data-theme="dark"] .queue-notfound-footer {
-  border-top-color: #2a3242 !important;
+  border-top-color: #3a2a1e !important;
 }

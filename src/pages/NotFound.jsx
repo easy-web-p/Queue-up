@@ -1,5 +1,4 @@
 import { useNavigate, Link } from "react-router-dom";
-import ShopeeSearchBar from "../components/ShopeeSearchBar.jsx";
 import { usePreferences } from "../context/PreferencesContext.jsx";
 import "./NotFound.css";
 
@@ -9,10 +8,7 @@ function NotFound() {
 
   return (
     <div className="queue-notfound-page">
-      {/* Header Navigation Search Bar (ปิดประวัติการค้นหาและซ่อนคีย์เวิร์ดยอดนิยมในหน้า 404) */}
-      <ShopeeSearchBar disableHistory={true} hideTrendingLinks={true} />
-
-      {/* Main Centered 404 Content */}
+      {/* Main Centered 404 Content (ไม่มี Header SearchBar) */}
       <main className="queue-notfound-container">
         <div className="queue-notfound-card">
           {/* Animated/Glowing 404 Code Display */}
