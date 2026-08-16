@@ -10,6 +10,7 @@ import Footer from "../components/Footer.jsx";
 import { generateSecureAccountId } from "../utils/security.js";
 import { getUserBehaviorInsights } from "../services/aiBehaviorEngine.js";
 import { getSecurityHealthReport } from "../services/aiSecurityShield.js";
+import { calculateUserTrustScore } from "../services/aiUserVerificationEngine.js";
 import "./UserProfile.css";
 import "./UserPurchase.css";
 
@@ -104,6 +105,20 @@ function UserProfile() {
   };
 
   const membershipInfo = getMembershipTierInfo(userPoints);
+
+  // 🛡️ Multi-Layer Verification & Trust Score Engine
+  const userTrustReport = calculateUserTrustScore(
+    {
+      fullName,
+      email,
+      phone,
+      gender,
+      birthDate,
+      photo: avatar,
+      role: user?.role || "customer",
+    },
+    orders
+  );
 
   // Payment & Financial Information States
   const [bankName, setBankName] = useState("PromptPay (พร้อมเพย์)");
@@ -560,6 +575,56 @@ function UserProfile() {
                     ✓ บันทึกข้อมูลอัตโนมัติเรียบร้อยแล้ว
                   </span>
                 )}
+              </div>
+
+              {/* Trust Score & Multi-Layer Verification Banner */}
+              <div
+                className="p-3 rounded-4 mb-4 text-white d-flex align-items-center justify-content-between flex-wrap gap-3"
+                style={{
+                  background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+                  border: `1.5px solid ${userTrustReport.badgeColor}`,
+                  boxShadow: "0 8px 20px rgba(0, 0, 0, 0.12)",
+                }}
+              >
+                <div className="d-flex align-items-center gap-3">
+                  <div
+                    className="p-3 rounded-circle d-flex align-items-center justify-content-center"
+                    style={{ backgroundColor: userTrustReport.badgeColor + "25", color: userTrustReport.badgeColor }}
+                  >
+                    <i className="bi bi-shield-check fs-3" />
+                  </div>
+                  <div>
+                    <div className="d-flex align-items-center gap-2">
+                      <span className="fw-bold text-white fs-6">
+                        {userTrustReport.levelName}
+                      </span>
+                      <span
+                        className="badge rounded-pill small px-2 py-1"
+                        style={{ backgroundColor: userTrustReport.badgeColor, color: "#fff" }}
+                      >
+                        {userTrustReport.trustCategory}
+                      </span>
+                    </div>
+                    <div className="small text-slate-300 mt-1">
+                      คะแนนความน่าเชื่อถือบัญชี (Trust Score): <b>{userTrustReport.trustScore} / 100</b> — {userTrustReport.statusText}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="d-flex align-items-center gap-2">
+                  <button
+                    className="btn btn-sm btn-outline-warning rounded-pill px-3"
+                    onClick={() => {
+                      alert(
+                        `🛡️ รายงานคะแนนความน่าเชื่อถือ (Trust Score Breakdown):\n\n` +
+                          userTrustReport.breakdown.map((b) => `• ${b.label}`).join("\n") +
+                          `\n\nสิทธิ์การใช้งานของคุณ:\n• สั่งจองอาหาร: ${userTrustReport.privileges.canOrder ? "อนุมัติ ✅" : "ไม่อนุมัติ ❌"}\n• เขียนรีวิวร้านค้า: ${userTrustReport.privileges.canReview ? "อนุมัติ ✅" : "ต้องใช้ Level 2+ ⚠️"}\n• รายงานร้านค้า: ${userTrustReport.privileges.canReportStore ? "อนุมัติ ✅" : "ต้องใช้ Trust Score 70+ ⚠️"}`
+                      );
+                    }}
+                  >
+                    <i className="bi bi-bar-chart-line me-1" /> ดูรายละเอียดคะแนน
+                  </button>
+                </div>
               </div>
 
               {/* Field 1: ชื่อ */}
