@@ -112,20 +112,22 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
 
       if (match) {
         // If chat with store already exists, activate it and update orderContext
-        if (activeChatId !== match.id) {
-          setTimeout(() => setActiveChatId(match.id), 0);
-        }
-        setConversations((prev) =>
-          prev.map((c) =>
-            c.id === match.id
-              ? {
-                  ...c,
-                  unread: 0,
-                  orderContext: initialOrderContext || c.orderContext,
-                }
-              : c
-          )
-        );
+        setTimeout(() => {
+          if (activeChatId !== match.id) {
+            setActiveChatId(match.id);
+          }
+          setConversations((prev) =>
+            prev.map((c) =>
+              c.id === match.id
+                ? {
+                    ...c,
+                    unread: 0,
+                    orderContext: initialOrderContext || c.orderContext,
+                  }
+                : c
+            )
+          );
+        }, 0);
       } else {
         // If chat with store does NOT exist yet, create a BRAND NEW store conversation dynamically!
         const newChatId = "chat_" + Math.random().toString(36).substring(2, 9);
@@ -153,8 +155,10 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
           ],
         };
 
-        setConversations((prev) => [newChat, ...prev]);
-        setTimeout(() => setActiveChatId(newChatId), 0);
+        setTimeout(() => {
+          setConversations((prev) => [newChat, ...prev]);
+          setActiveChatId(newChatId);
+        }, 0);
       }
     } else if (conversations.length > 0 && !activeChatId) {
       setTimeout(() => setActiveChatId(conversations[0].id), 0);

@@ -3,6 +3,7 @@
 export const SHARED_PRODUCTS = [
   {
     id: "m1",
+    storeId: "store_canteen01",
     name: "ชุดไก่บักเก็ตซอสเกาหลี ชุบแป้งกรอบ ทอดสดใหม่ร้อนๆ",
     title: "ชุดไก่บักเก็ตซอสเกาหลี ชุบแป้งกรอบ ทอดสดใหม่ร้อนๆ",
     category: "single_dish",
@@ -30,6 +31,7 @@ export const SHARED_PRODUCTS = [
   },
   {
     id: "m2",
+    storeId: "store_burger03",
     name: "เบอร์เกอร์ไก่กรอบชีสทะลัก ชิ้นโต ผักสลัดสดใหม่",
     title: "เบอร์เกอร์ไก่กรอบชีสทะลัก ชิ้นโต ผักสลัดสดใหม่",
     category: "western",
@@ -55,6 +57,7 @@ export const SHARED_PRODUCTS = [
   },
   {
     id: "m3",
+    storeId: "store_canteen01",
     name: "ชุดข้าวผัดกุ้งกะทะร้อน + ไข่ดาวสด",
     title: "ชุดข้าวผัดกุ้งกะทะร้อน + ไข่ดาวสด",
     category: "single_dish",
@@ -80,6 +83,7 @@ export const SHARED_PRODUCTS = [
   },
   {
     id: "m4",
+    storeId: "store_boba02",
     name: "ชานมไข่มุกบราวน์ชูการ์ หวานน้อยกลมกล่อม",
     title: "ชานมไข่มุกบราวน์ชูการ์ หวานน้อยกลมกล่อม",
     category: "beverage",
@@ -105,6 +109,7 @@ export const SHARED_PRODUCTS = [
   },
   {
     id: "m5",
+    storeId: "store_noodle05",
     name: "ก๋วยเตี๋ยวเรือหมูน้ำตก สูตรโบราณเข้มข้น",
     title: "ก๋วยเตี๋ยวเรือหมูน้ำตก สูตรโบราณเข้มข้น",
     category: "noodle",
@@ -130,6 +135,7 @@ export const SHARED_PRODUCTS = [
   },
   {
     id: "m6",
+    storeId: "store_seafood06",
     name: "ต้มยำกุ้งแม่น้ำน้ำข้น รสจัดจ้านเครื่องแน่น",
     title: "ต้มยำกุ้งแม่น้ำน้ำข้น รสจัดจ้านเครื่องแน่น",
     category: "curry_soup",
@@ -155,6 +161,7 @@ export const SHARED_PRODUCTS = [
   },
   {
     id: "m7",
+    storeId: "store_shabu07",
     name: "ชุดชาบูหมูสไลด์ซุปดำพรีเมียม",
     title: "ชุดชาบูหมูสไลด์ซุปดำพรีเมียม",
     category: "shabu_hotpot",
@@ -180,6 +187,7 @@ export const SHARED_PRODUCTS = [
   },
   {
     id: "m8",
+    storeId: "store_japanese08",
     name: "ข้าวหน้าแซลมอนย่างเทริยากิ",
     title: "ข้าวหน้าแซลมอนย่างเทริยากิ",
     category: "japanese",
@@ -205,6 +213,7 @@ export const SHARED_PRODUCTS = [
   },
   {
     id: "m9",
+    storeId: "store_steak09",
     name: "สเต็กหมูพริกไทยดำ ซอสฉ่ำๆ",
     title: "สเต็กหมูพริกไทยดำ ซอสฉ่ำๆ",
     category: "western",
@@ -230,6 +239,7 @@ export const SHARED_PRODUCTS = [
   },
   {
     id: "m10",
+    storeId: "store_sweet10",
     name: "บิงซูสตรอว์เบอร์รีนมสด",
     title: "บิงซูสตรอว์เบอร์รีนมสด",
     category: "dessert",

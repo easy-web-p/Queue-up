@@ -5,6 +5,7 @@ import { switchRole } from "../store/authSlice.js";
 import { db, doc, getDoc, setDoc } from "../firebase/config.js";
 import { SHARED_PRODUCTS } from "../data/mockProducts.js";
 import ChatModal from "../components/ChatModal.jsx";
+import BookingCalendar from "../components/BookingCalendar.jsx";
 import {
   generateAIMarketingRecommendations,
   getActiveMerchantCoupons,
@@ -58,31 +59,88 @@ function MerchantDashboard() {
   const navigate = useNavigate();
   const { user } = useSelector((state) => state.auth);
 
-  // Merchant Tab States: 'queue' | 'menu' | 'profile' | 'staff'
+  // Merchant Tab States: 'queue' | 'planner' | 'menu' | 'profile' | 'staff' | 'marketing'
   const [activeTab, setActiveTab] = useState("queue");
-  const [queueFilter, setQueueFilter] = useState("ALL"); // 'ALL' | 'TO_PAY' | 'TO_SHIP' | 'TO_RECEIVE' | 'COMPLETED'
-  
-  // Data States
-  const [merchantOrders, setMerchantOrders] = useState(MOCK_MERCHANT_ORDERS);
+  const [queueFilter, setQueueFilter] = useState("ALL");
+
+  // Read Store Profile & storeId from LocalStorage & User Auth Context (Full Onboarding Tracing)
+  const getInitialStoreData = () => {
+    try {
+      const userKey = user && user.uid ? `queueup_merchant_store_${user.uid}` : null;
+      const stored = (userKey && localStorage.getItem(userKey)) || localStorage.getItem("queueup_merchant_store");
+      if (stored) {
+        const m = JSON.parse(stored);
+        return {
+          storeId: m.storeId || (user && user.uid ? `store_${user.uid.substring(0, 10)}` : "store_canteen01"),
+          name: m.merchantStoreName || m.storeName || (user && user.merchantStoreName) || (user ? `ร้านค้าของ ${user.name || user.email}` : "ร้านครัวโรงเรียน QueueUp Canteen"),
+          phone: m.phone || m.businessPhone || (user && user.phone) || "081-234-5678",
+          location: m.canteenLocation ? (m.counterNo ? `${m.canteenLocation} (${m.counterNo})` : m.canteenLocation) : (user && user.canteenLocation) || "โรงอาหาร 1 (อาคารเรียน 2)",
+          promptpayName: m.promptpayName || (user && user.promptpayName) || (user ? user.name || "เจ้าของร้าน" : "เจ้าของร้าน"),
+          promptpayNo: m.promptpayNo || (user && user.promptpayNo) || "081-234-5678",
+        };
+      }
+    } catch {
+      // ignore
+    }
+    return {
+      storeId: user && user.uid ? `store_${user.uid.substring(0, 10)}` : "store_canteen01",
+      name: (user && user.merchantStoreName) || (user ? `ร้านค้าของ ${user.name || user.email}` : "ร้านครัวโรงเรียน QueueUp Canteen"),
+      phone: (user && user.phone) || "081-234-5678",
+      location: (user && user.canteenLocation) || "โรงอาหาร 1 (อาคารเรียน 2)",
+      promptpayName: (user && user.promptpayName) || (user ? user.name || "เจ้าของร้าน" : "เจ้าของร้าน"),
+      promptpayNo: (user && user.promptpayNo) || "081-234-5678",
+    };
+  };
+
+  const initialStore = getInitialStoreData();
+  const [currentStoreId] = useState(initialStore.storeId);
+
+  const [merchantOrders, setMerchantOrders] = useState(() => {
+    // 1. Read store-specific merchant orders first
+    const storeSpecific = localStorage.getItem(`queueup_merchant_orders_${initialStore.storeId}`);
+    if (storeSpecific) {
+      try {
+        return JSON.parse(storeSpecific);
+      } catch {
+        // ignore
+      }
+    }
+
+    // 2. Read global customer orders and filter strictly by storeId
+    const globalUserOrders = localStorage.getItem("queueup_user_orders");
+    if (globalUserOrders) {
+      try {
+        const parsed = JSON.parse(globalUserOrders);
+        const filtered = parsed.filter((o) => o.storeId === initialStore.storeId);
+        if (filtered.length > 0) return filtered;
+      } catch {
+        // ignore
+      }
+    }
+
+    // 3. Demo orders apply ONLY to the default canteen ("store_canteen01")
+    if (initialStore.storeId === "store_canteen01") {
+      return MOCK_MERCHANT_ORDERS.map((o) => ({ ...o, storeId: "store_canteen01" }));
+    }
+
+    // NEW merchant stores will have [] (0 orders from other stores!)
+    return [];
+  });
   const [menuItems, setMenuItems] = useState(
     SHARED_PRODUCTS.map((p) => ({ ...p, isAvailable: true }))
   );
 
-  // Store Profile & Private Financial Information States
-  const [storeName, setStoreName] = useState("ร้านครัวโรงเรียน QueueUp Canteen");
-  const [storePhone, setStorePhone] = useState("081-234-5678");
-  const [canteenLocation, setCanteenLocation] = useState("โรงอาหาร 1 (อาคารเรียน 2 เคาน์เตอร์ 1)");
+  const [storeName, setStoreName] = useState(initialStore.name);
+  const [storePhone, setStorePhone] = useState(initialStore.phone);
+  const [canteenLocation, setCanteenLocation] = useState(initialStore.location);
   const [storeHours, setStoreHours] = useState("07:00 - 15:00 น.");
   
-  // Private Financial Subcollection (merchantProfiles/{merchantId}/private/finance)
   const [privateBankName, setPrivateBankName] = useState("PromptPay (พร้อมเพย์)");
-  const [privateAccountNo, setPrivateAccountNo] = useState("081-234-5678");
-  const [privateAccountOwner, setPrivateAccountOwner] = useState(
-    user ? user.name || "นายสมชาย ใจดี" : "นายสมชาย ใจดี"
-  );
+  const [privateAccountNo, setPrivateAccountNo] = useState(initialStore.promptpayNo);
+  const [privateAccountOwner, setPrivateAccountOwner] = useState(initialStore.promptpayName);
   const [isSavedFinance, setIsSavedFinance] = useState(false);
+  const [isSavedProfile, setIsSavedProfile] = useState(false);
 
-  // Staff Management Subcollection States
   const [staffList, setStaffList] = useState([
     { uid: "STF01", name: "นางสาวมยุรี ใจดี", role: "พนักงานรับออเดอร์/แคชเชียร์", phone: "082-111-2233" },
     { uid: "STF02", name: "นายประสิทธิ์ ขยันทำงาน", role: "พ่อครัว/ผู้ช่วยเตรียมอาหาร", phone: "083-444-5566" },
@@ -91,12 +149,10 @@ function MerchantDashboard() {
   const [newStaffRole, setNewStaffRole] = useState("พนักงานรับออเดอร์/แคชเชียร์");
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
 
-  // Chat Drawer State
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatCustomerName, setChatCustomerName] = useState("");
   const [chatOrderContext, setChatOrderContext] = useState(null);
 
-  // 🤖 AI Marketing & Security Shield States
   const [aiMarketingCoupons] = useState(() => generateAIMarketingRecommendations());
   const [activeCouponsList, setActiveCouponsList] = useState(() => getActiveMerchantCoupons());
   const [securityReport] = useState(() => getSecurityHealthReport());
@@ -106,7 +162,7 @@ function MerchantDashboard() {
     const success = deployAICoupon(coupon);
     if (success) {
       setActiveCouponsList(getActiveMerchantCoupons());
-      setMarketingSuccessMsg(`เปิดใช้งานคูปอง "${coupon.code}" เรียบร้อยแล้ว! ลูกค้าสามารถใช้ส่วนลดได้ทันที 🎉`);
+      setMarketingSuccessMsg(`เปิดใช้งานคูปอง "${coupon.code}" เรียบร้อยแล้ว! ลูกค้าสามารถใช้ส่วนลดได้ทันที`);
       setTimeout(() => setMarketingSuccessMsg(""), 4000);
     }
   };
@@ -116,10 +172,21 @@ function MerchantDashboard() {
     setActiveCouponsList(updated);
   };
 
-  // Fetch Firestore Merchant Profile Data on Mount
   useEffect(() => {
+    // Sync from Firestore users & merchantProfiles if logged in
     if (user && user.uid) {
-      const merchantId = "MCH-" + (user.uid ? user.uid.substring(0, 8) : "58140");
+      getDoc(doc(db, "users", user.uid)).then((uSnap) => {
+        if (uSnap.exists()) {
+          const uData = uSnap.data();
+          if (uData.merchantStoreName) setStoreName(uData.merchantStoreName);
+          if (uData.phone) setStorePhone(uData.phone);
+          if (uData.canteenLocation) setCanteenLocation(uData.canteenLocation);
+          if (uData.promptpayName) setPrivateAccountOwner(uData.promptpayName);
+          if (uData.promptpayNo) setPrivateAccountNo(uData.promptpayNo);
+        }
+      });
+
+      const merchantId = "MCH-" + user.uid.substring(0, 8);
       getDoc(doc(db, "merchantProfiles", merchantId)).then((docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
@@ -129,7 +196,6 @@ function MerchantDashboard() {
         }
       });
 
-      // Fetch Private Finance Subcollection
       getDoc(doc(db, "merchantProfiles", merchantId, "private", "finance")).then((finSnap) => {
         if (finSnap.exists()) {
           const finData = finSnap.data();
@@ -141,23 +207,64 @@ function MerchantDashboard() {
     }
   }, [user]);
 
-  // Handle Order Queue Progression
   const handleUpdateOrderStatus = (orderId, newStatus, newText) => {
-    setMerchantOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, status: newStatus, statusText: newText } : o))
-    );
+    setMerchantOrders((prev) => {
+      const updated = prev.map((o) => (o.id === orderId ? { ...o, status: newStatus, statusText: newText } : o));
+      try {
+        localStorage.setItem(`queueup_merchant_orders_${currentStoreId}`, JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+      return updated;
+    });
   };
 
-  // Toggle Menu Item Availability (In Stock / Out of Stock)
-  const handleToggleStock = (productId) => {
+  const handleToggleProductStatus = (productId) => {
     setMenuItems((prev) =>
       prev.map((p) => (p.id === productId ? { ...p, isAvailable: !p.isAvailable } : p))
     );
   };
 
-  // Save Private Financial Details securely to Firestore merchantProfiles/{merchantId}/private/finance
-  const handleSavePrivateFinance = async () => {
-    const merchantId = "MCH-" + (user?.uid ? user.uid.substring(0, 8) : "58140");
+  const handleSaveStoreProfile = async (e) => {
+    if (e) e.preventDefault();
+
+    const merchantData = {
+      isMerchantRegistered: true,
+      role: "merchant",
+      isMerchantVerified: true,
+      merchantStoreName: storeName,
+      storeName,
+      phone: storePhone,
+      businessPhone: storePhone,
+      canteenLocation,
+      storeHours,
+      promptpayName: privateAccountOwner,
+      promptpayNo: privateAccountNo,
+      updatedAt: new Date().toISOString(),
+    };
+
+    try {
+      localStorage.setItem("queueup_merchant_store", JSON.stringify(merchantData));
+      if (user && user.uid) {
+        localStorage.setItem(`queueup_merchant_store_${user.uid}`, JSON.stringify(merchantData));
+        await setDoc(doc(db, "users", user.uid), merchantData, { merge: true });
+
+        const merchantId = "MCH-" + user.uid.substring(0, 8);
+        await setDoc(doc(db, "merchantProfiles", merchantId), merchantData, { merge: true });
+      }
+
+      setIsSavedProfile(true);
+      setTimeout(() => setIsSavedProfile(false), 3000);
+    } catch (err) {
+      console.error("Save store profile error:", err);
+    }
+  };
+
+  const handleSavePrivateFinance = async (e) => {
+    e.preventDefault();
+    if (!user || !user.uid) return;
+
+    const merchantId = "MCH-" + user.uid.substring(0, 8);
     try {
       await setDoc(
         doc(db, "merchantProfiles", merchantId, "private", "finance"),
@@ -172,128 +279,95 @@ function MerchantDashboard() {
       setIsSavedFinance(true);
       setTimeout(() => setIsSavedFinance(false), 3000);
     } catch (err) {
-      console.warn("Error saving private finance subcollection:", err);
-      setIsSavedFinance(true);
-      setTimeout(() => setIsSavedFinance(false), 3000);
+      console.error("Save private finance error:", err);
+      alert("เกิดข้อผิดพลาดในการบันทึกข้อมูลการเงินลับ");
     }
   };
 
-  // Add Staff Member to Subcollection
-  const handleAddStaff = () => {
+  const handleAddStaff = (e) => {
+    e.preventDefault();
     if (!newStaffName.trim()) return;
+
     const newStaff = {
-      uid: "STF_" + Date.now(),
+      uid: `STF0${staffList.length + 1}`,
       name: newStaffName,
       role: newStaffRole,
-      phone: "08X-XXX-XXXX",
+      phone: "089-XXX-XXXX",
     };
-    setStaffList((prev) => [...prev, newStaff]);
+
+    setStaffList([...staffList, newStaff]);
     setNewStaffName("");
     setIsAddStaffOpen(false);
   };
 
-  // Filter Queue Orders
-  const filteredQueueOrders = merchantOrders.filter((order) => {
+  const handleSwitchToStudentView = () => {
+    dispatch(switchRole("customer"));
+    navigate("/home");
+  };
+
+  const filteredQueueOrders = merchantOrders.filter((o) => {
     if (queueFilter === "ALL") return true;
-    return order.status === queueFilter;
+    return o.status === queueFilter;
   });
 
   return (
-    <div className="merchant-dashboard-page">
-      {/* ---------------- STORE BRANDING NAVBAR ---------------- */}
-      <nav className="merchant-top-navbar">
-        <div className="merchant-brand-group">
-          <img src="/logo.png" alt="QueueUp Logo" className="merchant-brand-logo" />
-          <div>
-            <div className="d-flex align-items-center gap-2">
-              <span className="merchant-store-name">{storeName}</span>
-              <span className="merchant-store-badge">
-                <i className="bi bi-shop me-1" /> ศูนย์จัดการร้านค้า (Seller Centre)
-              </span>
+    <div className="merchant-dashboard-container">
+      <div className="merchant-dashboard-header-bg">
+        <div className="merchant-dashboard-header-wrapper">
+          <div className="merchant-header-left">
+            <div className="merchant-avatar-box">
+              <i className="bi bi-shop fs-2 text-danger" />
             </div>
-            <div className="small text-slate-300">
-              <i className="bi bi-geo-alt-fill text-danger me-1" /> {canteenLocation}
+            <div>
+              <div className="d-flex align-items-center flex-wrap gap-2">
+                <h2 className="merchant-title mb-0">{storeName}</h2>
+                <span className="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
+                  <i className="bi bi-patch-check-fill me-1" />
+                  ร้านค้ายืนยันแล้ว
+                </span>
+                <span className="badge bg-secondary-subtle text-slate-300 border border-secondary px-2 py-1 small">
+                  ID ร้าน: {currentStoreId}
+                </span>
+              </div>
+              <p className="merchant-subtitle mb-0 mt-1">
+                <i className="bi bi-geo-alt-fill text-danger me-1" /> {canteenLocation} •{" "}
+                <i className="bi bi-telephone-fill text-primary me-1" /> {storePhone}
+              </p>
             </div>
+          </div>
+
+          <div className="merchant-header-right">
+            <button className="btn btn-outline-light font-weight-bold" onClick={handleSwitchToStudentView}>
+              <i className="bi bi-person-bounding-box me-1" /> สลับมุมมองผู้ใช้นักเรียน
+            </button>
           </div>
         </div>
+      </div>
 
-        <div className="d-flex align-items-center gap-3">
-          <button
-            className="merchant-switch-user-btn"
-            onClick={() => {
-              dispatch(switchRole("customer"));
-              navigate("/home");
-            }}
-          >
-            <i className="bi bi-person-circle me-1" /> สลับเป็นมุมมองลูกค้า
-          </button>
-        </div>
-      </nav>
-
-      <div className="merchant-container">
-        {/* ---------------- 1. DASHBOARD STAT SUMMARY CARDS ---------------- */}
-        <div className="merchant-stats-grid">
-          <div className="merchant-stat-card">
-            <div className="merchant-stat-info">
-              <span className="merchant-stat-label">ยอดขายวันนี้</span>
-              <span className="merchant-stat-value text-success">฿1,850.00</span>
-            </div>
-            <div className="merchant-stat-icon-circle bg-success-subtle text-success">
-              <i className="bi bi-currency-dollar" />
-            </div>
-          </div>
-
-          <div className="merchant-stat-card">
-            <div className="merchant-stat-info">
-              <span className="merchant-stat-label">คิวที่กำลังปรุง</span>
-              <span className="merchant-stat-value text-primary">
-                {merchantOrders.filter((o) => o.status === "TO_SHIP").length} คิว
-              </span>
-            </div>
-            <div className="merchant-stat-icon-circle bg-primary-subtle text-primary">
-              <i className="bi bi-fire" />
-            </div>
-          </div>
-
-          <div className="merchant-stat-card">
-            <div className="merchant-stat-info">
-              <span className="merchant-stat-label">ออเดอร์รอชำระเงิน</span>
-              <span className="merchant-stat-value text-warning">
-                {merchantOrders.filter((o) => o.status === "TO_PAY").length} คิว
-              </span>
-            </div>
-            <div className="merchant-stat-icon-circle bg-warning-subtle text-warning">
-              <i className="bi bi-clock-history" />
-            </div>
-          </div>
-
-          <div className="merchant-stat-card">
-            <div className="merchant-stat-info">
-              <span className="merchant-stat-label">เสร็จสิ้นวันนี้</span>
-              <span className="merchant-stat-value text-slate-700">24 รายการ</span>
-            </div>
-            <div className="merchant-stat-icon-circle bg-slate-100 text-slate-600">
-              <i className="bi bi-check-circle-fill" />
-            </div>
-          </div>
-        </div>
-
-        {/* ---------------- 2. MAIN NAVIGATION TABS HEADER ---------------- */}
-        <div className="merchant-tabs-header">
+      <div className="merchant-dashboard-body">
+        <div className="merchant-tabs-nav">
           <button
             className={`merchant-tab-btn ${activeTab === "queue" ? "active" : ""}`}
             onClick={() => setActiveTab("queue")}
           >
-            <i className="bi bi-card-checklist fs-5" />
-            <span>จัดการคิวอาหาร & ออเดอร์</span>
+            <i className="bi bi-receipt-cutoff fs-5 text-danger" />
+            <span>บอร์ดคิวสั่งอาหารเรียลไทม์</span>
+          </button>
+
+          <button
+            className={`merchant-tab-btn ${activeTab === "planner" ? "active" : ""}`}
+            onClick={() => setActiveTab("planner")}
+          >
+            <i className="bi bi-calendar3 fs-5 text-success" />
+            <span>แผนเตรียมวัตถุดิบ & ตารางจอง</span>
           </button>
 
           <button
             className={`merchant-tab-btn ${activeTab === "menu" ? "active" : ""}`}
             onClick={() => setActiveTab("menu")}
           >
-            <i className="bi bi-egg-fried fs-5" />
-            <span>จัดการเมนูอาหาร & สต็อก</span>
+            <i className="bi bi-egg-fried fs-5 text-warning" />
+            <span>เมนูอาหาร & สถานะสต็อก</span>
           </button>
 
           <button
@@ -301,7 +375,7 @@ function MerchantDashboard() {
             onClick={() => setActiveTab("profile")}
           >
             <i className="bi bi-gear-wide-connected fs-5" />
-            <span>ตั้งค่าร้านค้า & ข้อมูลการเงินลับ</span>
+            <span>ตั้งค่าร้านค้า & การเงินลับ</span>
           </button>
 
           <button
@@ -317,11 +391,11 @@ function MerchantDashboard() {
             onClick={() => setActiveTab("marketing")}
           >
             <i className="bi bi-robot fs-5 text-primary" />
-            <span>🤖 AI การตลาด & คูปองส่วนลด</span>
+            <span>AI การตลาด & คูปองส่วนลด</span>
           </button>
         </div>
 
-        {/* ---------------- 3. TAB 1: LIVE ORDER QUEUE BOARD ---------------- */}
+        {/* TAB 1: LIVE ORDER QUEUE BOARD */}
         {activeTab === "queue" && (
           <div className="merchant-panel-box">
             <div className="d-flex align-items-center justify-content-between mb-3">
@@ -337,7 +411,6 @@ function MerchantDashboard() {
               </button>
             </div>
 
-            {/* Queue Subtabs */}
             <div className="merchant-queue-subtabs">
               {[
                 { id: "ALL", label: "ทั้งหมด" },
@@ -356,7 +429,6 @@ function MerchantDashboard() {
               ))}
             </div>
 
-            {/* Orders Cards List */}
             {filteredQueueOrders.length > 0 ? (
               filteredQueueOrders.map((order) => (
                 <div key={order.id} className="merchant-order-card">
@@ -396,7 +468,6 @@ function MerchantDashboard() {
                     </button>
                   </div>
 
-                  {/* Order Items */}
                   <div className="merchant-order-items-list">
                     {order.items.map((item, idx) => (
                       <div key={idx} className="merchant-order-item-row">
@@ -484,7 +555,14 @@ function MerchantDashboard() {
           </div>
         )}
 
-        {/* ---------------- 4. TAB 2: MENU & STOCK MANAGEMENT ---------------- */}
+        {/* TAB 2: BOOKING & PREP PLANNER */}
+        {activeTab === "planner" && (
+          <div className="merchant-panel-box">
+            <BookingCalendar viewMode="merchant" />
+          </div>
+        )}
+
+        {/* TAB 3: MENU MANAGEMENT */}
         {activeTab === "menu" && (
           <div className="merchant-panel-box">
             <div className="d-flex align-items-center justify-content-between mb-4">
@@ -500,249 +578,188 @@ function MerchantDashboard() {
               </button>
             </div>
 
-            <div className="table-responsive">
-              <table className="merchant-menu-table">
-                <thead>
-                  <tr>
-                    <th>รูปภาพ</th>
-                    <th>ชื่อเมนูอาหาร</th>
-                    <th>หมวดหมู่</th>
-                    <th>ราคา (บาท)</th>
-                    <th>ยอดขายรวม</th>
-                    <th>สถานะพร้อมขาย</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {menuItems.map((item) => (
-                    <tr key={item.id}>
-                      <td>
-                        <img
-                          src={item.image || "/logo.png"}
-                          alt={item.name}
-                          style={{ width: "44px", height: "44px", borderRadius: "6px", objectFit: "cover" }}
-                        />
-                      </td>
-                      <td>
-                        <div className="fw-bold text-dark">{item.name}</div>
-                        <div className="small text-muted">{item.shopName}</div>
-                      </td>
-                      <td>
-                        <span className="badge bg-slate-100 text-slate-700 border">
-                          {item.categoryLabel}
-                        </span>
-                      </td>
-                      <td>
-                        <span className="fw-bold text-danger">฿{item.price}</span>
-                      </td>
-                      <td>{item.sales || "1.2k ครั้ง"}</td>
-                      <td>
-                        <div className="d-flex align-items-center gap-2">
-                          <label className="merchant-stock-switch">
-                            <input
-                              type="checkbox"
-                              checked={item.isAvailable}
-                              onChange={() => handleToggleStock(item.id)}
-                            />
-                            <span className="merchant-stock-slider" />
-                          </label>
-                          <span
-                            className={`small fw-bold ${
-                              item.isAvailable ? "text-success" : "text-danger"
-                            }`}
-                          >
-                            {item.isAvailable ? "มีสินค้า (ขายอยู่)" : "สินค้าหมด"}
-                          </span>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="merchant-menu-grid">
+              {menuItems.map((item) => (
+                <div key={item.id} className="merchant-menu-card">
+                  <div className="merchant-menu-card-img-wrapper">
+                    <img
+                      src={item.image || "/crispy_fried_chicken.jpg"}
+                      alt={item.name}
+                      className="merchant-menu-card-img"
+                    />
+                    <span className={`merchant-menu-stock-badge ${item.isAvailable ? "in-stock" : "out-of-stock"}`}>
+                      {item.isAvailable ? "พร้อมขาย" : "หมดชั่วคราว"}
+                    </span>
+                  </div>
+                  <div className="merchant-menu-card-content">
+                    <h5 className="merchant-menu-card-title">{item.name}</h5>
+                    <div className="text-danger font-weight-bold fs-5 mb-2">฿{item.price}</div>
+                    <div className="d-flex align-items-center justify-content-between">
+                      <button
+                        className={`btn btn-sm ${item.isAvailable ? "btn-outline-secondary" : "btn-success"}`}
+                        onClick={() => handleToggleProductStatus(item.id)}
+                      >
+                        {item.isAvailable ? "ทำเป็นเมนูหมด" : "เปิดขายเมนูนี้"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
 
-        {/* ---------------- 5. TAB 3: STORE PROFILE & PRIVATE FINANCE ---------------- */}
+        {/* TAB 4: STORE PROFILE & PRIVATE FINANCE */}
         {activeTab === "profile" && (
           <div className="merchant-panel-box">
-            <h3 className="merchant-panel-title">
-              <i className="bi bi-shield-lock-fill text-danger me-2" />
-              ตั้งค่าโปรไฟล์ร้านค้า & ข้อมูลการเงินลับ (Private Financial Subcollection)
+            <h3 className="merchant-panel-title mb-4">
+              <i className="bi bi-gear-wide-connected text-primary me-2" />
+              ตั้งค่าข้อมูลร้านค้า & ข้อมูลบัญชีรับเงินโอน
             </h3>
 
-            {/* Public Store Information Form */}
-            <div className="p-3 bg-light rounded-3 mb-4 border">
-              <h5 className="fw-bold text-dark mb-3">
-                <i className="bi bi-shop me-2" /> ข้อมูลสาธารณะของร้านค้า
-              </h5>
-              <div className="row g-3">
-                <div className="col-md-6">
-                  <label className="form-label small fw-bold">ชื่อร้านค้า (Store Name)</label>
-                  <input
-                    type="text"
-                    className="form-control form-control-sm"
-                    value={storeName}
-                    onChange={(e) => setStoreName(e.target.value)}
-                  />
-                </div>
-                <div className="col-md-6">
-                  <label className="form-label small fw-bold">เบอร์โทรศัพท์ติดต่อร้านค้า</label>
-                  <input
-                    type="text"
-                    className="form-control form-control-sm"
-                    value={storePhone}
-                    onChange={(e) => setStorePhone(e.target.value)}
-                  />
-                </div>
-                <div className="col-md-6">
-                  <label className="form-label small fw-bold">ตำแหน่งโรงอาหาร / เลขเคาน์เตอร์</label>
-                  <input
-                    type="text"
-                    className="form-control form-control-sm"
-                    value={canteenLocation}
-                    onChange={(e) => setCanteenLocation(e.target.value)}
-                  />
-                </div>
-                <div className="col-md-6">
-                  <label className="form-label small fw-bold">เวลาทำการร้านค้า</label>
-                  <input
-                    type="text"
-                    className="form-control form-control-sm"
-                    value={storeHours}
-                    onChange={(e) => setStoreHours(e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
+            <div className="row g-4">
+              <div className="col-md-6">
+                <form onSubmit={handleSaveStoreProfile} className="p-3 bg-light rounded-3 border">
+                  <h5 className="fw-bold mb-3">ข้อมูลร้านค้าที่แสดงสาธารณะ</h5>
+                  <div className="mb-3">
+                    <label className="form-label font-weight-bold">ชื่อร้านค้า:</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={storeName}
+                      onChange={(e) => setStoreName(e.target.value)}
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label font-weight-bold">พิกัดโรงอาหาร:</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={canteenLocation}
+                      onChange={(e) => setCanteenLocation(e.target.value)}
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label font-weight-bold">เบอร์โทรศัพท์ร้านค้า:</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={storePhone}
+                      onChange={(e) => setStorePhone(e.target.value)}
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label font-weight-bold">เวลาทำการ:</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={storeHours}
+                      onChange={(e) => setStoreHours(e.target.value)}
+                    />
+                  </div>
 
-            {/* Private Financial Subcollection Form */}
-            <div className="p-3 bg-white rounded-3 border border-danger border-opacity-25 shadow-sm">
-              <div className="d-flex align-items-center justify-content-between mb-3">
-                <h5 className="fw-bold text-danger mb-0">
-                  <i className="bi bi-bank2 me-2" /> ข้อมูลการเงินลับร้านค้า (merchantProfiles/{`{merchantId}`}/private/finance)
-                </h5>
-                <span className="badge bg-danger">ข้อมูลคุ้มครองความปลอดภัย 100%</span>
-              </div>
-              <p className="text-muted small mb-3">
-                ข้อมูลการเงินนี้ถูกจัดเก็บแยกใน Subcollection ลับ เพื่อป้องกันบุคคลภายนอกส่องดู ปลอดภัยตามกฎหมาย PDPA
-              </p>
+                  {isSavedProfile && (
+                    <div className="alert alert-success py-2 px-3 small mb-3">
+                      <i className="bi bi-check-circle-fill me-1" /> บันทึกข้อมูลร้านค้าเรียบร้อยแล้ว!
+                    </div>
+                  )}
 
-              <div className="row g-3 mb-3">
-                <div className="col-md-4">
-                  <label className="form-label small fw-bold">ธนาคาร / ช่องทางรับโอนเงิน</label>
-                  <select
-                    className="form-select form-select-sm"
-                    value={privateBankName}
-                    onChange={(e) => setPrivateBankName(e.target.value)}
-                  >
-                    <option value="PromptPay (พร้อมเพย์)">PromptPay (พร้อมเพย์ QR Code)</option>
-                    <option value="ธนาคารกสิกรไทย (KBANK)">ธนาคารกสิกรไทย (KBANK)</option>
-                    <option value="ธนาคารไทยพาณิชย์ (SCB)">ธนาคารไทยพาณิชย์ (SCB)</option>
-                    <option value="ธนาคารกรุงเทพ (BBL)">ธนาคารกรุงเทพ (BBL)</option>
-                    <option value="ธนาคารกรุงไทย (KTB)">ธนาคารกรุงไทย (KTB)</option>
-                  </select>
-                </div>
-                <div className="col-md-4">
-                  <label className="form-label small fw-bold">หมายเลขบัญชี / เบอร์พร้อมเพย์รับเงิน</label>
-                  <input
-                    type="text"
-                    className="form-control form-control-sm"
-                    value={privateAccountNo}
-                    onChange={(e) => setPrivateAccountNo(e.target.value)}
-                  />
-                </div>
-                <div className="col-md-4">
-                  <label className="form-label small fw-bold">ชื่อบัญชีผู้ถือร้านค้า</label>
-                  <input
-                    type="text"
-                    className="form-control form-control-sm"
-                    value={privateAccountOwner}
-                    onChange={(e) => setPrivateAccountOwner(e.target.value)}
-                  />
-                </div>
+                  <button type="submit" className="btn btn-primary w-100 font-weight-bold">
+                    <i className="bi bi-save-fill me-1" /> บันทึกข้อมูลร้านค้า
+                  </button>
+                </form>
               </div>
 
-              <button
-                className="btn btn-danger font-weight-bold px-4 py-2"
-                onClick={handleSavePrivateFinance}
-              >
-                <i className="bi bi-shield-check me-1" /> บันทึกข้อมูลการเงินลับ (Private Subcollection)
-              </button>
+              <div className="col-md-6">
+                <form onSubmit={handleSavePrivateFinance} className="p-3 bg-dark text-white rounded-3 border border-secondary">
+                  <div className="d-flex align-items-center justify-content-between mb-3">
+                    <h5 className="fw-bold text-warning mb-0">
+                      <i className="bi bi-shield-lock-fill me-2" />
+                      ข้อมูลการเงินรับโอน
+                    </h5>
+                    <span className="badge bg-secondary">ความปลอดภัยขั้นสูง</span>
+                  </div>
 
-              {isSavedFinance && (
-                <div className="alert alert-success mt-3 mb-0 p-2 text-center small fw-bold">
-                  ✓ บันทึกข้อมูลการเงินลับลง Firestore merchantProfiles/private/finance เรียบร้อยแล้ว!
-                </div>
-              )}
+                  <p className="small text-slate-300 mb-3">
+                    ข้อมูลส่วนนี้ปลอดภัยด้วยระบบสิทธิ์การเข้าถึง Private Subcollection
+                  </p>
+
+                  <div className="mb-3">
+                    <label className="form-label text-slate-200">ธนาคาร / PromptPay:</label>
+                    <input
+                      type="text"
+                      className="form-control bg-secondary text-white border-dark"
+                      value={privateBankName}
+                      onChange={(e) => setPrivateBankName(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="form-label text-slate-200">เลขที่บัญชี / เบอร์พร้อมเพย์:</label>
+                    <input
+                      type="text"
+                      className="form-control bg-secondary text-white border-dark"
+                      value={privateAccountNo}
+                      onChange={(e) => setPrivateAccountNo(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="form-label text-slate-200">ชื่อเจ้าของบัญชี:</label>
+                    <input
+                      type="text"
+                      className="form-control bg-secondary text-white border-dark"
+                      value={privateAccountOwner}
+                      onChange={(e) => setPrivateAccountOwner(e.target.value)}
+                    />
+                  </div>
+
+                  {isSavedFinance && (
+                    <div className="alert alert-success py-2 px-3 small mb-3">
+                      <i className="bi bi-check-circle-fill me-1" /> บันทึกข้อมูลการเงินลับเรียบร้อยแล้ว!
+                    </div>
+                  )}
+
+                  <button type="submit" className="btn btn-warning w-100 font-weight-bold text-dark">
+                    <i className="bi bi-save-fill me-1" /> บันทึกข้อมูลการเงินลับ
+                  </button>
+                </form>
+              </div>
             </div>
           </div>
         )}
 
-        {/* ---------------- 6. TAB 4: STORE STAFF MANAGEMENT ---------------- */}
+        {/* TAB 5: STAFF MANAGEMENT */}
         {activeTab === "staff" && (
           <div className="merchant-panel-box">
             <div className="d-flex align-items-center justify-content-between mb-4">
               <h3 className="merchant-panel-title mb-0">
                 <i className="bi bi-people-fill text-primary me-2" />
-                จัดการพนักงานประจำร้าน (merchantProfiles/{`{merchantId}`}/staff)
+                จัดการสิทธิ์พนักงานประจำร้าน
               </h3>
               <button
-                className="btn btn-primary font-weight-bold px-3 py-2"
-                onClick={() => setIsAddStaffOpen(true)}
+                className="btn btn-primary font-weight-bold"
+                onClick={() => setIsAddStaffOpen(!isAddStaffOpen)}
               >
                 <i className="bi bi-person-plus-fill me-1" /> เพิ่มพนักงานประจำร้าน
               </button>
             </div>
 
-            <div className="table-responsive">
-              <table className="merchant-menu-table">
-                <thead>
-                  <tr>
-                    <th>รหัสพนักงาน</th>
-                    <th>ชื่อ-นามสกุล พนักงาน</th>
-                    <th>ตำแหน่งประจำร้าน</th>
-                    <th>เบอร์ติดต่อ</th>
-                    <th>จัดการ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {staffList.map((staff) => (
-                    <tr key={staff.uid}>
-                      <td><span className="badge bg-slate-200 text-slate-800">{staff.uid}</span></td>
-                      <td><div className="fw-bold text-dark">{staff.name}</div></td>
-                      <td><span className="badge bg-primary-subtle text-primary">{staff.role}</span></td>
-                      <td>{staff.phone}</td>
-                      <td>
-                        <button
-                          className="btn btn-sm btn-outline-danger"
-                          onClick={() => setStaffList((prev) => prev.filter((s) => s.uid !== staff.uid))}
-                        >
-                          <i className="bi bi-trash-fill me-1" /> ลบสิทธิ์
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Add Staff Modal Dialog */}
             {isAddStaffOpen && (
-              <div className="queueup-chat-overlay" onClick={() => setIsAddStaffOpen(false)}>
-                <div className="bg-white p-4 rounded-3 border shadow-lg" style={{ width: "420px" }} onClick={(e) => e.stopPropagation()}>
-                  <h5 className="fw-bold text-dark mb-3">เพิ่มพนักงานประจำร้านค้า</h5>
-                  <div className="mb-3">
-                    <label className="form-label small fw-bold">ชื่อ-นามสกุล พนักงาน *</label>
+              <form onSubmit={handleAddStaff} className="p-3 bg-light border rounded-3 mb-4">
+                <h6 className="fw-bold mb-3">เพิ่มข้อมูลพนักงานใหม่</h6>
+                <div className="row g-3">
+                  <div className="col-md-5">
                     <input
                       type="text"
                       className="form-control"
-                      placeholder="กรอกชื่อ-นามสกุลพนักงาน"
+                      placeholder="ชื่อ-นามสกุล พนักงาน"
                       value={newStaffName}
                       onChange={(e) => setNewStaffName(e.target.value)}
+                      required
                     />
                   </div>
-                  <div className="mb-3">
-                    <label className="form-label small fw-bold">ตำแหน่งหน้าที่ *</label>
+                  <div className="col-md-5">
                     <select
                       className="form-select"
                       value={newStaffRole}
@@ -750,167 +767,46 @@ function MerchantDashboard() {
                     >
                       <option value="พนักงานรับออเดอร์/แคชเชียร์">พนักงานรับออเดอร์/แคชเชียร์</option>
                       <option value="พ่อครัว/ผู้ช่วยเตรียมอาหาร">พ่อครัว/ผู้ช่วยเตรียมอาหาร</option>
-                      <option value="เจ้าหน้าที่ส่งอาหารที่เคาน์เตอร์">เจ้าหน้าที่ส่งอาหารที่เคาน์เตอร์</option>
+                      <option value="ผู้ดูแลระบบร้านค้าประจำสาขา">ผู้ดูแลระบบร้านค้าประจำสาขา</option>
                     </select>
                   </div>
-                  <div className="d-flex justify-content-end gap-2">
-                    <button className="btn btn-light" onClick={() => setIsAddStaffOpen(false)}>ยกเลิก</button>
-                    <button className="btn btn-primary fw-bold" onClick={handleAddStaff}>บันทึกพนักงาน</button>
+                  <div className="col-md-2">
+                    <button type="submit" className="btn btn-success w-100 font-weight-bold">
+                      เพิ่มสิทธิ์
+                    </button>
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ---------------- 7. TAB 5: AI MARKETING STRATEGIST & COUPON ENGINE ---------------- */}
-        {activeTab === "marketing" && (
-          <div className="merchant-panel-box">
-            <div className="d-flex align-items-center justify-content-between mb-4">
-              <div>
-                <h3 className="merchant-panel-title mb-1 text-primary">
-                  <i className="bi bi-robot me-2" />
-                  ศูนย์วางแผนการตลาด AI & จัดโปรโมชั่นคูปองร้านค้า
-                </h3>
-                <p className="text-secondary small mb-0">
-                  วิเคราะห์ยอดขาย พฤติกรรมนักเรียน และแนะนำคูปองโปรโมชั่นเพิ่มยอดขายแบบอัตโนมัติ (1-Click Deploy)
-                </p>
-              </div>
-              {securityReport && (
-                <div className="badge bg-success-subtle text-success p-2 border border-success-subtle rounded-3 d-flex align-items-center gap-2">
-                  <i className="bi bi-shield-check fs-5" />
-                  <div className="text-start">
-                    <div className="fw-bold small">{securityReport.shieldVersion}</div>
-                    <div className="text-muted" style={{ fontSize: "11px" }}>สถานะเกราะ: {securityReport.status}</div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {marketingSuccessMsg && (
-              <div className="alert alert-success alert-dismissible fade show fw-bold shadow-sm" role="alert">
-                <i className="bi bi-check-circle-fill me-2" />
-                {marketingSuccessMsg}
-              </div>
+              </form>
             )}
 
-            {/* AI Strategic Marketing Analysis Insights Banner */}
-            <div className="p-4 rounded-3 mb-4 text-white" style={{ background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)", border: "1px solid #334155" }}>
-              <div className="d-flex align-items-center gap-3 mb-3">
-                <div className="rounded-circle bg-primary p-3 d-flex align-items-center justify-content-center" style={{ width: "48px", height: "48px" }}>
-                  <i className="bi bi-graph-up-arrow fs-4 text-white" />
-                </div>
-                <div>
-                  <h5 className="fw-bold mb-1">🤖 AI Marketing Insights บทวิเคราะห์ร้านค้าประจำวัน</h5>
-                  <p className="text-slate-300 small mb-0">
-                    อิงจากข้อมูลการสั่งซื้อย้อนหลัง: ช่วงพักเที่ยงลูกค้าหนาแน่นที่สุด เมนูข้าวกะเพราและไก่ทอดเป็นสินค้าขายดีประจำโรงอาหาร
-                  </p>
-                </div>
-              </div>
-              <div className="row g-3 text-dark">
-                <div className="col-md-4">
-                  <div className="bg-white p-3 rounded-3 shadow-sm">
-                    <div className="text-muted small fw-bold">ช่วงเวลาคนแน่น (Peak Hours)</div>
-                    <div className="fs-5 fw-bold text-danger">11:30 - 12:30 น.</div>
-                    <span className="badge bg-danger-subtle text-danger mt-1">เร่งความเร็วปรุงคิว</span>
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="bg-white p-3 rounded-3 shadow-sm">
-                    <div className="text-muted small fw-bold">ช่วงเวลาชะลอตัว (Off-Peak)</div>
-                    <div className="fs-5 fw-bold text-warning">13:00 - 14:30 น.</div>
-                    <span className="badge bg-warning-subtle text-warning mt-1">ควรเปิดคูปอง Happy Hour</span>
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="bg-white p-3 rounded-3 shadow-sm">
-                    <div className="text-muted small fw-bold">อัตราสั่งซ้ำ (Retention Rate)</div>
-                    <div className="fs-5 fw-bold text-success">78.5% ของนักเรียน</div>
-                    <span className="badge bg-success-subtle text-success mt-1">ความพึงพอใจสูงมาก</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* AI Recommended Coupon Campaign Packages */}
-            <h5 className="fw-bold mb-3 text-dark">
-              💡 แผนโปรโมชั่น & คูปองที่ AI แนะนำสำหรับร้านคุณ (1-Click Deployment)
-            </h5>
-
-            <div className="row g-3 mb-4">
-              {aiMarketingCoupons.map((coupon) => (
-                <div key={coupon.id} className="col-md-4">
-                  <div className="card h-100 border-0 shadow-sm p-3 position-relative" style={{ background: "#f8fafc", borderRadius: "12px", borderLeft: "5px solid #0284c7" }}>
-                    <div className="d-flex justify-content-between align-items-start mb-2">
-                      <span className="badge bg-primary text-white">{coupon.recommendedBadge}</span>
-                      <span className="fw-bold text-primary fs-6">CODE: {coupon.code}</span>
-                    </div>
-
-                    <h6 className="fw-bold text-dark mb-2">{coupon.title}</h6>
-                    <p className="text-muted small mb-3">{coupon.description}</p>
-
-                    <div className="bg-white p-2 rounded-2 border mb-3 small">
-                      <div className="text-slate-600 mb-1">
-                        🎯 <strong>กลุ่มเป้าหมาย:</strong> {coupon.targetAudience}
-                      </div>
-                      <div className="text-success fw-bold">
-                        📈 <strong>คาดการณ์ผลลัพธ์:</strong> {coupon.projectedSalesIncrease}
-                      </div>
-                    </div>
-
-                    <div className="mt-auto">
-                      <button
-                        className="btn btn-primary w-100 fw-bold shadow-sm"
-                        onClick={() => handleDeployCoupon(coupon)}
-                      >
-                        <i className="bi bi-rocket-takeoff-fill me-1" />
-                        เปิดใช้งานโปรโมชั่นนี้ทันที (1-Click)
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Active Live Coupons Management */}
-            <h5 className="fw-bold mb-3 text-dark">
-              🏷️ รายการคูปองส่วนลดที่เปิดใช้งานอยู่ในระบบ (Live Merchant Coupons)
-            </h5>
-
-            <div className="table-responsive bg-white rounded-3 border shadow-sm">
-              <table className="table align-middle mb-0">
-                <thead className="bg-light">
+            <div className="table-responsive">
+              <table className="table table-hover align-middle">
+                <thead className="table-light">
                   <tr>
-                    <th>รหัสคูปอง (Code)</th>
-                    <th>ชื่อโปรโมชั่น</th>
-                    <th>มูลค่าส่วนลด</th>
-                    <th>ขั้นต่ำ</th>
-                    <th>สถานะ</th>
-                    <th>จัดการ</th>
+                    <th>รหัสพนักงาน</th>
+                    <th>ชื่อ-นามสกุล</th>
+                    <th>ตำแหน่ง / สิทธิ์</th>
+                    <th>เบอร์โทรศัพท์</th>
+                    <th>การจัดการ</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {activeCouponsList.map((c) => (
-                    <tr key={c.code}>
-                      <td className="fw-bold text-primary">{c.code}</td>
-                      <td>{c.title}</td>
-                      <td className="fw-bold text-success">
-                        {c.discountType === "PERCENT" ? `${c.discountValue}%` : `฿${c.discountValue}`}
-                      </td>
-                      <td>฿{c.minSpend}</td>
+                  {staffList.map((stf) => (
+                    <tr key={stf.uid}>
+                      <td className="fw-bold">{stf.uid}</td>
+                      <td>{stf.name}</td>
                       <td>
-                        {c.isActive ? (
-                          <span className="badge bg-success-subtle text-success">ใช้งานอยู่ (Active)</span>
-                        ) : (
-                          <span className="badge bg-secondary-subtle text-secondary">ปิดใช้งาน (Inactive)</span>
-                        )}
+                        <span className="badge bg-primary-subtle text-primary border border-primary-subtle">
+                          {stf.role}
+                        </span>
                       </td>
+                      <td>{stf.phone}</td>
                       <td>
                         <button
-                          className={`btn btn-sm ${c.isActive ? "btn-outline-danger" : "btn-outline-success"} fw-bold`}
-                          onClick={() => handleToggleCoupon(c.code)}
+                          className="btn btn-sm btn-outline-danger"
+                          onClick={() => setStaffList(staffList.filter((s) => s.uid !== stf.uid))}
                         >
-                          {c.isActive ? "ระงับคูปอง" : "เปิดใช้งานอีกครั้ง"}
+                          ลบสิทธิ์
                         </button>
                       </td>
                     </tr>
@@ -920,14 +816,92 @@ function MerchantDashboard() {
             </div>
           </div>
         )}
+
+        {/* TAB 6: AI MARKETING & SECURITY SHIELD */}
+        {activeTab === "marketing" && (
+          <div className="merchant-panel-box">
+            <div className="d-flex align-items-center justify-content-between mb-4">
+              <h3 className="merchant-panel-title mb-0">
+                <i className="bi bi-robot text-primary me-2" />
+                AI การตลาดอัตโนมัติ & ระบบความปลอดภัยของร้านค้า
+              </h3>
+              <span className="badge bg-success-subtle text-success p-2">
+                <i className="bi bi-shield-check me-1" />
+                Security Health: {securityReport.healthScore}/100
+              </span>
+            </div>
+
+            {marketingSuccessMsg && (
+              <div className="alert alert-success fw-bold mb-4">{marketingSuccessMsg}</div>
+            )}
+
+            <div className="row g-4">
+              <div className="col-md-7">
+                <div className="p-3 bg-light rounded-3 border">
+                  <h5 className="fw-bold mb-3 text-dark">
+                    <i className="bi bi-stars text-warning me-1" />
+                    ข้อเสนอแนะคูปองส่วนลดจาก AI (AI Coupon Generator)
+                  </h5>
+
+                  <div className="d-flex flex-column gap-3">
+                    {aiMarketingCoupons.map((c, idx) => (
+                      <div key={idx} className="p-3 bg-white rounded-3 border d-flex justify-content-between align-items-center">
+                        <div>
+                          <strong className="text-primary fs-5">{c.code}</strong> - {c.title}
+                          <div className="text-muted small mt-1">{c.aiReason}</div>
+                          <div className="text-success small font-weight-bold">
+                            ส่วนลด {c.discountType === "PERCENT" ? `${c.discountValue}%` : `฿${c.discountValue}`} (เมื่อสั่งขั้นต่ำ ฿{c.minSpend})
+                          </div>
+                        </div>
+                        <button
+                          className="btn btn-primary btn-sm font-weight-bold px-3 ms-2"
+                          onClick={() => handleDeployCoupon(c)}
+                        >
+                          เปิดใช้งานคูปองนี้
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="col-md-5">
+                <div className="p-3 bg-dark text-white rounded-3 border border-secondary">
+                  <h5 className="fw-bold text-warning mb-3">
+                    <i className="bi bi-ticket-perforated-fill me-2" />
+                    คูปองร้านค้าที่กำลังเปิดใช้งาน (Live)
+                  </h5>
+
+                  <div className="d-flex flex-column gap-2 mb-3">
+                    {activeCouponsList.map((cp, idx) => (
+                      <div key={idx} className="p-2 bg-secondary rounded d-flex justify-content-between align-items-center">
+                        <div>
+                          <strong className="text-warning">{cp.code}</strong> - {cp.title}
+                          <div className="small text-slate-300">
+                            {cp.isActive ? "กำลังทำงานอยู่" : "ปิดใช้งานอยู่"}
+                          </div>
+                        </div>
+                        <button
+                          className={`btn btn-sm ${cp.isActive ? "btn-outline-danger" : "btn-success"}`}
+                          onClick={() => handleToggleCoupon(cp.code)}
+                        >
+                          {cp.isActive ? "ปิด" : "เปิด"}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Real-Time Customer Merchant Chat Modal */}
       <ChatModal
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
-        initialStoreName={chatCustomerName}
-        initialOrderContext={chatOrderContext}
+        customerName={chatCustomerName}
+        orderContext={chatOrderContext}
       />
     </div>
   );

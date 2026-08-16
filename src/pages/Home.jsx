@@ -11,6 +11,9 @@ import FoodCard from "../components/FoodCard.jsx";
 import ShopeeSearchBar from "../components/ShopeeSearchBar.jsx";
 import ChatModal from "../components/ChatModal.jsx";
 import Footer from "../components/Footer.jsx";
+import BookingCalendar from "../components/BookingCalendar.jsx";
+import DailyMenuBoard from "../components/DailyMenuBoard.jsx";
+import ShopReelsFeed from "../components/ShopReelsFeed.jsx";
 import { usePreferences } from "../context/PreferencesContext.jsx";
 import { SHARED_PRODUCTS } from "../data/mockProducts.js";
 import { INITIAL_PRODUCTS } from "../firebase/config.js";
@@ -55,7 +58,7 @@ function Home() {
   const [showNotice, setShowNotice] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(false);
 
-  // 🧠 AI User Behavior & Live Merchant Coupons States
+  // AI User Behavior & Live Merchant Coupons States
   const [aiInsights] = useState(() => getUserBehaviorInsights());
   const [queuePrediction] = useState(() => predictQueueWaitTime(3));
   const [liveCoupons] = useState(() => getActiveMerchantCoupons());
@@ -101,11 +104,11 @@ function Home() {
       list.push({
         id: "welcome-gift",
         type: "welcome",
-        badge: language === "en" ? "🎁 NEW MEMBER GIFT" : "🎁 สิทธิพิเศษสมาชิกใหม่",
+        badge: language === "en" ? "NEW MEMBER GIFT" : "สิทธิพิเศษสมาชิกใหม่",
         title:
           language === "en"
-            ? `🎉 Welcome ${user ? user.name || user.email : "Member"}! Claim your ฿50 OFF coupon "WELCOME50" for your first order!`
-            : `🎉 ยินดีต้อนรับคุณ ${user ? user.name || user.email : "สมาชิก QueueUp"} เข้าสู่ QueueUp! รับคูปองส่วนลดสมาชิกใหม่ "WELCOME50" ลดทันที 50 บาท!`,
+            ? `Welcome ${user ? user.name || user.email : "Member"}! Claim your ฿50 OFF coupon "WELCOME50" for your first order!`
+            : `ยินดีต้อนรับคุณ ${user ? user.name || user.email : "สมาชิก QueueUp"} เข้าสู่ QueueUp! รับคูปองส่วนลดสมาชิกใหม่ "WELCOME50" ลดทันที 50 บาท!`,
         actionType: "claim_coupon",
       });
     }
@@ -114,7 +117,7 @@ function Home() {
       {
         id: "app-v25",
         type: "feature",
-        badge: language === "en" ? "🚀 APP UPDATE v2.5" : "🚀 อัปเดตใหม่ v2.5",
+        badge: language === "en" ? "APP UPDATE v2.5" : "อัปเดตใหม่ v2.5",
         title:
           language === "en"
             ? "QueueUp Canteen Pre-Order, Real-time Queue Tracking & Auto PromptPay QR!"
@@ -124,7 +127,7 @@ function Home() {
       {
         id: "prog-crm",
         type: "program",
-        badge: language === "en" ? "⚡ NEW PROGRAM" : "⚡ โปรแกรมใหม่",
+        badge: language === "en" ? "NEW PROGRAM" : "โปรแกรมใหม่",
         title:
           language === "en"
             ? "New Member Welcome Coupons & Parent Nutrition Spending Tracker!"
@@ -134,7 +137,7 @@ function Home() {
       {
         id: "shop-pa-daeng",
         type: "store",
-        badge: language === "en" ? "🔔 STORE UPDATE" : "🔔 อัปเดตจากร้านค้าที่ติดตาม",
+        badge: language === "en" ? "STORE UPDATE" : "อัปเดตจากร้านค้าที่ติดตาม",
         title:
           language === "en"
             ? "[Pa Daeng Canteen] Order ahead now & claim free 50 CRM bonus points!"
@@ -148,7 +151,6 @@ function Home() {
 
   const currentUpdate = appUpdatesList[activeUpdateIndex] || appUpdatesList[0];
 
-  // Rotate app updates automatically every 4.5 seconds
   useEffect(() => {
     const timer = setInterval(() => {
       setActiveUpdateIndex((prev) => (prev + 1) % appUpdatesList.length);
@@ -156,7 +158,6 @@ function Home() {
     return () => clearInterval(timer);
   }, [appUpdatesList.length]);
 
-  // Handler for First-Time User Welcome Coupon Claim
   const handleClaimWelcomeCoupon = () => {
     const couponCode = "WELCOME50";
     const userName = user ? user.name || user.email : "สมาชิกใหม่";
@@ -181,12 +182,11 @@ function Home() {
 
     alert(
       language === "en"
-        ? `🎉 Congratulations ${userName}!\nCoupon code "${couponCode}" (฿50 OFF) saved & copied to clipboard!\nUse it on your first checkout.`
-        : `🎉 ยินดีด้วยคุณ ${userName}!\nคัดลอกรหัสคูปอง "${couponCode}" (ส่วนลด 50 บาท) เรียบร้อยแล้ว!\nสามารถนำไปกรอกใช้เป็นส่วนลดในหน้าชำระเงินได้ทันที`
+        ? `Congratulations ${userName}!\nCoupon code "${couponCode}" (฿50 OFF) saved & copied to clipboard!\nUse it on your first checkout.`
+        : `ยินดีด้วยคุณ ${userName}!\nคัดลอกรหัสคูปอง "${couponCode}" (ส่วนลด 50 บาท) เรียบร้อยแล้ว!\nสามารถนำไปกรอกใช้เป็นส่วนลดในหน้าชำระเงินได้ทันที`
     );
   };
 
-  // Firestore Sync Effect
   useEffect(() => {
     fetchFoodCategoriesFromFirestore().then((dbCats) => {
       if (dbCats && dbCats.length > 0) {
@@ -221,15 +221,15 @@ function Home() {
 
   return (
     <div className="queue-home-container">
-      {/* 1. Shopee Header Search Bar */}
+      {/* 1. Header Search Bar */}
       <ShopeeSearchBar />
 
-      {/* 2. First-Time User Welcome Banner (แสดงความยินดีสมาชิกใหม่ + ชื่อผู้ใช้ + คูปอง 50 บาท) */}
-      {/* 2. Single Unified Announcement Banner (แสดงแค่อันเดียว หมุนเวียนข่าวสารแบบดีไซน์พรีเมียม) */}
+      {/* 2. Single Unified Announcement Banner */}
       {showNotice && currentUpdate && (
         <div className="queue-notice-banner">
           <div className="queue-notice-content">
             <span className="queue-notice-chip">
+              <i className="bi bi-bell-fill me-1" />
               {currentUpdate.badge}
             </span>
             <span
@@ -306,28 +306,30 @@ function Home() {
         className="queue-home-wrapper"
         style={{ marginTop: (showNotice || showWelcomeBanner) ? "0px" : "24px" }}
       >
-        {/* 3. Red Hero Banner Section */}
+        {/* 3. Hero Banner Section */}
         <section className="queue-hero-banner">
           <div className="queue-hero-left">
             <span className="queue-hero-tag">
-              {language === "en" ? "CRISPY · DELICIOUS · HOT" : "กรอบ อร่อย ร้อนๆ"}
+              <i className="bi bi-clock-history me-1" />
+              {language === "en" ? "SMART PRE-BOOKING PLATFORM" : "แพลตฟอร์มสั่งจองอาหารล่วงตามนัด"}
             </span>
             <h1 className="queue-hero-title">
-              {language === "en" ? "Delicious & Crispy," : "อร่อยกรอบ เข้มข้น"}
+              {language === "en" ? "Pre-Order & Schedule Pickup," : "จองอาหารล่วงหน้า ระบุเวลานัด"}
               <br />
-              {language === "en" ? "Freshly Prepared Daily!" : "สั่งสดใหม่ทุกวัน!"}
+              {language === "en" ? "Zero Queues & Hot Meals Daily!" : "ไม่ต้องยืนรอคิว ได้กินอาหารร้อนๆ ตรงเวลา!"}
             </h1>
             <p className="queue-hero-sub">
               {language === "en"
-                ? "Freshly fried & served hot! Pre-order your meals with zero queues."
-                : "ชุบแป้งสดใหม่ ทอดร้อนๆ สั่งอาหารล่วงหน้า ไม่ต้องต่อคิวยาว"}
+                ? "Select date & time slot, order from top school canteen shops, and track status live."
+                : "ระบุวันและเวลารับอาหารล่วงหน้า วางแผนมื้ออาหารในโรงเรียน มั่นใจได้อาหารเสิร์ฟร้อนทันเวลา"}
             </p>
             <div className="queue-hero-actions">
               <button
                 className="queue-hero-btn-primary"
-                onClick={() => navigate("/search?keyword=ไก่ทอด")}
+                onClick={() => navigate("/search?keyword=อาหาร")}
               >
-                {language === "en" ? "Explore Hot Stores" : "สำรวจร้านเด็ด"} <i className="bi bi-arrow-right ms-1" />
+                <i className="bi bi-calendar-check me-1" />
+                {language === "en" ? "Explore & Pre-Book" : "ค้นหาร้านและสั่งจองล่วงหน้า"}
               </button>
               <div className="queue-hero-points-badge">
                 <span><i className="bi bi-coin text-warning me-1" /> {language === "en" ? "CRM Points: 128" : "แต้มสะสม CRM: 128"}</span>
@@ -342,9 +344,19 @@ function Home() {
           />
         </section>
 
-        {/* 4. Circular Food Category Story Carousel */}
+        {/* 4. Interactive Booking Calendar Component */}
+        <BookingCalendar viewMode="user" />
+
+        {/* 5. Daily Menu Specials & Merchant Announcements */}
+        <DailyMenuBoard />
+
+        {/* 6. Shop Video Reels & Student Community Feed */}
+        <ShopReelsFeed onOrderFromReel={(prodId) => navigate(`/product/${prodId}`)} />
+
+        {/* 7. Food Categories Carousel */}
         <section className="queue-category-section">
           <h5 className="fw-bold queue-category-title mb-3">
+            <i className="bi bi-grid-fill text-primary me-2" />
             {language === "en" ? "Food Categories" : "หมวดหมู่อาหาร"}
           </h5>
           <div className="queue-category-list">
@@ -378,7 +390,7 @@ function Home() {
           </div>
         </section>
 
-        {/* 5. 10 อันดับเมนูขายดีประจำโรงอาหาร (Horizontal Auto-Scrolling Carousel) */}
+        {/* 8. Top 10 Bestsellers Carousel */}
         <section className="bg-white p-4 rounded-4 shadow-sm border mb-4 queue-bestseller-section">
           <div className="d-flex align-items-center justify-content-between mb-3">
             <div>
@@ -393,7 +405,10 @@ function Home() {
               </p>
             </div>
             <div className="d-flex align-items-center gap-2">
-              <span className="badge bg-danger">{language === "en" ? "POPULAR" : "ยอดนิยม"}</span>
+              <span className="badge bg-danger">
+                <i className="bi bi-star-fill me-1" />
+                {language === "en" ? "POPULAR" : "ยอดนิยม"}
+              </span>
               <button
                 type="button"
                 className="queue-carousel-arrow-btn"
@@ -432,27 +447,30 @@ function Home() {
           </div>
         </section>
 
-        {/* 5.5 AI SMART BEHAVIOR & CONVENIENCE BAR + LIVE COUPONS TICKER */}
+        {/* 9. AI Smart Behavior & Live Merchant Coupons */}
         <section className="bg-white p-4 rounded-4 shadow-sm border mb-4">
           <div className="d-flex align-items-center justify-content-between mb-3">
             <h5 className="fw-bold text-dark mb-0">
-              <i className="bi bi-robot text-primary me-2" />
-              🧠 AI Smart Assistant & คูปองส่วนลดพิเศษประจำวัน
+              <i className="bi bi-cpu-fill text-primary me-2" />
+              AI Smart Assistant & คูปองส่วนลดพิเศษประจำวัน
             </h5>
             {queuePrediction && (
               <span className="badge bg-primary-subtle text-primary p-2 fs-6">
-                ⏱️ AI คาดการณ์เวลารอคิวเฉลี่ย: {queuePrediction.formattedRange} ({queuePrediction.statusText})
+                <i className="bi bi-clock-history me-1" />
+                AI คาดการณ์เวลารอคิวเฉลี่ย: {queuePrediction.formattedRange} ({queuePrediction.statusText})
               </span>
             )}
           </div>
 
           <div className="row g-3">
-            {/* Quick Re-order Card based on AI Behavior Learning */}
             {aiInsights && aiInsights.lastOrderedItem ? (
               <div className="col-md-6">
                 <div className="p-3 rounded-3 border bg-gradient text-dark d-flex align-items-center justify-content-between" style={{ background: "#f0f9ff", borderColor: "#bae6fd" }}>
                   <div>
-                    <span className="badge bg-primary mb-1">⚡ AI Quick Re-order (สั่งต่อใน 1 คลิก)</span>
+                    <span className="badge bg-primary mb-1">
+                      <i className="bi bi-lightning-charge-fill me-1" />
+                      AI Quick Re-order (สั่งต่อใน 1 คลิก)
+                    </span>
                     <h6 className="fw-bold mb-1">{aiInsights.lastOrderedItem.itemTitle}</h6>
                     <p className="text-muted small mb-0">
                       {aiInsights.lastOrderedItem.variant ? `ตัวเลือก: ${aiInsights.lastOrderedItem.variant} • ` : ""}
@@ -466,14 +484,18 @@ function Home() {
                       navigate(`/product/${aiInsights.lastOrderedItem.itemId || "prod-default"}`);
                     }}
                   >
-                    สั่งซ้ำอีกครั้ง 🛒
+                    <i className="bi bi-bag-plus me-1" />
+                    สั่งซ้ำอีกครั้ง
                   </button>
                 </div>
               </div>
             ) : (
               <div className="col-md-6">
                 <div className="p-3 rounded-3 border text-dark" style={{ background: "#fafafa" }}>
-                  <span className="badge bg-secondary mb-1">💡 AI Behavioral Learning</span>
+                  <span className="badge bg-secondary mb-1">
+                    <i className="bi bi-lightbulb-fill me-1" />
+                    AI Behavioral Learning
+                  </span>
                   <p className="small mb-0 text-muted">
                     {aiInsights?.aiSuggestion || "ระบบกำลังเรียนรู้พฤติกรรมการสั่งซื้อของคุณ สั่งอาหารมื้อนี้เพื่อเปิดใช้งาน 1-Click Quick Re-order"}
                   </p>
@@ -481,10 +503,12 @@ function Home() {
               </div>
             )}
 
-            {/* Live Active Merchant Coupons Ticker */}
             <div className="col-md-6">
               <div className="p-3 rounded-3 border bg-light">
-                <span className="badge bg-success mb-1">🏷️ คูปองร้านค้าที่เปิดใช้งาน (Live)</span>
+                <span className="badge bg-success mb-1">
+                  <i className="bi bi-tag-fill me-1" />
+                  คูปองร้านค้าที่เปิดใช้งาน (Live)
+                </span>
                 {liveCoupons && liveCoupons.length > 0 ? (
                   <div className="d-flex align-items-center justify-content-between">
                     <div>
@@ -504,7 +528,8 @@ function Home() {
                         }
                       }}
                     >
-                      คัดลอกโค้ด 📋
+                      <i className="bi bi-clipboard me-1" />
+                      คัดลอกโค้ด
                     </button>
                   </div>
                 ) : (
@@ -515,7 +540,7 @@ function Home() {
           </div>
         </section>
 
-        {/* 6. AI QueueUp Smart Search Recommendation Dark Section */}
+        {/* 10. AI Smart Recommendation Dark Section */}
         <section className="queue-ai-section">
           <div className="queue-ai-header-row">
             <div>
@@ -583,7 +608,7 @@ function Home() {
         </section>
       </div>
 
-      {/* 7. Floating Bottom-Right Chat Button */}
+      {/* Floating Bottom-Right Chat Button */}
       <button
         className="queue-floating-chat-btn"
         onClick={() => setIsChatOpen(true)}
@@ -600,7 +625,7 @@ function Home() {
         onClose={() => setIsChatOpen(false)}
       />
 
-      {/* Global Reusable Premium Footer */}
+      {/* Footer */}
       <Footer />
     </div>
   );

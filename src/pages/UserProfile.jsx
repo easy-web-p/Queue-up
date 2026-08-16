@@ -53,6 +53,80 @@ function UserProfile() {
   const [chatStoreName, setChatStoreName] = useState("");
   const [chatOrderContext, setChatOrderContext] = useState(null);
 
+  // Booking & Purchase History State
+  const [orders, setOrders] = useState(() => {
+    const saved = localStorage.getItem("queueup_user_orders");
+    return saved ? JSON.parse(saved) : [
+      {
+        id: "240809QUEUE01",
+        shopName: "ร้านครัวโรงเรียน QueueUp Canteen",
+        shopLocation: "โรงอาหารอาคาร 1 เคาน์เตอร์ 2",
+        orderDate: "09 ส.ค. 2026, 11:42 น.",
+        status: "TO_PAY",
+        statusText: "รอชำระเงินในระบบ (กรุณาชำระเงินเพื่อยืนยันคิว)",
+        queueNo: "A05",
+        totalAmount: 65,
+        paymentMethod: "QR PromptPay / สแกนผ่านแอปธนาคาร",
+        items: [
+          {
+            id: "p1",
+            name: "ชุดข้าวผัดกุ้งกะทะร้อน + ไข่ดาวสด",
+            price: 65,
+            quantity: 1,
+            variant: "เผ็ดน้อย / ไม่ใส่ต้นหอม",
+            image: "/logo.png",
+          },
+        ],
+      },
+      {
+        id: "240808QUEUE02",
+        shopName: "ร้านชาไข่มุก บราวน์ชูการ์ Express",
+        shopLocation: "อาคารเรียน 3 ฝั่งสนามฟุตบอล",
+        orderDate: "08 ส.ค. 2026, 15:20 น.",
+        status: "COMPLETED",
+        statusText: "รับอาหารสำเร็จเรียบร้อยแล้ว",
+        queueNo: "B12",
+        totalAmount: 45,
+        paymentMethod: "พร้อมเพย์โรงเรียน",
+        items: [
+          {
+            id: "p2",
+            name: "ชาไทยเฉาก๊วย หวาน 50%",
+            price: 45,
+            quantity: 1,
+            variant: "หวานน้อย 50%",
+            image: "https://images.unsplash.com/photo-1558857563-b371033873b8?w=300&auto=format&fit=crop&q=80",
+          },
+        ],
+      },
+    ];
+  });
+  const [orderStatusTab, setOrderStatusTab] = useState("ALL");
+  const [orderSearchQuery, setOrderSearchQuery] = useState("");
+  const [selectedOrderForPayment, setSelectedOrderForPayment] = useState(null);
+
+  // Bank & Payment Accounts State
+  const [bankName, setBankName] = useState(() => localStorage.getItem("queueup_bank_name") || "กรุงไทย (Krungthai Bank)");
+  const [bankAccountNo, setBankAccountNo] = useState(() => localStorage.getItem("queueup_bank_account_no") || "123-4-56789-0");
+  const [bankAccountName, setBankAccountName] = useState(() => localStorage.getItem("queueup_bank_account_name") || "ด.ช. พิสิษฐ์ แก้วกุลพิสิษฐ์");
+  const [isEditingPayment, setIsEditingPayment] = useState(false);
+
+  // Auto Save Status Ticker State
+  const [autoSaveStatus, setAutoSaveStatus] = useState("บันทึกอัตโนมัติเรียบร้อย");
+
+  // Account ID Password Verification Modal State
+  const [isPasswordVerifyModalOpen, setIsPasswordVerifyModalOpen] = useState(false);
+  const [newAccountIdInput, setNewAccountIdInput] = useState("");
+  const [verifyPasswordInput, setVerifyPasswordInput] = useState("");
+  const [showAccountId, setShowAccountId] = useState(false);
+
+  // Delete Account Modal State
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isFinalConfirmModalOpen, setIsFinalConfirmModalOpen] = useState(false);
+  const [deleteUsername, setDeleteUsername] = useState("");
+  const [deleteEmail, setDeleteEmail] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
+
   // 🛡️ AI Security Shield & 🧠 AI Behavior Learning States
   const [aiBehaviorProfile] = useState(() => getUserBehaviorInsights());
   const [securityHealth] = useState(() => getSecurityHealthReport());
@@ -1107,7 +1181,15 @@ function UserProfile() {
 
                     {order.items.map((item, idx) => (
                       <div key={idx} className="shopee-order-item">
-                        <img src={item.image} alt={item.name} className="shopee-item-img" />
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="shopee-item-img"
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = "/crispy_fried_chicken.jpg";
+                          }}
+                        />
                         <div className="shopee-item-details">
                           <div className="shopee-item-title">{item.name}</div>
                           <div className="shopee-item-variant">ตัวเลือก: {item.variant}</div>

@@ -28,7 +28,15 @@ function FoodCard({
     <div className="shopee-food-card" onClick={onClick}>
       {/* 1. Image Wrapper with Badges & Floating Heart Button */}
       <div className="shopee-food-img-wrapper">
-        <img src={image} alt={foodTitle} className="shopee-food-img" />
+        <img
+          src={image}
+          alt={foodTitle}
+          className="shopee-food-img"
+          onError={(e) => {
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = "/crispy_fried_chicken.jpg";
+          }}
+        />
 
         {/* Mall / Recommended Tag (Top-Left) */}
         <span className="shopee-food-badge-mall">ร้านเด็ด</span>

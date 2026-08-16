@@ -310,11 +310,14 @@ export function calculateUserTrustScore(profile = {}, orderHistory = []) {
   }
 
   // Trust Status Assessment
-  let trustCategory = "Normal";
-  if (score >= 90) trustCategory = "Trusted Account 🛡️";
-  else if (score >= 70) trustCategory = "Normal Account ✅";
-  else if (score >= 50) trustCategory = "Warning Account ⚠️";
-  else trustCategory = "Under Review 🛑";
+  const trustCategory =
+    score >= 90
+      ? "Trusted Account 🛡️"
+      : score >= 70
+      ? "Normal Account ✅"
+      : score >= 50
+      ? "Warning Account ⚠️"
+      : "Under Review 🛑";
 
   return {
     trustScore: score,

@@ -26,23 +26,19 @@ function ProductDetail() {
   const navigate = useNavigate();
   const { user } = useSelector((state) => state.auth);
 
-  // Find product or fallback to default m1
   const initialProduct = PRODUCTS_BY_ID[id] || PRODUCTS_BY_ID.m1;
   const [product, setProduct] = useState(initialProduct);
 
-  // States
   const [selectedImg, setSelectedImg] = useState(initialProduct.mainImg || initialProduct.image);
   const [guestCount, setGuestCount] = useState("1 คน");
-  const [bookingDate, setBookingDate] = useState("10 ส.ค.");
+  const [bookingDate, setBookingDate] = useState("17 ส.ค.");
   const [selectedTimeSlot, setSelectedTimeSlot] = useState(TIME_SLOTS[1]);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
 
-  // Profile completeness guard states
   const [isIncompleteProfileModalOpen, setIsIncompleteProfileModalOpen] = useState(false);
   const [missingProfileFields, setMissingProfileFields] = useState([]);
 
-  // Fetch product data dynamically from Firebase Firestore
   useEffect(() => {
     let isMounted = true;
     async function loadProductData() {
@@ -64,14 +60,12 @@ function ProductDetail() {
     };
   }, [id]);
 
-  // Price Calculation Logic
   const discountPercent = parseInt((selectedTimeSlot?.discount || "0").replace("-", "").replace("%", "")) / 100;
   const basePrice = Number(product?.price) || 0;
   const discountedUnitPrice = Math.round(basePrice * (1 - discountPercent));
   const guestMultiplier = parseInt(guestCount) || 1;
   const totalCalculatedPrice = discountedUnitPrice * guestMultiplier;
 
-  // Check Profile Completeness Guard
   const checkProfileCompleteness = async () => {
     let profileData = null;
 
@@ -91,124 +85,117 @@ function ProductDetail() {
       if (saved) {
         try {
           profileData = JSON.parse(saved);
-        } catch {}
+        } catch {
+          // ignore
+        }
       }
     }
 
     const missing = [];
-    if (!profileData?.phone || profileData.phone.trim() === "") {
-      missing.push("เบอร์โทรศัพท์ (สำหรับ SMS และการแจ้งเตือนคิว)");
-    }
-    if (!profileData?.gender || profileData.gender.trim() === "") {
-      missing.push("เพศ");
-    }
-    if (!profileData?.birthDate || profileData.birthDate.trim() === "") {
-      missing.push("วันเดือนปีเกิด");
-    }
 
-    setMissingProfileFields(missing);
-    return missing.length > 0;
+    const hasPhone = Boolean(profileData?.phone || profileData?.phoneNumber);
+    const hasName = Boolean(profileData?.name || profileData?.displayName || profileData?.fullName);
+    const hasSchool = Boolean(profileData?.school || profileData?.university || profileData?.canteen);
+
+    if (!hasName) missing.push("ชื่อ-นามสกุล");
+    if (!hasPhone) missing.push("เบอร์โทรศัพท์สำหรับรับแจ้งเตือนคิว");
+    if (!hasSchool) missing.push("สังกัดโรงเรียน/คณะ/โรงอาหาร");
+
+    return {
+      isComplete: missing.length === 0,
+      missing,
+    };
   };
 
   const handleNextBooking = async () => {
-    const isProfileIncomplete = await checkProfileCompleteness();
-    if (isProfileIncomplete) {
+    const { isComplete, missing } = await checkProfileCompleteness();
+    if (!isComplete) {
+      setMissingProfileFields(missing);
       setIsIncompleteProfileModalOpen(true);
-      return;
+    } else {
+      setIsPaymentModalOpen(true);
     }
-    setIsPaymentModalOpen(true);
   };
 
   return (
-    <div className="shopee-pd-page">
-      {/* Payment Gateway Modal */}
-      <PaymentModal
-        isOpen={isPaymentModalOpen}
-        onClose={() => setIsPaymentModalOpen(false)}
-        amount={totalCalculatedPrice}
-        itemTitle={`${product.name} (${guestCount} · ${bookingDate} ${selectedTimeSlot.time})`}
-        productId={product.id || id}
-        quantity={guestMultiplier}
-        discountPercent={discountPercent * 100}
-        booking={{ date: bookingDate, time: selectedTimeSlot.time }}
-      />
-
-      {/* Header Search Bar */}
+    <div className="queue-pd-container">
       <ShopeeSearchBar />
 
-      <div className="shopee-pd-container">
-        {/* Breadcrumb Path: QueueUp > ตำแหน่งโรงอาหาร > ชื่อร้าน > ประเภทอาหาร > ชื่อเมนู */}
-        <div className="shopee-pd-breadcrumb">
-          <a href="/home" onClick={(e) => { e.preventDefault(); navigate("/home"); }}>
-            QueueUp
-          </a>
-          <span>&gt;</span>
-          <a href="/search?keyword=โรงอาหาร" onClick={(e) => { e.preventDefault(); navigate("/search?keyword=โรงอาหาร"); }}>
-            <i className="bi bi-geo-alt-fill text-danger me-1" /> {product.shopLocation || "โรงอาหาร 1 (อาคารเรียน 2)"}
-          </a>
-          <span>&gt;</span>
-          <a href={`/search?keyword=${encodeURIComponent(product.shopName)}`} onClick={(e) => { e.preventDefault(); navigate(`/search?keyword=${encodeURIComponent(product.shopName)}`); }}>
-            {product.shopName}
-          </a>
-          <span>&gt;</span>
-          <a href={`/search?keyword=${encodeURIComponent(product.categoryLabel || "อาหาร")}`} onClick={(e) => { e.preventDefault(); navigate(`/search?keyword=${encodeURIComponent(product.categoryLabel || "อาหาร")}`); }}>
-            <i className="bi bi-tag-fill me-1" /> {product.categoryLabel || "อาหารจานเดียว"}
-          </a>
-          <span>&gt;</span>
-          <span className="shopee-pd-breadcrumb-active">{product.name}</span>
+      <div className="queue-pd-wrapper">
+        <div className="queue-pd-breadcrumb mb-3">
+          <span className="text-muted" style={{ cursor: "pointer" }} onClick={() => navigate("/home")}>
+            <i className="bi bi-house-door-fill me-1" /> หน้าหลัก
+          </span>
+          <span className="mx-2 text-muted">/</span>
+          <span className="text-muted" style={{ cursor: "pointer" }} onClick={() => navigate("/search?keyword=ทั้งหมด")}>
+            โรงอาหารกลาง
+          </span>
+          <span className="mx-2 text-muted">/</span>
+          <span className="fw-bold text-dark">{product.name}</span>
         </div>
 
-        {/* Main 2-Column Split Layout */}
-        <div className="queue-pd-split-layout">
-          {/* ==========================================================================
-              LEFT COLUMN: SELECTED FOOD IMAGE & RECOMMENDED MENU BOX
-              ========================================================================== */}
-          <div>
-            {/* Gallery Box: ถ้ามีรูปเดียวแสดงแค่รูปเดียว ถ้ามีหลายรูปแสดงคอลัมน์ย่อยตามจำนวนรูปที่มีจริง */}
-            <div className="queue-pd-left-card">
-              <div className="queue-pd-main-img-box">
-                <img src={selectedImg} alt={product.name} className="queue-pd-main-img" />
-              </div>
-
-              {/* Vertical Thumbnail Column (แสดงเฉพาะเมื่อสินค้ามีมากกว่า 1 รูป) */}
-              {product.images && product.images.length > 1 && (
-                <div className="queue-pd-vertical-thumbs">
-                  {product.images.map((imgUrl, idx) => (
-                    <img
-                      key={idx}
-                      src={imgUrl}
-                      alt={`Thumbnail ${idx + 1}`}
-                      className={`queue-pd-vthumb-img ${selectedImg === imgUrl ? "active" : ""}`}
-                      onClick={() => setSelectedImg(imgUrl)}
-                    />
-                  ))}
-                </div>
-              )}
+        <div className="queue-pd-main-grid">
+          <div className="queue-pd-left-col">
+            <div className="queue-pd-main-img-box">
+              <img
+                src={selectedImg}
+                alt={product.name}
+                className="queue-pd-main-img"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "/crispy_fried_chicken.jpg";
+                }}
+              />
             </div>
 
-            {/* Recommended Menu & Terms Card */}
+            <div className="queue-pd-thumb-grid">
+              {[product.mainImg || product.image, ...(product.gallery || [])].slice(0, 4).map((img, idx) => (
+                <div
+                  key={idx}
+                  className={`queue-pd-thumb-box ${selectedImg === img ? "active" : ""}`}
+                  onClick={() => setSelectedImg(img)}
+                >
+                  <img
+                    src={img}
+                    alt={`Thumbnail ${idx}`}
+                    className="queue-pd-thumb-img"
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = "/crispy_fried_chicken.jpg";
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+
             <div className="queue-pd-recommend-box">
               <div className="queue-pd-recommend-header">
-                <h3 className="queue-pd-recommend-title">เมนูแนะนำ</h3>
-                <span className="queue-pd-discount-badge-pink">{selectedTimeSlot.discount} ⌄</span>
+                <h3 className="queue-pd-recommend-title">
+                  <i className="bi bi-info-circle-fill me-1 text-primary" />
+                  เงื่อนไขการสั่งจองและรับส่วนลด
+                </h3>
+                <span className="queue-pd-discount-badge-pink">{selectedTimeSlot.discount}</span>
               </div>
               <p className="queue-pd-recommend-desc">
                 ส่วนลดพิเศษระบบ QueueUp CRM สามารถใช้ได้กับเมนูอาหารที่เป็นราคาปกติทั้งหมด
-                ยกเว้นเมนูที่ระบุไว้ในเงื่อนไขพิเศษ สั่งจองคิวล่วงหน้ารับแต้มสะสมฟรีทันที!
+                สั่งจองคิวล่วงหน้ารับแต้มสะสมฟรีทันที และสามารถระบุสล็อตเวลารับอาหารที่สะดวกได้
               </p>
             </div>
           </div>
 
-          {/* ==========================================================================
-              RIGHT COLUMN: RESTAURANT INFO & BOOKING SYSTEM
-              ========================================================================== */}
           <div className="queue-pd-right-card">
-            {/* Restaurant Atmosphere Banner Photo */}
             <div className="queue-pd-shop-banner-box">
-              <img src={product.shopBanner} alt={product.shopName} className="queue-pd-shop-banner-img" />
+              <img
+                src={product.shopBanner}
+                alt={product.shopName}
+                className="queue-pd-shop-banner-img"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "/crispy_fried_chicken.jpg";
+                }}
+              />
             </div>
 
-            {/* Restaurant Title & Info */}
             <div>
               <div className="d-flex align-items-center justify-content-between">
                 <h1 className="queue-pd-shop-title mb-0">{product.shopName}</h1>
@@ -234,7 +221,7 @@ function ProductDetail() {
 
               <div className="queue-pd-shop-meta-row">
                 <div className="queue-pd-shop-hours">
-                  เวลาทำการ: <strong>{product.shopHours || "07:30 - 16:00 น."} ▾</strong>
+                  เวลาทำการ: <strong>{product.shopHours || "07:30 - 16:00 น."}</strong>
                 </div>
                 <div className="queue-pd-shop-rating">
                   <i className="bi bi-star-fill text-warning me-1" /> {product.rating} | จองแล้ว {product.sales}
@@ -242,7 +229,6 @@ function ProductDetail() {
               </div>
             </div>
 
-            {/* Price Highlight Box */}
             <div className="d-flex align-items-baseline gap-2 bg-light p-2 rounded">
               <span className="text-muted small text-decoration-line-through">
                 ฿{product.originalPrice}
@@ -251,36 +237,35 @@ function ProductDetail() {
               <span className="badge bg-danger ms-1">ส่วนลด {selectedTimeSlot.discount}</span>
             </div>
 
-            {/* Interactive Booking Controls */}
             <div className="d-flex flex-column gap-3">
               <div className="queue-pd-booking-inputs-row">
-                {/* Guest / Quantity Selector */}
                 <select
                   className="queue-pd-input-select"
                   value={guestCount}
                   onChange={(e) => setGuestCount(e.target.value)}
                 >
-                  <option value="1 คน">👤 1 คน</option>
-                  <option value="2 คน">👤 2 คน</option>
-                  <option value="3 คน">👤 3 คน</option>
-                  <option value="4 คน+">👤 4 คนขึ้นไป</option>
+                  <option value="1 คน">1 คน</option>
+                  <option value="2 คน">2 คน</option>
+                  <option value="3 คน">3 คน</option>
+                  <option value="4 คน+">4 คนขึ้นไป</option>
                 </select>
 
-                {/* Date Selector */}
                 <select
                   className="queue-pd-input-select"
                   value={bookingDate}
                   onChange={(e) => setBookingDate(e.target.value)}
                 >
-                  <option value="10 ส.ค.">📅 วันนี้ (10 ส.ค.)</option>
-                  <option value="11 ส.ค.">📅 พรุ่งนี้ (11 ส.ค.)</option>
-                  <option value="12 ส.ค.">📅 12 ส.ค.</option>
+                  <option value="17 ส.ค.">วันนี้ (17 ส.ค.)</option>
+                  <option value="18 ส.ค.">พรุ่งนี้ (18 ส.ค.)</option>
+                  <option value="19 ส.ค.">19 ส.ค.</option>
                 </select>
               </div>
 
-              {/* Time Slot Discount Badges Carousel */}
               <div>
-                <div className="text-muted small fw-bold mb-2">เลือกช่วงเวลาจองคิวพร้อมส่วนลด:</div>
+                <div className="text-muted small fw-bold mb-2">
+                  <i className="bi bi-clock-history me-1 text-primary" />
+                  เลือกช่วงเวลาจองคิวพร้อมส่วนลด:
+                </div>
                 <div className="queue-pd-time-slots-grid">
                   {TIME_SLOTS.map((slot) => (
                     <button
@@ -290,7 +275,7 @@ function ProductDetail() {
                       }`}
                       onClick={() => setSelectedTimeSlot(slot)}
                     >
-                      <span>{slot.time}</span>
+                      <span>{slot.time} น.</span>
                       <span>{slot.discount}</span>
                     </button>
                   ))}
@@ -298,11 +283,10 @@ function ProductDetail() {
               </div>
             </div>
 
-            {/* Summary Footer & Action Button */}
             <div className="queue-pd-booking-footer">
               <div>
                 <div className="queue-pd-booking-summary-text">
-                  {guestCount} · {bookingDate}, {selectedTimeSlot.time} / {selectedTimeSlot.discount}
+                  {guestCount} · {bookingDate}, {selectedTimeSlot.time} น. / {selectedTimeSlot.discount}
                 </div>
                 <div className="text-danger fw-bold fs-5">
                   ยอดรวม: ฿{totalCalculatedPrice.toFixed(2)}
@@ -310,6 +294,7 @@ function ProductDetail() {
               </div>
 
               <button className="queue-pd-btn-next" onClick={handleNextBooking}>
+                <i className="bi bi-calendar-check me-1" />
                 ถัดไป / ยืนยันการจองคิว
               </button>
             </div>
@@ -317,16 +302,17 @@ function ProductDetail() {
         </div>
       </div>
 
-      {/* Payment Gateway Modal */}
       <PaymentModal
         isOpen={isPaymentModalOpen}
         onClose={() => setIsPaymentModalOpen(false)}
+        storeId={product.storeId || "store_canteen01"}
+        shopName={product.shopName || "ร้านครัวโรงเรียน QueueUp Canteen"}
+        shopLocation={product.shopLocation || "โรงอาหาร 1 (อาคารเรียน 2)"}
         itemTitle={product.name || product.title}
         itemPrice={discountedUnitPrice}
         queueNo="A06"
       />
 
-      {/* Floating Bottom-Right Chat Button */}
       <button
         className="queue-floating-chat-btn"
         onClick={() => setIsChatOpen(true)}
@@ -337,13 +323,11 @@ function ProductDetail() {
         <span className="queue-chat-badge">3</span>
       </button>
 
-      {/* Real-Time Chat Modal Component */}
       <ChatModal
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
       />
 
-      {/* Profile Incomplete Blocking Modal */}
       {isIncompleteProfileModalOpen && (
         <div
           className="modal fade show d-block"
@@ -385,45 +369,36 @@ function ProductDetail() {
                 />
               </div>
 
-              <div className="modal-body p-4">
-                <p className="lead-text text-slate-200 fs-6 mb-3">
-                  ขออภัย ระบบไม่สามารถยืนยันคำสั่งจองคิวอาหารให้คุณได้ เนื่องจาก <b>ข้อมูลส่วนตัวของคุณยังไม่สมบูรณ์</b>
+              <div className="modal-body py-4">
+                <p className="mb-3 text-slate-200">
+                  กรุณากรอกข้อมูลส่วนตัวในโปรไฟล์ให้ครบถ้วนก่อนสั่งอาหาร เพื่อให้ร้านค้าและระบบแจ้งเตือนคิวสามารถติดต่อคุณได้ตามนัดหมาย:
                 </p>
-
-                <div className="bg-dark p-3 rounded-3 border border-secondary mb-4">
-                  <div className="fw-bold text-warning mb-2">
-                    <i className="bi bi-x-circle-fill me-2 text-danger" />
-                    ข้อมูลที่ยังไม่ได้กรอกในระบบ:
-                  </div>
-                  <ul className="mb-0 text-slate-300 small ps-3">
+                <div className="bg-dark p-3 rounded-3 border border-secondary mb-3">
+                  <div className="text-warning fw-bold small mb-2">ข้อมูลที่ยังไม่สมบูรณ์:</div>
+                  <ul className="mb-0 text-danger-subtle small ps-3">
                     {missingProfileFields.map((field, idx) => (
                       <li key={idx} className="mb-1">{field}</li>
                     ))}
                   </ul>
                 </div>
-
-                <p className="small text-slate-400 mb-0">
-                  💡 กรุณาคลิกปุ่มด้านล่างเพื่อเติมข้อมูลส่วนตัวให้สมบูรณ์ ใช้เวลาไม่เกิน 30 วินาที เพื่อรักษาสิทธิ์ในการรับคูปองส่วนลดและการแจ้งเตือนคิวอาหารของคุณ
-                </p>
               </div>
 
-              <div className="modal-footer border-top border-secondary pt-3 d-flex justify-content-between gap-2">
+              <div className="modal-footer border-top border-secondary pt-3">
                 <button
-                  type="button"
-                  className="btn btn-outline-light px-4 rounded-pill"
+                  className="btn btn-secondary px-4 me-2"
                   onClick={() => setIsIncompleteProfileModalOpen(false)}
                 >
                   ยกเลิก
                 </button>
                 <button
-                  type="button"
-                  className="btn btn-warning text-dark font-weight-bold px-4 py-2 rounded-pill shadow-lg"
+                  className="btn btn-warning fw-bold text-dark px-4"
                   onClick={() => {
                     setIsIncompleteProfileModalOpen(false);
-                    navigate("/user/account/profile?tab=info");
+                    navigate("/user/account/profile");
                   }}
                 >
-                  <i className="bi bi-pencil-square me-1" /> ไปเติมข้อมูลส่วนตัวให้สมบูรณ์
+                  <i className="bi bi-pencil-square me-1" />
+                  ไปที่หน้าโปรไฟล์เพื่อกรอกข้อมูล
                 </button>
               </div>
             </div>
@@ -431,7 +406,6 @@ function ProductDetail() {
         </div>
       )}
 
-      {/* Global Reusable Premium Footer */}
       <Footer />
     </div>
   );

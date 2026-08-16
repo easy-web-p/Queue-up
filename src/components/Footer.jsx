@@ -96,7 +96,9 @@ export default function Footer() {
                     try {
                       localStorage.removeItem("queueup_cookie_consent");
                       window.location.reload();
-                    } catch {}
+                    } catch {
+                      // ignore
+                    }
                   }}
                 >
                   <i className="bi bi-sliders" />

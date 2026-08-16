@@ -1,3 +1,5 @@
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../firebase/config.js";
 import { useState, useEffect, useMemo } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";

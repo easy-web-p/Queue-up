@@ -8,6 +8,10 @@ function PaymentModal({
   amount = 0,
   itemTitle = "รายการจองอาหาร QueueUp",
   orderId = "240809QUEUE01",
+  storeId = "store_canteen01",
+  shopName = "ร้านครัวโรงเรียน QueueUp Canteen",
+  shopLocation = "โรงอาหาร 1 (อาคารเรียน 2)",
+  queueNo = "A06",
   onPaymentSuccess,
 }) {
   const navigate = useNavigate();
@@ -38,11 +42,9 @@ function PaymentModal({
 
   // Format timer as mm:ss
   const formatTime = (seconds) => {
-    const m = Math.floor(seconds / 60)
-      .toString()
-      .padStart(2, "0");
-    const s = (seconds % 60).toString().padStart(2, "0");
-    return `${m}:${s}`;
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
   if (!isOpen) return null;
@@ -76,13 +78,70 @@ function PaymentModal({
     }
   };
 
-  // Confirm Payment & Trigger Success Callback
+  // Confirm Payment & Save Order with storeId
   const handleConfirmPayment = () => {
     setIsPaidSuccess(true);
 
+    const generatedOrderId = "2408" + Math.floor(100000 + Math.random() * 900000);
+    const newOrder = {
+      id: generatedOrderId,
+      storeId: storeId || "store_canteen01",
+      shopName: shopName || "ร้านครัวโรงเรียน QueueUp Canteen",
+      shopLocation: shopLocation || "โรงอาหาร 1",
+      orderDate:
+        new Date().toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "numeric" }) +
+        ", " +
+        new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }) +
+        " น.",
+      status: "TO_SHIP",
+      statusText: "กำลังปรุงคิวอาหาร (ประมาณ 10 นาที)",
+      queueNo: queueNo || "A06",
+      totalAmount: Number(amount) || 65,
+      paymentMethod: "PromptPay QR Code",
+      items: [
+        {
+          id: "p_" + Date.now(),
+          name: itemTitle || "ชุดข้าวผัดกุ้งกะทะร้อน",
+          price: Number(amount) || 65,
+          quantity: 1,
+          variant: "ปกติ",
+          image: "/logo.png",
+        },
+      ],
+    };
+
+    try {
+      const savedUserOrders = localStorage.getItem("queueup_user_orders");
+      const existingUserOrders = savedUserOrders ? JSON.parse(savedUserOrders) : [];
+      localStorage.setItem("queueup_user_orders", JSON.stringify([newOrder, ...existingUserOrders]));
+
+      const targetStoreId = storeId || "store_canteen01";
+      const savedMerchantOrders = localStorage.getItem(`queueup_merchant_orders_${targetStoreId}`);
+      const existingMerchantOrders = savedMerchantOrders ? JSON.parse(savedMerchantOrders) : [];
+      localStorage.setItem(
+        `queueup_merchant_orders_${targetStoreId}`,
+        JSON.stringify([
+          {
+            id: newOrder.id,
+            storeId: targetStoreId,
+            customerName: "นักเรียน / สมาชิก QueueUp",
+            phone: "081-234-5678",
+            status: "TO_SHIP",
+            statusText: "กำลังปรุงคิวอาหาร",
+            time: new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }) + " น.",
+            items: newOrder.items.map((i) => ({ name: i.name, variant: i.variant, qty: i.quantity, price: i.price })),
+            totalPrice: newOrder.totalAmount,
+          },
+          ...existingMerchantOrders,
+        ])
+      );
+    } catch {
+      // ignore
+    }
+
     setTimeout(() => {
       if (onPaymentSuccess) {
-        onPaymentSuccess(orderId);
+        onPaymentSuccess(generatedOrderId);
       }
       handleClose();
       navigate("/user/account/profile?tab=bookings");

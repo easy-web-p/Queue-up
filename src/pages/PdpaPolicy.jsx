@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import ShopeeSearchBar from "../components/ShopeeSearchBar.jsx";
 import Footer from "../components/Footer.jsx";

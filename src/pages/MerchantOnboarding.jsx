@@ -32,7 +32,10 @@ function MerchantOnboarding() {
     if (e) e.preventDefault();
     setIsSubmitting(true);
 
+    const storeId = user && user.uid ? `store_${user.uid.substring(0, 10)}` : `store_${Date.now()}`;
+
     const merchantProfile = {
+      storeId,
       isMerchantRegistered: true,
       role: "merchant",
       isMerchantVerified: true,
@@ -49,14 +52,41 @@ function MerchantOnboarding() {
     if (user && user.uid) {
       try {
         await setDoc(doc(db, "users", user.uid), merchantProfile, { merge: true });
+        
+        const merchantId = "MCH-" + user.uid.substring(0, 8);
+        await setDoc(
+          doc(db, "merchantProfiles", merchantId),
+          {
+            storeName,
+            businessPhone: phone,
+            canteenLocation: `${canteenLocation} (${counterNo})`,
+            ownerUid: user.uid,
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+
+        await setDoc(
+          doc(db, "merchantProfiles", merchantId, "private", "finance"),
+          {
+            bankName: "PromptPay (พร้อมเพย์)",
+            accountNumber: promptpayNo,
+            accountOwner: promptpayName,
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
       } catch (err) {
         console.warn("Firestore save merchant profile error:", err);
       }
     }
 
-    // Save to LocalStorage
+    // Save to LocalStorage (Global & Per-user)
     localStorage.setItem("queueup_merchant_verified", "true");
     localStorage.setItem("queueup_merchant_store", JSON.stringify(merchantProfile));
+    if (user && user.uid) {
+      localStorage.setItem(`queueup_merchant_store_${user.uid}`, JSON.stringify(merchantProfile));
+    }
 
     // Switch Role to Merchant
     dispatch(switchRole("merchant"));
