@@ -56,6 +56,55 @@ function UserProfile() {
   const [aiBehaviorProfile] = useState(() => getUserBehaviorInsights());
   const [securityHealth] = useState(() => getSecurityHealthReport());
 
+  // 🏆 Loyalty & Membership Tier System (Bronze, Silver, Gold, Platinum)
+  const [userPoints, setUserPoints] = useState(1250);
+
+  const getMembershipTierInfo = (pts) => {
+    if (pts >= 3500) {
+      return {
+        name: "Platinum Member",
+        icon: "bi-gem",
+        color: "#a855f7",
+        bg: "rgba(168, 85, 247, 0.15)",
+        nextInfo: "ระดับสมาชิกสูงสุด (สิทธิพิเศษ School Executive Privileges)",
+        progress: 100,
+        discount: "ส่วนลด 20% + ส่งอาหารฟรีทุกออเดอร์",
+      };
+    } else if (pts >= 1500) {
+      return {
+        name: "Gold Member",
+        icon: "bi-trophy-fill",
+        color: "#f59e0b",
+        bg: "rgba(245, 158, 11, 0.15)",
+        nextInfo: `สะสมอีก ${(3500 - pts).toLocaleString()} แต้ม เพื่อเลื่อนเป็น Platinum Member`,
+        progress: Math.min(100, Math.round(((pts - 1500) / 2000) * 100)),
+        discount: "ส่วนลด 15% + คิวสปีดรันความเร็วสูง",
+      };
+    } else if (pts >= 500) {
+      return {
+        name: "Silver Member",
+        icon: "bi-award-fill",
+        color: "#94a3b8",
+        bg: "rgba(148, 163, 184, 0.15)",
+        nextInfo: `สะสมอีก ${(1500 - pts).toLocaleString()} แต้ม เพื่อเลื่อนเป็น Gold Member`,
+        progress: Math.min(100, Math.round(((pts - 500) / 1000) * 100)),
+        discount: "ส่วนลด 10% + สิทธิ์จองคิวด่วน",
+      };
+    } else {
+      return {
+        name: "Bronze Member",
+        icon: "bi-award",
+        color: "#d97706",
+        bg: "rgba(217, 119, 6, 0.15)",
+        nextInfo: `สะสมอีก ${(500 - pts).toLocaleString()} แต้ม เพื่อเลื่อนเป็น Silver Member`,
+        progress: Math.min(100, Math.round((pts / 500) * 100)),
+        discount: "ส่วนลดสะสมคูปอง 5%",
+      };
+    }
+  };
+
+  const membershipInfo = getMembershipTierInfo(userPoints);
+
   // Payment & Financial Information States
   const [bankName, setBankName] = useState("PromptPay (พร้อมเพย์)");
   const [bankAccountNo, setBankAccountNo] = useState("081-234-5678");
@@ -404,6 +453,27 @@ function UserProfile() {
               </div>
             </div>
             <div className="shopee-sidebar-user-title">{fullName}</div>
+            
+            {/* Membership Tier Badge */}
+            <div
+              className="mt-2 px-3 py-1 rounded-pill d-inline-flex align-items-center gap-1 cursor-pointer"
+              style={{
+                backgroundColor: membershipInfo.bg,
+                color: membershipInfo.color,
+                border: `1px solid ${membershipInfo.color}50`,
+                fontSize: "11px",
+                fontWeight: "800",
+              }}
+              onClick={() => handleTabChange("membership")}
+              title="คลิกเพื่อดูสิทธิพิเศษประจำระดับสมาชิก"
+            >
+              <i className={`bi ${membershipInfo.icon}`} />
+              <span>{membershipInfo.name}</span>
+            </div>
+            <div className="small text-muted mt-1" style={{ fontSize: "11px" }}>
+              🪙 <b>{userPoints.toLocaleString()}</b> Points
+            </div>
+
             <label className="shopee-change-photo-btn">
               <i className="bi bi-camera-fill me-1" />
               แก้ไขรูปโปรไฟล์
@@ -435,6 +505,16 @@ function UserProfile() {
               <div className="shopee-sidebar-nav-left">
                 <i className="bi bi-tag shopee-sidebar-nav-icon" />
                 <span>คูปอง</span>
+              </div>
+            </div>
+
+            <div
+              className={`shopee-sidebar-nav-item ${activeTab === "membership" ? "active" : ""}`}
+              onClick={() => handleTabChange("membership")}
+            >
+              <div className="shopee-sidebar-nav-left">
+                <i className="bi bi-trophy shopee-sidebar-nav-icon" />
+                <span>แต้มสะสม & สมาชิก</span>
               </div>
             </div>
 
@@ -854,6 +934,122 @@ function UserProfile() {
                   <path d="M20 56h24" />
                 </svg>
                 <div className="shopee-empty-text-main">คุณไม่มีรหัสโปรโมชันในขณะนี้</div>
+              </div>
+            </div>
+          )}
+
+          {/* ---------------- 2.5 PANEL: แต้มสะสม & ระดับสมาชิก (LOYALTY & MEMBERSHIP TIER) ---------------- */}
+          {activeTab === "membership" && (
+            <div>
+              <div className="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+                <div>
+                  <h2 className="shopee-panel-title mb-1">แต้มสะสม & ระดับสมาชิก (Loyalty & Membership)</h2>
+                  <p className="text-muted small mb-0">
+                    สะสม QueueUp Points จากการสั่งอาหารเพื่อเลื่อนระดับสมาชิกและรับสิทธิพิเศษมากมาย
+                  </p>
+                </div>
+                <div
+                  className="px-3 py-2 rounded-pill d-flex align-items-center gap-2"
+                  style={{
+                    backgroundColor: membershipInfo.bg,
+                    border: `1.5px solid ${membershipInfo.color}`,
+                    color: membershipInfo.color,
+                    fontWeight: "800",
+                    fontSize: "0.92rem",
+                  }}
+                >
+                  <i className={`bi ${membershipInfo.icon} fs-5`} />
+                  <span>{membershipInfo.name}</span>
+                </div>
+              </div>
+
+              {/* Points Banner Card */}
+              <div
+                className="p-4 rounded-4 mb-4 text-white position-relative overflow-hidden"
+                style={{
+                  background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+                  border: "1px solid rgba(251, 191, 36, 0.4)",
+                  boxShadow: "0 10px 25px rgba(0, 0, 0, 0.15)",
+                }}
+              >
+                <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                  <div>
+                    <span className="text-warning small fw-bold text-uppercase tracking-wider">
+                      คลังแต้มสะสมของคุณ (QueueUp Points Balance)
+                    </span>
+                    <h1 className="fw-bold display-6 mb-0 text-warning mt-1">
+                      🪙 {userPoints.toLocaleString()} <span className="fs-5 text-slate-300">แต้ม</span>
+                    </h1>
+                    <div className="small text-slate-300 mt-2">
+                      <i className="bi bi-info-circle me-1" />
+                      {membershipInfo.nextInfo}
+                    </div>
+                  </div>
+                  <button
+                    className="btn btn-warning text-dark font-weight-bold px-4 py-2 rounded-pill shadow-sm"
+                    onClick={() => {
+                      alert("🎉 คุณแลกคูปองส่วนลดอาหาร 20 บาท ด้วย 200 แต้มสำเร็จ!");
+                      setUserPoints((prev) => Math.max(0, prev - 200));
+                    }}
+                  >
+                    <i className="bi bi-gift-fill me-1" /> แลกแต้มเป็นคูปองอาหาร (200 แต้ม)
+                  </button>
+                </div>
+
+                {/* Progress bar to next tier */}
+                <div className="mt-4 pt-3 border-top border-secondary">
+                  <div className="d-flex justify-content-between small text-slate-300 mb-1">
+                    <span>ระดับปัจจุบัน: <b>{membershipInfo.name}</b></span>
+                    <span>{membershipInfo.progress}% ถึงระดับถัดไป</span>
+                  </div>
+                  <div className="progress" style={{ height: "10px", backgroundColor: "#334155", borderRadius: "10px" }}>
+                    <div
+                      className="progress-bar bg-warning progress-bar-striped progress-bar-animated"
+                      role="progressbar"
+                      style={{ width: `${membershipInfo.progress}%`, borderRadius: "10px" }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Tier Comparison Grid */}
+              <h5 className="fw-bold mb-3 text-slate-800">สิทธิพิเศษประจำระดับสมาชิก (Membership Tier Privileges)</h5>
+              <div className="row g-3 mb-4">
+                <div className="col-md-3 col-6">
+                  <div className={`p-3 rounded-4 border text-center h-100 ${membershipInfo.name === "Bronze Member" ? "border-warning bg-amber-50" : "border-slate-200 bg-white"}`}>
+                    <div className="fs-2 mb-1">🥉</div>
+                    <h6 className="fw-bold mb-1" style={{ color: "#d97706" }}>Bronze Member</h6>
+                    <div className="small text-muted mb-2">0 - 499 แต้ม</div>
+                    <span className="badge bg-warning text-dark rounded-pill small">ส่วนลด 5%</span>
+                  </div>
+                </div>
+
+                <div className="col-md-3 col-6">
+                  <div className={`p-3 rounded-4 border text-center h-100 ${membershipInfo.name === "Silver Member" ? "border-secondary bg-slate-100" : "border-slate-200 bg-white"}`}>
+                    <div className="fs-2 mb-1">🥈</div>
+                    <h6 className="fw-bold mb-1" style={{ color: "#64748b" }}>Silver Member</h6>
+                    <div className="small text-muted mb-2">500 - 1,499 แต้ม</div>
+                    <span className="badge bg-secondary text-white rounded-pill small">ส่วนลด 10% + จองคิวด่วน</span>
+                  </div>
+                </div>
+
+                <div className="col-md-3 col-6">
+                  <div className={`p-3 rounded-4 border text-center h-100 ${membershipInfo.name === "Gold Member" ? "border-warning bg-warning-50" : "border-slate-200 bg-white"}`}>
+                    <div className="fs-2 mb-1">🥇</div>
+                    <h6 className="fw-bold mb-1" style={{ color: "#eab308" }}>Gold Member</h6>
+                    <div className="small text-muted mb-2">1,500 - 3,499 แต้ม</div>
+                    <span className="badge bg-warning text-dark rounded-pill small">ส่วนลด 15% + สปีดคิว</span>
+                  </div>
+                </div>
+
+                <div className="col-md-3 col-6">
+                  <div className={`p-3 rounded-4 border text-center h-100 ${membershipInfo.name === "Platinum Member" ? "border-purple bg-purple-50" : "border-slate-200 bg-white"}`}>
+                    <div className="fs-2 mb-1">💎</div>
+                    <h6 className="fw-bold mb-1" style={{ color: "#a855f7" }}>Platinum Member</h6>
+                    <div className="small text-muted mb-2">3,500+ แต้ม</div>
+                    <span className="badge bg-purple text-white rounded-pill small">VIP School Executive 20%</span>
+                  </div>
+                </div>
               </div>
             </div>
           )}
