@@ -11,6 +11,7 @@ import UserProfile from "./pages/UserProfile.jsx";
 import Queueup from "./pages/Queueup.jsx";
 import UserPurchase from "./pages/UserPurchase.jsx";
 import MerchantDashboard from "./pages/MerchantDashboard.jsx";
+import MerchantOnboarding from "./pages/MerchantOnboarding.jsx";
 import NotFound from "./pages/NotFound.jsx";
 import PdpaPolicy from "./pages/PdpaPolicy.jsx";
 import PageRouteLoader from "./components/PageRouteLoader.jsx";
@@ -66,10 +67,12 @@ function App() {
             <Route path="/product/:id" element={<ProtectedRoute><ProductDetail /></ProtectedRoute>} />
             <Route path="/Product/:id" element={<ProtectedRoute><ProductDetail /></ProtectedRoute>} />
 
-            {/* Merchant Dashboard Routes */}
+            {/* Merchant Dashboard & Onboarding Routes */}
             <Route path="/merchant/dashboard" element={<ProtectedRoute><MerchantDashboard /></ProtectedRoute>} />
             <Route path="/Merchant/Dashboard" element={<ProtectedRoute><MerchantDashboard /></ProtectedRoute>} />
             <Route path="/Merchant/dashboard" element={<ProtectedRoute><MerchantDashboard /></ProtectedRoute>} />
+            <Route path="/portal/th-onboarding" element={<ProtectedRoute><MerchantOnboarding /></ProtectedRoute>} />
+            <Route path="/portal/onboarding" element={<ProtectedRoute><MerchantOnboarding /></ProtectedRoute>} />
 
             {/* Wildcard 404 Page Not Found Route */}
             <Route path="*" element={<NotFound />} />

@@ -1,0 +1,193 @@
+/* --------------------------------------------------------------------------
+ * SHOPEE / QUEUEUP MERCHANT ONBOARDING STYLES (/portal/th-onboarding)
+ * -------------------------------------------------------------------------- */
+.shopee-onboarding-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #f6f6f6;
+  color: #222222;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.shopee-onboarding-header {
+  background-color: #ffffff;
+  border-bottom: 1px solid #e8e8e8;
+  height: 70px;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+.shopee-onboarding-header-container {
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.shopee-onboarding-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.shopee-onboarding-logo {
+  height: 38px;
+  object-fit: contain;
+}
+
+.shopee-onboarding-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #ee4d2d;
+}
+
+.shopee-onboarding-user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: #555555;
+}
+
+.shopee-onboarding-user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #e0e0e0;
+}
+
+.shopee-onboarding-username {
+  font-weight: 600;
+  color: #333333;
+}
+
+.shopee-onboarding-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 16px;
+}
+
+.shopee-onboarding-card {
+  background-color: #ffffff;
+  border-radius: 4px;
+  border: 1px solid #e8e8e8;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  width: 100%;
+  max-width: 720px;
+  padding: 48px 40px;
+  text-align: center;
+}
+
+.shopee-onboarding-card.form-card {
+  text-align: left;
+  max-width: 680px;
+}
+
+.shopee-onboarding-illustration-box {
+  width: 140px;
+  height: 140px;
+  margin: 0 auto 24px auto;
+  border-radius: 50%;
+  background: #fff0ed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.shopee-onboarding-illustration-img {
+  width: 90px;
+  height: 90px;
+  object-fit: contain;
+}
+
+.shopee-onboarding-card-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #222222;
+  margin-bottom: 8px;
+}
+
+.shopee-onboarding-card-subtitle {
+  font-size: 0.95rem;
+  color: #757575;
+  margin-bottom: 28px;
+  line-height: 1.5;
+}
+
+.shopee-onboarding-btn-primary {
+  background-color: #ee4d2d;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 32px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.shopee-onboarding-btn-primary:hover {
+  background-color: #d73211;
+  color: #ffffff;
+}
+
+.fade-in {
+  animation: fadeInOnboarding 0.3s ease-in-out;
+}
+
+@keyframes fadeInOnboarding {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Warm Dark Theme Support */
+html[data-theme="dark"] .shopee-onboarding-page {
+  background-color: #16100c !important;
+  color: #f3ece3 !important;
+}
+
+html[data-theme="dark"] .shopee-onboarding-header,
+html[data-theme="dark"] .shopee-onboarding-card {
+  background-color: #211710 !important;
+  border-color: #3a2a1e !important;
+  color: #f3ece3 !important;
+}
+
+html[data-theme="dark"] .shopee-onboarding-title {
+  color: #ff7a1a !important;
+}
+
+html[data-theme="dark"] .shopee-onboarding-username,
+html[data-theme="dark"] .shopee-onboarding-card-title {
+  color: #f3ece3 !important;
+}
+
+html[data-theme="dark"] .shopee-onboarding-card-subtitle {
+  color: #b8aa98 !important;
+}
+
+html[data-theme="dark"] .shopee-onboarding-illustration-box {
+  background: #2d2017 !important;
+}
+
+html[data-theme="dark"] .shopee-onboarding-btn-primary {
+  background-color: #ff7a1a !important;
+}
+
+html[data-theme="dark"] .shopee-onboarding-btn-primary:hover {
+  background-color: #ff8e38 !important;
+}

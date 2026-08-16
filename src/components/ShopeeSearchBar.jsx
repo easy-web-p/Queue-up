@@ -124,6 +124,40 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
     navigate("/login", { replace: true });
   };
 
+  // Merchant Store Verification Guard
+  const handleMerchantLinkClick = async () => {
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+
+    let isRegistered = false;
+    if (user.activeRole === "merchant" || user.role === "merchant" || user.isMerchantVerified || user.isMerchantRegistered) {
+      isRegistered = true;
+    } else {
+      const savedMerchantVerified = localStorage.getItem("queueup_merchant_verified");
+      if (savedMerchantVerified === "true") {
+        isRegistered = true;
+      } else {
+        try {
+          const docSnap = await getDoc(doc(db, "users", user.uid));
+          if (docSnap.exists() && (docSnap.data()?.isMerchantRegistered || docSnap.data()?.role === "merchant")) {
+            isRegistered = true;
+          }
+        } catch (err) {
+          console.warn("Merchant check error:", err);
+        }
+      }
+    }
+
+    if (isRegistered) {
+      dispatch(switchRole("merchant"));
+      navigate("/merchant/dashboard");
+    } else {
+      navigate("/portal/th-onboarding");
+    }
+  };
+
   return (
     <header className="shopee-header-container">
       {/* 1. Top Sub-Navigation Bar */}
@@ -132,10 +166,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
           <span
             className="shopee-nav-item"
             style={{ cursor: "pointer" }}
-            onClick={() => {
-              dispatch(switchRole("merchant"));
-              navigate("/merchant/dashboard");
-            }}
+            onClick={handleMerchantLinkClick}
           >
             <i className="bi bi-shop me-1" /> {language === "en" ? "Seller Centre" : "ศูนย์ผู้ขาย"} {user && user.activeRole === "merchant" ? "(Merchant)" : ""}
           </span>
@@ -143,10 +174,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
           <span
             className="shopee-nav-item"
             style={{ cursor: "pointer" }}
-            onClick={() => {
-              dispatch(switchRole("merchant"));
-              navigate("/merchant/dashboard");
-            }}
+            onClick={handleMerchantLinkClick}
           >
             <i className="bi bi-rocket-takeoff me-1" /> สมัครเป็นผู้ขาย / เปิดร้านค้า
           </span>
