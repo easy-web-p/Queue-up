@@ -106,6 +106,17 @@ function UserProfile() {
 
   const membershipInfo = getMembershipTierInfo(userPoints);
 
+  const filteredOrders = orders.filter((order) => {
+    const matchStatus = orderStatusTab === "ALL" || order?.status === orderStatusTab;
+    const q = orderSearchQuery.trim().toLowerCase();
+    const matchQuery =
+      q === "" ||
+      (order?.shopName || "").toLowerCase().includes(q) ||
+      (order?.id || "").toLowerCase().includes(q) ||
+      (order?.items || []).some((item) => (item?.name || "").toLowerCase().includes(q));
+    return matchStatus && matchQuery;
+  });
+
   // 🛡️ Multi-Layer Verification & Trust Score Engine
   const userTrustReport = calculateUserTrustScore(
     {
@@ -117,98 +128,8 @@ function UserProfile() {
       photo: avatar,
       role: user?.role || "customer",
     },
-    orders
+    orders || []
   );
-
-  // Payment & Financial Information States
-  const [bankName, setBankName] = useState("PromptPay (พร้อมเพย์)");
-  const [bankAccountNo, setBankAccountNo] = useState("081-234-5678");
-  const [bankAccountName, setBankAccountName] = useState(
-    user ? user.name || "เด็กชายพิสิษฐ์ แก้วกุลพิสิษฐ์" : "เด็กชายพิสิษฐ์ แก้วกุลพิสิษฐ์"
-  );
-  const [isEditingPayment, setIsEditingPayment] = useState(false);
-
-  // Account ID Password Verification & Visibility States
-  const [showAccountId, setShowAccountId] = useState(false);
-  const [isPasswordVerifyModalOpen, setIsPasswordVerifyModalOpen] = useState(false);
-  const [verifyPasswordInput, setVerifyPasswordInput] = useState("");
-  const [newAccountIdInput, setNewAccountIdInput] = useState("");
-
-  // Delete Account Modal States (2-Step Verification)
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [deleteUsername, setDeleteUsername] = useState("");
-  const [deleteEmail, setDeleteEmail] = useState("");
-  const [deletePassword, setDeletePassword] = useState("");
-  const [isFinalConfirmModalOpen, setIsFinalConfirmModalOpen] = useState(false);
-
-  // Real-Time Auto-Save Status State
-  const [autoSaveStatus, setAutoSaveStatus] = useState(""); // "" | "saving" | "saved"
-
-  // Order Tracking States for tab=bookings
-  const [orderStatusTab, setOrderStatusTab] = useState("ALL"); // 'ALL' | 'TO_PAY' | 'TO_SHIP' | 'TO_RECEIVE' | 'COMPLETED' | 'REFUND'
-  const [orderSearchQuery, setOrderSearchQuery] = useState("");
-  const [selectedOrderForPayment, setSelectedOrderForPayment] = useState(null);
-  const [orders, setOrders] = useState([
-    {
-      id: "240809QUEUE01",
-      shopName: "ร้านครัวโรงเรียน QueueUp Canteen",
-      status: "TO_RECEIVE",
-      statusText: "คิวพร้อมรับแล้ว (ลำดับคิว A05)",
-      items: [
-        {
-          name: "ชุดข้าวผัดกุ้งกะทะร้อน + ไข่ดาวสด",
-          variant: "เผ็ดน้อย, ไม่ใส่ผักหอม",
-          price: 65.0,
-          qty: 1,
-          image: "/logo.png",
-        },
-      ],
-      totalPrice: 65.0,
-    },
-    {
-      id: "240809QUEUE02",
-      shopName: "ร้านสเต็กพี่ตั้ม School Food",
-      status: "TO_SHIP",
-      statusText: "กำลังเตรียมคิวอาหาร (ประมาณ 10 นาที)",
-      items: [
-        {
-          name: "สเต็กหมูพริกไทยดำ + เฟรนช์ฟรายส์กรอบ",
-          variant: "ซอสพริกไทยดำเข้มข้น",
-          price: 120.0,
-          qty: 1,
-          image: "/logo.png",
-        },
-      ],
-      totalPrice: 120.0,
-    },
-    {
-      id: "240809QUEUE03",
-      shopName: "ร้านชาไข่มุก บราวน์ชูการ์ Express",
-      status: "COMPLETED",
-      statusText: "สำเร็จแล้ว",
-      items: [
-        {
-          name: "ชาไทยนมสดไข่มุกไต้หวัน หวานน้อย",
-          variant: "ระดับความหวาน 25%, น้ำแข็งน้อย",
-          price: 45.0,
-          qty: 1,
-          image: "https://images.unsplash.com/photo-1558857563-b371033873b8?w=200&auto=format&fit=crop&q=60",
-        },
-      ],
-      totalPrice: 45.0,
-    },
-  ]);
-
-  const filteredOrders = orders.filter((order) => {
-    const matchStatus = orderStatusTab === "ALL" || order?.status === orderStatusTab;
-    const q = orderSearchQuery.trim().toLowerCase();
-    const matchQuery =
-      q === "" ||
-      (order?.shopName || "").toLowerCase().includes(q) ||
-      (order?.id || "").toLowerCase().includes(q) ||
-      (order?.items || []).some((item) => (item?.name || "").toLowerCase().includes(q));
-    return matchStatus && matchQuery;
-  });
 
   const handleOpenPayment = (order) => {
     setSelectedOrderForPayment(order);
