@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
+import { db, doc, getDoc } from "../firebase/config.js";
 import PaymentModal from "../components/PaymentModal.jsx";
 import ShopeeSearchBar from "../components/ShopeeSearchBar.jsx";
 import ChatModal from "../components/ChatModal.jsx";
@@ -22,6 +24,7 @@ const TIME_SLOTS = [
 function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useSelector((state) => state.auth);
 
   // Find product or fallback to default m1
   const initialProduct = PRODUCTS_BY_ID[id] || PRODUCTS_BY_ID.m1;
@@ -34,6 +37,10 @@ function ProductDetail() {
   const [selectedTimeSlot, setSelectedTimeSlot] = useState(TIME_SLOTS[1]);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+
+  // Profile completeness guard states
+  const [isIncompleteProfileModalOpen, setIsIncompleteProfileModalOpen] = useState(false);
+  const [missingProfileFields, setMissingProfileFields] = useState([]);
 
   // Fetch product data dynamically from Firebase Firestore
   useEffect(() => {
@@ -64,7 +71,51 @@ function ProductDetail() {
   const guestMultiplier = parseInt(guestCount) || 1;
   const totalCalculatedPrice = discountedUnitPrice * guestMultiplier;
 
-  const handleNextBooking = () => {
+  // Check Profile Completeness Guard
+  const checkProfileCompleteness = async () => {
+    let profileData = null;
+
+    if (user && user.uid) {
+      try {
+        const docSnap = await getDoc(doc(db, "users", user.uid));
+        if (docSnap.exists()) {
+          profileData = docSnap.data();
+        }
+      } catch (err) {
+        console.warn("Fetch user profile check error:", err);
+      }
+    }
+
+    if (!profileData) {
+      const saved = localStorage.getItem("queueup_user");
+      if (saved) {
+        try {
+          profileData = JSON.parse(saved);
+        } catch {}
+      }
+    }
+
+    const missing = [];
+    if (!profileData?.phone || profileData.phone.trim() === "") {
+      missing.push("เบอร์โทรศัพท์ (สำหรับ SMS และการแจ้งเตือนคิว)");
+    }
+    if (!profileData?.gender || profileData.gender.trim() === "") {
+      missing.push("เพศ");
+    }
+    if (!profileData?.birthDate || profileData.birthDate.trim() === "") {
+      missing.push("วันเดือนปีเกิด");
+    }
+
+    setMissingProfileFields(missing);
+    return missing.length > 0;
+  };
+
+  const handleNextBooking = async () => {
+    const isProfileIncomplete = await checkProfileCompleteness();
+    if (isProfileIncomplete) {
+      setIsIncompleteProfileModalOpen(true);
+      return;
+    }
     setIsPaymentModalOpen(true);
   };
 
@@ -291,6 +342,94 @@ function ProductDetail() {
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
       />
+
+      {/* Profile Incomplete Blocking Modal */}
+      {isIncompleteProfileModalOpen && (
+        <div
+          className="modal fade show d-block"
+          style={{
+            backgroundColor: "rgba(15, 23, 42, 0.85)",
+            backdropFilter: "blur(10px)",
+            zIndex: 100005,
+          }}
+          tabIndex="-1"
+        >
+          <div className="modal-dialog modal-dialog-centered">
+            <div
+              className="modal-content text-white p-2"
+              style={{
+                background: "linear-gradient(145deg, #1e293b 0%, #0f172a 100%)",
+                border: "2px solid #f59e0b",
+                borderRadius: "24px",
+                boxShadow: "0 20px 50px rgba(0, 0, 0, 0.6)",
+              }}
+            >
+              <div className="modal-header border-bottom border-secondary pb-3">
+                <div className="d-flex align-items-center gap-3">
+                  <div className="bg-warning text-dark p-3 rounded-circle d-flex align-items-center justify-content-center" style={{ width: "48px", height: "48px" }}>
+                    <i className="bi bi-exclamation-triangle-fill fs-4" />
+                  </div>
+                  <div>
+                    <h5 className="modal-title fw-bold text-warning mb-0">
+                      ไม่สามารถทำการสั่งจองคิวอาหารได้
+                    </h5>
+                    <span className="text-slate-300 small">
+                      มาตรการความปลอดภัยและแจ้งเตือนคิวโรงอาหาร
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn-close btn-close-white"
+                  onClick={() => setIsIncompleteProfileModalOpen(false)}
+                />
+              </div>
+
+              <div className="modal-body p-4">
+                <p className="lead-text text-slate-200 fs-6 mb-3">
+                  ขออภัย ระบบไม่สามารถยืนยันคำสั่งจองคิวอาหารให้คุณได้ เนื่องจาก <b>ข้อมูลส่วนตัวของคุณยังไม่สมบูรณ์</b>
+                </p>
+
+                <div className="bg-dark p-3 rounded-3 border border-secondary mb-4">
+                  <div className="fw-bold text-warning mb-2">
+                    <i className="bi bi-x-circle-fill me-2 text-danger" />
+                    ข้อมูลที่ยังไม่ได้กรอกในระบบ:
+                  </div>
+                  <ul className="mb-0 text-slate-300 small ps-3">
+                    {missingProfileFields.map((field, idx) => (
+                      <li key={idx} className="mb-1">{field}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                <p className="small text-slate-400 mb-0">
+                  💡 กรุณาคลิกปุ่มด้านล่างเพื่อเติมข้อมูลส่วนตัวให้สมบูรณ์ ใช้เวลาไม่เกิน 30 วินาที เพื่อรักษาสิทธิ์ในการรับคูปองส่วนลดและการแจ้งเตือนคิวอาหารของคุณ
+                </p>
+              </div>
+
+              <div className="modal-footer border-top border-secondary pt-3 d-flex justify-content-between gap-2">
+                <button
+                  type="button"
+                  className="btn btn-outline-light px-4 rounded-pill"
+                  onClick={() => setIsIncompleteProfileModalOpen(false)}
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-warning text-dark font-weight-bold px-4 py-2 rounded-pill shadow-lg"
+                  onClick={() => {
+                    setIsIncompleteProfileModalOpen(false);
+                    navigate("/user/account/profile?tab=info");
+                  }}
+                >
+                  <i className="bi bi-pencil-square me-1" /> ไปเติมข้อมูลส่วนตัวให้สมบูรณ์
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Global Reusable Premium Footer */}
       <Footer />
