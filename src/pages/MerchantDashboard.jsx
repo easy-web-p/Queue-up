@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { switchRole } from "../store/authSlice.js";
+import { switchRole, clearUser } from "../store/authSlice.js";
 import { db, doc, getDoc, setDoc } from "../firebase/config.js";
 import { SHARED_PRODUCTS } from "../data/mockProducts.js";
 import ChatModal from "../components/ChatModal.jsx";
 import BookingCalendar from "../components/BookingCalendar.jsx";
+import SellerAssistantModal from "../components/SellerAssistantModal.jsx";
 import {
   generateAIMarketingRecommendations,
   getActiveMerchantCoupons,
@@ -13,6 +14,8 @@ import {
   toggleCouponState,
 } from "../services/aiMarketingService.js";
 import { getSecurityHealthReport } from "../services/aiSecurityShield.js";
+import { recordAuditLog } from "../services/storeIsolationEngine.js";
+import Footer from "../components/Footer.jsx";
 import "./MerchantDashboard.css";
 
 const MOCK_MERCHANT_ORDERS = [
@@ -63,6 +66,29 @@ function MerchantDashboard() {
   const [activeTab, setActiveTab] = useState("queue");
   const [queueFilter, setQueueFilter] = useState("ALL");
 
+  const cleanDisplayName = (rawName, email) => {
+    if (!rawName || rawName.trim() === "" || rawName.toLowerCase().includes("anime manga")) {
+      if (email && email.includes("@")) {
+        return `ร้านค้าของคุณ ${email.split("@")[0]}`;
+      }
+      return "ร้านอาหาร QueueUp Canteen";
+    }
+    if (rawName.startsWith("ร้านค้าของ") || rawName.startsWith("ร้าน")) {
+      return rawName;
+    }
+    return `ร้านค้าของ ${rawName}`;
+  };
+
+  const cleanOwnerName = (rawName, email) => {
+    if (!rawName || rawName.trim() === "" || rawName.toLowerCase().includes("anime manga")) {
+      if (email && email.includes("@")) {
+        return email.split("@")[0];
+      }
+      return "เจ้าของร้าน QueueUp";
+    }
+    return rawName;
+  };
+
   // Read Store Profile & storeId from LocalStorage & User Auth Context (Full Onboarding Tracing)
   const getInitialStoreData = () => {
     try {
@@ -72,10 +98,10 @@ function MerchantDashboard() {
         const m = JSON.parse(stored);
         return {
           storeId: m.storeId || (user && user.uid ? `store_${user.uid.substring(0, 10)}` : "store_canteen01"),
-          name: m.merchantStoreName || m.storeName || (user && user.merchantStoreName) || (user ? `ร้านค้าของ ${user.name || user.email}` : "ร้านครัวโรงเรียน QueueUp Canteen"),
+          name: cleanDisplayName(m.merchantStoreName || m.storeName || (user && user.merchantStoreName), user?.email),
           phone: m.phone || m.businessPhone || (user && user.phone) || "081-234-5678",
           location: m.canteenLocation ? (m.counterNo ? `${m.canteenLocation} (${m.counterNo})` : m.canteenLocation) : (user && user.canteenLocation) || "โรงอาหาร 1 (อาคารเรียน 2)",
-          promptpayName: m.promptpayName || (user && user.promptpayName) || (user ? user.name || "เจ้าของร้าน" : "เจ้าของร้าน"),
+          promptpayName: cleanOwnerName(m.promptpayName || (user && user.promptpayName) || (user ? user.name : ""), user?.email),
           promptpayNo: m.promptpayNo || (user && user.promptpayNo) || "081-234-5678",
         };
       }
@@ -84,10 +110,10 @@ function MerchantDashboard() {
     }
     return {
       storeId: user && user.uid ? `store_${user.uid.substring(0, 10)}` : "store_canteen01",
-      name: (user && user.merchantStoreName) || (user ? `ร้านค้าของ ${user.name || user.email}` : "ร้านครัวโรงเรียน QueueUp Canteen"),
+      name: cleanDisplayName(user && user.merchantStoreName, user?.email),
       phone: (user && user.phone) || "081-234-5678",
       location: (user && user.canteenLocation) || "โรงอาหาร 1 (อาคารเรียน 2)",
-      promptpayName: (user && user.promptpayName) || (user ? user.name || "เจ้าของร้าน" : "เจ้าของร้าน"),
+      promptpayName: cleanOwnerName((user && user.promptpayName) || (user ? user.name : ""), user?.email),
       promptpayNo: (user && user.promptpayNo) || "081-234-5678",
     };
   };
@@ -126,15 +152,30 @@ function MerchantDashboard() {
     // NEW merchant stores will have [] (0 orders from other stores!)
     return [];
   });
-  const [menuItems, setMenuItems] = useState(
-    SHARED_PRODUCTS.map((p) => ({ ...p, isAvailable: true }))
-  );
+
+  const [menuItems, setMenuItems] = useState(() => {
+    const savedMenu = localStorage.getItem(`queueup_merchant_menu_${initialStore.storeId}`);
+    if (savedMenu) {
+      try {
+        return JSON.parse(savedMenu);
+      } catch {
+        // ignore
+      }
+    }
+    if (initialStore.storeId === "store_canteen01") {
+      return SHARED_PRODUCTS.map((p) => ({ ...p, isAvailable: true }));
+    }
+    return SHARED_PRODUCTS.filter((p) => p.storeId === initialStore.storeId).map((p) => ({
+      ...p,
+      isAvailable: true,
+    }));
+  });
 
   const [storeName, setStoreName] = useState(initialStore.name);
   const [storePhone, setStorePhone] = useState(initialStore.phone);
   const [canteenLocation, setCanteenLocation] = useState(initialStore.location);
   const [storeHours, setStoreHours] = useState("07:00 - 15:00 น.");
-  
+
   const [privateBankName, setPrivateBankName] = useState("PromptPay (พร้อมเพย์)");
   const [privateAccountNo, setPrivateAccountNo] = useState(initialStore.promptpayNo);
   const [privateAccountOwner, setPrivateAccountOwner] = useState(initialStore.promptpayName);
@@ -153,44 +194,77 @@ function MerchantDashboard() {
   const [chatCustomerName, setChatCustomerName] = useState("");
   const [chatOrderContext, setChatOrderContext] = useState(null);
 
+  const [isSellerAssistantOpen, setIsSellerAssistantOpen] = useState(false);
+  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+
+  const handleLogout = () => {
+    dispatch(clearUser());
+    navigate("/login", { replace: true });
+  };
+
   const [aiMarketingCoupons] = useState(() => generateAIMarketingRecommendations());
-  const [activeCouponsList, setActiveCouponsList] = useState(() => getActiveMerchantCoupons());
+  const [activeCouponsList, setActiveCouponsList] = useState(() => getActiveMerchantCoupons(initialStore.storeId));
   const [securityReport] = useState(() => getSecurityHealthReport());
   const [marketingSuccessMsg, setMarketingSuccessMsg] = useState("");
 
   const handleDeployCoupon = (coupon) => {
-    const success = deployAICoupon(coupon);
+    const success = deployAICoupon(coupon, currentStoreId);
     if (success) {
-      setActiveCouponsList(getActiveMerchantCoupons());
+      setActiveCouponsList(getActiveMerchantCoupons(currentStoreId));
       setMarketingSuccessMsg(`เปิดใช้งานคูปอง "${coupon.code}" เรียบร้อยแล้ว! ลูกค้าสามารถใช้ส่วนลดได้ทันที`);
       setTimeout(() => setMarketingSuccessMsg(""), 4000);
     }
   };
 
   const handleToggleCoupon = (code) => {
-    const updated = toggleCouponState(code);
+    const updated = toggleCouponState(code, currentStoreId);
     setActiveCouponsList(updated);
   };
 
+  // Track Registration Status cleanly
+  const [isRegistered, setIsRegistered] = useState(() => {
+    if (!user) return false;
+    const userKey = `queueup_merchant_store_${user.uid}`;
+    return !!(user.isMerchantRegistered || user.merchantId || localStorage.getItem(userKey));
+  });
+
   useEffect(() => {
-    // Sync from Firestore users & merchantProfiles if logged in
-    if (user && user.uid) {
+    if (!user) {
+      navigate("/portal/th-onboarding", { replace: true });
+      return;
+    }
+
+    // Direct redirect if not registered
+    const userKey = `queueup_merchant_store_${user.uid}`;
+    const hasLocalStore = localStorage.getItem(userKey);
+
+    if (!user.isMerchantRegistered && !user.merchantId && !hasLocalStore) {
       getDoc(doc(db, "users", user.uid)).then((uSnap) => {
         if (uSnap.exists()) {
           const uData = uSnap.data();
-          if (uData.merchantStoreName) setStoreName(uData.merchantStoreName);
-          if (uData.phone) setStorePhone(uData.phone);
-          if (uData.canteenLocation) setCanteenLocation(uData.canteenLocation);
-          if (uData.promptpayName) setPrivateAccountOwner(uData.promptpayName);
-          if (uData.promptpayNo) setPrivateAccountNo(uData.promptpayNo);
+          if (uData.isMerchantRegistered || uData.merchantId) {
+            setIsRegistered(true);
+            if (uData.merchantStoreName) setStoreName(cleanDisplayName(uData.merchantStoreName, user.email));
+            if (uData.phone) setStorePhone(uData.phone);
+            if (uData.canteenLocation) setCanteenLocation(uData.canteenLocation);
+          } else {
+            navigate("/portal/th-onboarding", { replace: true });
+          }
+        } else {
+          navigate("/portal/th-onboarding", { replace: true });
         }
       });
+    }
 
-      const merchantId = "MCH-" + user.uid.substring(0, 8);
+    const merchantId = user.merchantId;
+    const storeId = user.storeId;
+
+    if (merchantId) {
       getDoc(doc(db, "merchantProfiles", merchantId)).then((docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
-          if (data.storeName) setStoreName(data.storeName);
+          setIsRegistered(true);
+          if (data.merchantStoreName || data.storeName) setStoreName(cleanDisplayName(data.merchantStoreName || data.storeName, user.email));
           if (data.businessPhone) setStorePhone(data.businessPhone);
           if (data.canteenLocation) setCanteenLocation(data.canteenLocation);
         }
@@ -201,11 +275,24 @@ function MerchantDashboard() {
           const finData = finSnap.data();
           if (finData.bankName) setPrivateBankName(finData.bankName);
           if (finData.accountNumber) setPrivateAccountNo(finData.accountNumber);
-          if (finData.accountOwner) setPrivateAccountOwner(finData.accountOwner);
+          if (finData.accountOwner) setPrivateAccountOwner(cleanOwnerName(finData.accountOwner, user.email));
         }
       });
     }
-  }, [user]);
+
+    if (storeId) {
+      getDoc(doc(db, "shops", storeId)).then((storeSnap) => {
+        if (storeSnap.exists()) {
+          const sData = storeSnap.data();
+          setIsRegistered(true);
+          if (sData.storeName) setStoreName(cleanDisplayName(sData.storeName, user.email));
+          if (sData.phone) setStorePhone(sData.phone);
+          if (sData.canteenLocation) setCanteenLocation(sData.canteenLocation);
+          if (sData.storeHours) setStoreHours(sData.storeHours);
+        }
+      });
+    }
+  }, [user, navigate]);
 
   const handleUpdateOrderStatus = (orderId, newStatus, newText) => {
     setMerchantOrders((prev) => {
@@ -228,7 +315,12 @@ function MerchantDashboard() {
   const handleSaveStoreProfile = async (e) => {
     if (e) e.preventDefault();
 
-    const merchantData = {
+    if (!user || !user.uid) return;
+
+    const merchantId = user.merchantId || "MCH-" + user.uid.substring(0, 8);
+    const storeId = user.storeId || "STORE-DEMO01";
+
+    const publicStoreData = {
       isMerchantRegistered: true,
       role: "merchant",
       isMerchantVerified: true,
@@ -238,20 +330,26 @@ function MerchantDashboard() {
       businessPhone: storePhone,
       canteenLocation,
       storeHours,
-      promptpayName: privateAccountOwner,
-      promptpayNo: privateAccountNo,
       updatedAt: new Date().toISOString(),
     };
 
     try {
-      localStorage.setItem("queueup_merchant_store", JSON.stringify(merchantData));
-      if (user && user.uid) {
-        localStorage.setItem(`queueup_merchant_store_${user.uid}`, JSON.stringify(merchantData));
-        await setDoc(doc(db, "users", user.uid), merchantData, { merge: true });
+      // 1. users/{uid}
+      await setDoc(doc(db, "users", user.uid), publicStoreData, { merge: true });
 
-        const merchantId = "MCH-" + user.uid.substring(0, 8);
-        await setDoc(doc(db, "merchantProfiles", merchantId), merchantData, { merge: true });
-      }
+      // 2. merchantProfiles/{merchantId}
+      await setDoc(doc(db, "merchantProfiles", merchantId), publicStoreData, { merge: true });
+
+      // 3. shops/{storeId}
+      await setDoc(doc(db, "shops", storeId), publicStoreData, { merge: true });
+
+      // 4. Audit Log
+      await recordAuditLog(db, {
+        action: "UPDATE_STORE_PROFILE",
+        actorUid: user.uid,
+        merchantId,
+        metadata: { storeName, canteenLocation, storePhone },
+      });
 
       setIsSavedProfile(true);
       setTimeout(() => setIsSavedProfile(false), 3000);
@@ -264,11 +362,12 @@ function MerchantDashboard() {
     e.preventDefault();
     if (!user || !user.uid) return;
 
-    const merchantId = "MCH-" + user.uid.substring(0, 8);
+    const merchantId = user.merchantId || "MCH-" + user.uid.substring(0, 8);
     try {
       await setDoc(
         doc(db, "merchantProfiles", merchantId, "private", "finance"),
         {
+          ownerUid: user.uid,
           bankName: privateBankName,
           accountNumber: privateAccountNo,
           accountOwner: privateAccountOwner,
@@ -276,6 +375,18 @@ function MerchantDashboard() {
         },
         { merge: true }
       );
+
+      // Audit Log
+      await recordAuditLog(db, {
+        action: "CHANGE_FINANCE",
+        actorUid: user.uid,
+        merchantId,
+        metadata: {
+          accountOwner: privateAccountOwner,
+          bankName: privateBankName,
+        },
+      });
+
       setIsSavedFinance(true);
       setTimeout(() => setIsSavedFinance(false), 3000);
     } catch (err) {
@@ -310,6 +421,10 @@ function MerchantDashboard() {
     return o.status === queueFilter;
   });
 
+  if (!isRegistered) {
+    return null;
+  }
+
   return (
     <div className="merchant-dashboard-container">
       <div className="merchant-dashboard-header-bg">
@@ -336,10 +451,49 @@ function MerchantDashboard() {
             </div>
           </div>
 
-          <div className="merchant-header-right">
+          <div className="merchant-header-right d-flex align-items-center gap-3">
             <button className="btn btn-outline-light font-weight-bold" onClick={handleSwitchToStudentView}>
               <i className="bi bi-person-bounding-box me-1" /> สลับมุมมองผู้ใช้นักเรียน
             </button>
+
+            {/* User Account Profile Dropdown (Matching Screenshot Reference) */}
+            <div className="position-relative">
+              <button
+                className="btn btn-light d-flex align-items-center gap-2 font-weight-bold rounded-pill px-3 shadow-sm border-0"
+                onClick={() => setIsUserDropdownOpen((prev) => !prev)}
+              >
+                <div
+                  className="rounded-circle bg-secondary-subtle d-flex align-items-center justify-content-center"
+                  style={{ width: "32px", height: "32px" }}
+                >
+                  <i className="bi bi-person-fill text-secondary fs-5" />
+                </div>
+                <span className="text-dark small">{cleanOwnerName(user?.name, user?.email)}</span>
+                <i className={`bi bi-chevron-${isUserDropdownOpen ? "up" : "down"} text-muted small`} />
+              </button>
+
+              {isUserDropdownOpen && (
+                <div
+                  className="position-absolute end-0 mt-2 bg-white rounded-3 shadow-lg p-3 text-dark text-center border"
+                  style={{ width: "230px", zIndex: 9999 }}
+                >
+                  <div
+                    className="rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto mb-2 border"
+                    style={{ width: "68px", height: "68px" }}
+                  >
+                    <i className="bi bi-person-fill text-secondary display-6" />
+                  </div>
+                  <div className="fw-bold text-dark fs-6 mb-2">{cleanOwnerName(user?.name, user?.email)}</div>
+                  <hr className="my-2" />
+                  <button
+                    className="btn btn-outline-danger w-100 font-weight-bold d-flex align-items-center justify-content-center gap-2 py-2 rounded-3"
+                    onClick={handleLogout}
+                  >
+                    <i className="bi bi-box-arrow-right fs-5" /> ออกจากระบบ
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -558,7 +712,7 @@ function MerchantDashboard() {
         {/* TAB 2: BOOKING & PREP PLANNER */}
         {activeTab === "planner" && (
           <div className="merchant-panel-box">
-            <BookingCalendar viewMode="merchant" />
+            <BookingCalendar viewMode="merchant" storeId={currentStoreId} orders={merchantOrders} />
           </div>
         )}
 
@@ -903,6 +1057,33 @@ function MerchantDashboard() {
         customerName={chatCustomerName}
         orderContext={chatOrderContext}
       />
+
+      {/* Seller Assistant Floating Widget Trigger */}
+      <button
+        className="btn btn-danger rounded-circle shadow-lg position-fixed d-flex align-items-center justify-content-center"
+        style={{
+          bottom: "30px",
+          right: "30px",
+          width: "62px",
+          height: "62px",
+          zIndex: 9990,
+          background: "linear-gradient(135deg, #ee4d2d 0%, #ff7337 100%)",
+          border: "none",
+        }}
+        onClick={() => setIsSellerAssistantOpen(true)}
+        title="เปิด Seller Assistant ผู้ช่วยร้านค้า"
+      >
+        <i className="bi bi-headset fs-2 text-white" />
+      </button>
+
+      {/* Seller Assistant Modal matching reference screenshot 1 */}
+      <SellerAssistantModal
+        isOpen={isSellerAssistantOpen}
+        onClose={() => setIsSellerAssistantOpen(false)}
+        userName={cleanOwnerName(user?.name, user?.email)}
+      />
+
+      <Footer />
     </div>
   );
 }

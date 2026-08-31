@@ -11,13 +11,10 @@ import FoodCard from "../components/FoodCard.jsx";
 import ShopeeSearchBar from "../components/ShopeeSearchBar.jsx";
 import ChatModal from "../components/ChatModal.jsx";
 import Footer from "../components/Footer.jsx";
-import BookingCalendar from "../components/BookingCalendar.jsx";
-import DailyMenuBoard from "../components/DailyMenuBoard.jsx";
-import ShopReelsFeed from "../components/ShopReelsFeed.jsx";
 import { usePreferences } from "../context/PreferencesContext.jsx";
 import { SHARED_PRODUCTS } from "../data/mockProducts.js";
 import { INITIAL_PRODUCTS } from "../firebase/config.js";
-import { getUserBehaviorInsights, predictQueueWaitTime, recordUserOrderBehavior } from "../services/aiBehaviorEngine.js";
+import { getUserBehaviorInsights, recordUserOrderBehavior } from "../services/aiBehaviorEngine.js";
 import { getActiveMerchantCoupons } from "../services/aiMarketingService.js";
 import "./Home.css";
 
@@ -60,7 +57,6 @@ function Home() {
 
   // AI User Behavior & Live Merchant Coupons States
   const [aiInsights] = useState(() => getUserBehaviorInsights());
-  const [queuePrediction] = useState(() => predictQueueWaitTime(3));
   const [liveCoupons] = useState(() => getActiveMerchantCoupons());
 
   // Carousel Horizontal Auto-scroll state & ref
@@ -215,9 +211,37 @@ function Home() {
     );
   };
 
+  const [catalogSort, setCatalogSort] = useState("all");
+
+  // Top 10 Bestselling food items sorted by real order volume / sales
+  const topBestsellers = useMemo(() => {
+    return [...(menuItems || [])]
+      .sort((a, b) => {
+        const salesA = parseInt(String(a.salesCount || a.sales || "0").replace(/[^0-9]/g, ""), 10) || 0;
+        const salesB = parseInt(String(b.salesCount || b.sales || "0").replace(/[^0-9]/g, ""), 10) || 0;
+        return salesB - salesA;
+      })
+      .slice(0, 10);
+  }, [menuItems]);
+
   const filteredMenuItems = (menuItems || []).filter((item) => {
     return selectedCategory === "all" || item?.category === selectedCategory;
   });
+
+  const displayCatalogItems = useMemo(() => {
+    let list = (menuItems || []).filter((item) => {
+      return selectedCategory === "all" || item?.category === selectedCategory;
+    });
+
+    if (catalogSort === "rating") {
+      list = [...list].sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    } else if (catalogSort === "price_low") {
+      list = [...list].sort((a, b) => (a.price || 0) - (b.price || 0));
+    } else if (catalogSort === "fast") {
+      list = [...list].filter((a) => (a.price || 0) <= 60 || a.category === "noodle" || a.category === "single_dish");
+    }
+    return list;
+  }, [menuItems, selectedCategory, catalogSort]);
 
   return (
     <div className="queue-home-container">
@@ -344,16 +368,7 @@ function Home() {
           />
         </section>
 
-        {/* 4. Interactive Booking Calendar Component */}
-        <BookingCalendar viewMode="user" />
-
-        {/* 5. Daily Menu Specials & Merchant Announcements */}
-        <DailyMenuBoard />
-
-        {/* 6. Shop Video Reels & Student Community Feed */}
-        <ShopReelsFeed onOrderFromReel={(prodId) => navigate(`/product/${prodId}`)} />
-
-        {/* 7. Food Categories Carousel */}
+        {/* 4. Food Categories Carousel */}
         <section className="queue-category-section">
           <h5 className="fw-bold queue-category-title mb-3">
             <i className="bi bi-grid-fill text-primary me-2" />
@@ -390,7 +405,7 @@ function Home() {
           </div>
         </section>
 
-        {/* 8. Top 10 Bestsellers Carousel */}
+        {/* 5. Top 10 Bestsellers Carousel */}
         <section className="bg-white p-4 rounded-4 shadow-sm border mb-4 queue-bestseller-section">
           <div className="d-flex align-items-center justify-content-between mb-3">
             <div>
@@ -434,7 +449,7 @@ function Home() {
             onMouseEnter={() => setIsCarouselHovered(true)}
             onMouseLeave={() => setIsCarouselHovered(false)}
           >
-            {filteredMenuItems.map((item) => (
+            {topBestsellers.map((item) => (
               <div key={item.id} className="queue-bestseller-carousel-item">
                 <FoodCard
                   item={item}
@@ -447,19 +462,13 @@ function Home() {
           </div>
         </section>
 
-        {/* 9. AI Smart Behavior & Live Merchant Coupons */}
+        {/* 6. AI Smart Behavior & Live Merchant Coupons */}
         <section className="bg-white p-4 rounded-4 shadow-sm border mb-4">
           <div className="d-flex align-items-center justify-content-between mb-3">
             <h5 className="fw-bold text-dark mb-0">
               <i className="bi bi-cpu-fill text-primary me-2" />
               AI Smart Assistant & คูปองส่วนลดพิเศษประจำวัน
             </h5>
-            {queuePrediction && (
-              <span className="badge bg-primary-subtle text-primary p-2 fs-6">
-                <i className="bi bi-clock-history me-1" />
-                AI คาดการณ์เวลารอคิวเฉลี่ย: {queuePrediction.formattedRange} ({queuePrediction.statusText})
-              </span>
-            )}
           </div>
 
           <div className="row g-3">
@@ -604,6 +613,67 @@ function Home() {
                 <span>• คิวรอน้อยกว่า 12 นาที</span>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* 8. Food Catalog Grid with Interactive Filters & Sorting */}
+        <section className="bg-white p-4 rounded-4 shadow-sm border mb-4">
+          <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+            <div>
+              <h5 className="fw-bold text-dark mb-0">
+                <i className="bi bi-grid-3x3-gap-fill text-primary me-2" />
+                🍽️ อาหารทั้งหมดในโรงอาหาร
+              </h5>
+              <p className="text-muted text-xs mb-0 mt-1">
+                {displayCatalogItems.length} รายการอาหาร • กรองตามหมวดหมู่และราคา
+              </p>
+            </div>
+
+            {/* Filter Buttons */}
+            <div className="d-flex flex-wrap gap-2">
+              <button
+                type="button"
+                className={`btn btn-sm ${catalogSort === "all" ? "btn-dark fw-bold" : "btn-outline-secondary"}`}
+                onClick={() => setCatalogSort("all")}
+              >
+                ทั้งหมด
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${catalogSort === "rating" ? "btn-dark fw-bold" : "btn-outline-secondary"}`}
+                onClick={() => setCatalogSort("rating")}
+              >
+                <i className="bi bi-star-fill text-warning me-1" /> คะแนนสูงสุด
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${catalogSort === "price_low" ? "btn-dark fw-bold" : "btn-outline-secondary"}`}
+                onClick={() => setCatalogSort("price_low")}
+              >
+                <i className="bi bi-tag-fill me-1" /> ราคาประหยัด
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${catalogSort === "fast" ? "btn-dark fw-bold" : "btn-outline-secondary"}`}
+                onClick={() => setCatalogSort("fast")}
+              >
+                <i className="bi bi-lightning-charge-fill text-warning me-1" /> เสิร์ฟไว (&lt; 8 นาที)
+              </button>
+            </div>
+          </div>
+
+          {/* Food Cards Grid */}
+          <div className="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3">
+            {displayCatalogItems.map((item) => (
+              <div key={item.id} className="col">
+                <FoodCard
+                  item={item}
+                  isFavorite={favorites.includes(item.id)}
+                  onToggleFavorite={toggleFavorite}
+                  onClick={() => navigate(`/product/${item.id}`)}
+                />
+              </div>
+            ))}
           </div>
         </section>
       </div>

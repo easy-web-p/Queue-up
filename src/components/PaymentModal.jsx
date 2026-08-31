@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { generateStoreQueueNo } from "../services/storeIsolationEngine.js";
 import "./PaymentModal.css";
 
 function PaymentModal({
@@ -78,14 +79,16 @@ function PaymentModal({
     }
   };
 
-  // Confirm Payment & Save Order with storeId
+  // Confirm Payment & Save Order with storeId (Architecture v3.0)
   const handleConfirmPayment = () => {
     setIsPaidSuccess(true);
 
     const generatedOrderId = "2408" + Math.floor(100000 + Math.random() * 900000);
+    const formattedQueueNo = queueNo && queueNo.includes("-Q") ? queueNo : generateStoreQueueNo(storeId, Math.floor(1 + Math.random() * 15));
+
     const newOrder = {
       id: generatedOrderId,
-      storeId: storeId || "store_canteen01",
+      storeId: storeId || "STORE-DEMO01",
       shopName: shopName || "ร้านครัวโรงเรียน QueueUp Canteen",
       shopLocation: shopLocation || "โรงอาหาร 1",
       orderDate:
@@ -95,7 +98,7 @@ function PaymentModal({
         " น.",
       status: "TO_SHIP",
       statusText: "กำลังปรุงคิวอาหาร (ประมาณ 10 นาที)",
-      queueNo: queueNo || "A06",
+      queueNo: formattedQueueNo,
       totalAmount: Number(amount) || 65,
       paymentMethod: "PromptPay QR Code",
       items: [

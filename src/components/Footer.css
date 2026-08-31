@@ -28,7 +28,8 @@
 }
 
 .qup-footer-container {
-  max-width: 1280px;
+  max-width: clamp(1200px, 92vw, 1680px);
+  width: 100%;
   margin: 0 auto;
   padding: 0 1.5rem;
 }

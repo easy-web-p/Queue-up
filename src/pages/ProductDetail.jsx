@@ -309,7 +309,8 @@ function ProductDetail() {
         shopName={product.shopName || "ร้านครัวโรงเรียน QueueUp Canteen"}
         shopLocation={product.shopLocation || "โรงอาหาร 1 (อาคารเรียน 2)"}
         itemTitle={product.name || product.title}
-        itemPrice={discountedUnitPrice}
+        amount={totalCalculatedPrice}
+        itemPrice={totalCalculatedPrice}
         queueNo="A06"
       />
 

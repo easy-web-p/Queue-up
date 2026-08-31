@@ -51,9 +51,47 @@ const MOCK_HOURLY_PREP = [
   { time: "12:45 - 13:00 น.", count: 4, capacity: 20, status: "low" },
 ];
 
-export default function BookingCalendar({ viewMode = "user" }) {
+export default function BookingCalendar({ viewMode = "user", storeId = "store_canteen01", orders = [] }) {
   const [selectedDate, setSelectedDate] = useState("2026-08-17");
   const [activeTab, setActiveTab] = useState(viewMode);
+
+  // Compute dynamic capacity slots based on storeId and real orders
+  const getCapacitySlots = () => {
+    const timeSlots = [
+      "11:00 - 11:15 น.",
+      "11:15 - 11:30 น.",
+      "11:30 - 11:45 น.",
+      "11:45 - 12:00 น.",
+      "12:00 - 12:15 น.",
+      "12:15 - 12:30 น.",
+      "12:30 - 12:45 น.",
+      "12:45 - 13:00 น.",
+    ];
+
+    // For default demo canteen "store_canteen01" or "STORE-DEMO01", show demo prep data if no orders
+    if ((storeId === "store_canteen01" || storeId === "STORE-DEMO01") && orders.length === 0) {
+      return MOCK_HOURLY_PREP;
+    }
+
+    // For specific store (new store or real orders), count orders per time slot
+    return timeSlots.map((slot) => {
+      const count = orders.filter((o) => o.time === slot || o.timeSlot === slot).length;
+      const capacity = 20;
+      let status = "low";
+      if (count >= capacity) status = "full";
+      else if (count >= 15) status = "high";
+      else if (count >= 8) status = "medium";
+
+      return {
+        time: slot,
+        count,
+        capacity,
+        status,
+      };
+    });
+  };
+
+  const hourlyPrepData = getCapacitySlots();
 
   const getStatusBadge = (status) => {
     switch (status) {
@@ -212,7 +250,7 @@ export default function BookingCalendar({ viewMode = "user" }) {
           </div>
 
           <div className="prep-time-grid">
-            {MOCK_HOURLY_PREP.map((slot, idx) => (
+            {hourlyPrepData.map((slot, idx) => (
               <div key={idx} className={`prep-time-card status-${slot.status}`}>
                 <div className="prep-time-label">
                   <i className="bi bi-clock me-1" />

@@ -1,9 +1,15 @@
 import { useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { switchRole } from "../store/authSlice.js";
+import { switchRole, clearUser } from "../store/authSlice.js";
 import { db, doc, setDoc } from "../firebase/config.js";
-import Footer from "../components/Footer.jsx";
+import {
+  generateAccountId,
+  generateMerchantId,
+  generateStoreId,
+  recordAuditLog,
+} from "../services/storeIsolationEngine.js";
+import SellerAssistantModal from "../components/SellerAssistantModal.jsx";
 import "./MerchantOnboarding.css";
 
 /**
@@ -18,57 +24,100 @@ function MerchantOnboarding() {
   // Onboarding Step State: 0 (Welcome Screen) | 1 (Store Info Form) | 2 (Payment Setup) | 3 (Complete)
   const [step, setStep] = useState(0);
 
+  const [isSellerAssistantOpen, setIsSellerAssistantOpen] = useState(false);
+  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+
+  const handleLogout = () => {
+    dispatch(clearUser());
+    navigate("/login", { replace: true });
+  };
+
+  const getCleanName = () => {
+    if (!user) return "";
+    const raw = user.name || "";
+    if (!raw || raw.toLowerCase().includes("anime manga")) {
+      if (user.email && user.email.includes("@")) return user.email.split("@")[0];
+      return "สมาชิก";
+    }
+    return raw;
+  };
+
+  const cleanOwnerName = getCleanName();
+
   // Merchant Form States
-  const [storeName, setStoreName] = useState(user ? `ร้านค้าของ ${user.name || "สมาชิก"}` : "ร้านอาหารโรงอาหาร 1");
+  const [storeName, setStoreName] = useState(
+    cleanOwnerName ? `ร้านค้าของคุณ ${cleanOwnerName}` : "ร้านอาหารโรงอาหาร 1"
+  );
   const [canteenLocation, setCanteenLocation] = useState("โรงอาหาร 1 (อาคารเรียน 2)");
   const [counterNo, setCounterNo] = useState("เคาน์เตอร์ 4");
   const [phone, setPhone] = useState("081-234-5678");
-  const [promptpayName, setPromptpayName] = useState(user ? user.name || "" : "");
+  const [promptpayName, setPromptpayName] = useState(cleanOwnerName || "เจ้าของร้าน QueueUp");
   const [promptpayNo, setPromptpayNo] = useState("081-234-5678");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Complete Merchant Registration
+  // Complete Merchant Registration (Architecture v3.0)
   const handleCompleteRegistration = async (e) => {
     if (e) e.preventDefault();
     setIsSubmitting(true);
 
-    const storeId = user && user.uid ? `store_${user.uid.substring(0, 10)}` : `store_${Date.now()}`;
+    const accountId = generateAccountId();
+    const merchantId = generateMerchantId();
+    const storeId = generateStoreId();
 
-    const merchantProfile = {
+    const userProfileUpdate = {
+      accountId,
+      merchantId,
       storeId,
       isMerchantRegistered: true,
       role: "merchant",
       isMerchantVerified: true,
-      merchantStoreName: storeName,
-      canteenLocation,
-      counterNo,
-      phone,
-      promptpayName,
-      promptpayNo,
-      registeredAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
 
-    // Save to Firestore if user exists
+    // Save to Firestore Structure v3.0
     if (user && user.uid) {
       try {
-        await setDoc(doc(db, "users", user.uid), merchantProfile, { merge: true });
-        
-        const merchantId = "MCH-" + user.uid.substring(0, 8);
+        // 1. users/{uid}
+        await setDoc(doc(db, "users", user.uid), userProfileUpdate, { merge: true });
+
+        // 2. merchantProfiles/{merchantId}
         await setDoc(
           doc(db, "merchantProfiles", merchantId),
           {
-            storeName,
+            merchantId,
+            storeId,
+            ownerUid: user.uid,
+            merchantStoreName: storeName,
             businessPhone: phone,
             canteenLocation: `${canteenLocation} (${counterNo})`,
-            ownerUid: user.uid,
+            createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           },
           { merge: true }
         );
 
+        // 3. shops/{storeId}
+        await setDoc(
+          doc(db, "shops", storeId),
+          {
+            storeId,
+            merchantId,
+            ownerUid: user.uid,
+            storeName,
+            canteenLocation: `${canteenLocation} (${counterNo})`,
+            phone,
+            storeHours: "07:00 - 15:00 น.",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+
+        // 4. merchantProfiles/{merchantId}/private/finance (Private Isolated Subcollection)
         await setDoc(
           doc(db, "merchantProfiles", merchantId, "private", "finance"),
           {
+            ownerUid: user.uid,
             bankName: "PromptPay (พร้อมเพย์)",
             accountNumber: promptpayNo,
             accountOwner: promptpayName,
@@ -76,17 +125,22 @@ function MerchantOnboarding() {
           },
           { merge: true }
         );
+
+        // 5. Audit Log in auditLogs
+        await recordAuditLog(db, {
+          action: "REGISTER_MERCHANT",
+          actorUid: user.uid,
+          merchantId,
+          metadata: { storeId, accountId, storeName },
+        });
       } catch (err) {
-        console.warn("Firestore save merchant profile error:", err);
+        console.error("Firestore Onboarding Error:", err);
       }
     }
 
-    // Save to LocalStorage (Global & Per-user)
-    localStorage.setItem("queueup_merchant_verified", "true");
-    localStorage.setItem("queueup_merchant_store", JSON.stringify(merchantProfile));
-    if (user && user.uid) {
-      localStorage.setItem(`queueup_merchant_store_${user.uid}`, JSON.stringify(merchantProfile));
-    }
+    // Save non-sensitive transient UI reference keys ONLY (Architecture v3.0 LocalStorage Policy)
+    localStorage.setItem("queueup_last_store_id", storeId);
+    localStorage.setItem("queueup_last_merchant_id", merchantId);
 
     // Switch Role to Merchant
     dispatch(switchRole("merchant"));
@@ -112,23 +166,47 @@ function MerchantOnboarding() {
             <span className="shopee-onboarding-title">QueueUp Seller Centre</span>
           </div>
 
-          <div className="shopee-onboarding-user-info">
-            {user && user.photo ? (
-              <img
-                src={user.photo}
-                alt="Avatar"
-                className="shopee-onboarding-user-avatar"
-                onError={(e) => {
-                  e.currentTarget.onerror = null;
-                  e.currentTarget.src = "/yeti_mascot.jpg";
-                }}
-              />
-            ) : (
-              <i className="bi bi-person-circle fs-4 text-secondary me-2" />
+          {/* User Profile Dropdown matching Screenshot Reference 2 */}
+          <div className="position-relative">
+            <button
+              className="btn btn-light d-flex align-items-center gap-2 font-weight-bold rounded-pill px-3 shadow-sm border"
+              onClick={() => setIsUserDropdownOpen((prev) => !prev)}
+            >
+              <div
+                className="rounded-circle bg-secondary-subtle d-flex align-items-center justify-content-center"
+                style={{ width: "28px", height: "28px" }}
+              >
+                <i className="bi bi-person-fill text-secondary fs-6" />
+              </div>
+              <span className="text-dark small font-weight-bold">
+                {user ? user.name || user.email : "สมาชิก QueueUp"}
+              </span>
+              <i className={`bi bi-chevron-${isUserDropdownOpen ? "up" : "down"} text-muted small`} />
+            </button>
+
+            {isUserDropdownOpen && (
+              <div
+                className="position-absolute end-0 mt-2 bg-white rounded-3 shadow-lg p-3 text-dark text-center border"
+                style={{ width: "220px", zIndex: 9999 }}
+              >
+                <div
+                  className="rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto mb-2 border"
+                  style={{ width: "64px", height: "64px" }}
+                >
+                  <i className="bi bi-person-fill text-secondary display-6" />
+                </div>
+                <div className="fw-bold text-dark fs-6 mb-2">
+                  {user ? user.name || user.email : "สมาชิก QueueUp"}
+                </div>
+                <hr className="my-2" />
+                <button
+                  className="btn btn-outline-danger w-100 font-weight-bold d-flex align-items-center justify-content-center gap-2 py-2 rounded-3"
+                  onClick={handleLogout}
+                >
+                  <i className="bi bi-box-arrow-right fs-5" /> ออกจากระบบ
+                </button>
+              </div>
             )}
-            <span className="shopee-onboarding-username">
-              {user ? user.name || user.email : "สมาชิก QueueUp"}
-            </span>
           </div>
         </div>
       </header>
@@ -320,7 +398,30 @@ function MerchantOnboarding() {
         )}
       </main>
 
-      <Footer />
+      {/* Seller Assistant Floating Widget Trigger */}
+      <button
+        className="btn btn-danger rounded-circle shadow-lg position-fixed d-flex align-items-center justify-content-center"
+        style={{
+          bottom: "30px",
+          right: "30px",
+          width: "62px",
+          height: "62px",
+          zIndex: 9990,
+          background: "linear-gradient(135deg, #ee4d2d 0%, #ff7337 100%)",
+          border: "none",
+        }}
+        onClick={() => setIsSellerAssistantOpen(true)}
+        title="เปิด Seller Assistant ผู้ช่วยร้านค้า"
+      >
+        <i className="bi bi-headset fs-2 text-white" />
+      </button>
+
+      {/* Seller Assistant Modal matching reference screenshot 1 */}
+      <SellerAssistantModal
+        isOpen={isSellerAssistantOpen}
+        onClose={() => setIsSellerAssistantOpen(false)}
+        userName={cleanOwnerName || (user ? user.name || user.email : "ผู้ขาย")}
+      />
     </div>
   );
 }

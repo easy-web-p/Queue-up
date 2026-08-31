@@ -594,7 +594,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
             <input
               type="text"
               className="shopee-search-input"
-              placeholder={t("search")}
+              placeholder={language === "en" ? "Search foods, shops, or ask QueueUp AI..." : "ค้นหาร้าน อาหาร หรือถาม QueueUp AI..."}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onFocus={() => setIsInputFocused(true)}
@@ -651,12 +651,38 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
               </svg>
             </button>
 
-            {/* 1. Popover เมื่อคลิกช่องค้นหาและยังไม่ได้พิมพ์คำ (เปิดใช้เมื่อ disableHistory เป็น false เท่านั้น) */}
+            {/* 1. Popover เมื่อคลิกช่องค้นหาและยังไม่ได้พิมพ์คำ (QueueUp AI + Search History) */}
             {!disableHistory && isInputFocused && searchTerm.trim() === "" && (
               <div className="shopee-suggestions-box">
-                {searchHistory.length > 0 ? (
+                {/* AI Assistant Quick Prompts */}
+                <div className="shopee-history-header d-flex align-items-center justify-content-between text-primary">
+                  <span><i className="bi bi-robot me-1" /> 🤖 QueueUp AI Suggestions</span>
+                  <span className="badge bg-primary-subtle text-primary" style={{ fontSize: "10px" }}>AI Smart</span>
+                </div>
+                {[
+                  { label: "✨ แนะนำเมนูให้ฉัน", query: "อาหารแนะนำยอดนิยม" },
+                  { label: "🌶️ อยากกินอะไรเผ็ด ๆ", query: "อยากกินอะไรเผ็ด ๆ" },
+                  { label: "💰 หาอาหารไม่เกิน 50 บาท", query: "อาหารไม่เกิน 50 บาท" },
+                  { label: "⚡ หาเมนูที่ทำเร็ว", query: "หาเมนูที่ทำเร็ว" },
+                  { label: "🏪 แนะนำร้านยอดนิยม", query: "ร้านยอดนิยม" },
+                ].map((aiPrompt, idx) => (
+                  <div
+                    key={idx}
+                    className="shopee-suggestion-row"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleSelectKeyword(aiPrompt.query);
+                    }}
+                  >
+                    <span className="fw-semibold text-dark">{aiPrompt.label}</span>
+                  </div>
+                ))}
+
+                {searchHistory.length > 0 && (
                   <>
-                    <div className="shopee-history-header">ประวัติการค้นหา</div>
+                    <div className="shopee-history-header mt-2">
+                      <i className="bi bi-clock-history me-1" /> ประวัติการค้นหา
+                    </div>
                     {searchHistory.map((item, idx) => (
                       <div
                         key={idx}
@@ -666,25 +692,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
                           handleSelectKeyword(item);
                         }}
                       >
-                        <span>{item}</span>
-                      </div>
-                    ))}
-                  </>
-                ) : (
-                  <>
-                    <div className="shopee-history-header">
-                      <i className="bi bi-fire text-danger me-1" /> ค้นหายอดนิยม
-                    </div>
-                    {TOP_TRENDING_KEYWORDS.map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="shopee-suggestion-row"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          handleSelectKeyword(item);
-                        }}
-                      >
-                        <i className="bi bi-fire text-danger me-2" />
+                        <i className="bi bi-search text-muted me-2" style={{ fontSize: "12px" }} />
                         <span>{item}</span>
                       </div>
                     ))}
@@ -694,8 +702,21 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
             )}
 
             {/* 2. Popover คำแนะนำการค้นหา (เมื่อเริ่มพิมพ์คำ) */}
-            {isInputFocused && searchTerm.trim() !== "" && suggestions.length > 0 && (
+            {isInputFocused && searchTerm.trim() !== "" && (
               <div className="shopee-suggestions-box">
+                <div className="shopee-history-header text-primary">
+                  <i className="bi bi-sparkles me-1" /> ค้นหาด้วย QueueUp AI
+                </div>
+                <div
+                  className="shopee-suggestion-row bg-light"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleSelectKeyword(searchTerm);
+                  }}
+                >
+                  <i className="bi bi-search text-danger me-2" />
+                  <span>ค้นหา "<strong>{searchTerm}</strong>"</span>
+                </div>
                 {suggestions.map((item, idx) => (
                   <div
                     key={idx}
@@ -705,7 +726,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
                       handleSelectKeyword(item);
                     }}
                   >
-                    <i className="bi bi-search text-muted" />
+                    <i className="bi bi-arrow-right text-muted me-2" style={{ fontSize: "12px" }} />
                     <span>{item}</span>
                   </div>
                 ))}

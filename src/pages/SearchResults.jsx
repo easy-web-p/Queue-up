@@ -69,15 +69,39 @@ function SearchResults() {
 
   // Keyword & Multi-Filter Logic
   const filteredProducts = productsList.filter((item) => {
-    // 1. Keyword Filter
+    // 1. Natural Language AI Keyword Filter
     if (keyword && keyword !== "ทั้งหมด" && keyword !== "อาหาร") {
-      const q = keyword.toLowerCase();
-      const matchTitle = item.title ? item.title.toLowerCase().includes(q) : false;
-      const matchName = item.name ? item.name.toLowerCase().includes(q) : false;
-      const matchCategory = item.categoryLabel ? item.categoryLabel.toLowerCase().includes(q) : false;
-      const matchShop = item.shopName ? item.shopName.toLowerCase().includes(q) : false;
-      if (!matchTitle && !matchName && !matchCategory && !matchShop) {
-        return false;
+      const q = keyword.toLowerCase().trim();
+
+      // AI Intent 1: อยากกินอะไรเผ็ดๆ
+      if (q.includes("เผ็ด") || q.includes("แซ่บ") || q.includes("จัดจ้าน")) {
+        const isSpicy =
+          item.category === "curry_soup" ||
+          item.category === "thai_spicy" ||
+          (item.name && (item.name.includes("ต้มยำ") || item.name.includes("กะเพรา") || item.name.includes("พริก") || item.name.includes("เกาหลี") || item.name.includes("แซ่บ")));
+        if (!isSpicy) return false;
+      }
+      // AI Intent 2: ราคาไม่เกิน 50 บาท
+      else if (q.includes("ไม่เกิน 50") || q.includes("50 บาท") || q.includes("ประหยัด")) {
+        if (item.price > 50) return false;
+      }
+      // AI Intent 3: เสิร์ฟไว / ทำเร็ว
+      else if (q.includes("เร็ว") || q.includes("ไว") || q.includes("ด่วน")) {
+        if (item.price > 70 && item.category !== "noodle") return false;
+      }
+      // AI Intent 4: ร้านยอดนิยม / แนะนำ
+      else if (q.includes("ยอดนิยม") || q.includes("แนะนำ") || q.includes("ดัง")) {
+        if ((item.rating || 0) < 4.8) return false;
+      }
+      // Standard Exact / Fuzzy Match on Name, Title, Shop, Category
+      else {
+        const matchTitle = item.title ? item.title.toLowerCase().includes(q) : false;
+        const matchName = item.name ? item.name.toLowerCase().includes(q) : false;
+        const matchCategory = item.categoryLabel ? item.categoryLabel.toLowerCase().includes(q) : false;
+        const matchShop = item.shopName ? item.shopName.toLowerCase().includes(q) : false;
+        if (!matchTitle && !matchName && !matchCategory && !matchShop) {
+          return false;
+        }
       }
     }
 

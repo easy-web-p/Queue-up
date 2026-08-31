@@ -5,19 +5,25 @@
 
 .shopee-profile-page {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
   background-color: #f5f5f5;
   color: #222222;
   font-family: -apple-system, BlinkMacSystemFont, "Plus Jakarta Sans", "Segoe UI", Roboto, sans-serif;
   padding-bottom: 0;
+  width: 100%;
 }
 
 .shopee-profile-container {
-  max-width: 1140px;
+  max-width: clamp(1200px, 92vw, 1680px);
+  width: 100%;
   margin: 0 auto;
-  padding: 24px 16px 0 16px;
+  padding: 24px 20px 40px 20px;
   display: flex;
-  gap: 20px;
+  gap: 24px;
   align-items: flex-start;
+  flex: 1 0 auto;
 }
 
 /* 1. Left Sidebar Navigation Panel */

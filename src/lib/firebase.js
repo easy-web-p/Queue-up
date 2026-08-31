@@ -227,3 +227,36 @@ export const fetchEvaluationsFromFirestore = async () => {
   localStorage.setItem("queueup_user_evaluations", JSON.stringify(INITIAL_EVALUATIONS));
   return INITIAL_EVALUATIONS;
 };
+
+// Aliases & Admin Helpers
+export const fetchMenuItemsFromFirestore = fetchProductsFromFirestore;
+
+export const fetchOrdersFromFirestore = async () => {
+  try {
+    const querySnapshot = await getDocs(collection(db, "orders"));
+    const list = [];
+    querySnapshot.forEach((docSnap) => {
+      list.push({ id: docSnap.id, ...docSnap.data() });
+    });
+    return list;
+  } catch (error) {
+    console.warn("Firestore fetchOrders warning:", error);
+    return [];
+  }
+};
+
+export const fetchUsersFromFirestore = async () => {
+  try {
+    const querySnapshot = await getDocs(collection(db, "users"));
+    const list = [];
+    querySnapshot.forEach((docSnap) => {
+      list.push({ id: docSnap.id, ...docSnap.data() });
+    });
+    return list;
+  } catch (error) {
+    console.warn("Firestore fetchUsers warning:", error);
+    return [];
+  }
+};
+
+

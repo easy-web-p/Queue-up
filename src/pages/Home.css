@@ -4,16 +4,34 @@
 
 .queue-home-container {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
   background-color: #f8fafc;
   color: #0f172a;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   padding-bottom: 0;
+  width: 100%;
 }
 
 .queue-home-wrapper {
-  max-width: 1200px;
+  max-width: clamp(1200px, 92vw, 1680px);
+  width: 100%;
   margin: 0 auto;
-  padding: 24px 16px 0 16px;
+  padding: 24px 20px 40px 20px;
+  flex: 1 0 auto;
+}
+
+@media (min-width: 1440px) {
+  .queue-home-wrapper {
+    max-width: 1440px;
+  }
+}
+
+@media (min-width: 1920px) {
+  .queue-home-wrapper {
+    max-width: 1680px;
+  }
 }
 
 /* 1. First-Time User Welcome Banner */

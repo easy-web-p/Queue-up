@@ -24,7 +24,8 @@ body.dark-mode .shopee-header-container {
 
 /* 1. Top Sub-Navigation Bar */
 .shopee-top-nav {
-  max-width: 1200px;
+  max-width: clamp(1200px, 92vw, 1680px);
+  width: 100%;
   margin: 0 auto;
   padding: 6px 16px;
   display: flex;
@@ -217,7 +218,8 @@ body.dark-mode .shopee-header-container {
 
 /* 2. Main Search Header Section */
 .shopee-main-header {
-  max-width: 1200px;
+  max-width: clamp(1200px, 92vw, 1680px);
+  width: 100%;
   margin: 0 auto;
   padding: 16px 16px 12px 16px;
   display: flex;

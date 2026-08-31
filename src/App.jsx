@@ -14,6 +14,7 @@ import MerchantDashboard from "./pages/MerchantDashboard.jsx";
 import MerchantOnboarding from "./pages/MerchantOnboarding.jsx";
 import NotFound from "./pages/NotFound.jsx";
 import PdpaPolicy from "./pages/PdpaPolicy.jsx";
+import StoreAdminPage from "./pages/StoreAdminPage.tsx";
 import PageRouteLoader from "./components/PageRouteLoader.jsx";
 import CookieConsentBanner from "./components/CookieConsentBanner.jsx";
 import CookieSessionTracker from "./components/CookieSessionTracker.jsx";
@@ -73,6 +74,10 @@ function App() {
             <Route path="/Merchant/dashboard" element={<ProtectedRoute><MerchantDashboard /></ProtectedRoute>} />
             <Route path="/portal/th-onboarding" element={<ProtectedRoute><MerchantOnboarding /></ProtectedRoute>} />
             <Route path="/portal/onboarding" element={<ProtectedRoute><MerchantOnboarding /></ProtectedRoute>} />
+
+            {/* Admin Routes */}
+            <Route path="/admin" element={<ProtectedRoute><StoreAdminPage /></ProtectedRoute>} />
+            <Route path="/Admin" element={<ProtectedRoute><StoreAdminPage /></ProtectedRoute>} />
 
             {/* Wildcard 404 Page Not Found Route */}
             <Route path="*" element={<NotFound />} />
