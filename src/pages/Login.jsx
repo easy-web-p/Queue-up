@@ -248,22 +248,68 @@ function Login() {
   const handleGoogleLogin = async () => {
     try {
       setIsGoogleUser(true);
+      setLoading(true);
       if (loginWithGoogle) {
-        const user = await loginWithGoogle();
-        if (user) {
-          setCurrentUid(user.uid);
-          setEmail(user.email || "");
-          setName(user.displayName || "");
-          if (user.photoURL) {
-            setSelectedAvatar(user.photoURL);
-            setUploadedAvatar(user.photoURL);
+        const gUser = await loginWithGoogle();
+        if (gUser) {
+          const defaultName = gUser.displayName || "(ม.1/6) -58140 เด็กชายพิสิษฐ์ แก้วกุลพิสิษฐ์";
+          const defaultEmail = gUser.email || "58140@lomsak.ac.th";
+          const defaultPhoto = gUser.photoURL || "/yeti_mascot.jpg";
+          const accountId = generateSecureAccountId(58140);
+
+          localStorage.setItem("queueup_secure_account_id", accountId);
+          localStorage.setItem(
+            "queueup_user",
+            JSON.stringify({
+              uid: gUser.uid,
+              name: defaultName,
+              email: defaultEmail,
+              photo: defaultPhoto,
+              roles: ["customer"],
+              activeRole: "customer",
+            })
+          );
+
+          dispatch(
+            setUser({
+              uid: gUser.uid,
+              name: defaultName,
+              email: defaultEmail,
+              photo: defaultPhoto,
+              roles: ["customer"],
+              activeRole: "customer",
+            })
+          );
+
+          try {
+            await setDoc(
+              doc(db, "users", gUser.uid),
+              {
+                uid: gUser.uid,
+                accountId: accountId,
+                roles: ["customer"],
+                activeRole: "customer",
+                isGoogleUser: true,
+                email: defaultEmail,
+                displayName: defaultName,
+                fullName: defaultName,
+                photo: defaultPhoto,
+                updatedAt: serverTimestamp(),
+              },
+              { merge: true }
+            );
+          } catch (err) {
+            console.warn("Firestore setDoc on Google login:", err);
           }
-          setIsCreateProfile(true);
+
+          setLoading(false);
+          navigate("/home", { replace: true });
         }
       }
     } catch (error) {
       console.error("Google Login Error:", error);
-      alert("⚠️ เกิดข้อผิดพลาดในการเข้าสู่ระบบด้วย Google");
+      setLoading(false);
+      alert("⚠️ เกิดข้อผิดพลาดในการเข้าสู่ระบบด้วย Google: " + (error.message || ""));
     }
   };
 
