@@ -6,7 +6,7 @@ import PaymentModal from "../components/PaymentModal.jsx";
 import ShopeeSearchBar from "../components/ShopeeSearchBar.jsx";
 import ChatModal from "../components/ChatModal.jsx";
 import Footer from "../components/Footer.jsx";
-import { PRODUCTS_BY_ID } from "../data/mockProducts.js";
+import { PRODUCTS_BY_ID, SHARED_PRODUCTS } from "../data/mockProducts.js";
 import { fetchProductByIdFromFirestore } from "../lib/firebase.js";
 import "./ProductDetail.css";
 
@@ -21,12 +21,39 @@ const TIME_SLOTS = [
   { time: "15:00", discount: "-10%" },
 ];
 
+function resolveProductByParam(rawParam) {
+  if (!rawParam) return PRODUCTS_BY_ID.m1;
+
+  const decoded = decodeURIComponent(rawParam).trim();
+
+  // 1. Direct match by ID (e.g. m1, m2)
+  if (PRODUCTS_BY_ID[decoded]) return PRODUCTS_BY_ID[decoded];
+  if (PRODUCTS_BY_ID[rawParam]) return PRODUCTS_BY_ID[rawParam];
+
+  // 2. Match by exact product name or title or encoded name
+  const foundByName = SHARED_PRODUCTS.find((p) => {
+    if (!p) return false;
+    const pName = (p.name || "").trim();
+    const pTitle = (p.title || "").trim();
+    return (
+      pName === decoded ||
+      pTitle === decoded ||
+      encodeURIComponent(pName) === rawParam ||
+      encodeURIComponent(pTitle) === rawParam ||
+      pName.includes(decoded) ||
+      decoded.includes(pName)
+    );
+  });
+
+  return foundByName || PRODUCTS_BY_ID.m1;
+}
+
 function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useSelector((state) => state.auth);
 
-  const initialProduct = PRODUCTS_BY_ID[id] || PRODUCTS_BY_ID.m1;
+  const initialProduct = resolveProductByParam(id);
   const [product, setProduct] = useState(initialProduct);
 
   const [selectedImg, setSelectedImg] = useState(initialProduct.mainImg || initialProduct.image);
@@ -42,16 +69,16 @@ function ProductDetail() {
   useEffect(() => {
     let isMounted = true;
     async function loadProductData() {
-      const docData = await fetchProductByIdFromFirestore(id);
+      const decoded = decodeURIComponent(id || "").trim();
+      let docData = await fetchProductByIdFromFirestore(id);
+      if (!docData && decoded !== id) {
+        docData = await fetchProductByIdFromFirestore(decoded);
+      }
+
       if (isMounted) {
-        if (docData) {
-          setProduct(docData);
-          setSelectedImg(docData.mainImg || docData.image);
-        } else {
-          const fallback = PRODUCTS_BY_ID[id] || PRODUCTS_BY_ID.m1;
-          setProduct(fallback);
-          setSelectedImg(fallback.mainImg || fallback.image);
-        }
+        const resolved = docData || resolveProductByParam(id);
+        setProduct(resolved);
+        setSelectedImg(resolved.mainImg || resolved.image);
       }
     }
     loadProductData();
