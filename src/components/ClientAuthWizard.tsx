@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { GoogleOAuthProvider, GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import { ChevronRight, ChevronLeft, Smartphone, CheckCircle, ShieldCheck } from 'lucide-react';
-import { findUserInFirestore, saveUserToFirestore } from '../../lib/firebase';
-import { CustomerProfile } from '../../types';
+import { findUserInFirestore, saveUserToFirestore } from '../lib/firebase';
+import { CustomerProfile } from '../types';
 
 // หมายเลขประจำแอปพลิเคชัน (Client ID) ที่คุณได้มาจาก Google Cloud Console และ Meta Developers
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "482403349684-c528mehmq78amj1pj3m1rqmh768tnbur.apps.googleusercontent.com";
