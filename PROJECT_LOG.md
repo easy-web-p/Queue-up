@@ -117,7 +117,133 @@ my-QueueUp-app/
 
 ---
 
-## 🛠️ 3. แผนการพัฒนาและแก้ไขปัญหาที่ดำเนินการสำเร็จ (Problem-Solving & Bug Fixes)
+## 🔐 3. รายละเอียดการทำงานของระบบสิทธิ์การเข้าถึง (Access Control Security Architecture)
+
+### 🎯 วัตถุประสงค์
+ระบบ Access Control ของ QueueUp ทำหน้าที่ควบคุมว่าผู้ใช้แต่ละประเภทสามารถเข้าหน้าใด อ่านข้อมูลอะไร และดำเนินการอะไรได้บ้าง โดยแบ่งการรักษาความปลอดภัยออกเป็นหลายชั้น:
+
+```
+ผู้ใช้ ➔ Firebase Authentication ➔ ProtectedRoute Guard ➔ Role / Permission ➔ Store Isolation (Data Ownership) ➔ Firestore Security Rules
+```
+
+> **หมายเหตุ:** `ProtectedRoute.jsx` เป็นด่านป้องกันฝั่ง Frontend เท่านั้น ความปลอดภัยของข้อมูลจริงถูกบังคับซ้ำที่ **Firestore Security Rules (`firestore.rules`)** และ **Backend/Cloud Functions** เสมอ
+
+---
+
+### 1. 🔒 Authentication Guard (กรณียังไม่ได้เข้าสู่ระบบ)
+* ทุกหน้าที่เกี่ยวข้องกับข้อมูลส่วนตัว การสั่งอาหาร การชำระเงิน หรือการจัดการระบบ (`/home`, `/user/profile`, `/user/purchase`, `/product/:id`, `/booking`, `/merchant/dashboard`, `/admin`) จะถูกตรวจสอบสถานะผ่าน `AuthContext.jsx` และ Firebase Auth
+* **Flow การทำงาน :**
+  ```
+  ผู้ใช้เปิด URL ➔ AuthContext ตรวจสอบ Firebase Auth ➔ กำลังโหลด? (⏳ Loading) ➔ Authenticated?
+    ├── ❌ NO  ➔ Redirect ไปยัง /login พร้อมจำ Path เดิมไว้
+    └── ✅ YES ➔ ตรวจสอบ Role ตามลำดับ
+  ```
+* **สำคัญ :** ระบบจะไม่ Redirect ก่อน Firebase ตรวจสอบ Auth เสร็จสิ้น เพื่อป้องกันปัญหาหน้าเด้งกลับ `/login` ทั้งที่ผู้ใช้ล็อกอินอยู่แล้ว
+
+---
+
+### 2. 👤 Customer / Student Access (สิทธิ์นักเรียนและผู้ซื้อ)
+* **หน้าที่อนุญาต :** `/home`, `/search`, `/product/:id`, `/user/purchase`, `/user/account/profile`, `/booking`, `/queueup`
+* **สามารถทำได้ :** ค้นหาเมนูอาหาร, เลือกรอบเวลารับอาหาร (Time-slot), เพิ่มลงตะกร้า, ชำระเงินผ่าน PromptPay QR, ดูตั๋วคิวสด, ดูประวัติการสั่งซื้อ และสะสมแต้ม CRM Points
+* **ไม่สามารถทำได้ :**
+  - ❌ เข้าหน้า `/merchant/dashboard`
+  - ❌ เข้าหน้า `/admin`
+  - ❌ แก้ไขข้อมูลร้านค้า / สต็อกอาหาร
+  - ❌ ดูออเดอร์ของร้านอื่น หรือดูข้อมูลส่วนตัวของ Customer คนอื่น
+
+---
+
+### 3. 🏪 Merchant Access (สิทธิ์เจ้าของร้านค้าในโรงอาหาร)
+* **หน้าที่อนุญาต :** `/merchant/dashboard` (`MerchantDashboard.jsx`)
+* **คอมโพเนนต์ภายใน :**
+  - `MerchantKDS.tsx` : หน้าจอควบคุมครัว Kanban 1-Tap Bump
+  - `MerchantMenuManager.tsx` : จัดการเมนู ปรับราคา และเปิด/ปิดสต็อกอาหาร
+  - `MerchantCRMAnalytics.tsx` : วิเคราะห์ยอดขายและอัตราลูกค้าประจำ
+  - `SellerAssistantModal.jsx` : ผู้ช่วย AI แนะนำเมนูขายดีและการตั้งราคา
+
+---
+
+### 4. 🏬 Merchant Store Isolation (การแยกข้อมูลระหว่างร้านค้า)
+* Merchant ไม่ได้มีสิทธิ์เข้าถึงข้อมูลร้านค้าทั้งหมด แต่จะถูกผูกเข้ากับ:
+  ```
+  user.uid ➔ merchant profile ➔ storeId ➔ เฉพาะข้อมูลของ storeId นี้เท่านั้น
+  ```
+* **Firestore Security Rules :** ป้องกันไม่ให้ Merchant ร้าน A เข้าถึงหรือแก้ไขสินค้า ออเดอร์ และยอดขายของร้าน B แม้จะพยายามส่ง Request เองจากภายนอก
+
+---
+
+### 5. 👑 Super Admin Access (สิทธิ์ผู้ดูแลระบบส่วนกลาง)
+* **หน้าที่อนุญาต :** `/admin` (`StoreAdminPage.tsx`)
+* **เงื่อนไข :** `allowedRoles = ["admin"]` (เฉพาะบัญชี `58140@lomsak.ac.th` หรือบัญชีที่มีสิทธิ์ Admin เท่านั้น)
+* **ความสามารถ :**
+  - 🏪 **Store Management :** อนุมัติร้านค้าใหม่, ระงับร้านค้า, ตรวจสอบข้อมูลและค่าธรรมเนียม
+  - 👤 **User Management :** ตรวจสอบรายชื่อผู้ใช้, จัดการสถานะบัญชี, ระงับบัญชีตามนโยบาย
+  - 🚨 **Order Intervention :** ตรวจสอบออเดอร์ระดับ Platform, ยกเลิกออเดอร์ผิดปกติ, ดำเนินการ Refund
+  - 📊 **Platform Analytics :** ดูภาพรวม GMV, จำนวนออเดอร์รวม, ยอดขายสะสมทั้งโรงอาหาร
+
+---
+
+### 6. 🚫 การป้องกันการเข้าถึง `/admin` (Direct URL Protection)
+* หากผู้ใช้ทั่วไป (`Customer` หรือ `Merchant`) พยายามพิมพ์ `/admin` ใน URL Bar:
+  ```
+  /admin ➔ ProtectedRoute ➔ Authenticated? ➔ YES ➔ Role == 'admin'?
+    ├── ✅ YES ➔ เข้าสู่ StoreAdminPage (Admin Portal)
+    └── ❌ NO  ➔ แสดงหน้า Access Denied แจ้งเตือนสิทธิ์ไม่เพียงพอ พร้อมปุ่มกลับหน้าหลัก
+  ```
+
+---
+
+### 7. 🔄 Role Switching (การสลับโหมดการใช้งาน)
+* **หลักการ :** การสลับบทบาท (Role Switcher) เป็นเพียง **"การเปลี่ยนพื้นที่การใช้งานของสิทธิ์ที่มีอยู่แล้ว"** ไม่ใช่การยกระดับสิทธิ์ใหม่จากฝั่ง Client
+* หาก Customer ที่ยังไม่มีสิทธิ์ Merchant ต้องการเปิดร้านค้า ต้องผ่านขั้นตอน Onboarding (`/portal/th-onboarding`) เพื่อส่งข้อมูลให้ Super Admin ตรวจสอบและอนุมัติก่อน
+
+---
+
+### 8. 🛡️ Frontend + Backend Multi-layer Security
+* **Layer 1 (Frontend Guard) :** `ProtectedRoute.jsx` ตรวจสอบสถานะ Login และ Role ก่อนเรนเดอร์หน้าจอ
+* **Layer 2 (Backend Security Rules) :** `firestore.rules` ตรวจสอบ UID, Role, Store Ownership และ Data Integrity ที่ระดับฐานข้อมูลทุกครั้งที่มีการอ่านหรือเขียน
+
+---
+
+### 9. 💳 Payment Security (ความปลอดภัยระบบชำระเงิน)
+* ระบบไม่เชื่อยอดเงินที่ส่งมาจาก Client โดยตรง
+* ลำดับขั้นตอนการชำระเงิน:
+  ```
+  สร้าง Payment ➔ คำนวณยอดเงินจริงจากฐานข้อมูล ➔ แสดง QR PromptPay ➔ ตรวจสอบสลิป ➔ อัปเดตสถานะ PENDING ➔ PAID ➔ CONFIRMED ➔ สร้างบัตรคิว (Queue Ticket)
+  ```
+
+---
+
+### 10. 🎫 Queue Security (ความปลอดภัยของตั๋วคิว)
+* คิวทุกใบผูกกับ `userId`, `orderId`, `storeId`, และ `queueNumber`
+* Customer A สามารถดูได้เฉพาะคิวของตนเอง ไม่สามารถสอดแนมคิวของ Customer B ได้
+* Merchant ดูได้เฉพาะคิวที่สั่งในร้านของตนเอง
+
+---
+
+### 11. 🤖 AI Security Guard
+* โมเดล AI (`aiBehaviorEngine.js`, `aiChatService.js`, `aiSecurityShield.js`) ทำหน้าที่เป็น **"ผู้ช่วยวิเคราะห์และแนะนำ"** เท่านั้น
+* **ห้าม AI เป็นตัวกำหนดสิทธิ์ผู้ใช้โดยเด็ดขาด** สิทธิ์ทั้งหมดต้องมาจาก Firebase Auth Token และ Firestore Database Claims เท่านั้น
+
+---
+
+### 12. 📜 Audit Logs (บันทึกประวัติการดำเนินงานสำคัญ)
+* บันทึก Log ทุกครั้งที่มีการเปลี่ยนแปลงสำคัญ: ใคร ทำอะไร กับข้อมูลใด เมื่อไหร่ และผลลัพธ์คืออะไร (เช่น การเปลี่ยน Role, การระงับบัญชี, การอนุมัติร้านค้า, การ Refund) ผ่าน `storeIsolationEngine.js`
+
+---
+
+### 13. 🧩 สรุปตารางสิทธิ์การเข้าถึง (Role-Permission Matrix)
+
+| บทบาทผู้ใช้ (Role) | พื้นที่การใช้งานหลัก | สิทธิ์การเข้าถึงและการทำงาน |
+| :--- | :--- | :--- |
+| **Guest** (ยังไม่ล็อกอิน) | `/login`, `/queueup`, `/pdpa` | ดูได้เฉพาะหน้า Landing Page และหน้านโยบายสาธารณะ |
+| **Customer** (นักเรียน/ผู้ซื้อ) | `/home`, `/search`, `/product`, `/purchase`, `/profile`, `/booking` | ค้นหาอาหาร สั่งจองล่วงหน้า สแกนจ่ายเงิน และดูตั๋วคิวของตนเอง |
+| **Merchant** (ร้านค้าโรงอาหาร) | `/merchant/dashboard` | จัดการครัว KDS ปรับเมนู สต็อก และดูยอดขายเฉพาะร้านของตนเอง |
+| **Super Admin** (ผู้ดูแลส่วนกลาง) | `/admin` | จัดการภาพรวมร้านค้า ผู้ใช้ ออเดอร์ทั้งโรงอาหาร และ Audit Logs |
+
+---
+
+## 🛠️ 4. แผนการพัฒนาและแก้ไขปัญหาที่ดำเนินการสำเร็จ (Problem-Solving & Bug Fixes)
 
 | ปัญหาที่พบ | สาเหตุ | วิธีการแก้ไข | สถานะ |
 | :--- | :--- | :--- | :---: |
@@ -125,10 +251,11 @@ my-QueueUp-app/
 | **2. รูปภาพใน `ProductDetail` ขยายผิดสัดส่วน** | CSS Class ไม่ตรงกับโครงสร้าง JSX Grid 2 คอลัมน์ | ปรับจับคู่คลาส CSS `queue-pd-main-grid` และ `queue-pd-wrapper` ใหม่ | ✅ แก้ได้ 100% |
 | **3. Netlify ขึ้นข้อผิดพลาด 404 Not Found เมื่อรีเฟรชหน้าเว็บ** | เซิร์ฟเวอร์ไม่รู้จัก Client-Side Routing ของ Single Page App | สร้างไฟล์ `public/_redirects` และกำหนดกฎ `/* /index.html 200` | ✅ แก้ได้ 100% |
 | **4. ข้อมูลค้างเมื่ออินเทอร์เน็ตหลุด** | ไม่มีการสำรองข้อมูลฝั่ง Client | วางระบบ LocalStorage Fallback ซิงค์ข้อมูลอัตโนมัติเมื่อกลับมาออนไลน์ | ✅ แก้ได้ 100% |
+| **5. การเข้าถึงหน้า Admin / Merchant โดยไม่ตรวจสิทธิ์** | ขาดการตรวจสอบ Role-Based Access Control ใน Route Guard | เพิ่มการตรวจสอบ `allowedRoles` ใน `ProtectedRoute.jsx` พร้อมหน้า Access Denied | ✅ แก้ได้ 100% |
 
 ---
 
-## 🚀 4. แผนงานและฟังก์ชันที่ต้องพัฒนาต่อในอนาคต (Future Roadmap & Backlog)
+## 🚀 5. แผนงานและฟังก์ชันที่ต้องพัฒนาต่อในอนาคต (Future Roadmap & Backlog)
 
 1. **IoT Kitchen Buzzer & Central Canteen TV Display :**  
    - พัฒนาระบบแสดงผลหมายเลขคิวบนหน้าจอทีวีรวมกลางโรงอาหาร พร้อมเชื่อมต่ออุปกรณ์กระดิ่งไร้สายแจ้งเตือนที่โต๊ะอาหาร
