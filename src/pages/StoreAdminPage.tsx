@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import {
   Store,
   Settings,
@@ -27,7 +29,8 @@ import {
   BarChart3,
   KeyRound,
   FileText,
-  UserPlus
+  UserPlus,
+  Download
 } from 'lucide-react';
 import { MenuItem, Order, CustomerProfile, MerchantShop } from '../types';
 import { fetchMenuItemsFromFirestore, fetchOrdersFromFirestore, fetchShopsFromFirestore, fetchUsersFromFirestore } from '../lib/firebase';
@@ -51,6 +54,9 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
   onNavigateToStore,
   onNavigateToLogin,
 }) => {
+  const navigate = useNavigate();
+  const { user } = useSelector((state: any) => state.auth);
+
   const [activeTab, setActiveTab] = useState<
     'overview' | 'menu_admin' | 'orders' | 'payments' | 'staff' | 'crm' | 'logs'
   >('overview');
@@ -171,6 +177,33 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
     setNewItemDesc('');
   };
 
+  const handleExportCSV = () => {
+    const headers = ['OrderID', 'Customer', 'Items', 'TotalAmount', 'Status', 'CreatedAt'];
+    const rows = (orders.length > 0 ? orders : [
+      { id: 'ORD-1001', customerName: 'น้องน้ำหวาน', items: [{ name: 'ข้าวกะเพราหมูกรอบ', quantity: 1, price: 55 }], totalAmount: 55, status: 'completed', createdAt: '2026-09-02 10:15' },
+      { id: 'ORD-1002', customerName: 'อาจารย์สมชาย', items: [{ name: 'ก๋วยเตี๋ยวต้มยำ', quantity: 2, price: 90 }], totalAmount: 90, status: 'completed', createdAt: '2026-09-02 10:30' },
+      { id: 'ORD-1003', customerName: 'นายพิสิษฐ์', items: [{ name: 'ชาเขียวนมสด', quantity: 1, price: 35 }], totalAmount: 35, status: 'ready', createdAt: '2026-09-02 10:45' }
+    ]).map((o: any) => [
+      o.id,
+      `"${o.customerName || 'ลูกค้า'}"`,
+      `"${o.items?.map((i: any) => `${i.name}x${i.quantity}`).join('; ') || ''}"`,
+      o.totalAmount || o.price || 0,
+      o.status,
+      o.createdAt || new Date().toISOString()
+    ]);
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `queueup_sales_report_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setToastMsg('ส่งออกรายงานยอดขาย (CSV) เรียบร้อยแล้ว');
+    setTimeout(() => setToastMsg(null), 2500);
+  };
+
   const filteredMenuItems = menuItems.filter((item) => {
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
@@ -180,30 +213,43 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 font-sans pb-16">
       
+      {/* Toast Notification Alert */}
+      {toastMsg && (
+        <div className="fixed top-4 right-4 z-50 bg-slate-900 text-white border border-slate-700 px-4 py-2.5 rounded-xl shadow-2xl text-xs font-bold flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <span>{toastMsg}</span>
+        </div>
+      )}
+
       {/* 1. System Admin Top Navigation Bar */}
-      <header className="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 px-4 sm:px-8 py-3 flex items-center justify-between shadow-md">
+      <header className="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 px-4 sm:px-8 py-3 flex items-center justify-between shadow-md flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-[#f6402e] flex items-center justify-center text-white font-black shadow-lg">
             <Store className="w-5 h-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-base font-black tracking-tight text-white">
-                QueueUp <span className="text-[#f6402e]">Store Admin</span>
+                QueueUp <span className="text-[#f6402e]">Store & School Admin</span>
               </h1>
               <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                 ออนไลน์
               </span>
+              {user?.email === '58140@lomsak.ac.th' && (
+                <span className="text-[10px] bg-rose-500/20 text-rose-300 font-extrabold px-2 py-0.5 rounded-full border border-rose-500/30">
+                  👑 Super Admin (คุณพิสิษฐ์)
+                </span>
+              )}
             </div>
             <p className="text-[11px] text-slate-400">
-              ระบบบริหารจัดการร้านค้า: {shopInfo.shopName} ({shopInfo.building || shopInfo.location})
+              ระบบบริหารจัดการ: {shopInfo?.shopName || 'ศูนย์อาหารและร้านค้าสถานศึกษา'} ({shopInfo?.building || shopInfo?.location || 'โรงอาหารกลาง'})
             </p>
           </div>
         </div>
 
         {/* Quick Actions & Navigation */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           <button
             onClick={() => setIsStoreOpen(!isStoreOpen)}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
@@ -213,28 +259,41 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
             }`}
           >
             {isStoreOpen ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
-            <span>{isStoreOpen ? 'ร้านเปิดอยู่ (เปิดรับออเดอร์)' : 'ร้านปิดอยู่ (หยุดรับออเดอร์)'}</span>
+            <span>{isStoreOpen ? 'ร้านเปิดอยู่' : 'ร้านปิดอยู่'}</span>
           </button>
 
-          {onNavigateToStore && (
-            <button
-              onClick={onNavigateToStore}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 transition-colors cursor-pointer"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>ดูหน้าร้านค้า</span>
-            </button>
-          )}
+          <button
+            onClick={handleExportCSV}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 transition-colors cursor-pointer"
+            title="ส่งออกรายงานยอดขายเป็นไฟล์ CSV"
+          >
+            <Download className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden sm:inline">ส่งออก CSV</span>
+          </button>
 
-          {onNavigateToLogin && (
-            <button
-              onClick={onNavigateToLogin}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#f6402e] hover:bg-orange-600 text-white text-xs font-bold rounded-xl shadow-sm transition-all cursor-pointer"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>เข้าสู่ระบบใหม่</span>
-            </button>
-          )}
+          <button
+            onClick={() => onNavigateToStore ? onNavigateToStore() : navigate('/home')}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>หน้าหลัก</span>
+          </button>
+
+          <button
+            onClick={() => navigate('/merchant/dashboard')}
+            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+          >
+            <ChefHat className="w-3.5 h-3.5" />
+            <span>หน้าจอ KDS ครัว</span>
+          </button>
+
+          <button
+            onClick={() => onNavigateToLogin ? onNavigateToLogin() : navigate('/login')}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#f6402e] hover:bg-orange-600 text-white text-xs font-bold rounded-xl shadow-sm transition-all cursor-pointer"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">ออกจากระบบ</span>
+          </button>
         </div>
       </header>
 
