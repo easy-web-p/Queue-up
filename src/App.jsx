@@ -72,15 +72,15 @@ function App() {
             <Route path="/food-booking" element={<ProtectedRoute><FoodBooking /></ProtectedRoute>} />
 
             {/* Merchant Dashboard & Onboarding Routes */}
-            <Route path="/merchant/dashboard" element={<ProtectedRoute><MerchantDashboard /></ProtectedRoute>} />
-            <Route path="/Merchant/Dashboard" element={<ProtectedRoute><MerchantDashboard /></ProtectedRoute>} />
-            <Route path="/Merchant/dashboard" element={<ProtectedRoute><MerchantDashboard /></ProtectedRoute>} />
-            <Route path="/portal/th-onboarding" element={<ProtectedRoute><MerchantOnboarding /></ProtectedRoute>} />
-            <Route path="/portal/onboarding" element={<ProtectedRoute><MerchantOnboarding /></ProtectedRoute>} />
+            <Route path="/merchant/dashboard" element={<ProtectedRoute allowedRoles={["merchant", "admin"]}><MerchantDashboard /></ProtectedRoute>} />
+            <Route path="/Merchant/Dashboard" element={<ProtectedRoute allowedRoles={["merchant", "admin"]}><MerchantDashboard /></ProtectedRoute>} />
+            <Route path="/Merchant/dashboard" element={<ProtectedRoute allowedRoles={["merchant", "admin"]}><MerchantDashboard /></ProtectedRoute>} />
+            <Route path="/portal/th-onboarding" element={<ProtectedRoute allowedRoles={["customer", "merchant", "admin"]}><MerchantOnboarding /></ProtectedRoute>} />
+            <Route path="/portal/onboarding" element={<ProtectedRoute allowedRoles={["customer", "merchant", "admin"]}><MerchantOnboarding /></ProtectedRoute>} />
 
             {/* Admin Routes */}
-            <Route path="/admin" element={<ProtectedRoute><StoreAdminPage /></ProtectedRoute>} />
-            <Route path="/Admin" element={<ProtectedRoute><StoreAdminPage /></ProtectedRoute>} />
+            <Route path="/admin" element={<ProtectedRoute allowedRoles={["admin"]}><StoreAdminPage /></ProtectedRoute>} />
+            <Route path="/Admin" element={<ProtectedRoute allowedRoles={["admin"]}><StoreAdminPage /></ProtectedRoute>} />
 
             {/* Wildcard 404 Page Not Found Route */}
             <Route path="*" element={<NotFound />} />
