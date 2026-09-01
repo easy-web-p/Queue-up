@@ -579,13 +579,30 @@ html[data-theme="dark"] .shopee-change-photo-btn:hover {
 @media (max-width: 768px) {
   .shopee-profile-container {
     flex-direction: column;
+    padding: 14px 10px 30px 10px;
+    gap: 16px;
   }
 
   .shopee-user-sidebar {
     width: 100%;
+    margin-bottom: 0;
   }
 
   .shopee-profile-main-card {
-    padding: 20px 16px;
+    padding: 18px 14px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+@media (max-width: 480px) {
+  .shopee-profile-container {
+    padding: 10px 8px 24px 8px;
+    gap: 12px;
+  }
+
+  .shopee-profile-main-card {
+    padding: 14px 10px;
+    border-radius: 14px;
   }
 }

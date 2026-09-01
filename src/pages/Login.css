@@ -101,6 +101,24 @@
   }
 }
 
+@media (max-width: 480px) {
+  .yeti-login-page {
+    padding: 0.75rem 0.5rem;
+  }
+
+  .yeti-card {
+    padding: 16px 12px;
+    border-radius: 18px;
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .yeti-form-container {
+    padding: 4px 4px !important;
+  }
+}
+
 /* Left Hero Banner Section */
 .yeti-hero {
   position: relative;

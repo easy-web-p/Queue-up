@@ -20,7 +20,9 @@
 }
 
 .merchant-dashboard-header-wrapper {
-  max-width: clamp(1240px, 92vw, 1680px);
+  max-width: 1440px;
+  width: 100%;
+  box-sizing: border-box;
   margin: 0 auto;
   padding: 0 20px;
   display: flex;
@@ -60,7 +62,9 @@
 }
 
 .merchant-dashboard-body {
-  max-width: clamp(1240px, 92vw, 1680px);
+  max-width: 1440px;
+  width: 100%;
+  box-sizing: border-box;
   margin: 24px auto 0 auto;
   padding: 0 20px;
 }
