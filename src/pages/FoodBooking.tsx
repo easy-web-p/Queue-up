@@ -235,3 +235,5 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
     </div>
   );
 };
+
+export default FoodBooking;

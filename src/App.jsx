@@ -15,6 +15,7 @@ import MerchantOnboarding from "./pages/MerchantOnboarding.jsx";
 import NotFound from "./pages/NotFound.jsx";
 import PdpaPolicy from "./pages/PdpaPolicy.jsx";
 import StoreAdminPage from "./pages/StoreAdminPage.tsx";
+import FoodBooking from "./pages/FoodBooking.tsx";
 import PageRouteLoader from "./components/PageRouteLoader.jsx";
 import CookieConsentBanner from "./components/CookieConsentBanner.jsx";
 import CookieSessionTracker from "./components/CookieSessionTracker.jsx";
@@ -67,6 +68,8 @@ function App() {
             <Route path="/Product" element={<ProtectedRoute><ProductDetail /></ProtectedRoute>} />
             <Route path="/product/:id" element={<ProtectedRoute><ProductDetail /></ProtectedRoute>} />
             <Route path="/Product/:id" element={<ProtectedRoute><ProductDetail /></ProtectedRoute>} />
+            <Route path="/booking" element={<ProtectedRoute><FoodBooking /></ProtectedRoute>} />
+            <Route path="/food-booking" element={<ProtectedRoute><FoodBooking /></ProtectedRoute>} />
 
             {/* Merchant Dashboard & Onboarding Routes */}
             <Route path="/merchant/dashboard" element={<ProtectedRoute><MerchantDashboard /></ProtectedRoute>} />
