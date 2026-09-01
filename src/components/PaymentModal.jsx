@@ -30,8 +30,9 @@ function PaymentModal({
   const [isVerifyingSlip, setIsVerifyingSlip] = useState(false);
   const [slipVerified, setSlipVerified] = useState(false);
 
-  // Success State
+  // Success & Submitting States (Idempotency Guard)
   const [isPaidSuccess, setIsPaidSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Countdown timer effect
   useEffect(() => {
@@ -56,6 +57,7 @@ function PaymentModal({
     setSlipPreview(null);
     setSlipVerified(false);
     setIsPaidSuccess(false);
+    setIsSubmitting(false);
     onClose();
   };
 
@@ -82,6 +84,8 @@ function PaymentModal({
 
   // Confirm Payment & Save Order with storeId (Architecture v3.0)
   const handleConfirmPayment = () => {
+    if (isSubmitting || isPaidSuccess) return;
+    setIsSubmitting(true);
     setIsPaidSuccess(true);
     soundManager.playQueueIssuedSound();
 

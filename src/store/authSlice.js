@@ -15,6 +15,21 @@ const getInitialUser = () => {
   return null
 }
 
+// Helper: Filter out sensitive fields before saving user session to LocalStorage
+const filterSafeUserSession = (rawUser) => {
+  if (!rawUser) return null;
+  const { uid, email, displayName, name, photo, photoURL, activeRole, roles, role, school } = rawUser;
+  return {
+    uid: uid || "",
+    email: email || "",
+    displayName: displayName || name || "ผู้ใช้งาน QueueUp",
+    photoURL: photoURL || photo || "/yeti_mascot.jpg",
+    activeRole: activeRole || role || "customer",
+    roles: roles || [activeRole || role || "customer"],
+    school: school || "โรงเรียน",
+  };
+};
+
 const authSlice = createSlice({
   name: 'auth',
   initialState: {
@@ -23,10 +38,11 @@ const authSlice = createSlice({
   },
   reducers: {
     setUser: (state, action) => {
-      state.user = action.payload
-      state.isLoading = false
+      state.user = action.payload;
+      state.isLoading = false;
       if (typeof window !== 'undefined' && action.payload) {
-        localStorage.setItem('queueup_user', JSON.stringify(action.payload))
+        const safeSession = filterSafeUserSession(action.payload);
+        localStorage.setItem('queueup_user', JSON.stringify(safeSession));
       }
     },
     switchRole: (state, action) => {
@@ -37,7 +53,8 @@ const authSlice = createSlice({
           activeRole: newRole,
         };
         if (typeof window !== 'undefined') {
-          localStorage.setItem('queueup_user', JSON.stringify(state.user));
+          const safeSession = filterSafeUserSession(state.user);
+          localStorage.setItem('queueup_user', JSON.stringify(safeSession));
         }
       }
     },

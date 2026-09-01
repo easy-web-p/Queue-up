@@ -254,3 +254,46 @@ export const decryptPayload = async (cipherText, secretKeyStr = "QUEUEUP_AES256_
     return cipherText;
   }
 };
+
+// 11. Sanitize Log Data to eliminate PII (Personal Identifiable Information) leaks
+const PII_PATTERNS = {
+  email: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,
+  phone: /(\+66|0)[0-9]{1,2}-?[0-9]{3}-?[0-9]{4}/g,
+  thaiNationalId: /\b[0-9]{13}\b/g,
+  bearerToken: /Bearer\s+([a-zA-Z0-9-_.]+)/gi,
+};
+
+const DENIED_KEYS = new Set([
+  'password', 'token', 'accesstoken', 'refreshtoken', 'pin',
+  'nationalid', 'studentid', 'creditcard', 'cvv', 'promptpaypayload'
+]);
+
+export function sanitizeLogData(data) {
+  if (!data) return data;
+  if (typeof data === 'string') {
+    let sanitized = data;
+    sanitized = sanitized.replace(PII_PATTERNS.email, '[REDACTED_EMAIL]');
+    sanitized = sanitized.replace(PII_PATTERNS.phone, '[REDACTED_PHONE]');
+    sanitized = sanitized.replace(PII_PATTERNS.thaiNationalId, '[REDACTED_ID]');
+    sanitized = sanitized.replace(PII_PATTERNS.bearerToken, 'Bearer [REDACTED_TOKEN]');
+    return sanitized;
+  }
+  if (typeof data === 'object') {
+    const cleanObj = Array.isArray(data) ? [] : {};
+    for (const [key, value] of Object.entries(data)) {
+      if (DENIED_KEYS.has(key.toLowerCase())) {
+        cleanObj[key] = '[REDACTED_SENSITIVE_FIELD]';
+      } else {
+        cleanObj[key] = sanitizeLogData(value);
+      }
+    }
+    return cleanObj;
+  }
+  return data;
+}
+
+// 12. Generate Idempotency Key for unique transaction deduplication
+export function generateIdempotencyKey(prefix = "idem") {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+}
+

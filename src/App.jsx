@@ -21,6 +21,7 @@ import CookieConsentBanner from "./components/CookieConsentBanner.jsx";
 import CookieSessionTracker from "./components/CookieSessionTracker.jsx";
 
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
 function App() {
   return (
@@ -33,7 +34,8 @@ function App() {
           <CookieSessionTracker />
           {/* Global PDPA Cookie Consent Banner */}
           <CookieConsentBanner />
-          <Routes>
+          <ErrorBoundary>
+            <Routes>
             <Route path="/" element={<Loading />} />
             <Route path="/queueup" element={<Queueup />} />
             <Route path="/Queueup" element={<Queueup />} />
@@ -90,6 +92,7 @@ function App() {
             {/* Wildcard 404 Page Not Found Route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </ErrorBoundary>
         </BrowserRouter>
       </AuthProvider>
     </PreferencesProvider>
