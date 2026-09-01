@@ -651,53 +651,25 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
               </svg>
             </button>
 
-            {/* 1. Popover เมื่อคลิกช่องค้นหาและยังไม่ได้พิมพ์คำ (QueueUp AI + Search History) */}
-            {!disableHistory && isInputFocused && searchTerm.trim() === "" && (
+            {/* 1. Popover เมื่อคลิกช่องค้นหาและยังไม่ได้พิมพ์คำ (Search History) */}
+            {!disableHistory && isInputFocused && searchTerm.trim() === "" && searchHistory.length > 0 && (
               <div className="shopee-suggestions-box">
-                {/* AI Assistant Quick Prompts */}
-                <div className="shopee-history-header d-flex align-items-center justify-content-between text-primary">
-                  <span><i className="bi bi-robot me-1" /> 🤖 QueueUp AI Suggestions</span>
-                  <span className="badge bg-primary-subtle text-primary" style={{ fontSize: "10px" }}>AI Smart</span>
+                <div className="shopee-history-header">
+                  <i className="bi bi-clock-history me-1" /> ประวัติการค้นหา
                 </div>
-                {[
-                  { label: "✨ แนะนำเมนูให้ฉัน", query: "อาหารแนะนำยอดนิยม" },
-                  { label: "🌶️ อยากกินอะไรเผ็ด ๆ", query: "อยากกินอะไรเผ็ด ๆ" },
-                  { label: "💰 หาอาหารไม่เกิน 50 บาท", query: "อาหารไม่เกิน 50 บาท" },
-                  { label: "⚡ หาเมนูที่ทำเร็ว", query: "หาเมนูที่ทำเร็ว" },
-                  { label: "🏪 แนะนำร้านยอดนิยม", query: "ร้านยอดนิยม" },
-                ].map((aiPrompt, idx) => (
+                {searchHistory.map((item, idx) => (
                   <div
                     key={idx}
                     className="shopee-suggestion-row"
                     onMouseDown={(e) => {
                       e.preventDefault();
-                      handleSelectKeyword(aiPrompt.query);
+                      handleSelectKeyword(item);
                     }}
                   >
-                    <span className="fw-semibold text-dark">{aiPrompt.label}</span>
+                    <i className="bi bi-search text-muted me-2" style={{ fontSize: "12px" }} />
+                    <span>{item}</span>
                   </div>
                 ))}
-
-                {searchHistory.length > 0 && (
-                  <>
-                    <div className="shopee-history-header mt-2">
-                      <i className="bi bi-clock-history me-1" /> ประวัติการค้นหา
-                    </div>
-                    {searchHistory.map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="shopee-suggestion-row"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          handleSelectKeyword(item);
-                        }}
-                      >
-                        <i className="bi bi-search text-muted me-2" style={{ fontSize: "12px" }} />
-                        <span>{item}</span>
-                      </div>
-                    ))}
-                  </>
-                )}
               </div>
             )}
 
