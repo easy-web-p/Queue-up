@@ -14,6 +14,7 @@ import {
   toggleUserFavoriteInFirestore,
   saveOrderToFirestore,
 } from "../lib/firebase.js";
+import { generateStoreQueueNo } from "../services/storeIsolationEngine.js";
 import "./ProductDetail.css";
 
 // 7. TIME SLOT DATA ARCHITECTURE (Pickup Time Slot Reservation)
@@ -262,12 +263,17 @@ function ProductDetail() {
   };
 
   // 12. Payment Success Handler -> Save Order & Queue Snapshot
-  const handlePaymentSuccess = async () => {
+  const [currentQueueNo] = useState(() => {
+    const targetStore = (product && product.storeId) ? product.storeId : "store_canteen01";
+    return generateStoreQueueNo(targetStore, 6);
+  });
+
+  const handlePaymentSuccess = async (createdId) => {
     const orderPayload = {
-      orderId: `ORD-${Date.now()}`,
+      orderId: createdId || `ORD-${Date.now()}`,
       userId: user?.uid || "guest_user",
       storeId: product.storeId || "store_canteen01",
-      shopName: store?.name || product.shopName,
+      shopName: store?.name || product.shopName || "ร้านครัวโรงเรียน QueueUp Canteen",
       items: [
         {
           productId: product.id || "m1",
@@ -286,15 +292,15 @@ function ProductDetail() {
       ],
       pickupSlot: {
         date: bookingDate,
-        time: selectedTimeSlot.time,
-        discount: selectedTimeSlot.discount,
+        time: selectedTimeSlot?.time || "12:00",
+        discount: selectedTimeSlot?.discount || "0%",
       },
       subtotal: totalCalculatedPrice,
       total: totalCalculatedPrice,
       paymentMethod: "PROMPTPAY_QR",
       paymentStatus: "PAID",
       orderStatus: "PREPARING",
-      queueNumber: "A06",
+      queueNumber: currentQueueNo,
     };
 
     await saveOrderToFirestore(orderPayload);
@@ -601,6 +607,7 @@ function ProductDetail() {
       <PaymentModal
         isOpen={isPaymentModalOpen}
         onClose={() => setIsPaymentModalOpen(false)}
+        onPaymentSuccess={handlePaymentSuccess}
         onSuccess={handlePaymentSuccess}
         storeId={product.storeId || "store_canteen01"}
         shopName={store?.name || product.shopName || "ร้านครัวโรงเรียน QueueUp Canteen"}
@@ -608,7 +615,7 @@ function ProductDetail() {
         itemTitle={product.name || product.title}
         amount={totalCalculatedPrice}
         itemPrice={totalCalculatedPrice}
-        queueNo="A06"
+        queueNo={currentQueueNo}
       />
 
       {/* 17. CHAT ASSISTANT FLOATING BUTTON */}
