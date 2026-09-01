@@ -182,6 +182,18 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
           </span>
           <span className="shopee-nav-divider" />
           <span className="shopee-nav-item">{language === "en" ? "Download" : "ดาวน์โหลด"}</span>
+          {(user?.email === "58140@lomsak.ac.th" || user?.activeRole === "admin" || user?.roles?.includes("admin")) && (
+            <>
+              <span className="shopee-nav-divider" />
+              <span
+                className="shopee-nav-item fw-bold text-warning"
+                style={{ cursor: "pointer" }}
+                onClick={() => navigate("/admin")}
+              >
+                <i className="bi bi-shield-lock-fill me-1" /> {language === "en" ? "Admin Portal" : "ระบบหลังบ้าน"}
+              </span>
+            </>
+          )}
           <span className="shopee-nav-divider" />
           <span className="shopee-nav-item">
             {language === "en" ? "Follow us on" : "ติดตามเราบน"} <i className="bi bi-facebook" />{" "}
@@ -516,6 +528,34 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
                   {language === "en" ? "My Orders" : "การซื้อของฉัน"}
                 </a>
               </li>
+              <li>
+                <a
+                  className="shopee-dropdown-item text-primary"
+                  href="/merchant/dashboard"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleMerchantLinkClick();
+                  }}
+                >
+                  <i className="bi bi-shop me-2" />
+                  {language === "en" ? "Merchant Dashboard" : "ศูนย์ผู้ขาย / หน้าจอครัว"}
+                </a>
+              </li>
+              {(user?.email === "58140@lomsak.ac.th" || user?.activeRole === "admin" || user?.roles?.includes("admin")) && (
+                <li>
+                  <a
+                    className="shopee-dropdown-item text-warning fw-bold"
+                    href="/admin"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      navigate("/admin");
+                    }}
+                  >
+                    <i className="bi bi-shield-lock-fill me-2 text-warning" />
+                    {language === "en" ? "Super Admin Portal" : "ผู้ดูแลระบบหลังบ้าน"}
+                  </a>
+                </li>
+              )}
               <li>
                 <button
                   type="button"
