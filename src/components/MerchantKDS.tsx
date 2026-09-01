@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Order, QueueStatus } from '../types';
 import { ChefHat, CheckCircle2, Eye, Phone, Sparkles } from 'lucide-react';
+import { soundManager } from '../utils/audioNotification.js';
 
 interface Props {
   orders: Order[];
@@ -114,8 +115,9 @@ export const MerchantKDS: React.FC<Props> = ({
                       onClick={() => {
                         onVerifyPayment(order.id);
                         onUpdateOrderStatus(order.id, 'cooking');
+                        soundManager.playNewOrderAlert();
                       }}
-                      className="w-full py-2 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs rounded-xl shadow-md shadow-orange-500/20 transition-all"
+                      className="w-full py-2 bg-[#8B0000] hover:bg-[#700000] text-white font-bold text-xs rounded-xl shadow-md shadow-red-950/20 transition-all cursor-pointer"
                     >
                       อนุมัติสลิป & เริ่มปรุงอาหาร 🔥
                     </button>
@@ -172,8 +174,11 @@ export const MerchantKDS: React.FC<Props> = ({
                   </div>
 
                   <button
-                    onClick={() => onUpdateOrderStatus(order.id, 'ready')}
-                    className="w-full py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-500/20 transition-all flex items-center justify-center gap-1"
+                    onClick={() => {
+                      onUpdateOrderStatus(order.id, 'ready');
+                      soundManager.playOrderReadyChime();
+                    }}
+                    className="w-full py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-500/20 transition-all flex items-center justify-center gap-1 cursor-pointer"
                   >
                     <Sparkles className="w-4 h-4" />
                     <span>ปรุงเสร็จแล้ว! เปลี่ยนเป็นพร้อมรับ</span>
@@ -188,7 +193,7 @@ export const MerchantKDS: React.FC<Props> = ({
         <div className="bg-emerald-50/60 rounded-3xl p-4 border border-emerald-100 space-y-4">
           <div className="flex items-center justify-between px-2">
             <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
               <span>3. พร้อมรับอาหาร (Ready) ({readyOrders.length})</span>
             </h3>
           </div>
@@ -226,8 +231,11 @@ export const MerchantKDS: React.FC<Props> = ({
                   </div>
 
                   <button
-                    onClick={() => onUpdateOrderStatus(order.id, 'completed')}
-                    className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1"
+                    onClick={() => {
+                      onUpdateOrderStatus(order.id, 'completed');
+                      soundManager.playQueueIssuedSound();
+                    }}
+                    className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer"
                   >
                     <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                     <span>ลูกค้ารับอาหารเรียบร้อย</span>

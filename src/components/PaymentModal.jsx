@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { generateStoreQueueNo } from "../services/storeIsolationEngine.js";
+import { soundManager } from "../utils/audioNotification.js";
 import "./PaymentModal.css";
 
 function PaymentModal({
@@ -82,6 +83,7 @@ function PaymentModal({
   // Confirm Payment & Save Order with storeId (Architecture v3.0)
   const handleConfirmPayment = () => {
     setIsPaidSuccess(true);
+    soundManager.playQueueIssuedSound();
 
     const generatedOrderId = "2408" + Math.floor(100000 + Math.random() * 900000);
     const formattedQueueNo = queueNo && queueNo.includes("-Q") ? queueNo : generateStoreQueueNo(storeId, Math.floor(1 + Math.random() * 15));

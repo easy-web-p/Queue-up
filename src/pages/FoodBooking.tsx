@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Clock, Utensils, QrCode, CheckCircle2, ArrowLeft, ShieldCheck, Sparkles, MapPin, AlertCircle } from 'lucide-react';
 import { MenuItem, CartItem, Order, CustomerProfile } from '../types';
 import { saveOrderToFirestore } from '../lib/firebase';
+import { soundManager } from '../utils/audioNotification.js';
 
 interface FoodBookingPageProps {
   cartItems?: CartItem[];
@@ -54,6 +55,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
     };
 
     await saveOrderToFirestore(newOrder);
+    soundManager.playQueueIssuedSound();
     setIsSubmitting(false);
     setCreatedOrder(newOrder);
 
