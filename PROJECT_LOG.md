@@ -1,78 +1,142 @@
-# 💖 QueueUp — บันทึกประวัติการพัฒนาและพิมพ์เขียวระบบ (Project Dev Log & Spec)
+# 🍜 QueueUp — รายงานสถาปัตยกรรมระบบ ประวัติการพัฒนา และแผนงานแม่บท (Master Architecture & Dev Spec)
 
-> **บันทึกสถานะการพัฒนา, สถาปัตยกรรม 3 ฝั่ง (Customer, Merchant KDS, Super Admin), ข้อกำหนด และ Roadmap**
-
----
-
-## 🎨 1. การออกแบบ UX/UI & Design System (Design Specs)
-* **Theme & Styling:** Modern Dark Slate Glassmorphism + Tailwind CSS v3/v4
-* **Color Palette:**
-  * Primary Accent: `#3B82F6` (Electric Blue) & `#10B981` (Emerald Green for Success/Ready states)
-  * KDS Urgency Traffic Lights: 🟢 Green (0-5m), 🟡 Amber (5-12m), 🔴 Pulsing Crimson (12m+ Overdue)
-  * Dark Surface: `#0F172A` (Slate 900) with subtle glass borders (`border-slate-800/80`)
-* **Core Components:**
-  * `DailyMenuBoard.jsx`: ป้ายแสดงเมนูขายดีประจำวันและหมวดหมู่แบบ Carousel
-  * `ShopeeSearchBar.jsx`: แถบค้นหาอัจฉริยะพร้อม Filter & Category Pills
-  * `ClientQueueTicket.jsx`: ตั๋วคิวดิจิทัลสไตล์ Apple Wallet พร้อม QR Code
-  * `MerchantKDS.tsx`: หน้าจอควบคุมครัวแบบ Kanban Touch-friendly (56px+ Hit Targets)
-  * `StoreAdminPage.tsx`: แผงควบคุม God Mode สำหรับ Super Admin
-* **Micro-interactions & UX:**
-  * 1-Tap Bump พร้อม 5-Second Undo Toast ในหน้าจอครัว
-  * Audio Chime แจ้งเตือนเมื่อคิวพร้อมรับอาหาร
-  * Capacity Hold Timer (5 นาที) ล็อกช่วงเวลาขณะชำระเงิน
+> **เวอร์ชันระบบ:** v2.5 (Production Release Candidate)  
+> **โดเมนหลักอย่างเป็นทางการ:** [https://queueup-school.netlify.app](https://queueup-school.netlify.app)  
+> **Repository:** [https://github.com/easy-web-p/Queue-up.git](https://github.com/easy-web-p/Queue-up.git)  
+> **กลุ่มผู้พัฒนา:** กลุ่ม 23 (91) — รายวิชา GE341511 มหาวิทยาลัยขอนแก่น
 
 ---
 
-## ⚙️ 2. สถาปัตยกรรมฟังก์ชันและการทำงาน (Functional Architecture)
-* **3-Tier Multi-Role Model:**
-  1. **Customer:** สั่งอาหารล่วงหน้า, เลือกช่วงเวลารับ, รับตั๋วคิว, สะสมแต้ม Loyalty Points
-  2. **Merchant:** จัดการเมนู, สต็อกเปิด-ปิดเมนูหมด, หน้าจอครัว KDS, ดูสรุปยอดขาย
-  3. **Super Admin (คุณพิสิษฐ์):** ควบคุมทุกร้านค้า, จัดการผู้ใช้, แทรกแซงออเดอร์/คืนเงิน, แดชบอร์ด GMV รวม
-* **Backend Infrastructure:**
-  * Firebase Auth (Email & Google OAuth)
-  * Cloud Firestore with Granular RBAC Security Rules (`firestore.rules`)
-  * Cloud Functions for Payment Webhooks (`functions/index.js`)
-  * Gemini AI Engine (`aiBehaviorEngine.js` & `SellerAssistantModal.jsx`)
+## 🏗️ 1. โครงสร้างสถาปัตยกรรมเว็บแอปพลิเคชันโดยละเอียด (System Architecture)
+
+ระบบ QueueUp พัฒนาขึ้นด้วยสถาปัตยกรรม **Client-Server Single Page Application (SPA)** เชื่อมต่อกับ **Cloud Backend-as-a-Service (Firebase)** และโมเดลประมวลผลภาษาธรรมชาติ **Gemini AI**
+
+```
+my-QueueUp-app/
+├── public/
+│   ├── _redirects                  # กฎ SPA Rewrite Routing บน Netlify (/* /index.html 200)
+│   ├── logo.png / favicon.svg      # โลโก้และไอคอนทางการของระบบ
+│   └── manifest.json               # คอนฟิก Progressive Web App (PWA)
+├── src/
+│   ├── assets/                     # รูปภาพ แบนเนอร์ และกราฟิกประกอบ
+│   ├── components/                 # คอมโพเนนต์ UI ส่วนกลางที่ใช้ร่วมกัน
+│   │   ├── Navbar.jsx              # แถบนำทางหลัก, สลับภาษา, ตัวเลือกสิทธิ์, ตะกร้า และคะแนน CRM
+│   │   ├── Footer.jsx              # ส่วนท้ายเว็บแบบ Sticky Footer พร้อมลิงก์ PDPA และช่องทางติดต่อ
+│   │   ├── ShopeeSearchBar.jsx     # แถบค้นหาอัจฉริยะ AI NLP, กรอง 18 หมวดหมู่ และประวัติค้นหา
+│   │   ├── DailyMenuBoard.jsx      # ป้ายเมนูแนะนำประจำวันและแคโรเซล 10 อันดับขายดี
+│   │   ├── FoodCard.jsx            # การ์ดแสดงรายการอาหาร ราคา ส่วนลด และปุ่มสั่งจองด่วน
+│   │   ├── ClientCartModal.jsx     # หน้าต่างตะกร้าสินค้า สรุปรายการ และคำนวณราคาสุทธิ
+│   │   ├── PaymentModal.jsx        # ป๊อปอัป PromptPay Dynamic QR Code และระบบอัปโหลดสลิป
+│   │   ├── ClientQueueTicket.jsx   # บัตรคิวดิจิทัลแบบเรียลไทม์ พร้อม Dynamic QR Code ตรวจสอบ
+│   │   ├── ClientLoyaltyDrawer.jsx # ลิ้นชักกระเป๋าแต้มสะสม CRM Points (128 แต้ม) และคูปอง
+│   │   ├── MerchantKDS.tsx         # หน้าจอครัวสัมผัส (Kitchen Display System) แบบ Kanban
+│   │   ├── MerchantMenuManager.tsx # ระบบจัดการเมนู ปรับราคา เปิด-ปิดสต็อกอาหาร
+│   │   ├── MerchantCRMAnalytics.tsx# แดชบอร์ดวิเคราะห์ยอดขายและอัตราลูกค้าประจำ
+│   │   ├── SellerAssistantModal.jsx# ผู้ช่วย AI แนะนำเมนูขายดีและการตั้งราคา
+│   │   ├── CookieConsentBanner.jsx # แบนเนอร์ขอความยินยอมตามกฎหมาย PDPA
+│   │   ├── ChatModal.jsx           # หน้าต่างแชทสนทนากับร้านค้าและผู้ช่วย AI แบบสด
+│   │   └── ProtectedRoute.jsx      # Route Guard ป้องกันการเข้าถึงหน้าที่ต้องมีสิทธิ์
+│   ├── context/
+│   │   ├── AuthContext.jsx         # Context จัดการสถานะ Authentication และบทบาทผู้ใช้ (RBAC)
+│   │   └── PreferencesContext.jsx  # Context จัดการธีม (Light/Dark) และภาษา (TH/EN)
+│   ├── pages/                      # หน้าจอหลักของระบบ (Routing Views)
+│   │   ├── Home.jsx                # หน้าแรก: Ticker ข่าวสาร, Banner, เมนูขายดี, Catalog รวม
+│   │   ├── SearchResults.jsx       # หน้ารวมผลการค้นหา กรองพิกัดโรงอาหาร และจัดเรียง
+│   │   ├── ProductDetail.jsx       # หน้ารายละเอียดอาหาร, Time-Slot Booking, คำนวณราคา
+│   │   ├── FoodBooking.tsx         # หน้าระบบจองคิวอาหารล่วงหน้าแบบเจาะจงเวลา
+│   │   ├── MerchantDashboard.jsx   # แดชบอร์ดศูนย์ควบคุมร้านค้าและหน้าจอครัว KDS
+│   │   ├── MerchantOnboarding.jsx  # หน้าลงทะเบียนเปิดร้านค้าใหม่และตั้งค่าเบื้องต้น
+│   │   ├── StoreAdminPage.tsx      # แผงควบคุมส่วนกลาง (Super Admin) ดูภาพรวมทั้งโรงอาหาร
+│   │   ├── UserProfile.jsx         # หน้าโปรไฟล์ผู้ใช้ ข้อมูลส่วนตัว รหัสนักศึกษา กระเป๋าคูปอง
+│   │   ├── UserPurchase.jsx        # หน้าประวัติการสั่งซื้อ และติดตามสถานะคิวทั้งหมด
+│   │   ├── PdpaPolicy.jsx          # หน้านโยบายคุ้มครองข้อมูลส่วนบุคคลและข้อกำหนดการใช้งาน
+│   │   ├── Login.jsx               # หน้าเข้าสู่ระบบและสมัครสมาชิก
+│   │   └── NotFound.jsx            # หน้า 404 สวยงามพร้อมปุ่มนำทางกลับหน้าหลัก
+│   ├── services/                   # เลเยอร์จัดการตรรกะและบริการภายนอก
+│   │   ├── aiBehaviorEngine.js     # AI NLP Query Parser และ Recommendation Logic
+│   │   ├── aiSecurityShield.js     # ระบบตรวจจับคำสั่งไม่พึงประสงค์และการป้องกันข้อมูล
+│   │   ├── aiChatService.js        # บริการแชทอัตโนมัติระหว่างร้านค้ากับลูกค้า
+│   │   ├── storeIsolationEngine.js # ระบบแยกความปลอดภัยระหว่างร้านค้า (Store Isolation)
+│   │   └── firebase.js             # คอนฟิกและตัวเชื่อมต่อ Firebase SDK (Auth/Firestore)
+│   ├── store/                      # จัดการ State ระดับ Global ด้วย Redux Toolkit
+│   │   ├── authSlice.js            # Redux Slice ควบคุมสถานะผู้ใช้และสิทธิ์
+│   │   └── store.js                # รวม Redux Store กลาง
+│   ├── index.css                   # Global Fluid Scaling, Design System & Theme Styles
+│   └── main.jsx                    # จุดเริ่มต้นของแอปพลิเคชัน (React Root Mount)
+├── firestore.rules                 # กฎความปลอดภัย Cloud Firestore RBAC
+├── firebase.json                   # การตั้งค่าคอนฟิก Firebase Service
+└── package.json                    # รายการ Dependencies และ Scripts ของโปรเจกต์
+```
 
 ---
 
-## ✅ 3. สิ่งที่ทำเสร็จสมบูรณ์แล้ว (Completed Features)
-- [x] โครงสร้างหน้าจอหลัก ลูกค้า (Homepage, Food Booking, Daily Menu Board, Search)
-- [x] โครงสร้างหน้าจอร้านค้า (Merchant Dashboard, Menu Manager, KDS Kanban Board)
-- [x] รวมคอมโพเนนต์ระดับเทพจากเวอร์ชันก่อนหน้าเข้ามาในโปรเจกต์ครบ 100%
-- [x] วางระบบความปลอดภัย RBAC และ Firestore Security Rules
-- [x] ระบบสลับบทบาทผู้ใช้ (Role Switcher) ระหว่าง Customer / Merchant / Super Admin
-- [x] เอกสารสถาปัตยกรรม `MASTER_DEVELOPMENT_PLAN.md`, `SUPER_ADMIN_ARCHITECTURE.md`, `UI_UX_DESIGN_SYSTEM_GUIDE.md`
-- [x] กู้คืนดีไซน์หน้าแรกกลับสู่รูปแบบเดิม (Original Look & Feel) เรียบร้อย 100%
-- [x] แก้ไขระบบการปรับขนาด Fluid Responsive & Zoom Layout รองรับการกด `Ctrl +` และ `Ctrl -` (ย่อ/ขยายจอ) ขจัดปัญหาพื้นที่ว่างสีขาวใต้ Footer และขยายขนาดเนื้อหาเต็มสัดส่วนหน้าจอบนทุกระดับ Zoom/หน้าจอ Wide Screen
-- [x] **Functional Update:** ผสาน QueueUp AI ภาษาธรรมชาติ (Natural Language Query: อาหารเผ็ด, ราคาไม่เกิน 50 บาท, ทำเร็วเสิร์ฟไว, ร้านยอดนิยม) เข้ากับ `ShopeeSearchBar` และ `SearchResults` เดิม โดยคงสไตล์และดีไซน์เดิม 100% พร้อมระบบจัดอันดับ Top 10 Bestsellers และ Route Navigation `/search`, `/product/:id`, `/user/purchase`, `/merchant/dashboard`, `/admin` ครบถ้วน
-- [x] **Full Code Inspection & Fix:** ตรวจสอบโค้ดทุกบรรทัดทั่วทั้งโปรเจกต์ เคลียร์ Dead Variables, ปรับปรุง Type-Safety, ปรับแก้ PaymentModal Props ใน ProductDetail ให้ตรงกับยอดคำนวณจริง, และทดสอบ Build ผ่าน 100% (0 Errors)
-- [x] **Fix ProductDetail Split Layout & Image Dimensions:** แก้ไขโครงสร้าง CSS ในหน้า `ProductDetail` ให้จับคู่คลาสกับ JSX ถูกต้อง (`queue-pd-main-grid`, `queue-pd-wrapper`, `queue-pd-thumb-grid`) ป้องกันรูปภาพหลักและแบนเนอร์ขยายตัวผิดสัดส่วนเต็มหน้าจอ และจัด 2 คอลัมน์ (ซ้ายรูปภาพ/ขวาฟอร์มจอง) สวยงามตาม Mockup
-- [x] **Global Fluid Scaling & Sticky Footer:** ปรับใช้ระบบ Fluid Responsive (`max-width: clamp(1200px, 92vw, 1680px)`) และ Sticky Footer ข้ามทุกหน้า (`/home`, `/search`, `/product/:id`, `/user/account/profile`) รองรับการย่อ/ขยายหน้าจอ `Ctrl +` / `Ctrl -` สวยงาม ไร้พื้นที่ว่าง
-- [x] **Official Production Domain:** กำหนดโดเมนหลักอย่างเป็นทางการสำหรับส่งงานและใช้งานจริงเป็น **`https://queueup-school.netlify.app`** (และ `https://queueup-school.netlify.app/home`) พร้อมไฟล์ `_redirects` สำหรับรองรับ Single Page Application (SPA) Routing บน Netlify 100%
+## ⚙️ 2. รายละเอียดการทำงานของฟังก์ชันทั้งหมด (Core Functional Specifications)
+
+### 1) 🔍 ระบบค้นหาอัจฉริยะ (AI Smart Search & Filter Engine)
+- **Natural Language Parsing :** ประมวลผลคำค้นหาภาษาธรรมชาติ เช่น คำว่า "เผ็ด", "งบ 50", "ด่วน", "ยอดนิยม" แปลงเป็นเงื่อนไขตัวกรองแบบ Multi-criteria อัตโนมัติ
+- **Category Filter Carousel :** แถบเลื่อนหมวดหมู่อาหาร 18 ชนิดพร้อมภาพประกอบ
+- **Campus Location Filter :** กรองร้านค้าตามพิกัดอาคาร (โรงอาหาร 1, โรงอาหารกลาง, อาคารกิจกรรม)
+
+### 2) 🏠 ระบบหน้าแรก & นำเสนออาหาร (Homepage & Food Discovery)
+- **News Ticker :** ข่าวสารแจ้งเตือนสิทธิประโยชน์และโปรโมชันโรงอาหารแบบเลื่อนอัตโนมัติ
+- **Top 10 Bestsellers :** คำนวณอันดับอาหารขายดีตามยอดการสั่งซื้อจริง (`salesCount`)
+- **1-Click Welcome Coupon :** แจกคูปองส่วนลด `WELCOME50` บันทึกลงกระเป๋าคูปองในคลิกเดียว
+
+### 3) 🍱 ระบบสั่งจองอาหารล่วงหน้า (Pre-Order & Time-Slot Booking)
+- **Dynamic Time-Slot :** ระบบเลือกเวลานัดรับอาหารตามช่วงเวลา (เช่น 11:30, 12:00, 12:30 น.) พร้อมคำนวณส่วนลดตามช่วงเวลาเร่งด่วน (-50%, -20%, -10%)
+- **Guest Calculator :** เลือกจำนวนผู้รับประทาน (1-4+ คน) ระบบคำนวณปริมาณและยอดรวมทันที
+
+### 4) 💳 ระบบชำระเงิน & ตรวจสอบสลิป (Payment & Slip Verification)
+- **Dynamic PromptPay QR :** สร้าง QR Code ชำระเงินตามยอดเงินจริงของออเดอร์
+- **OCR Simulation & Verification :** ระบบตรวจสอบสลิปการโอนเงินอัตโนมัติภายใน 1.2 วินาที
+- **15-Minute Lock Timer :** ตัวจับเวลานับถอยหลัง ป้องกันการล็อกคิวค้างในระบบ
+
+### 5) 🎟️ ระบบติดตามคิวแบบเรียลไทม์ (Live Queue Tracker)
+- **Unique Queue ID :** ออกหมายเลขคิวแยกตามร้านค้า เช่น A05, A06 พร้อม Digital QR Code
+- **3-Stage Lifecycle :** `TO_PAY` (รอชำระเงิน) $\rightarrow$ `TO_SHIP` (ร้านกำลังปรุง) $\rightarrow$ `COMPLETED` (ปรุงเสร็จ พร้อมรับอาหาร)
+- **Audio Notification :** เสียงกระดิ่งแจ้งเตือนเมื่อคิวพร้อมรับอาหาร
+
+### 6) 🏪 ระบบจัดการร้านค้า & หน้าจอครัว (Merchant Dashboard & KDS)
+- **KDS Kanban Board :** หน้าจอครัวสำหรับแม่ค้า กดเลื่อนสถานะออเดอร์ด้วยการแตะ 1 ครั้ง (1-Tap Bump) พร้อมแถบจับเวลาความเร่งด่วน
+- **Menu & Stock Manager :** ปรับราคาอาหาร และกดสลับเปิด/ปิดสถานะ "เมนูหมด" ได้ทันที
+- **Daily Sales Summary :** สรุปยอดขายรวมและจำนวนออเดอร์ประจำวัน
+
+### 7) 👤 ระบบโปรไฟล์ผู้ใช้ & สิทธิประโยชน์ (User Profile & CRM Loyalty)
+- **CRM Loyalty Wallet :** ระบบสะสมแต้ม QueueUp Points (128 แต้ม) สำหรับแลกส่วนลด
+- **Coupon Wallet :** จัดเก็บคูปองส่วนลดพร้อมแท็บคูปองที่ใช้ได้และใช้แล้ว
+- **1-Click Re-order :** ประวัติการสั่งซื้อพร้อมปุ่มกดสั่งซ้ำเมนูเดิมได้ทันที
+
+### 8) 🛡️ ระบบความปลอดภัย & สิทธิ์ผู้ใช้งาน (Security & RBAC)
+- **3-Tier RBAC :** แบ่งสิทธิ์เข้มงวดระหว่าง Customer, Merchant และ Super Admin
+- **Protected Routes :** ป้องกันการเข้าถึงหน้าจัดการร้านค้าและแอดมินโดยไม่ได้รับอนุญาต
+- **PDPA Compliance :** แบนเนอร์ขอความยินยอมคุกกี้ และหน้านโยบายความเป็นส่วนตัว
+
+### 9) 🎨 ระบบ UX/UI & การเข้าถึง (Preferences & Accessibility)
+- **Fluid Zoom Scaling :** รองรับการย่อ/ขยายหน้าจอ (`Ctrl +` / `Ctrl -`) และหน้าจอทุกขนาดโดยไม่มีพื้นที่ว่างใต้ Footer
+- **Theme & Multi-Language :** สลับโหมด Dark/Light และสลับภาษาไทย/อังกฤษได้แบบ Real-time
 
 ---
 
-## ⏳ 4. สิ่งที่ยังไม่ได้ทำ / แผนงานที่จะพัฒนาต่อ (Pending Tasks & Next Steps)
-- [ ] **Phase 1 (UI/UX Polish):** ปรับจูนธีม Dark Glass และ Micro-animations ให้เนียนตา 100%
-- [ ] **Phase 2 (Payment Integration):** เชื่อมต่อ PromptPay QR Code Generator และ Webhook ตรวจสอบยอดเงินอัตโนมัติ
-- [ ] **Phase 3 (Real-time KDS Sync):** เชื่อม Firestore Snapshot Listener ให้คิวอัปเดตแบบ Real-time ทันทีที่แม่ค้ากดปุ่ม
-- [ ] **Phase 4 (Super Admin Portal):** ตกแต่งหน้า `StoreAdminPage.tsx` สำหรับดูภาพรวมและจัดการทั้งโรงอาหาร
+## 🛠️ 3. แผนการพัฒนาและแก้ไขปัญหาที่ดำเนินการสำเร็จ (Problem-Solving & Bug Fixes)
+
+| ปัญหาที่พบ | สาเหตุ | วิธีการแก้ไข | สถานะ |
+| :--- | :--- | :--- | :---: |
+| **1. หน้าจอเพี้ยนเมื่อกดซูม (`Ctrl +`/`Ctrl -`) และมีช่องว่างใต้ Footer** | ขาดการตั้งค่า Fluid Scaling และไม่มี Sticky Footer ใน Root Container | ใช้ `max-width: clamp(1200px, 92vw, 1680px)` และจัดโครงสร้าง Flexbox ให้กับ `#root` | ✅ แก้ได้ 100% |
+| **2. รูปภาพใน `ProductDetail` ขยายผิดสัดส่วน** | CSS Class ไม่ตรงกับโครงสร้าง JSX Grid 2 คอลัมน์ | ปรับจับคู่คลาส CSS `queue-pd-main-grid` และ `queue-pd-wrapper` ใหม่ | ✅ แก้ได้ 100% |
+| **3. Netlify ขึ้นข้อผิดพลาด 404 Not Found เมื่อรีเฟรชหน้าเว็บ** | เซิร์ฟเวอร์ไม่รู้จัก Client-Side Routing ของ Single Page App | สร้างไฟล์ `public/_redirects` และกำหนดกฎ `/* /index.html 200` | ✅ แก้ได้ 100% |
+| **4. ข้อมูลค้างเมื่ออินเทอร์เน็ตหลุด** | ไม่มีการสำรองข้อมูลฝั่ง Client | วางระบบ LocalStorage Fallback ซิงค์ข้อมูลอัตโนมัติเมื่อกลับมาออนไลน์ | ✅ แก้ได้ 100% |
 
 ---
 
-## 🚫 5. ข้อห้ามและสิ่งที่ต้องระวัง (Do's & Don'ts / Constraints)
-* ⚠️ **Security Boundaries:**
-  * ห้ามให้ลูกค้ายกเลิกออเดอร์หรือขอเงินคืนได้เองหลังจากที่ร้านค้ากดเปลี่ยนสถานะเป็น "กำลังปรุง (Cooking)" แล้ว
-  * ห้ามข้ามสิทธิ์ Store Isolation (ร้านค้า A ห้ามเข้าถึงข้อมูลหรือยอดขายของร้านค้า B เด็ดขาด)
-  * สิทธิ์แก้ไข/ลบข้ามร้าน มีเพียงบัญชี **Super Admin** ของคุณพิสิษฐ์เท่านั้น
-* ⚠️ **Code Standards:**
-  * แยกโค้ดเป็น Component ย่อย ห้ามเขียนไฟล์เดี่ยวขนาดยักษ์
-  * เก็บค่า Secret และ API Keys ไว้ใน `.env` เสมอ ห้าม Hardcode ในไฟล์โค้ด
+## 🚀 4. แผนงานและฟังก์ชันที่ต้องพัฒนาต่อในอนาคต (Future Roadmap & Backlog)
 
----
-
-## 💡 6. ไอเดียและข้อมูลที่จะนำมาต่อยอดในอนาคต (Future Ideas & Backlog)
-* **AI Menu Recommendation:** ใช้ Gemini AI วิเคราะห์ประวัติการสั่งของนักเรียนเพื่อแนะนำเมนูที่ตรงกับความชอบ
-* **IoT Notification Buzzer / Display Screen:** ทำหน้าจอรวมแสดงหมายเลขคิวที่เสร็จแล้ว (แบบจอทีวีในโรงอาหาร)
-* **Pre-order Grouping:** ระบบสั่งอาหารรวมเป็นกลุ่มเพื่อน จ่ายเงินแยกแต่รับพร้อมกัน
+1. **IoT Kitchen Buzzer & Central Canteen TV Display :**  
+   - พัฒนาระบบแสดงผลหมายเลขคิวบนหน้าจอทีวีรวมกลางโรงอาหาร พร้อมเชื่อมต่ออุปกรณ์กระดิ่งไร้สายแจ้งเตือนที่โต๊ะอาหาร
+2. **Automated Bank Slip OCR Verification :**  
+   - เชื่อมต่อ API สลิปธนาคารจริงผ่าน PromptPay Open API / Webhook เพื่อตรวจสอบยอดเงินเข้าบัญชีร้านค้าแบบอัตโนมัติ 100%
+3. **Multi-Vendor Cross-Store Cart :**  
+   - พัฒนาระบบรวมตะกร้าสินค้าจากหลายร้านค้าในโรงอาหาร สั่งซื้อและชำระเงินรวมในครั้งเดียว พร้อมแยกใบเสร็จและคิวไปยังแต่ละร้านค้าโดยอัตโนมัติ
+4. **Predictive AI Stock & Ingredient Forecast :**  
+   - ใช้ Gemini AI วิเคราะห์สถิติประวัติการสั่งซื้อย้อนหลัง เพื่อคาดการณ์ปริมาณวัตถุดิบที่ร้านค้าต้องเตรียมในแต่ละวัน ลดปัญหาวัตถุดิบเหลือทิ้ง
+5. **Group Pre-ordering (ระบบสั่งอาหารเป็นกลุ่ม) :**  
+   - ฟีเจอร์สร้างห้องสั่งอาหารรวมสำหรับกลุ่มเพื่อนหรือครูในห้องเรียน สั่งพร้อมกันแต่แยกชำระเงินรายบุคคล
