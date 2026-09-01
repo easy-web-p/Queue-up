@@ -29,7 +29,6 @@
 - **Routing**: React Router v7 (Single Page Application with Netlify `_redirects`)
 - **Styling**: Vanilla CSS Modules, Modern Dark Slate Glassmorphism, Bootstrap Icons & Lucide Icons
 - **Backend & Database**: Firebase (Auth, Cloud Firestore DB, LocalStorage Fallback)
-- **AI Engine**: Gemini 3.7 Flash API & Natural Language Query Parser
 
 ---
 
