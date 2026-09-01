@@ -22,6 +22,29 @@ export default function Queueup() {
   const [isPdpaModalOpen, setIsPdpaModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Contact & Sales Closing State
+  const [contactName, setContactName] = useState("");
+  const [contactOrg, setContactOrg] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [contactPackage, setContactPackage] = useState("school_demo");
+  const [contactMsg, setContactMsg] = useState("");
+  const [isContactSuccess, setIsContactSuccess] = useState(false);
+  const [isContactSending, setIsContactSending] = useState(false);
+
+  const handleContactSubmit = (e) => {
+    e.preventDefault();
+    if (!contactName.trim() || !contactPhone.trim()) {
+      alert("กรุณากรอกชื่อและเบอร์โทรศัพท์สำหรับติดต่อกลับ");
+      return;
+    }
+    setIsContactSending(true);
+    setTimeout(() => {
+      setIsContactSending(false);
+      setIsContactSuccess(true);
+    }, 600);
+  };
+
   // Form Inputs for Rating Submission
   const [evalName, setEvalName] = useState(user ? user.name || user.email : "");
   const [evalUx, setEvalUx] = useState(9.5);
@@ -517,78 +540,370 @@ export default function Queueup() {
         </div>
       </section>
 
-      {/* ==================== 8. COOKIE POLICY & PDPA COMPLIANCE ==================== */}
-      <section id="cookie-policy" className="qup-section-container">
+      {/* ==================== 8.5. HIGH-CONVERTING SALES & SOLUTION PACKAGES ==================== */}
+      <section id="solution" className="qup-section-container">
         <div className="qup-section-header">
-          <span className="qup-section-sub" style={{ color: "#f59e0b" }}>PDPA COOKIE POLICY — นโยบายคุ้มครองข้อมูลส่วนบุคคล</span>
-          <h2 className="qup-section-title">นโยบายการใช้คุกกี้ (Cookie Policy) & สิทธิ์ผู้ใช้งาน</h2>
+          <span className="qup-section-sub" style={{ color: "#ee4d2d" }}>QUEUEUP SOLUTION & PACKAGES — โซลูชันยกระดับโรงอาหาร</span>
+          <h2 className="qup-section-title">เปลี่ยนโรงอาหารแบบเดิม สู่ Smart Canteen 4.0</h2>
           <p className="qup-section-desc">
-            คุกกี้ (Cookies) ในเว็บไซต์ QueueUp คือไฟล์ข้อมูลขนาดเล็กที่เว็บเซิร์ฟเวอร์เก็บบันทึกไว้บนเครื่องคอมพิวเตอร์หรือมือถือของผู้ใช้ เพื่อช่วยจำค่าการใช้งาน ข้อมูลเข้าสู่ระบบ และปรับปรุงประสบการณ์สั่งอาหารโดยไม่ต้องตั้งค่าใหม่ทุกครั้ง
+            โซลูชันครบวงจรที่ตอบโจทย์ทั้งนักเรียน ครู ผู้ปกครอง ร้านค้า และฝ่ายบริหารสถานศึกษา เพื่อเพิ่มประสิทธิภาพการบริการและสร้างความประทับใจสูงสุด
+          </p>
+        </div>
+
+        {/* 3 Core Solution Angles */}
+        <div className="row g-4 mb-5">
+          <div className="col-lg-4">
+            <div className="qup-solution-card">
+              <div className="qup-solution-icon bg-danger-subtle text-danger">
+                <i className="bi bi-people-fill" />
+              </div>
+              <h3 className="qup-solution-title">สำหรับนักเรียน & ผู้ปกครอง</h3>
+              <ul className="qup-solution-list">
+                <li><i className="bi bi-check-circle-fill text-success me-2" /> สั่งจองอาหารล่วงหน้า ระบุเวลารับอาหารแม่นยำ</li>
+                <li><i className="bi bi-check-circle-fill text-success me-2" /> ไม่ต้องยืนรอคิวแออัด ได้กินอาหารร้อนๆ ตรงเวลา</li>
+                <li><i className="bi bi-check-circle-fill text-success me-2" /> สแกนจ่ายเงินสะดวก พร้อมสะสมแต้มแลกส่วนลด CRM</li>
+              </ul>
+              <div className="mt-4 pt-3 border-top border-slate-700">
+                <span className="badge bg-danger text-white px-3 py-2 rounded-pill">ลดเวลารอคิวลงกว่า 70%</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="col-lg-4">
+            <div className="qup-solution-card featured">
+              <div className="qup-popular-badge">ยอดนิยมสำหรับโรงเรียน</div>
+              <div className="qup-solution-icon bg-warning-subtle text-warning">
+                <i className="bi bi-shop" />
+              </div>
+              <h3 className="qup-solution-title">สำหรับร้านค้าโรงอาหาร (Merchant)</h3>
+              <ul className="qup-solution-list">
+                <li><i className="bi bi-check-circle-fill text-success me-2" /> หน้าจอ KDS จัดการออเดอร์และปรุงอาหาร Real-Time</li>
+                <li><i className="bi bi-check-circle-fill text-success me-2" /> จัดการเมนู สต็อกสินค้า และเปิด-ปิดร้านค้าได้อิสระ</li>
+                <li><i className="bi bi-check-circle-fill text-success me-2" /> รายงานสรุปยอดขายรายวันและสถิติดึงดูดลูกค้าประจำ</li>
+              </ul>
+              <div className="mt-4 pt-3 border-top border-slate-700">
+                <span className="badge bg-warning text-dark px-3 py-2 rounded-pill">เพิ่มยอดขายเฉลี่ย +35%</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="col-lg-4">
+            <div className="qup-solution-card">
+              <div className="qup-solution-icon bg-info-subtle text-info">
+                <i className="bi bi-building-fill-check" />
+              </div>
+              <h3 className="qup-solution-title">สำหรับสถานศึกษา & ผู้บริหาร</h3>
+              <ul className="qup-solution-list">
+                <li><i className="bi bi-check-circle-fill text-success me-2" /> ลดความแออัดในโรงอาหารและจัดระเบียบช่วงพักเที่ยง</li>
+                <li><i className="bi bi-check-circle-fill text-success me-2" /> มั่นใจในมาตรฐานความปลอดภัย PDPA & Zero-Trust</li>
+                <li><i className="bi bi-check-circle-fill text-success me-2" /> แดชบอร์ดวิเคราะห์ Big Data พฤติกรรมการบริโภค</li>
+              </ul>
+              <div className="mt-4 pt-3 border-top border-slate-700">
+                <span className="badge bg-info text-white px-3 py-2 rounded-pill">ควบคุมสุขอนามัย 100%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Pricing / Implementation Packages */}
+        <div className="qup-pricing-banner mb-5">
+          <div className="row align-items-center g-4">
+            <div className="col-lg-8">
+              <span className="badge bg-warning text-dark px-3 py-1.5 rounded-pill fw-bold mb-2">
+                🎉 โปรโมชั่นเปิดตัวระบบเพื่อสถานศึกษา
+              </span>
+              <h3 className="fw-bold text-white fs-3 mb-2">
+                ทดลองติดตั้งและใช้งานระบบฟรี ไม่มีค่าธรรมเนียมแรกเข้า
+              </h3>
+              <p className="text-slate-300 mb-0">
+                ทีมงานพร้อมลงพื้นที่สำรวจและสาธิตการใช้งานระบบจริง (Live Demo) ให้กับคณะครูและร้านค้าถึงโรงเรียน
+              </p>
+            </div>
+            <div className="col-lg-4 text-lg-end">
+              <a href="#contact" className="qup-btn-primary" style={{ padding: "0.9rem 2rem", fontSize: "1.05rem", textDecoration: "none", display: "inline-flex" }}>
+                <i className="bi bi-telephone-inbound-fill me-2" /> ติดต่อขอรับสิทธิ์ใช้งานฟรี
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ==================== 8.6. PROJECT DEVELOPMENT TEAM SHOWCASE ==================== */}
+      <section id="team" className="qup-section-container">
+        <div className="qup-section-header">
+          <span className="qup-section-sub" style={{ color: "#38bdf8" }}>PROJECT DEVELOPERS — คณะผู้จัดทำและพัฒนาโครงการ</span>
+          <h2 className="qup-section-title">ทีมผู้พัฒนา QueueUp Smart School Food CRM</h2>
+          <p className="qup-section-desc">
+            โครงการพัฒนานวัตกรรมดิจิทัล <strong>กลุ่ม 23 (91)</strong> — รายวิชา <strong>GE341511 การคิดเชิงคำนวณและเชิงสถิติสำหรับ ABCD</strong>
           </p>
         </div>
 
         <div className="row g-4 mb-5">
-          <div className="col-md-4">
-            <div className="p-4 rounded-3 text-white h-100" style={{ background: "rgba(30, 41, 59, 0.7)", border: "1px solid rgba(255, 255, 255, 0.12)" }}>
-              <div className="d-flex align-items-center gap-2 mb-3">
-                <i className="bi bi-shield-check text-success fs-3" />
-                <h4 className="fw-bold mb-0 fs-5">1. คุกกี้จำเป็น (Strictly Necessary)</h4>
+          {[
+            {
+              name: "นายพิสิษฐ์ แก้วกุลพิสิษฐ์",
+              id: "693380082-8",
+              role: "UX/UI Lead & Super Admin",
+              desc: "ออกแบบประสบการณ์ผู้ใช้ สถาปัตยกรรมหน้าจอ Responsive และระบบจัดการสิทธิ์สูงสุด",
+              icon: "bi-palette-fill",
+              color: "#ee4d2d",
+              bg: "rgba(238, 77, 45, 0.15)",
+            },
+            {
+              name: "นายภานุ คำแก้ว",
+              id: "693380586-0",
+              role: "Backend & Firebase DB Lead",
+              desc: "ออกแบบฐานข้อมูล Cloud Firestore สถาปัตยกรรมความปลอดภัย และระบบเซิร์ฟเวอร์",
+              icon: "bi-database-fill-gear",
+              color: "#38bdf8",
+              bg: "rgba(56, 189, 248, 0.15)",
+            },
+            {
+              name: "นายภูริทัต มหานิล",
+              id: "693380588-6",
+              role: "AI & Core Feature Developer",
+              desc: "พัฒนาระบบ AI Smart Search, Recommendation Engine และระบบประมวลผลอัจฉริยะ",
+              icon: "bi-cpu-fill",
+              color: "#a855f7",
+              bg: "rgba(168, 85, 247, 0.15)",
+            },
+            {
+              name: "นายพลกฤต นิลอยู่",
+              id: "693380584-4",
+              role: "KDS & Payment Integration Lead",
+              desc: "พัฒนาระบบกระดานร้านค้า Kitchen Display System และระบบชำระเงิน Dynamic QR",
+              icon: "bi-credit-card-2-front-fill",
+              color: "#22c55e",
+              bg: "rgba(34, 197, 94, 0.15)",
+            },
+            {
+              name: "นายภาสกร หนองรั้ง",
+              id: "693380587-8",
+              role: "CRM & Loyalty Program Lead",
+              desc: "พัฒนาระบบแต้มสะสม คูปองส่วนลด และระบบวิเคราะห์ความภักดีของลูกค้าประจำ",
+              icon: "bi-gift-fill",
+              color: "#f59e0b",
+              bg: "rgba(245, 158, 11, 0.15)",
+            },
+            {
+              name: "นายคณิศร เลิศร่วมพัฒนา",
+              id: "693380570-5",
+              role: "QA Tester & Bug Hunter",
+              desc: "ทดสอบความเสถียร ตรวจสอบความถูกต้องของระบบ และค้นหาจุดบกพร่องทุกฟังก์ชัน",
+              icon: "bi-bug-fill",
+              color: "#ec4899",
+              bg: "rgba(236, 72, 153, 0.15)",
+            },
+            {
+              name: "นายกฤษณะ อุปถัมภ์",
+              id: "693380289-6",
+              role: "Field Research & User Interviewer",
+              desc: "เก็บรวบรวมข้อมูลภาคสนาม สำรวจปัญหาคิวโรงอาหารจริง และวิเคราะห์ความต้องการผู้ใช้",
+              icon: "bi-clipboard2-data-fill",
+              color: "#14b8a6",
+              bg: "rgba(20, 184, 166, 0.15)",
+            },
+            {
+              name: "นายพุฒิเมธ เตโช",
+              id: "693380083-6",
+              role: "Documentation & Presentation Lead",
+              desc: "รวบรวมเอกสารทางเทคนิค จัดเตรียมสื่อนำเสนอ และประสานงานข้อมูลโครงการทั้งระบบ",
+              icon: "bi-file-earmark-slides-fill",
+              color: "#6366f1",
+              bg: "rgba(99, 102, 241, 0.15)",
+            },
+          ].map((m, idx) => (
+            <div key={idx} className="col-md-6 col-lg-3">
+              <div className="qup-team-card h-100">
+                <div className="qup-team-icon-box" style={{ background: m.bg, color: m.color }}>
+                  <i className={`bi ${m.icon}`} />
+                </div>
+                <h4 className="qup-team-name">{m.name}</h4>
+                <div className="qup-team-id">รหัสประจำตัว: {m.id}</div>
+                <div className="qup-team-role" style={{ color: m.color }}>
+                  {m.role}
+                </div>
+                <p className="qup-team-desc">{m.desc}</p>
               </div>
-              <p className="text-slate-300 small mb-0" style={{ lineHeight: "1.6" }}>
-                ช่วยให้เว็บไซต์ทำงานได้ปกติ เช่น การล็อกอินด้วย Firebase Auth, การรักษาความปลอดภัยเซสชันจองคิวอาหาร และการปกป้องรหัสบัญชี (จำเป็นต้องใช้งานเสมอ)
-              </p>
             </div>
-          </div>
-
-          <div className="col-md-4">
-            <div className="p-4 rounded-3 text-white h-100" style={{ background: "rgba(30, 41, 59, 0.7)", border: "1px solid rgba(255, 255, 255, 0.12)" }}>
-              <div className="d-flex align-items-center gap-2 mb-3">
-                <i className="bi bi-graph-up-arrow text-info fs-3" />
-                <h4 className="fw-bold mb-0 fs-5">2. คุกกี้เพื่อการวิเคราะห์ (Analytics)</h4>
-              </div>
-              <p className="text-slate-300 small mb-0" style={{ lineHeight: "1.6" }}>
-                จัดเก็บข้อมูลสถิติพฤติกรรมการใช้งานอย่างเป็นปริศนา เพื่อนำไปปรับปรุงความเร็วของระบบจองคิวและพัฒนาระบบค้นหา Smart Search ให้ดียิ่งขึ้น
-              </p>
-            </div>
-          </div>
-
-          <div className="col-md-4">
-            <div className="p-4 rounded-3 text-white h-100" style={{ background: "rgba(30, 41, 59, 0.7)", border: "1px solid rgba(255, 255, 255, 0.12)" }}>
-              <div className="d-flex align-items-center gap-2 mb-3">
-                <i className="bi bi-ticket-perforated-fill text-warning fs-3" />
-                <h4 className="fw-bold mb-0 fs-5">3. คุกกี้การตลาด & CRM (Marketing)</h4>
-              </div>
-              <p className="text-slate-300 small mb-0" style={{ lineHeight: "1.6" }}>
-                จดจำความสนใจของผู้ใช้งานเพื่อนำเสนอโค้ดส่วนลด คูปองพิเศษ และโปรโมชั่นจากร้านอาหารที่ติดตามได้ตรงตามความต้องการของคุณ
-              </p>
-            </div>
-          </div>
+          ))}
         </div>
+      </section>
 
-        {/* PDPA Rights Card */}
-        <div className="p-4 rounded-3 text-white d-flex align-items-center justify-content-between flex-wrap gap-3" style={{ background: "linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%)", border: "1px solid rgba(238, 77, 45, 0.3)" }}>
-          <div className="d-flex align-items-center gap-3">
-            <i className="bi bi-person-check-fill text-warning fs-1" />
-            <div>
-              <h5 className="fw-bold mb-1">สิทธิ์ของคุณตามกฎหมาย PDPA (Personal Data Protection Act)</h5>
-              <p className="text-slate-300 small mb-0">
-                คุณมีสิทธิ์เลือกยอมรับ ปฏิเสธ หรือปรับเปลี่ยนการตั้งค่าคุกกี้แต่ละประเภทได้ตลอดเวลาผ่านแบนเนอร์หรือปุ่มตั้งค่าด้านล่าง
+      {/* ==================== 8.7. CONTACT US & SALES CLOSING FORM ==================== */}
+      <section id="contact" className="qup-section-container">
+        <div className="qup-contact-wrapper">
+          <div className="row g-5 align-items-center">
+            {/* Left Info Column */}
+            <div className="col-lg-5">
+              <span className="qup-section-sub" style={{ color: "#ee4d2d" }}>CONTACT & INQUIRIES — ติดต่อเรา</span>
+              <h2 className="qup-section-title" style={{ fontSize: "2.2rem" }}>
+                พร้อมยกระดับโรงอาหารของคุณหรือยัง?
+              </h2>
+              <p className="qup-section-desc mb-4">
+                ติดต่อทีมงาน QueueUp เพื่อขอคำปรึกษา นัดหมายสาธิตระบบจริง (Live Demo) หรือสมัครเข้าร่วมเป็นร้านค้าพันธมิตรได้ทันที
               </p>
+
+              <div className="qup-contact-info-list space-y-3 mb-4">
+                <div className="d-flex align-items-center gap-3 p-3 rounded-3" style={{ background: "rgba(30, 41, 59, 0.6)", border: "1px solid rgba(255, 255, 255, 0.08)" }}>
+                  <div className="qup-contact-icon-circle bg-danger-subtle text-danger">
+                    <i className="bi bi-geo-alt-fill fs-5" />
+                  </div>
+                  <div>
+                    <div className="text-slate-400 text-xs">ที่ตั้งศูนย์ปฏิบัติการ</div>
+                    <div className="text-white fw-bold small">โรงอาหารกลาง ศูนย์นวัตกรรมดิจิทัลสถานศึกษา</div>
+                  </div>
+                </div>
+
+                <div className="d-flex align-items-center gap-3 p-3 rounded-3" style={{ background: "rgba(30, 41, 59, 0.6)", border: "1px solid rgba(255, 255, 255, 0.08)" }}>
+                  <div className="qup-contact-icon-circle bg-success-subtle text-success">
+                    <i className="bi bi-telephone-fill fs-5" />
+                  </div>
+                  <div>
+                    <div className="text-slate-400 text-xs">สายด่วนฝ่ายดูแลระบบ</div>
+                    <div className="text-white fw-bold small">081-234-5678 / 056-711-444</div>
+                  </div>
+                </div>
+
+                <div className="d-flex align-items-center gap-3 p-3 rounded-3" style={{ background: "rgba(30, 41, 59, 0.6)", border: "1px solid rgba(255, 255, 255, 0.08)" }}>
+                  <div className="qup-contact-icon-circle bg-info-subtle text-info">
+                    <i className="bi bi-envelope-fill fs-5" />
+                  </div>
+                  <div>
+                    <div className="text-slate-400 text-xs">อีเมลติดต่อทางการ</div>
+                    <div className="text-white fw-bold small">58140@lomsak.ac.th / contact@queueup.app</div>
+                  </div>
+                </div>
+
+                <div className="d-flex align-items-center gap-3 p-3 rounded-3" style={{ background: "rgba(30, 41, 59, 0.6)", border: "1px solid rgba(255, 255, 255, 0.08)" }}>
+                  <div className="qup-contact-icon-circle bg-warning-subtle text-warning">
+                    <i className="bi bi-chat-dots-fill fs-5" />
+                  </div>
+                  <div>
+                    <div className="text-slate-400 text-xs">LINE Official Account</div>
+                    <div className="text-white fw-bold small">@QueueUpSchool (มี @ ด้านหน้า)</div>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="d-flex align-items-center gap-2">
-            <button
-              className="btn btn-outline-light font-weight-bold btn-sm shadow-sm"
-              onClick={() => setIsPdpaModalOpen(true)}
-            >
-              <i className="bi bi-file-earmark-text me-1" /> อ่านนโยบาย PDPA และเงื่อนไขการใช้งาน
-            </button>
-            <button
-              className="btn btn-warning font-weight-bold shadow-sm"
-              onClick={() => setIsCookieModalOpen(true)}
-            >
-              <i className="bi bi-sliders me-1" /> ปรับเปลี่ยนการตั้งค่าคุกกี้
-            </button>
+
+            {/* Right Interactive Form Column */}
+            <div className="col-lg-7">
+              <div className="qup-contact-card">
+                <h3 className="fw-bold text-white fs-4 mb-2">
+                  <i className="bi bi-send-fill text-danger me-2" /> ส่งข้อความ / ขอใบเสนอราคาติดตั้งระบบ
+                </h3>
+                <p className="text-slate-400 small mb-4">
+                  กรอกข้อมูลด้านล่าง ทีมงานจะติดต่อกลับเพื่อให้ข้อมูลและนัดหมายสาธิตระบบภายใน 24 ชั่วโมง
+                </p>
+
+                {isContactSuccess ? (
+                  <div className="p-4 rounded-3 text-center" style={{ background: "rgba(34, 197, 94, 0.15)", border: "1px solid #22c55e" }}>
+                    <div className="display-4 text-success mb-2">
+                      <i className="bi bi-check-circle-fill" />
+                    </div>
+                    <h4 className="fw-bold text-white mb-2">ส่งข้อมูลสำเร็จเรียบร้อยแล้ว!</h4>
+                    <p className="text-slate-300 small mb-3">
+                      ขอบพระคุณที่ให้ความสนใจในระบบ QueueUp ทีมงานฝ่ายบริการลูกค้าจะติดต่อกลับไปยังเบอร์โทรศัพท์หรืออีเมลของคุณโดยเร็วที่สุด
+                    </p>
+                    <button
+                      className="btn btn-success btn-sm rounded-pill px-4 fw-bold"
+                      onClick={() => setIsContactSuccess(false)}
+                    >
+                      ส่งข้อความเพิ่มเติม
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleContactSubmit}>
+                    <div className="row g-3 mb-3">
+                      <div className="col-md-6">
+                        <label className="text-slate-300 small fw-bold mb-1">ชื่อผู้ติดต่อ *</label>
+                        <input
+                          type="text"
+                          className="form-control qup-input"
+                          placeholder="เช่น อาจารย์สมชาย / ป้าแดง"
+                          value={contactName}
+                          onChange={(e) => setContactName(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div className="col-md-6">
+                        <label className="text-slate-300 small fw-bold mb-1">ชื่อโรงเรียน / สถานศึกษา / ร้านค้า</label>
+                        <input
+                          type="text"
+                          className="form-control qup-input"
+                          placeholder="เช่น โรงเรียนหล่มสักวิทยาคม / ร้านข้าวมันไก่"
+                          value={contactOrg}
+                          onChange={(e) => setContactOrg(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="row g-3 mb-3">
+                      <div className="col-md-6">
+                        <label className="text-slate-300 small fw-bold mb-1">เบอร์โทรศัพท์ติดต่อกลับ *</label>
+                        <input
+                          type="tel"
+                          className="form-control qup-input"
+                          placeholder="081-234-5678"
+                          value={contactPhone}
+                          onChange={(e) => setContactPhone(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div className="col-md-6">
+                        <label className="text-slate-300 small fw-bold mb-1">อีเมลติดต่อ</label>
+                        <input
+                          type="email"
+                          className="form-control qup-input"
+                          placeholder="your-email@school.ac.th"
+                          value={contactEmail}
+                          onChange={(e) => setContactEmail(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mb-3">
+                      <label className="text-slate-300 small fw-bold mb-1">ประเภทความสนใจ</label>
+                      <select
+                        className="form-select qup-input"
+                        value={contactPackage}
+                        onChange={(e) => setContactPackage(e.target.value)}
+                      >
+                        <option value="school_demo">🏫 สนใจติดตั้งระบบสำหรับโรงเรียน (นัด Live Demo)</option>
+                        <option value="merchant_join">🏪 สนใจสมัครเป็นร้านค้าพันธมิตรในโรงอาหาร</option>
+                        <option value="custom_enterprise">🏢 สนใจโซลูชันศูนย์อาหารขนาดใหญ่ / มหาวิทยาลัย</option>
+                        <option value="other">💬 สอบถามข้อมูลทั่วไปหรือเสนอแนะเพิ่มเติม</option>
+                      </select>
+                    </div>
+
+                    <div className="mb-4">
+                      <label className="text-slate-300 small fw-bold mb-1">ข้อความหรือรายละเอียดเพิ่มเติม</label>
+                      <textarea
+                        className="form-control qup-input"
+                        rows="3"
+                        placeholder="ระบุจำนวนร้านค้าโดยประมาณ หรือช่วงเวลาที่สะดวกให้ติดต่อกลับ..."
+                        value={contactMsg}
+                        onChange={(e) => setContactMsg(e.target.value)}
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="qup-btn-primary w-100 py-3 fs-6"
+                      disabled={isContactSending}
+                      style={{ justifyContent: "center" }}
+                    >
+                      {isContactSending ? (
+                        <span>กำลังส่งข้อมูล...</span>
+                      ) : (
+                        <span><i className="bi bi-send-check-fill me-2" /> ส่งข้อมูลเพื่อรับสิทธิ์และนัดสาธิตระบบ</span>
+                      )}
+                    </button>
+                  </form>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -610,19 +925,19 @@ export default function Queueup() {
             <h4>เกี่ยวกับเรา</h4>
             <ul className="qup-footer-links">
               <li><a href="#about">เรื่องราวของเรา</a></li>
-              <li><a href="#about">วิสัยทัศน์ & พันธกิจ</a></li>
-              <li><a href="#stats">สถิติความสำเร็จ</a></li>
+              <li><a href="#solution">โซลูชันโรงอาหาร</a></li>
+              <li><a href="#team">คณะผู้จัดทำโครงการ</a></li>
               <li><a href="#security">มาตรฐานความปลอดภัย</a></li>
             </ul>
           </div>
 
           <div className="qup-footer-col">
-            <h4>ฟีเจอร์แอปพลิเคชัน</h4>
+            <h4>ติดต่อ & สนับสนุน</h4>
             <ul className="qup-footer-links">
-              <li><a href="#features">ระบบจองคิว Real-Time</a></li>
-              <li><a href="#features">ระบบสั่งอาหารอัจฉริยะ</a></li>
-              <li><a href="#features">สแกนจ่าย QR PromptPay</a></li>
-              <li><a href="#features">การตั้งค่ารหัสบัญชี</a></li>
+              <li><a href="#contact">ติดต่อขอใบเสนอราคา</a></li>
+              <li><a href="#contact">นัดหมาย Live Demo</a></li>
+              <li><a href="#contact">สมัครร้านค้าพันธมิตร</a></li>
+              <li><a href="#cookie-policy">นโยบายคุกกี้ & PDPA</a></li>
             </ul>
           </div>
 
@@ -632,14 +947,14 @@ export default function Queueup() {
               ทดลองใช้งานระบบ QueueUp Platform ได้ทันทีฟรี
             </p>
             <button className="qup-btn-primary" style={{ width: "100%", justifyContent: "center" }} onClick={handleStartApp}>
-              🚀 เริ่มต้นใช้งานเลย
+              🚀 เข้าสู่ระบบสั่งอาหาร
             </button>
           </div>
         </div>
 
         <div className="qup-copyright-bar">
-          <div>© 2026 QueueUp Smart CRM System. All rights reserved.</div>
-          <div>พัฒนาด้วยมาตรฐาน Zero-Trust & Salted Cryptography</div>
+          <div>© 2026 QueueUp Smart School Food CRM. กลุ่ม 23 (91) GE341511. All rights reserved.</div>
+          <div>พัฒนาด้วยมาตรฐาน Zero-Trust, Salted SHA-256 & AES-256 Cryptography</div>
         </div>
       </footer>
 

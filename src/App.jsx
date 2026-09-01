@@ -41,6 +41,10 @@ function App() {
             <Route path="/Queueup" element={<Queueup />} />
             <Route path="/about" element={<Queueup />} />
             <Route path="/About" element={<Queueup />} />
+            <Route path="/contact" element={<Queueup />} />
+            <Route path="/Contact" element={<Queueup />} />
+            <Route path="/team" element={<Queueup />} />
+            <Route path="/pricing" element={<Queueup />} />
 
             {/* Standalone Legal & PDPA Policy Routes */}
             <Route path="/pdpa" element={<PdpaPolicy />} />
