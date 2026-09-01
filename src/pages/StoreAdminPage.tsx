@@ -105,14 +105,76 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
     { id: 'ST-02', name: 'นายสมชาย มีชัย', role: 'พ่อครัวหลัก (Chef)', phone: '089-876-5432', status: 'Active' },
     { id: 'ST-03', name: 'นางสาววิภา เรียนดี', role: 'พนักงานแคชเชียร์ (Cashier)', phone: '086-111-2222', status: 'Active' },
   ]);
+  const [showAddStaffModal, setShowAddStaffModal] = useState(false);
+  const [newStaffName, setNewStaffName] = useState('');
+  const [newStaffRole, setNewStaffRole] = useState('พนักงานแคชเชียร์ (Cashier)');
+  const [newStaffPhone, setNewStaffPhone] = useState('');
 
-  // System Logs Mock State
-  const logs = [
+  // CRM Coupons State
+  const [coupons, setCoupons] = useState([
+    { id: 'CP-1', code: 'WELCOME10', discount: 10, minSpend: 50, status: 'Active' },
+    { id: 'CP-2', code: 'LUNCH5', discount: 5, minSpend: 40, status: 'Active' },
+    { id: 'CP-3', code: 'STUDENT20', discount: 20, minSpend: 100, status: 'Active' }
+  ]);
+  const [showAddCouponModal, setShowAddCouponModal] = useState(false);
+  const [newCouponCode, setNewCouponCode] = useState('');
+  const [newCouponDiscount, setNewCouponDiscount] = useState(10);
+  const [newCouponMinSpend, setNewCouponMinSpend] = useState(50);
+
+  // System Logs State
+  const [logs, setLogs] = useState([
     { id: 'L-101', time: '10:14 น.', action: 'อัปเดตราคาเมนู ข้าวผัดกะเพราหมูกรอบ เป็น 55 บาท', user: 'ป้าแดง ใจดี' },
     { id: 'L-102', time: '10:05 น.', action: 'ตรวจสอบสลิปชำระเงิน ออเดอร์ #ORD-1002 สำเร็จ', user: 'ระบบอัตโนมัติ' },
     { id: 'L-103', time: '09:45 น.', action: 'เปิดร้านค้าประจำวัน รับออเดอร์ปกติ', user: 'ป้าแดง ใจดี' },
     { id: 'L-104', time: '09:30 น.', action: 'เติมสต็อกวัตถุดิบไก่ทอด +50 จาน', user: 'นายสมชาย มีชัย' },
-  ];
+  ]);
+
+  const handleAddStaffSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newStaffName.trim()) return;
+    const newStaff = {
+      id: `ST-${(staffList.length + 1).toString().padStart(2, '0')}`,
+      name: newStaffName,
+      role: newStaffRole,
+      phone: newStaffPhone || '080-000-0000',
+      status: 'Active'
+    };
+    setStaffList(prev => [...prev, newStaff]);
+    setLogs(prev => [{
+      id: `L-${Date.now().toString().slice(-4)}`,
+      time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
+      action: `เพิ่มพนักงานใหม่: ${newStaffName} (${newStaffRole})`,
+      user: user?.name || 'Admin'
+    }, ...prev]);
+    setShowAddStaffModal(false);
+    setNewStaffName('');
+    setNewStaffPhone('');
+    setToastMsg(`เพิ่มพนักงาน ${newStaffName} สำเร็จ`);
+    setTimeout(() => setToastMsg(null), 2500);
+  };
+
+  const handleAddCouponSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCouponCode.trim()) return;
+    const newCoupon = {
+      id: `CP-${coupons.length + 1}`,
+      code: newCouponCode.toUpperCase(),
+      discount: Number(newCouponDiscount),
+      minSpend: Number(newCouponMinSpend),
+      status: 'Active'
+    };
+    setCoupons(prev => [...prev, newCoupon]);
+    setLogs(prev => [{
+      id: `L-${Date.now().toString().slice(-4)}`,
+      time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
+      action: `สร้างโค้ดส่วนลดใหม่: ${newCouponCode.toUpperCase()} (ลด ฿${newCouponDiscount})`,
+      user: user?.name || 'Admin'
+    }, ...prev]);
+    setShowAddCouponModal(false);
+    setNewCouponCode('');
+    setToastMsg(`สร้างคูปอง ${newCoupon.code} สำเร็จ`);
+    setTimeout(() => setToastMsg(null), 2500);
+  };
 
   const handleToggleStock = (id: string) => {
     if (propsOnToggleStock) {
@@ -736,8 +798,8 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                   <label className="text-xs font-bold text-slate-700">หมายเลขพร้อมเพย์ (PromptPay ID)</label>
                   <input
                     type="text"
-                    value={shopInfo.promptpayNumber}
-                    onChange={(e) => setShopInfo({ ...shopInfo, promptpayNumber: e.target.value })}
+                    value={shopInfo?.promptpayNumber || '081-234-5678'}
+                    onChange={(e) => setShopInfo((prev) => prev ? { ...prev, promptpayNumber: e.target.value } : { id: 's1', shopName: 'ร้านค้าสถานศึกษา', promptpayNumber: e.target.value } as any)}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#f6402e]"
                   />
                 </div>
@@ -746,8 +808,8 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                   <label className="text-xs font-bold text-slate-700">ชื่อบัญชีผู้รับเงิน</label>
                   <input
                     type="text"
-                    value={shopInfo.ownerName}
-                    onChange={(e) => setShopInfo({ ...shopInfo, ownerName: e.target.value })}
+                    value={shopInfo?.ownerName || 'ป้าแดง ใจดี'}
+                    onChange={(e) => setShopInfo((prev) => prev ? { ...prev, ownerName: e.target.value } : { id: 's1', shopName: 'ร้านค้าสถานศึกษา', ownerName: e.target.value } as any)}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#f6402e]"
                   />
                 </div>
@@ -769,8 +831,8 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                   <QrCode className="w-32 h-32 text-[#f6402e]" />
                 </div>
                 <div>
-                  <div className="font-extrabold text-sm text-slate-900">{shopInfo.ownerName}</div>
-                  <div className="text-xs text-slate-500 font-mono">PromptPay: {shopInfo.promptpayNumber}</div>
+                  <div className="font-extrabold text-sm text-slate-900">{shopInfo?.ownerName || 'ป้าแดง ใจดี'}</div>
+                  <div className="text-xs text-slate-500 font-mono">PromptPay: {shopInfo?.promptpayNumber || '081-234-5678'}</div>
                 </div>
                 <span className="text-[10px] bg-orange-100 text-[#f6402e] font-bold px-3 py-1 rounded-full">
                   QR Code พร้อมใช้งานสำหรับแสดงในหน้ารับชำระเงิน
@@ -788,7 +850,10 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                 <h3 className="text-base font-extrabold text-slate-900">พนักงาน & สิทธิ์เข้าถึงระบบ</h3>
                 <p className="text-xs text-slate-500">จัดการรายชื่อผู้ช่วย พ่อครัว และแคชเชียร์ในร้าน</p>
               </div>
-              <button className="px-3.5 py-1.5 bg-slate-900 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer">
+              <button
+                onClick={() => setShowAddStaffModal(true)}
+                className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+              >
                 <UserPlus className="w-4 h-4" />
                 <span>เพิ่มพนักงาน</span>
               </button>
@@ -803,6 +868,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                     <th className="p-3">บทบาทสิทธิ์</th>
                     <th className="p-3">เบอร์ติดต่อ</th>
                     <th className="p-3">สถานะ</th>
+                    <th className="p-3 text-right">จัดการ</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
@@ -817,6 +883,21 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                           {st.status}
                         </span>
                       </td>
+                      <td className="p-3 text-right">
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`ต้องการลบพนักงาน ${st.name} ออกจากระบบหรือไม่?`)) {
+                              setStaffList((prev) => prev.filter((s) => s.id !== st.id));
+                              setToastMsg(`ลบพนักงาน ${st.name} เรียบร้อยแล้ว`);
+                              setTimeout(() => setToastMsg(null), 2500);
+                            }
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                          title="ลบพนักงาน"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -827,10 +908,19 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
 
         {/* TAB 6: CRM & LOYALTY */}
         {activeTab === 'crm' && (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-4">
-            <div>
-              <h3 className="text-base font-extrabold text-slate-900">ระบบ CRM & คะแนนสะสมของร้านค้า</h3>
-              <p className="text-xs text-slate-500">กำหนดอัตราการแจกแต้มและสร้างแคมเปญส่วนลดให้ลูกค้า</p>
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-5">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900">ระบบ CRM & โค้ดคูปองส่วนลด</h3>
+                <p className="text-xs text-slate-500">กำหนดอัตราการแจกแต้มและสร้างแคมเปญโปรโมชั่นดึงดูดลูกค้า</p>
+              </div>
+              <button
+                onClick={() => setShowAddCouponModal(true)}
+                className="px-3.5 py-1.5 bg-[#f6402e] hover:bg-orange-600 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+              >
+                <Plus className="w-4 h-4" />
+                <span>สร้างคูปองส่วนลดใหม่</span>
+              </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -845,6 +935,48 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                 <p className="text-xs text-slate-600">50 แต้ม = คูปองส่วนลด 5 บาทสำหรับมื้อถัดไป</p>
                 <div className="text-[11px] text-blue-700 font-bold">✓ ดึงดูดลูกค้าเดิมกลับมาซื้อซ้ำเป็นประจำ</div>
               </div>
+            </div>
+
+            {/* Coupons Table */}
+            <div className="overflow-x-auto border border-slate-200 rounded-xl">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
+                    <th className="p-3">รหัสโค้ด</th>
+                    <th className="p-3">มูลค่าส่วนลด</th>
+                    <th className="p-3">ยอดสั่งซื้อขั้นต่ำ</th>
+                    <th className="p-3">สถานะ</th>
+                    <th className="p-3 text-right">จัดการ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium">
+                  {coupons.map((cp) => (
+                    <tr key={cp.id} className="hover:bg-slate-50/80">
+                      <td className="p-3 font-mono font-extrabold text-[#f6402e]">{cp.code}</td>
+                      <td className="p-3 font-bold text-emerald-600">ลด ฿{cp.discount}</td>
+                      <td className="p-3 text-slate-600">ขั้นต่ำ ฿{cp.minSpend}</td>
+                      <td className="p-3">
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold text-[10px]">
+                          {cp.status}
+                        </span>
+                      </td>
+                      <td className="p-3 text-right">
+                        <button
+                          onClick={() => {
+                            setCoupons((prev) => prev.filter((c) => c.id !== cp.id));
+                            setToastMsg(`ลบคูปอง ${cp.code} สำเร็จ`);
+                            setTimeout(() => setToastMsg(null), 2500);
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                          title="ลบคูปอง"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
@@ -877,6 +1009,150 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
         )}
 
       </div>
+
+      {/* Add Staff Modal Overlay */}
+      {showAddStaffModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4 border border-slate-200 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-extrabold text-slate-900 text-base">เพิ่มพนักงานใหม่</h3>
+              <button
+                onClick={() => setShowAddStaffModal(false)}
+                className="text-slate-400 hover:text-slate-600 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleAddStaffSubmit} className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-slate-700">ชื่อ-นามสกุลพนักงาน *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="เช่น นายเอกชัย รักบริการ"
+                  value={newStaffName}
+                  onChange={(e) => setNewStaffName(e.target.value)}
+                  className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700">บทบาทหน้าที่ *</label>
+                <select
+                  value={newStaffRole}
+                  onChange={(e) => setNewStaffRole(e.target.value)}
+                  className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold"
+                >
+                  <option value="พนักงานแคชเชียร์ (Cashier)">พนักงานแคชเชียร์ (Cashier)</option>
+                  <option value="พ่อครัวหลัก (Chef)">พ่อครัวหลัก (Chef)</option>
+                  <option value="ผู้ช่วยครัว (Kitchen Assistant)">ผู้ช่วยครัว (Kitchen Assistant)</option>
+                  <option value="ผู้จัดการร้าน (Manager)">ผู้จัดการร้าน (Manager)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700">เบอร์โทรศัพท์ติดต่อ</label>
+                <input
+                  type="tel"
+                  placeholder="081-000-0000"
+                  value={newStaffPhone}
+                  onChange={(e) => setNewStaffPhone(e.target.value)}
+                  className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddStaffModal(false)}
+                  className="px-4 py-2 bg-slate-100 text-slate-700 text-xs font-bold rounded-xl hover:bg-slate-200 transition-colors"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-extrabold rounded-xl shadow-md transition-all"
+                >
+                  บันทึกพนักงาน
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Coupon Modal Overlay */}
+      {showAddCouponModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4 border border-slate-200 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-extrabold text-slate-900 text-base">สร้างโค้ดคูปองส่วนลดใหม่</h3>
+              <button
+                onClick={() => setShowAddCouponModal(false)}
+                className="text-slate-400 hover:text-slate-600 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleAddCouponSubmit} className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-slate-700">รหัสโค้ดคูปอง (ตัวพิมพ์ใหญ่) *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="เช่น PROMO50, LUNCH10"
+                  value={newCouponCode}
+                  onChange={(e) => setNewCouponCode(e.target.value)}
+                  className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold uppercase font-mono"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-bold text-slate-700">มูลค่าส่วนลด (บาท) *</label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    value={newCouponDiscount}
+                    onChange={(e) => setNewCouponDiscount(Number(e.target.value))}
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-700">ยอดสั่งซื้อขั้นต่ำ (บาท) *</label>
+                  <input
+                    type="number"
+                    required
+                    min={0}
+                    value={newCouponMinSpend}
+                    onChange={(e) => setNewCouponMinSpend(Number(e.target.value))}
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddCouponModal(false)}
+                  className="px-4 py-2 bg-slate-100 text-slate-700 text-xs font-bold rounded-xl hover:bg-slate-200 transition-colors"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-[#f6402e] hover:bg-orange-600 text-white text-xs font-extrabold rounded-xl shadow-md transition-all"
+                >
+                  สร้างคูปอง
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Add New Item Modal Overlay */}
       {showAddItemModal && (
