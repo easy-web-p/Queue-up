@@ -259,4 +259,95 @@ export const fetchUsersFromFirestore = async () => {
   }
 };
 
+// ==========================================================================
+// STORE, FAVORITES, RELATED PRODUCTS & ORDER SERVICES
+// ==========================================================================
+
+export const fetchStoreByIdFromFirestore = async (storeId) => {
+  if (!storeId) return null;
+  try {
+    const docRef = doc(db, "shops", storeId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return { id: docSnap.id, ...docSnap.data() };
+    }
+  } catch (error) {
+    console.warn("Firestore fetchStoreById warning:", error);
+  }
+  return null;
+};
+
+export const checkUserFavoriteInFirestore = async (userId, productId) => {
+  if (!userId || !productId) return false;
+  try {
+    const favRef = doc(db, "users", userId, "favorites", productId);
+    const favSnap = await getDoc(favRef);
+    return favSnap.exists();
+  } catch {
+    return false;
+  }
+};
+
+export const toggleUserFavoriteInFirestore = async (userId, productId) => {
+  if (!userId || !productId) return false;
+  try {
+    const favRef = doc(db, "users", userId, "favorites", productId);
+    const favSnap = await getDoc(favRef);
+    if (favSnap.exists()) {
+      const { deleteDoc } = await import("firebase/firestore");
+      await deleteDoc(favRef);
+      return false;
+    } else {
+      await setDoc(favRef, {
+        productId,
+        createdAt: serverTimestamp(),
+      });
+      return true;
+    }
+  } catch (error) {
+    console.warn("Firestore toggleUserFavorite warning:", error);
+    return false;
+  }
+};
+
+export const fetchRelatedProductsFromFirestore = async (storeId, currentProductId) => {
+  if (!storeId) return [];
+  try {
+    const q = query(collection(db, "products"), where("storeId", "==", storeId));
+    const querySnapshot = await getDocs(q);
+    const list = [];
+    querySnapshot.forEach((docSnap) => {
+      if (docSnap.id !== currentProductId) {
+        list.push({ id: docSnap.id, ...docSnap.data() });
+      }
+    });
+    return list;
+  } catch (error) {
+    console.warn("Firestore fetchRelatedProducts warning:", error);
+    return [];
+  }
+};
+
+export const saveOrderToFirestore = async (orderPayload) => {
+  if (!orderPayload) return null;
+  try {
+    const orderId = orderPayload.orderId || `ORD-${Date.now()}`;
+    const storeId = orderPayload.storeId || "store_canteen01";
+    const fullOrder = {
+      orderId,
+      ...orderPayload,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    // Save to global orders and shop-isolated subcollection
+    await setDoc(doc(db, "orders", orderId), fullOrder, { merge: true });
+    await setDoc(doc(db, "shops", storeId, "orders", orderId), fullOrder, { merge: true });
+    return fullOrder;
+  } catch (error) {
+    console.warn("Firestore saveOrder warning:", error);
+    return orderPayload;
+  }
+};
+
 
