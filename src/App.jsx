@@ -57,9 +57,14 @@ function App() {
             {/* User Orders & Profile Routes */}
             <Route path="/user/purchase" element={<ProtectedRoute><UserPurchase /></ProtectedRoute>} />
             <Route path="/User/Purchase" element={<ProtectedRoute><UserPurchase /></ProtectedRoute>} />
+            <Route path="/purchase" element={<ProtectedRoute><UserPurchase /></ProtectedRoute>} />
+            <Route path="/orders" element={<ProtectedRoute><UserPurchase /></ProtectedRoute>} />
+            <Route path="/user/orders" element={<ProtectedRoute><UserPurchase /></ProtectedRoute>} />
             <Route path="/user/account/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
             <Route path="/User/Account/Profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
             <Route path="/user/account/profile/" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
+            <Route path="/user/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
 
             {/* Search & Product Routes */}
             <Route path="/search" element={<ProtectedRoute><SearchResults /></ProtectedRoute>} />
