@@ -223,14 +223,18 @@ function Login() {
         const accountId = uData.accountId || generateSecureAccountId(58140);
         localStorage.setItem("queueup_secure_account_id", accountId);
 
+        const isAdminAccount = sanitizeInput(email) === "58140@lomsak.ac.th" || (uData.roles && uData.roles.includes("admin")) || uData.role === "admin";
+        const userRoles = isAdminAccount ? ["customer", "merchant", "admin"] : (uData.roles || ["customer"]);
+        const userActiveRole = uData.activeRole || "customer";
+
         dispatch(
           setUser({
             uid: firebaseUid,
             name: uData.displayName || uData.fullName || sanitizeInput(email.split("@")[0]),
             email: sanitizeInput(email),
             photo: uData.photo || selectedAvatar,
-            roles: uData.roles || ["customer"],
-            activeRole: uData.activeRole || "customer",
+            roles: userRoles,
+            activeRole: userActiveRole,
           })
         );
         setLoading(false);
@@ -271,6 +275,8 @@ function Login() {
     const defaultEmail = gUser.email || "58140@lomsak.ac.th";
     const defaultPhoto = gUser.photoURL || "/yeti_mascot.jpg";
     const accountId = generateSecureAccountId(58140);
+    const isAdminAccount = defaultEmail === "58140@lomsak.ac.th";
+    const userRoles = isAdminAccount ? ["customer", "merchant", "admin"] : ["customer"];
 
     localStorage.setItem("queueup_secure_account_id", accountId);
     localStorage.setItem(
@@ -280,7 +286,7 @@ function Login() {
         name: defaultName,
         email: defaultEmail,
         photo: defaultPhoto,
-        roles: ["customer"],
+        roles: userRoles,
         activeRole: "customer",
       })
     );
@@ -291,7 +297,7 @@ function Login() {
         name: defaultName,
         email: defaultEmail,
         photo: defaultPhoto,
-        roles: ["customer"],
+        roles: userRoles,
         activeRole: "customer",
       })
     );
@@ -302,7 +308,7 @@ function Login() {
         {
           uid: gUser.uid,
           accountId: accountId,
-          roles: ["customer"],
+          roles: userRoles,
           activeRole: "customer",
           isGoogleUser: true,
           email: defaultEmail,

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CustomerProfile } from '../../types';
+import { CustomerProfile } from '../types';
 import { Users, Send, TrendingUp, Award, Phone, CheckCircle2 } from 'lucide-react';
 
 interface Props {

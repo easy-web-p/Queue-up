@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Order, QueueStatus } from '../../types';
+import { Order, QueueStatus } from '../types';
 import { ChefHat, CheckCircle2, Eye, Phone, Sparkles } from 'lucide-react';
 
 interface Props {

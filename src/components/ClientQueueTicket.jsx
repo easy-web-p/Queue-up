@@ -35,18 +35,26 @@ export const ClientQueueTicket = ({ activeOrder }) => {
 
         <div className="border-top pt-2 mt-2">
           <small className="text-white-50 fw-bold d-block mb-1">รายการที่สั่ง:</small>
-          {(activeOrder.items || []).map((item, idx) => (
-            <div key={idx} className="d-flex justify-content-between small">
-              <span>• {item.menuItem?.name} x{item.quantity}</span>
-              <span className="fw-bold">฿{(item.menuItem?.price || 0) * item.quantity}</span>
-            </div>
-          ))}
+          {(activeOrder.items || []).map((item, idx) => {
+            const itemName = item.menuItem?.name || item.name || "รายการอาหาร";
+            const itemPrice = item.menuItem?.price || item.price || 0;
+            const itemQty = item.quantity || item.qty || 1;
+            return (
+              <div key={idx} className="d-flex justify-content-between small">
+                <span>• {itemName} x{itemQty}</span>
+                <span className="fw-bold">฿{itemPrice * itemQty}</span>
+              </div>
+            );
+          })}
           <div className="d-flex justify-content-between fw-bold text-warning border-top pt-2 mt-2">
             <span>รวมทั้งสิ้น:</span>
-            <span>{activeOrder.totalAmount} บาท</span>
+            <span>{activeOrder.totalAmount || activeOrder.totalPrice || 0} บาท</span>
           </div>
         </div>
       </div>
     </div>
   );
 };
+
+export default ClientQueueTicket;
+

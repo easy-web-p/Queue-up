@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MenuItem, MenuCategory } from '../../types';
+import { MenuItem, MenuCategory } from '../types';
 import { ToggleLeft, ToggleRight, Plus, Utensils, AlertTriangle, Edit2, Check } from 'lucide-react';
 
 interface Props {
