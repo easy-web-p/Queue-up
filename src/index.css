@@ -958,3 +958,82 @@ html[data-theme="dark"] .queue-btn-back:hover {
   color: #334155;
 }
 
+/* ==========================================================================
+   MULTI-SCREEN & ULTRA-WIDE RESPONSIVE DESIGN SYSTEM (v3.0)
+   ========================================================================== */
+
+/* 1. Ultra-Wide Displays, 4K & Dual Monitors (min-width: 1440px) */
+@media (min-width: 1440px) {
+  .queue-home-wrapper,
+  .merchant-dashboard-header-wrapper,
+  .merchant-dashboard-body,
+  .shopee-header-container,
+  .shopee-pd-container,
+  .user-profile-wrapper {
+    max-width: 1440px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+}
+
+@media (min-width: 1920px) {
+  .queue-home-wrapper,
+  .merchant-dashboard-header-wrapper,
+  .merchant-dashboard-body,
+  .shopee-header-container,
+  .shopee-pd-container,
+  .user-profile-wrapper {
+    max-width: 1680px !important;
+  }
+}
+
+/* 2. Fluid Multi-Column Grid Layout Scaling */
+@media (min-width: 1200px) {
+  .shopee-food-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 20px !important;
+  }
+}
+
+@media (min-width: 1600px) {
+  .shopee-food-grid {
+    grid-template-columns: repeat(5, 1fr) !important;
+    gap: 24px !important;
+  }
+}
+
+/* 3. Tablets & iPad Screens (768px - 1199px) */
+@media (min-width: 768px) and (max-width: 1199px) {
+  .shopee-food-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 16px !important;
+  }
+  
+  .merchant-dashboard-header-wrapper,
+  .merchant-dashboard-body {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+}
+
+/* 4. Compact Mobile & Smartphone Screens (320px - 767px) */
+@media (max-width: 767px) {
+  .shopee-food-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 12px !important;
+  }
+
+  .merchant-tab-btn {
+    min-width: 140px !important;
+    font-size: 0.8rem !important;
+    padding: 10px 12px !important;
+  }
+
+  .queue-floating-chat-btn {
+    bottom: 20px !important;
+    right: 16px !important;
+    padding: 8px 14px !important;
+    font-size: 12px !important;
+  }
+}
+
