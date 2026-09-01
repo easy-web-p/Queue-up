@@ -1,4 +1,3 @@
-import React from 'react';
 import { Calculator, LineChart, Sparkles, History } from 'lucide-react';
 
 export default function Navbar({ activeTab, setActiveTab }) {

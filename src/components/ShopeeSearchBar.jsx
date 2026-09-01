@@ -25,7 +25,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { logout } = useAuth();
-  const { theme, toggleTheme, setThemeMode, language, t, toggleLanguage } = usePreferences();
+  const { theme, toggleTheme, setThemeMode, language, toggleLanguage } = usePreferences();
   const { user } = useSelector((state) => state.auth);
 
   // States

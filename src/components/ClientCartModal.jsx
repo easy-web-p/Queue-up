@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ShoppingBag, Trash2, Plus, Minus, QrCode, Upload, CheckCircle2 } from 'lucide-react';
+import { useState } from 'react';
+import { ShoppingBag, Trash2, Plus, Minus, Upload, CheckCircle2 } from 'lucide-react';
 
 export const ClientCartModal = ({
   isOpen,
@@ -11,8 +11,8 @@ export const ClientCartModal = ({
 }) => {
   const [customerName, setCustomerName] = useState('พิมพ์ชนก เรียนดี');
   const [customerPhone, setCustomerPhone] = useState('081-234-5678');
-  const [orderType, setOrderType] = useState('preorder');
-  const [pickupTime, setPickupTime] = useState('12:00');
+  const [orderType] = useState('preorder');
+  const [pickupTime] = useState('12:00');
   const [uploadedSlip, setUploadedSlip] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 

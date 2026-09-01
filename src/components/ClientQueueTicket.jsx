@@ -1,5 +1,4 @@
-import React from 'react';
-import { Clock, CheckCircle2, QrCode, ChefHat, Sparkles } from 'lucide-react';
+import { Clock } from 'lucide-react';
 
 export const ClientQueueTicket = ({ activeOrder }) => {
   if (!activeOrder) {

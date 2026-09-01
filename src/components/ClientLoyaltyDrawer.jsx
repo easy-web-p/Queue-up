@@ -1,5 +1,4 @@
-import React from 'react';
-import { Award, Gift, ChevronRight, Check } from 'lucide-react';
+import { Award, Gift } from 'lucide-react';
 
 export const ClientLoyaltyDrawer = ({
   isOpen,

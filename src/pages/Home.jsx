@@ -224,10 +224,6 @@ function Home() {
       .slice(0, 10);
   }, [menuItems]);
 
-  const filteredMenuItems = (menuItems || []).filter((item) => {
-    return selectedCategory === "all" || item?.category === selectedCategory;
-  });
-
   const displayCatalogItems = useMemo(() => {
     let list = (menuItems || []).filter((item) => {
       return selectedCategory === "all" || item?.category === selectedCategory;
