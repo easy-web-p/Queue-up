@@ -322,3 +322,30 @@
     height: 70px;
   }
 }
+
+/* Explicit Dark Mode & Glassmorphism Polish for Product Detail */
+html[data-theme="dark"] .queue-pd-container {
+  background-color: #120c08 !important;
+  color: #f3ece3 !important;
+}
+
+html[data-theme="dark"] .queue-pd-main-img-box,
+html[data-theme="dark"] .queue-pd-thumb-box,
+html[data-theme="dark"] .queue-pd-recommend-box,
+html[data-theme="dark"] .queue-pd-right-card {
+  background-color: #1e150f !important;
+  border-color: #38271a !important;
+  color: #f3ece3 !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+html[data-theme="dark"] .queue-pd-recommend-title,
+html[data-theme="dark"] .queue-pd-shop-title {
+  color: #f3ece3 !important;
+}
+
+html[data-theme="dark"] .queue-pd-input-select {
+  background-color: #16100c !important;
+  color: #f3ece3 !important;
+  border-color: #38271a !important;
+}
