@@ -1,6 +1,7 @@
 html {
   height: 100%;
   background-color: #0f172a;
+  overflow-x: hidden;
 }
 
 body {
@@ -11,6 +12,7 @@ body {
   background-color: #0f172a;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
 }
 
 #root {
@@ -19,6 +21,7 @@ body {
   display: flex;
   flex-direction: column;
   flex: 1 0 auto;
+  overflow-x: hidden;
 }
 
 /* App-level Light & Dark design system. */

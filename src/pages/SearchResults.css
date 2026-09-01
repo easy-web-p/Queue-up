@@ -15,8 +15,9 @@
 }
 
 .shopee-search-container {
-  max-width: clamp(1200px, 92vw, 1680px);
+  max-width: 1440px;
   width: 100%;
+  box-sizing: border-box;
   margin: 0 auto;
   padding: 24px 20px 40px 20px;
   flex: 1 0 auto;
