@@ -1,12 +1,14 @@
 import { useSelector, useDispatch } from "react-redux";
 import { Navigate, useNavigate, useLocation } from "react-router-dom";
 import Loading from "../pages/Loading.jsx";
+import NotFound from "../pages/NotFound.jsx";
 import { switchRole } from "../store/authSlice.js";
 
 /**
  * PROTECTED ROUTE GUARD WITH RBAC (Role-Based Access Control)
  * 1. Enforces strict authentication for private pages - redirects to /login if unauthenticated.
  * 2. Enforces Role-Based Access Control for merchant & admin dashboard routes.
+ * 3. Hides admin routes from non-admin users by returning 404 (Security by Information Hiding).
  */
 export default function ProtectedRoute({ children, allowedRoles = [] }) {
   const { user, isLoading } = useSelector((state) => state.auth);
@@ -32,6 +34,10 @@ export default function ProtectedRoute({ children, allowedRoles = [] }) {
 
   // 1. If not logged in -> Redirect to /login
   if (!currentUser) {
+    // If attempting to access admin route while unauthenticated, show 404 to avoid leaking admin existence
+    if (allowedRoles && allowedRoles.includes("admin") && allowedRoles.length === 1) {
+      return <NotFound />;
+    }
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
@@ -45,6 +51,10 @@ export default function ProtectedRoute({ children, allowedRoles = [] }) {
     const hasRole = isSuperAdmin || allowedRoles.includes(currentRole) || allowedRoles.some((r) => userRoles.includes(r));
 
     if (!hasRole) {
+      // 🔒 Security Policy: When a non-admin attempts to access Admin route, render 404 NOT FOUND directly
+      if (allowedRoles.includes("admin") && allowedRoles.length === 1) {
+        return <NotFound />;
+      }
       // Access Denied Screen for unauthorized role
       return (
         <div style={{
