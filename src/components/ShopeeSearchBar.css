@@ -706,6 +706,51 @@ body.dark-mode .shopee-header-container {
   }
 }
 
+@media (max-width: 480px) {
+  .shopee-main-header {
+    padding: 6px 8px;
+    gap: 6px;
+  }
+
+  .shopee-logo-title {
+    font-size: 1.15rem;
+  }
+
+  .shopee-logo-card {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    padding: 2px;
+  }
+
+  .shopee-search-button {
+    width: 32px;
+    height: 28px;
+  }
+
+  .shopee-search-input {
+    font-size: 11.5px;
+    padding: 4px 2px;
+  }
+
+  .shopee-cart-container {
+    padding: 2px 4px;
+  }
+
+  .shopee-cart-icon {
+    font-size: 20px;
+  }
+
+  .shopee-cart-badge-count {
+    top: -2px;
+    right: 0px;
+    font-size: 9.5px;
+    padding: 0 4px;
+    line-height: 14px;
+    min-width: 15px;
+  }
+}
+
 /* Preference Switcher Buttons (TH/EN & Light/Dark Theme) matching user screenshot */
 .queue-preference-btn {
   background: rgba(255, 255, 255, 0.18);
