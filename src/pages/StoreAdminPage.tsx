@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { MenuItem, Order, CustomerProfile, MerchantShop } from '../types';
 import { fetchMenuItemsFromFirestore, fetchOrdersFromFirestore, fetchShopsFromFirestore, fetchUsersFromFirestore } from '../lib/firebase';
+import { db, doc, setDoc, deleteDoc } from '../firebase/config.js';
 
 interface StoreAdminPageProps {
   menuItems?: MenuItem[];
@@ -133,13 +134,18 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
     e.preventDefault();
     if (!newStaffName.trim()) return;
     const newStaff = {
-      id: `ST-${(staffList.length + 1).toString().padStart(2, '0')}`,
+      id: `ST-${staffList.length + 1}`,
       name: newStaffName,
       role: newStaffRole,
       phone: newStaffPhone || '080-000-0000',
       status: 'Active'
     };
     setStaffList(prev => [...prev, newStaff]);
+    try {
+      setDoc(doc(db, "shops", "store_canteen01", "staff", newStaff.id), newStaff, { merge: true });
+    } catch (e) {
+      console.warn("Firestore save staff error:", e);
+    }
     setLogs(prev => [{
       id: `L-${Date.now().toString().slice(-4)}`,
       time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
@@ -164,6 +170,11 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
       status: 'Active'
     };
     setCoupons(prev => [...prev, newCoupon]);
+    try {
+      setDoc(doc(db, "coupons", newCoupon.code), newCoupon, { merge: true });
+    } catch (e) {
+      console.warn("Firestore save coupon error:", e);
+    }
     setLogs(prev => [{
       id: `L-${Date.now().toString().slice(-4)}`,
       time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
@@ -180,11 +191,18 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
     if (propsOnToggleStock) {
       propsOnToggleStock(id);
     }
+    const targetItem = menuItems.find((i) => i.id === id);
+    const newAvail = targetItem ? !targetItem.isAvailable : true;
     setLocalMenuItems((prev) =>
       prev.map((item) =>
-        item.id === id ? { ...item, isAvailable: !item.isAvailable } : item
+        item.id === id ? { ...item, isAvailable: newAvail } : item
       )
     );
+    try {
+      setDoc(doc(db, "products", id), { isAvailable: newAvail }, { merge: true });
+    } catch (e) {
+      console.warn("Firestore toggle stock error:", e);
+    }
   };
 
   const handleUpdatePrice = (id: string, newPrice: number) => {
@@ -194,6 +212,11 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
     setLocalMenuItems((prev) =>
       prev.map((item) => (item.id === id ? { ...item, price: newPrice } : item))
     );
+    try {
+      setDoc(doc(db, "products", id), { price: newPrice }, { merge: true });
+    } catch (e) {
+      console.warn("Firestore update price error:", e);
+    }
     const itemMatch = menuItems.find((i) => i.id === id);
     if (itemMatch) {
       setToastMsg(`อัปเดตราคา ${itemMatch.name} เป็น ฿${newPrice} สำเร็จ`);
@@ -234,6 +257,11 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
       onAddNewItem(item);
     }
     setLocalMenuItems((prev) => [item, ...prev]);
+    try {
+      setDoc(doc(db, "products", item.id), item, { merge: true });
+    } catch (e) {
+      console.warn("Firestore add new product error:", e);
+    }
     setShowAddItemModal(false);
     setNewItemName('');
     setNewItemDesc('');

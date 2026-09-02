@@ -330,23 +330,31 @@ export const fetchRelatedProductsFromFirestore = async (storeId, currentProductI
 
 export const saveOrderToFirestore = async (orderPayload) => {
   if (!orderPayload) return null;
-  try {
-    const orderId = orderPayload.orderId || `ORD-${Date.now()}`;
-    const storeId = orderPayload.storeId || "store_canteen01";
-    const fullOrder = {
-      orderId,
-      ...orderPayload,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    };
+  const orderId = orderPayload.orderId || orderPayload.id || `ORD-${Date.now()}`;
+  const storeId = orderPayload.storeId || "store_canteen01";
+  const fullOrder = {
+    ...orderPayload,
+    id: orderId,
+    orderId,
+    storeId,
+    paymentStatus: orderPayload.paymentStatus || 'pending',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
 
-    // Save to global orders and shop-isolated subcollection
+  try {
+    // Save to global orders
     await setDoc(doc(db, "orders", orderId), fullOrder, { merge: true });
-    await setDoc(doc(db, "shops", storeId, "orders", orderId), fullOrder, { merge: true });
+    // Also save to store subcollection for shop isolation
+    try {
+      await setDoc(doc(db, "shops", storeId, "orders", orderId), fullOrder, { merge: true });
+    } catch (subErr) {
+      console.warn("Shop subcollection save warning:", subErr);
+    }
     return fullOrder;
   } catch (error) {
-    console.warn("Firestore saveOrder warning:", error);
-    return orderPayload;
+    console.error("Firestore saveOrder error:", error);
+    throw error;
   }
 };
 
