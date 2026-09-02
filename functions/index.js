@@ -37,32 +37,38 @@ export const createPromptPayPayment = onCall(
       throw new HttpsError("invalid-argument", "Invalid order details.");
     }
 
-    // 🔒 Idempotency Check: Return existing active payment if client retries with the same idempotency key
-    if (typeof idempotencyKey === "string" && idempotencyKey.trim()) {
-      const existingQuery = await db.collection("orders")
-        .where("userId", "==", request.auth.uid)
-        .where("idempotencyKey", "==", idempotencyKey.trim())
-        .limit(1)
-        .get();
-
-      if (!existingQuery.empty) {
-        const existingOrder = existingQuery.docs[0].data();
-        if (existingOrder.paymentStatus !== "creation_failed" && existingOrder.paymentStatus !== "cancelled") {
-          return {
-            orderId: existingOrder.orderId,
-            paymentId: existingOrder.paymentId,
-            qrUrl: existingOrder.qrUrl,
-            expiresAt: existingOrder.expiresAt || null,
-          };
-        }
-      }
-    }
-
     const orderRef = db.collection("orders").doc();
     const productRef = db.collection("products").doc(productId);
+    const idempotencyDocId = typeof idempotencyKey === "string" && idempotencyKey.trim()
+      ? `${request.auth.uid}_${idempotencyKey.trim()}`
+      : null;
+    const idempotencyRef = idempotencyDocId
+      ? db.collection("idempotency_keys").doc(idempotencyDocId)
+      : null;
 
-    // 🔒 Atomic Transaction: Validate stock, decrement stock, compute price/coupon, and create order atomically
-    const { totalSatang } = await db.runTransaction(async (transaction) => {
+    // 🔒 Atomic Transaction: Validate stock, check/lock idempotency, decrement stock, and create order atomically
+    const { totalSatang, existingResult } = await db.runTransaction(async (transaction) => {
+      if (idempotencyRef) {
+        const idempSnap = await transaction.get(idempotencyRef);
+        if (idempSnap.exists) {
+          const existingOrderId = idempSnap.data().orderId;
+          const existingOrderDoc = await transaction.get(db.collection("orders").doc(existingOrderId));
+          if (existingOrderDoc.exists) {
+            const ord = existingOrderDoc.data();
+            if (ord.paymentStatus !== "creation_failed" && ord.paymentStatus !== "cancelled") {
+              return {
+                existingResult: {
+                  orderId: ord.orderId,
+                  paymentId: ord.paymentId,
+                  qrUrl: ord.qrUrl,
+                  expiresAt: ord.expiresAt || null,
+                }
+              };
+            }
+          }
+        }
+      }
+
       const productSnap = await transaction.get(productRef);
       if (!productSnap.exists) throw new HttpsError("not-found", "Product is not available for payment.");
       const product = productSnap.data();
@@ -151,9 +157,21 @@ export const createPromptPayPayment = onCall(
         updatedAt: FieldValue.serverTimestamp()
       };
 
+      if (idempotencyRef) {
+        transaction.set(idempotencyRef, {
+          orderId: orderRef.id,
+          userId: request.auth.uid,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+      }
+
       transaction.set(orderRef, orderData);
       return { totalSatang: satang };
     });
+
+    if (existingResult) {
+      return existingResult;
+    }
 
     try {
       const charge = await opnRequest("/charges", opnSecretKey.value(), { amount: totalSatang, currency: "THB", description: `QueueUp ${orderRef.id}`, metadata: { orderId: orderRef.id, uid: request.auth.uid }, source: { type: "promptpay" } });

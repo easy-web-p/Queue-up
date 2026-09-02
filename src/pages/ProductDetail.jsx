@@ -12,7 +12,6 @@ import {
   fetchStoreByIdFromFirestore,
   checkUserFavoriteInFirestore,
   toggleUserFavoriteInFirestore,
-  saveOrderToFirestore,
 } from "../lib/firebase.js";
 import { generateStoreQueueNo } from "../services/storeIsolationEngine.js";
 import "./ProductDetail.css";
@@ -268,44 +267,7 @@ function ProductDetail() {
     return generateStoreQueueNo(targetStore, 6);
   });
 
-  const handlePaymentSuccess = async (createdId) => {
-    const orderPayload = {
-      orderId: createdId || `ORD-${Date.now()}`,
-      userId: user?.uid || "guest_user",
-      storeId: product.storeId || "store_canteen01",
-      shopName: store?.name || product.shopName || "ร้านครัวโรงเรียน QueueUp Canteen",
-      items: [
-        {
-          productId: product.id || "m1",
-          productName: product.name,
-          image: selectedImg,
-          basePrice,
-          selectedModifiers: [
-            { id: "spicy", value: spicyLevel },
-            { id: "topping", value: selectedToppings },
-            { id: "note", value: customerNote },
-          ],
-          quantity: quantityNumber,
-          unitPrice: discountedUnitPrice,
-          subtotal: totalCalculatedPrice,
-        },
-      ],
-      pickupSlot: {
-        date: bookingDate,
-        time: selectedTimeSlot?.time || "12:00",
-        discount: selectedTimeSlot?.discount || "0%",
-      },
-      subtotal: totalCalculatedPrice,
-      total: totalCalculatedPrice,
-      totalAmount: totalCalculatedPrice,
-      paymentMethod: "PROMPTPAY_QR",
-      paymentStatus: "pending",
-      paymentVerificationMethod: "promptpay_slip",
-      orderStatus: "TO_SHIP",
-      queueNumber: currentQueueNo,
-    };
-
-    await saveOrderToFirestore(orderPayload);
+  const handlePaymentSuccess = () => {
     setIsPaymentModalOpen(false);
     navigate("/user/account/profile?tab=bookings");
   };
@@ -611,6 +573,12 @@ function ProductDetail() {
         onClose={() => setIsPaymentModalOpen(false)}
         onPaymentSuccess={handlePaymentSuccess}
         onSuccess={handlePaymentSuccess}
+        productId={product.id}
+        quantity={quantityNumber}
+        booking={{
+          date: bookingDate,
+          timeSlot: selectedTimeSlot?.time || "12:00",
+        }}
         storeId={product.storeId || "store_canteen01"}
         shopName={store?.name || product.shopName || "ร้านครัวโรงเรียน QueueUp Canteen"}
         shopLocation={store?.location || product.shopLocation || "โรงอาหาร 1 (อาคารเรียน 2)"}

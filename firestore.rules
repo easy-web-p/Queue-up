@@ -224,5 +224,13 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // ==========================================
+    // 10. IDEMPOTENCY KEYS (Internal & Owner Read)
+    // ==========================================
+    match /idempotency_keys/{keyId} {
+      allow read: if isAuthenticated() && (keyId.matches('^' + request.auth.uid + '_.*') || isAdmin());
+      allow write: if false; // Only manageable by Cloud Functions / Admin SDK
+    }
+
   }
 }

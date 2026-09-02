@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { generateStoreQueueNo } from "../services/storeIsolationEngine.js";
+import { httpsCallable } from "firebase/functions";
+import { doc, onSnapshot } from "firebase/firestore";
+import { functions, db } from "../firebase/config.js";
 import { soundManager } from "../utils/audioNotification.js";
 import "./PaymentModal.css";
 
@@ -9,7 +11,11 @@ function PaymentModal({
   onClose,
   amount = 0,
   itemTitle = "รายการจองอาหาร QueueUp",
-  orderId = "240809QUEUE01",
+  orderId = "ORD-PENDING",
+  productId,
+  quantity = 1,
+  couponCode,
+  booking,
   storeId = "store_canteen01",
   shopName = "ร้านครัวโรงเรียน QueueUp Canteen",
   shopLocation = "โรงอาหาร 1 (อาคารเรียน 2)",
@@ -22,7 +28,12 @@ function PaymentModal({
   const [activePaymentMethod, setActivePaymentMethod] = useState("promptpay");
 
   // Timer State (15:00 minutes countdown)
-  const [timeLeft, setTimeLeft] = useState(900); // 15 mins * 60s
+  const [timeLeft, setTimeLeft] = useState(900);
+
+  // Cloud Function Payment State
+  const [serverPaymentData, setServerPaymentData] = useState(null);
+  const [isLoadingPayment, setIsLoadingPayment] = useState(false);
+  const [paymentError, setPaymentError] = useState(null);
 
   // Slip Upload States
   const [slipFile, setSlipFile] = useState(null);
@@ -30,9 +41,69 @@ function PaymentModal({
   const [isVerifyingSlip, setIsVerifyingSlip] = useState(false);
   const [slipVerified, setSlipVerified] = useState(false);
 
-  // Success & Submitting States (Idempotency Guard)
+  // Success & Submitting States
   const [isPaidSuccess, setIsPaidSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleClose = useCallback(() => {
+    setSlipFile(null);
+    setSlipPreview(null);
+    setSlipVerified(false);
+    setIsPaidSuccess(false);
+    setIsSubmitting(false);
+    onClose();
+  }, [onClose]);
+
+  // Initiate Server Payment with Cloud Function
+  useEffect(() => {
+    if (!isOpen || !productId) return;
+    let isMounted = true;
+
+    const initPayment = async () => {
+      setIsLoadingPayment(true);
+      setPaymentError(null);
+      try {
+        const createPayment = httpsCallable(functions, "createPromptPayPayment");
+        const idempotencyKey = `pay_${productId}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        const res = await createPayment({
+          productId,
+          quantity: Number(quantity) || 1,
+          couponCode: couponCode || undefined,
+          booking: booking || undefined,
+          idempotencyKey,
+        });
+
+        if (isMounted && res.data) {
+          setServerPaymentData(res.data);
+        }
+      } catch (err) {
+        console.warn("Cloud function createPromptPayPayment error (using offline promptpay fallback if unconfigured):", err);
+        if (isMounted) setPaymentError(err?.message || "ระบบชำระเงินขัดข้อง");
+      } finally {
+        if (isMounted) setIsLoadingPayment(false);
+      }
+    };
+
+    initPayment();
+    return () => { isMounted = false; };
+  }, [isOpen, productId, quantity, couponCode, booking]);
+
+  // Real-time Firestore Order Listener for Live Webhook Payment Status
+  useEffect(() => {
+    if (!serverPaymentData?.orderId) return;
+    const unsub = onSnapshot(doc(db, "orders", serverPaymentData.orderId), (docSnap) => {
+      if (docSnap.exists() && docSnap.data()?.paymentStatus === "paid") {
+        setIsPaidSuccess(true);
+        soundManager.playQueueIssuedSound();
+        setTimeout(() => {
+          if (onPaymentSuccess) onPaymentSuccess(serverPaymentData.orderId);
+          handleClose();
+          navigate("/user/account/profile?tab=bookings");
+        }, 1500);
+      }
+    });
+    return () => unsub();
+  }, [serverPaymentData?.orderId, onPaymentSuccess, navigate, handleClose]);
 
   // Countdown timer effect
   useEffect(() => {
@@ -51,15 +122,6 @@ function PaymentModal({
   };
 
   if (!isOpen) return null;
-
-  const handleClose = () => {
-    setSlipFile(null);
-    setSlipPreview(null);
-    setSlipVerified(false);
-    setIsPaidSuccess(false);
-    setIsSubmitting(false);
-    onClose();
-  };
 
   // Handle Payment Slip Image Selection
   const handleSlipChange = (e) => {
@@ -82,85 +144,29 @@ function PaymentModal({
     }
   };
 
-  // Confirm Payment & Save Order with storeId (Architecture v3.0)
+  // Confirm Payment
   const handleConfirmPayment = () => {
     if (isSubmitting || isPaidSuccess) return;
     setIsSubmitting(true);
     setIsPaidSuccess(true);
     soundManager.playQueueIssuedSound();
 
-    const generatedOrderId = "2408" + Math.floor(100000 + Math.random() * 900000);
-    const formattedQueueNo = queueNo && queueNo.includes("-Q") ? queueNo : generateStoreQueueNo(storeId, Math.floor(1 + Math.random() * 15));
-
-    const newOrder = {
-      id: generatedOrderId,
-      storeId: storeId || "STORE-DEMO01",
-      shopName: shopName || "ร้านครัวโรงเรียน QueueUp Canteen",
-      shopLocation: shopLocation || "โรงอาหาร 1",
-      orderDate:
-        new Date().toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "numeric" }) +
-        ", " +
-        new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }) +
-        " น.",
-      status: "TO_SHIP",
-      statusText: "กำลังปรุงคิวอาหาร (ประมาณ 10 นาที)",
-      queueNo: formattedQueueNo,
-      totalAmount: Number(amount) || 65,
-      paymentMethod: "PromptPay QR Code",
-      items: [
-        {
-          id: "p_" + Date.now(),
-          name: itemTitle || "ชุดข้าวผัดกุ้งกะทะร้อน",
-          price: Number(amount) || 65,
-          quantity: 1,
-          variant: "ปกติ",
-          image: "/logo.png",
-        },
-      ],
-    };
-
-    try {
-      const savedUserOrders = localStorage.getItem("queueup_user_orders");
-      const existingUserOrders = savedUserOrders ? JSON.parse(savedUserOrders) : [];
-      localStorage.setItem("queueup_user_orders", JSON.stringify([newOrder, ...existingUserOrders]));
-
-      const targetStoreId = storeId || "store_canteen01";
-      const savedMerchantOrders = localStorage.getItem(`queueup_merchant_orders_${targetStoreId}`);
-      const existingMerchantOrders = savedMerchantOrders ? JSON.parse(savedMerchantOrders) : [];
-      localStorage.setItem(
-        `queueup_merchant_orders_${targetStoreId}`,
-        JSON.stringify([
-          {
-            id: newOrder.id,
-            storeId: targetStoreId,
-            customerName: "นักเรียน / สมาชิก QueueUp",
-            phone: "081-234-5678",
-            status: "TO_SHIP",
-            statusText: "กำลังปรุงคิวอาหาร",
-            time: new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }) + " น.",
-            items: newOrder.items.map((i) => ({ name: i.name, variant: i.variant, qty: i.quantity, price: i.price })),
-            totalPrice: newOrder.totalAmount,
-          },
-          ...existingMerchantOrders,
-        ])
-      );
-    } catch {
-      // ignore
-    }
+    const finalOrderId = serverPaymentData?.orderId || `ORD-${Date.now()}`;
 
     setTimeout(() => {
       if (onPaymentSuccess) {
-        onPaymentSuccess(generatedOrderId);
+        onPaymentSuccess(finalOrderId);
       }
       handleClose();
       navigate("/user/account/profile?tab=bookings");
-    }, 1800);
+    }, 1500);
   };
 
-  // PromptPay Dynamic QR Payload Code
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=00020101021129370016A000000677010111011300668123456785802TH5303764540${Number(
-    amount
-  ).toFixed(2)}6304`;
+  // PromptPay QR (Use Server QR from Opn if available, fallback to dynamic PromptPay standard)
+  const qrCodeUrl = serverPaymentData?.qrUrl ||
+    `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=00020101021129370016A000000677010111011300668123456785802TH5303764540${Number(
+      amount
+    ).toFixed(2)}6304`;
 
   return (
     <div className="payment-modal-backdrop" onClick={handleClose}>
@@ -187,7 +193,10 @@ function PaymentModal({
         <div className="payment-summary-bar">
           <div>
             <div className="fw-bold text-dark">{itemTitle}</div>
-            <div className="text-muted small">รหัสออเดอร์: {orderId}</div>
+            <div className="text-muted small">
+              ร้าน: {shopName} ({shopLocation}) | คิว: <span className="badge bg-danger">{queueNo}</span> | รหัสออเดอร์: {serverPaymentData?.orderId || orderId}
+            </div>
+            {storeId && <span className="d-none">{storeId}</span>}
           </div>
           <div className="payment-summary-amount">฿{Number(amount).toFixed(2)}</div>
         </div>
@@ -232,6 +241,17 @@ function PaymentModal({
               {/* TAB 1: PROMPTPAY QR */}
               {activePaymentMethod === "promptpay" && (
                 <div className="promptpay-qr-container">
+                  {isLoadingPayment && (
+                    <div className="py-3">
+                      <div className="spinner-border text-danger spinner-border-sm mb-2" role="status" />
+                      <div className="small text-muted">กำลังสร้าง PromptPay QR Code จากเซิร์ฟเวอร์...</div>
+                    </div>
+                  )}
+                  {paymentError && (
+                    <div className="alert alert-warning small py-2 mb-3">
+                      <i className="bi bi-info-circle me-1" /> {paymentError}
+                    </div>
+                  )}
                   <div className="d-flex align-items-center justify-content-center gap-2 mb-2">
                     <img
                       src="/logo.png"
