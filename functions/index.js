@@ -172,16 +172,19 @@ export const createPromptPayPayment = onCall(
           throw new HttpsError("failed-precondition", `ร้านค้านี้ไม่เปิดรับออเดอร์ในรอบเวลา ${slotTime}`);
         }
 
-        const storeConfiguredCapacity = Number(shopData?.slotCapacity || shopData?.maxOrdersPerSlot || 20);
-
+        const storeConfiguredCapacity = shopData?.slotCapacity ?? shopData?.maxOrdersPerSlot;
         reservedSlotDocId = `${storeId}_${slotDate}_${slotTime}`;
         const slotRef = db.collection("store_slots").doc(reservedSlotDocId);
         const slotSnap = await transaction.get(slotRef);
 
+        if (typeof storeConfiguredCapacity !== "number" && !slotSnap.exists) {
+          throw new HttpsError("failed-precondition", "ร้านค้ายังไม่ได้เปิดการตั้งค่าความจุสำหรับรอบเวลานี้");
+        }
+
         const currentOrders = slotSnap.exists ? Number(slotSnap.data().currentOrders || 0) : 0;
         const maxCapacity = slotSnap.exists && typeof slotSnap.data().capacity === "number"
           ? Number(slotSnap.data().capacity)
-          : storeConfiguredCapacity;
+          : Number(storeConfiguredCapacity || 20);
 
         if (currentOrders + quantity > maxCapacity) {
           throw new HttpsError("failed-precondition", `รอบเวลา ${slotTime} วันที่ ${slotDate} เต็มแล้ว (รองรับได้สูงสุด ${maxCapacity} คิว)`);
@@ -264,6 +267,7 @@ export const createPromptPayPayment = onCall(
         paymentProvider: "opn",
         paymentMethod: "promptpay",
         paymentStatus: "pending",
+        resourcesReleased: false,
         queueStatus: "waiting",
         status: "TO_SHIP",
         createdAt: FieldValue.serverTimestamp(),
@@ -359,6 +363,77 @@ export const createPromptPayPayment = onCall(
   }
 );
 
+// 🔒 Idempotent Resource Release Engine: Safely returns stock and time-slot capacity
+export async function releaseOrderResources(orderDocRef, orderData) {
+  if (!orderData || orderData.resourcesReleased) return;
+
+  await db.runTransaction(async (transaction) => {
+    const freshSnap = await transaction.get(orderDocRef);
+    if (!freshSnap.exists || freshSnap.data().resourcesReleased) return;
+
+    const data = freshSnap.data();
+
+    // 1. Rollback stock
+    if (data.productId && typeof data.quantity === "number") {
+      const productRef = db.collection("products").doc(data.productId);
+      transaction.update(productRef, {
+        stock: FieldValue.increment(data.quantity),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
+
+    // 2. Rollback time-slot
+    if (data.booking?.date && (data.booking.timeSlot || data.booking.time) && data.storeId) {
+      const slotTime = String(data.booking.timeSlot || data.booking.time).trim();
+      const slotDate = String(data.booking.date).trim();
+      const slotDocId = `${data.storeId}_${slotDate}_${slotTime}`;
+      const slotRef = db.collection("store_slots").doc(slotDocId);
+      transaction.update(slotRef, {
+        currentOrders: FieldValue.increment(-data.quantity),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
+
+    transaction.update(orderDocRef, {
+      resourcesReleased: true,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  });
+}
+
+// Callable & periodic function to expire stale pending orders and release stock & slots
+export const expirePendingOrders = onCall(
+  { region: "asia-southeast1" },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Sign in is required.");
+
+    // Query pending orders older than 15 minutes
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const staleSnap = await db.collection("orders")
+      .where("paymentStatus", "in", ["pending", "charge_created_order_pending"])
+      .where("createdAt", "<=", fifteenMinutesAgo)
+      .limit(50)
+      .get();
+
+    let expiredCount = 0;
+    for (const doc of staleSnap.docs) {
+      const order = doc.data();
+      if (!order.resourcesReleased) {
+        await doc.ref.update({
+          paymentStatus: "expired",
+          status: "CANCELLED",
+          cancelReason: "Payment window expired (15 minutes)",
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        await releaseOrderResources(doc.ref, order);
+        expiredCount++;
+      }
+    }
+
+    return { success: true, expiredCount };
+  }
+);
+
 // Callable function to safely check payment status on-demand
 export const getPaymentStatus = onCall(
   { region: "asia-southeast1" },
@@ -410,6 +485,19 @@ export const opnWebhook = onRequest(
       // 🔒 Strict Cross-Check: charge metadata UID must strictly match order.userId
       if (orderSnap.data().userId !== chargeUid) {
         return res.status(400).send("User ID mismatch");
+      }
+
+      // Handle Expired / Failed Charge Events
+      if (charge.status === "expired" || charge.status === "failed") {
+        await orderRef.update({
+          paymentId: charge.id,
+          paymentStatus: charge.status === "expired" ? "expired" : "failed",
+          providerStatus: charge.status,
+          status: "CANCELLED",
+          updatedAt: FieldValue.serverTimestamp()
+        });
+        await releaseOrderResources(orderRef, orderSnap.data());
+        return res.status(200).send("Expired/Failed handled");
       }
 
       // 🔒 Idempotency check: Don't re-process already paid orders
