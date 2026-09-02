@@ -142,18 +142,46 @@ export const createPromptPayPayment = onCall(
         if (isNaN(parsedDate.getTime())) {
           throw new HttpsError("invalid-argument", "รูปแบบวันที่ไม่ถูกต้อง");
         }
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        if (parsedDate < today) {
+
+        // Time check in GMT+7 (Bangkok)
+        const nowUtc = new Date();
+        const thaiTimeStr = nowUtc.toLocaleString("en-US", { timeZone: "Asia/Bangkok" });
+        const thaiNow = new Date(thaiTimeStr);
+        const currentThaiYmd = `${thaiNow.getFullYear()}-${String(thaiNow.getMonth() + 1).padStart(2, "0")}-${String(thaiNow.getDate()).padStart(2, "0")}`;
+
+        if (slotDate < currentThaiYmd) {
           throw new HttpsError("invalid-argument", "ไม่สามารถเลือกวันที่ย้อนหลังได้");
         }
+
+        // Reject past time slots for current day
+        if (slotDate === currentThaiYmd) {
+          const [slotHour, slotMinute] = slotTime.split(":").map(Number);
+          const currentHour = thaiNow.getHours();
+          const currentMinute = thaiNow.getMinutes();
+          if (slotHour < currentHour || (slotHour === currentHour && slotMinute <= currentMinute)) {
+            throw new HttpsError("invalid-argument", `รอบเวลา ${slotTime} ของวันนี้ผ่านไปแล้ว กรุณาเลือกรอบเวลาถัดไป`);
+          }
+        }
+
+        // Store-specific Slot & Capacity Config Check
+        const shopRef = db.collection("shops").doc(storeId);
+        const shopSnap = await transaction.get(shopRef);
+        const shopData = shopSnap.exists ? shopSnap.data() : null;
+
+        if (shopData?.pickupSlots && Array.isArray(shopData.pickupSlots) && !shopData.pickupSlots.includes(slotTime)) {
+          throw new HttpsError("failed-precondition", `ร้านค้านี้ไม่เปิดรับออเดอร์ในรอบเวลา ${slotTime}`);
+        }
+
+        const storeConfiguredCapacity = Number(shopData?.slotCapacity || shopData?.maxOrdersPerSlot || 20);
 
         reservedSlotDocId = `${storeId}_${slotDate}_${slotTime}`;
         const slotRef = db.collection("store_slots").doc(reservedSlotDocId);
         const slotSnap = await transaction.get(slotRef);
 
         const currentOrders = slotSnap.exists ? Number(slotSnap.data().currentOrders || 0) : 0;
-        const maxCapacity = slotSnap.exists ? Number(slotSnap.data().capacity || 20) : 20;
+        const maxCapacity = slotSnap.exists && typeof slotSnap.data().capacity === "number"
+          ? Number(slotSnap.data().capacity)
+          : storeConfiguredCapacity;
 
         if (currentOrders + quantity > maxCapacity) {
           throw new HttpsError("failed-precondition", `รอบเวลา ${slotTime} วันที่ ${slotDate} เต็มแล้ว (รองรับได้สูงสุด ${maxCapacity} คิว)`);
@@ -262,6 +290,22 @@ export const createPromptPayPayment = onCall(
     });
 
     if (existingResult) {
+      // 🔒 Charge Recovery: If order was created but QR was missing on previous network drop, recover it directly from Opn API
+      if (!existingResult.qrUrl && existingResult.paymentId) {
+        try {
+          const recoveredCharge = await retrieveCharge(existingResult.paymentId, opnSecretKey.value());
+          const recoveredQr = recoveredCharge.source?.scannable_code?.image?.download_uri;
+          if (recoveredQr) {
+            await db.collection("orders").doc(existingResult.orderId).update({
+              qrUrl: recoveredQr,
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+            existingResult.qrUrl = recoveredQr;
+          }
+        } catch (recoverErr) {
+          console.warn("Charge recovery warning:", recoverErr);
+        }
+      }
       return existingResult;
     }
 
@@ -353,10 +397,20 @@ export const opnWebhook = onRequest(
       if (!chargeId) return res.status(400).send("Missing charge id");
       const charge = await retrieveCharge(chargeId, opnSecretKey.value());
       const orderId = charge.metadata?.orderId;
-      if (!orderId || charge.currency !== "THB") return res.status(400).send("Invalid payment metadata");
+      const chargeUid = charge.metadata?.uid;
+
+      if (!orderId || !chargeUid || charge.currency !== "THB") {
+        return res.status(400).send("Invalid payment metadata");
+      }
+
       const orderRef = db.collection("orders").doc(orderId);
       const orderSnap = await orderRef.get();
       if (!orderSnap.exists) return res.status(400).send("Order mismatch");
+
+      // 🔒 Strict Cross-Check: charge metadata UID must strictly match order.userId
+      if (orderSnap.data().userId !== chargeUid) {
+        return res.status(400).send("User ID mismatch");
+      }
 
       // 🔒 Idempotency check: Don't re-process already paid orders
       if (orderSnap.data().paymentStatus === "paid") {
