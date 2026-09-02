@@ -212,5 +212,13 @@ service cloud.firestore {
       allow update, delete: if false; // Immutable evaluation records
     }
 
+    // ==========================================
+    // 9. COUPONS & PROMOTIONS (Admin Write, Authenticated Read)
+    // ==========================================
+    match /coupons/{couponId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
   }
 }

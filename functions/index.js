@@ -27,7 +27,7 @@ async function retrieveCharge(chargeId, key) {
   return response.json();
 }
 
-// The browser sends only product id/quantity/couponCode. Price, discount and final order data are strictly computed here on the server.
+// The browser sends only product id/quantity/couponCode. Price, stock, discount and final order data are strictly computed and reserved here atomically via Firestore Transaction.
 export const createPromptPayPayment = onCall(
   { region: "asia-southeast1", secrets: [opnSecretKey] },
   async (request) => {
@@ -36,83 +36,103 @@ export const createPromptPayPayment = onCall(
     if (typeof productId !== "string" || !Number.isInteger(quantity) || quantity < 1 || quantity > 20) {
       throw new HttpsError("invalid-argument", "Invalid order details.");
     }
-    const productSnap = await db.collection("products").doc(productId).get();
-    if (!productSnap.exists) throw new HttpsError("not-found", "Product is not available for payment.");
-    const product = productSnap.data();
-    if (product.isAvailable === false) {
-      throw new HttpsError("failed-precondition", "เมนูนี้ปิดรับออเดอร์ชั่วคราว");
-    }
-    if (typeof product.stock === "number" && product.stock < quantity) {
-      throw new HttpsError("failed-precondition", `สินค้าในสต็อกไม่เพียงพอ (คงเหลือ ${product.stock} รายการ)`);
-    }
 
-    const unitPrice = Number(product.price);
-    if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
-      throw new HttpsError("failed-precondition", "Invalid product price in database.");
-    }
+    const orderRef = db.collection("orders").doc();
+    const productRef = db.collection("products").doc(productId);
 
-    const storeId = String(product.storeId || product.shopId || "STORE_DEFAULT");
-    const storeName = String(product.storeName || product.shopName || "ร้านค้าในโรงเรียน");
-    const subtotal = unitPrice * quantity;
-    let discountAmount = 0;
+    // 🔒 Atomic Transaction: Validate stock, decrement stock, compute price/coupon, and create order atomically
+    const { totalSatang } = await db.runTransaction(async (transaction) => {
+      const productSnap = await transaction.get(productRef);
+      if (!productSnap.exists) throw new HttpsError("not-found", "Product is not available for payment.");
+      const product = productSnap.data();
 
-    // 🔒 Server-Authoritative & Store-Scoped Coupon Verification
-    if (typeof couponCode === "string" && couponCode.trim()) {
-      const cleanCode = couponCode.trim().toUpperCase();
-      const couponSnap = await db.collection("coupons").doc(cleanCode).get();
-      if (couponSnap.exists) {
-        const coupon = couponSnap.data();
-        const minSpend = Number(coupon.minSpend) || 0;
-        const discountVal = Number(coupon.discount) || 0;
-        const isNotExpired = !coupon.expiryDate || new Date(coupon.expiryDate) > new Date();
-        const isStoreMatch = !coupon.storeId || coupon.scope === "platform" || coupon.storeId === storeId;
+      if (product.isAvailable === false) {
+        throw new HttpsError("failed-precondition", "เมนูนี้ปิดรับออเดอร์ชั่วคราว");
+      }
+      if (typeof product.stock === "number" && product.stock < quantity) {
+        throw new HttpsError("failed-precondition", `สินค้าในสต็อกไม่เพียงพอ (คงเหลือ ${product.stock} รายการ)`);
+      }
 
-        if (coupon.status === "Active" && isNotExpired && isStoreMatch && subtotal >= minSpend && discountVal > 0) {
-          if (coupon.discountType === "percent" || coupon.type === "percent") {
-            const percent = Math.min(100, Math.max(0, discountVal));
-            discountAmount = Math.round((subtotal * percent) / 100);
-          } else {
-            discountAmount = Math.min(subtotal, discountVal);
+      const unitPrice = Number(product.price);
+      if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+        throw new HttpsError("failed-precondition", "Invalid product price in database.");
+      }
+
+      const storeId = String(product.storeId || product.shopId || "STORE_DEFAULT");
+      const storeName = String(product.storeName || product.shopName || "ร้านค้าในโรงเรียน");
+      const subtotal = unitPrice * quantity;
+      let discountAmount = 0;
+
+      // 🔒 Server-Authoritative & Store-Scoped Coupon Verification
+      if (typeof couponCode === "string" && couponCode.trim()) {
+        const cleanCode = couponCode.trim().toUpperCase();
+        const couponRef = db.collection("coupons").doc(cleanCode);
+        const couponSnap = await transaction.get(couponRef);
+        if (couponSnap.exists) {
+          const coupon = couponSnap.data();
+          const minSpend = Number(coupon.minSpend) || 0;
+          const discountVal = Number(coupon.discount) || 0;
+          const isNotExpired = !coupon.expiryDate || new Date(coupon.expiryDate) > new Date();
+          const isStoreMatch = !coupon.storeId || coupon.scope === "platform" || coupon.storeId === storeId;
+
+          if (coupon.status === "Active" && isNotExpired && isStoreMatch && subtotal >= minSpend && discountVal > 0) {
+            if (coupon.discountType === "percent" || coupon.type === "percent") {
+              const percent = Math.min(100, Math.max(0, discountVal));
+              discountAmount = Math.round((subtotal * percent) / 100);
+            } else {
+              discountAmount = Math.min(subtotal, discountVal);
+            }
           }
         }
       }
-    }
 
-    const finalAmount = Math.max(1, subtotal - discountAmount);
-    const totalSatang = Math.round(finalAmount * 100);
-    const totalAmount = finalAmount;
-    const orderRef = db.collection("orders").doc();
-    await orderRef.set({
-      id: orderRef.id,
-      orderId: orderRef.id,
-      userId: request.auth.uid,
-      storeId,
-      storeName,
-      productId,
-      itemTitle: String(product.name || "QueueUp order").slice(0, 250),
-      items: [
-        {
-          productId,
-          name: product.name,
-          price: unitPrice,
-          quantity,
-        }
-      ],
-      quantity,
-      booking: booking || null,
-      subtotal: unitPrice * quantity,
-      discountAmount,
-      totalAmount,
-      totalPrice: totalAmount,
-      currency: "THB",
-      paymentProvider: "opn",
-      paymentMethod: "promptpay",
-      paymentStatus: "pending",
-      queueStatus: "waiting",
-      status: "TO_SHIP",
-      createdAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp()
+      const finalAmount = Math.max(1, subtotal - discountAmount);
+      const satang = Math.round(finalAmount * 100);
+
+      // 🔒 Atomic stock decrement to prevent race conditions
+      if (typeof product.stock === "number") {
+        transaction.update(productRef, {
+          stock: product.stock - quantity,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
+
+      const orderData = {
+        id: orderRef.id,
+        orderId: orderRef.id,
+        userId: request.auth.uid,
+        storeId,
+        storeName,
+        productId,
+        itemTitle: String(product.name || "QueueUp order").slice(0, 250),
+        items: [
+          {
+            productId,
+            name: product.name,
+            price: unitPrice,
+            quantity,
+          }
+        ],
+        quantity,
+        booking: booking || null,
+        subtotal,
+        discountAmount,
+        totalAmount: finalAmount,
+        totalPrice: finalAmount,
+        currency: "THB",
+        paymentProvider: "opn",
+        paymentMethod: "promptpay",
+        paymentStatus: "pending",
+        queueStatus: "waiting",
+        status: "TO_SHIP",
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp()
+      };
+
+      transaction.set(orderRef, orderData);
+      return { totalSatang: satang };
     });
+
     try {
       const charge = await opnRequest("/charges", opnSecretKey.value(), { amount: totalSatang, currency: "THB", description: `QueueUp ${orderRef.id}`, metadata: { orderId: orderRef.id, uid: request.auth.uid }, source: { type: "promptpay" } });
       const qrUrl = charge.source?.scannable_code?.image?.download_uri;
@@ -121,6 +141,12 @@ export const createPromptPayPayment = onCall(
       return { orderId: orderRef.id, paymentId: charge.id, qrUrl, expiresAt: charge.expires_at || null };
     } catch (error) {
       await orderRef.update({ paymentStatus: "creation_failed", updatedAt: FieldValue.serverTimestamp() });
+      // Revert stock decrement if payment provider rejects charge creation
+      try {
+        await productRef.update({ stock: FieldValue.increment(quantity) });
+      } catch (stockErr) {
+        console.warn("Revert stock warning:", stockErr);
+      }
       throw error;
     }
   }

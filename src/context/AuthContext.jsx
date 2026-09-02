@@ -2,7 +2,7 @@
 import { createContext, useEffect } from 'react'
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth'
 import { useDispatch } from 'react-redux'
-import { auth, googleProvider } from '../firebase/config.js'
+import { auth, googleProvider, db, doc, getDoc } from '../firebase/config.js'
 import { setUser, clearUser } from '../store/authSlice.js'
 
 export const AuthContext = createContext()
@@ -11,22 +11,43 @@ export function AuthProvider({ children }) {
   const dispatch = useDispatch()
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         const isAdmin = (firebaseUser.email || "").toLowerCase() === "58140@lomsak.ac.th";
-        const userRoles = isAdmin ? ["customer", "merchant", "admin"] : ["customer"];
-        const activeRole = isAdmin ? "admin" : "customer";
+        let userDocData = null;
+        try {
+          const userSnap = await getDoc(doc(db, "users", firebaseUser.uid));
+          if (userSnap.exists()) {
+            userDocData = userSnap.data();
+          }
+        } catch (e) {
+          console.warn("Could not fetch user profile from Firestore:", e);
+        }
+
+        const isMerchant = userDocData?.roles?.includes("merchant") || userDocData?.isMerchantVerified === true;
+        const roles = isAdmin
+          ? ["customer", "merchant", "admin"]
+          : isMerchant
+            ? ["customer", "merchant"]
+            : (userDocData?.roles || ["customer"]);
+
+        const activeRole = isAdmin
+          ? "admin"
+          : (userDocData?.activeRole || (isMerchant ? "merchant" : "customer"));
+
+        const isGoogle = Boolean(firebaseUser.providerData?.some(p => p.providerId === 'google.com'));
 
         dispatch(setUser({
           uid: firebaseUser.uid,
-          name: firebaseUser.displayName || "ผู้ใช้งาน QueueUp",
-          displayName: firebaseUser.displayName || "ผู้ใช้งาน QueueUp",
+          name: userDocData?.name || firebaseUser.displayName || "ผู้ใช้งาน QueueUp",
+          displayName: userDocData?.displayName || firebaseUser.displayName || "ผู้ใช้งาน QueueUp",
           email: firebaseUser.email || "",
-          photo: firebaseUser.photoURL || "/yeti_mascot.jpg",
-          photoURL: firebaseUser.photoURL || "/yeti_mascot.jpg",
-          roles: userRoles,
+          photo: userDocData?.photo || firebaseUser.photoURL || "/yeti_mascot.jpg",
+          photoURL: userDocData?.photoURL || firebaseUser.photoURL || "/yeti_mascot.jpg",
+          roles: roles,
           activeRole: activeRole,
-          isGoogleUser: true,
+          isGoogleUser: isGoogle,
+          storeId: userDocData?.storeId || (isMerchant ? "store_canteen01" : undefined),
         }));
       } else {
         // When Firebase session expires / signs out externally, clear state
