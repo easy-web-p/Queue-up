@@ -34,11 +34,12 @@ export default function ProtectedRoute({ children, allowedRoles = [] }) {
 
   // 1. If not logged in -> Redirect to /login
   if (!currentUser) {
-    // If attempting to access admin route while unauthenticated, show 404 to avoid leaking admin existence
+    // If attempting to access admin route while unauthenticated, show 404 to avoid leaking admin existence (Information Hiding)
     if (allowedRoles && allowedRoles.includes("admin") && allowedRoles.length === 1) {
       return <NotFound />;
     }
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    const destinationPath = `${location.pathname}${location.search || ""}`;
+    return <Navigate to="/login" state={{ from: destinationPath }} replace />;
   }
 
   // 2. Role-Based Access Control (RBAC) Check

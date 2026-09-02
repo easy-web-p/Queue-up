@@ -2,7 +2,9 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper Functions for Security & Data Validation
+    // ==========================================
+    // 🔐 HELPER FUNCTIONS FOR RBAC & AUTHORIZATION
+    // ==========================================
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -11,8 +13,21 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    function isEmailVerified() {
-      return isAuthenticated() && (request.auth.token.email_verified == true || request.auth.provider_id == 'google.com');
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == '58140@lomsak.ac.th' ||
+        request.auth.token.admin == true
+      );
+    }
+
+    function isStoreOwner(storeId) {
+      return isAuthenticated() && (
+        isAdmin() ||
+        (exists(/databases/$(database)/documents/shops/$(storeId)) && 
+         get(/databases/$(database)/documents/shops/$(storeId)).data.ownerUid == request.auth.uid) ||
+        (exists(/databases/$(database)/documents/merchantProfiles/$(storeId)) && 
+         get(/databases/$(database)/documents/merchantProfiles/$(storeId)).data.ownerUid == request.auth.uid)
+      );
     }
 
     function isValidString(val, minLen, maxLen) {
@@ -23,72 +38,107 @@ service cloud.firestore {
       return val is int || val is float;
     }
 
-    // 1. Food Categories Collection (Public Read, Verified Admin Write)
+    // ==========================================
+    // 1. FOOD CATEGORIES (Public Read, Admin Write)
+    // ==========================================
     match /food_categories/{catId} {
       allow read: if true;
-      allow write: if isAuthenticated();
+      allow write: if isAdmin();
     }
 
-    // 2. Products Collection (Public Read, Merchant Store Owner Write)
+    // ==========================================
+    // 2. PRODUCTS / MENU (Store Isolation Enforced)
+    // ==========================================
     match /products/{productId} {
       allow read: if true;
-      allow create, update: if isAuthenticated()
-        && isValidString(request.resource.data.name, 1, 250)
-        && isValidNumber(request.resource.data.price);
-      allow delete: if isAuthenticated();
+      allow create: if isAuthenticated() && (
+        isAdmin() || 
+        (request.resource.data.storeId != null && isStoreOwner(request.resource.data.storeId))
+      ) && isValidString(request.resource.data.name, 1, 250) && isValidNumber(request.resource.data.price);
+      
+      allow update: if isAuthenticated() && (
+        isAdmin() || 
+        (resource.data.storeId != null && isStoreOwner(resource.data.storeId))
+      );
+      
+      allow delete: if isAuthenticated() && (
+        isAdmin() || 
+        (resource.data.storeId != null && isStoreOwner(resource.data.storeId))
+      );
     }
 
-    // 3. Shops Collection (Public Read, Authenticated Write)
+    // ==========================================
+    // 3. SHOPS (Public Read, Owner / Admin Write)
+    // ==========================================
     match /shops/{shopId} {
       allow read: if true;
-      allow write: if isAuthenticated();
+      allow create: if isAuthenticated() && (isAdmin() || request.resource.data.ownerUid == request.auth.uid);
+      allow update, delete: if isStoreOwner(shopId);
     }
 
-    // 4. Users Collection (Strict Ownership Enforced)
+    // ==========================================
+    // 4. USERS COLLECTION (Ownership & Admin Protected)
+    // ==========================================
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow create, update: if isOwner(userId);
-      allow delete: if false; // Audit Trail protection
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow create, update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin(); // Audit Trail protection
     }
 
-    // 5. Merchant Profiles Collection (Decoupled merchantId Schema)
+    // ==========================================
+    // 5. MERCHANT PROFILES & FINANCIALS
+    // ==========================================
     match /merchantProfiles/{merchantId} {
-      // 🟢 สาธารณะอ่านข้อมูลร้านค้าทั่วไปได้ (ชื่อร้าน เวลาเปิด-ปิด พิกัดร้าน)
       allow read: if true;
-      
-      // 🔒 เฉพาะเจ้าของร้าน (ownerUid == auth.uid) เท่านั้นที่สามารถสร้าง แก้ไข หรือลบโปรไฟล์ร้านได้
-      allow create: if isAuthenticated()
-        && request.resource.data.ownerUid == request.auth.uid;
-      
-      allow update, delete: if isAuthenticated()
-        && resource.data.ownerUid == request.auth.uid;
+      allow create: if isAuthenticated() && (isAdmin() || request.resource.data.ownerUid == request.auth.uid);
+      allow update, delete: if isStoreOwner(merchantId);
 
-      // 🛡️ Subcollection พิเศษสำหรับข้อมูลการเงิน (Private Financial Subcollection)
-      // ปิดกั้นการอ่านสาธารณะ 100%! อ่านและเขียนได้เฉพาะเจ้าของร้านเท่านั้น (อ่านผ่าน Cloud Function เมื่อชำระเงิน)
+      // Private Financial & PromptPay Config Subcollection
       match /private/finance {
-        allow read, write: if isAuthenticated()
-          && get(/databases/$(database)/documents/merchantProfiles/$(merchantId)).data.ownerUid == request.auth.uid;
+        allow read, write: if isStoreOwner(merchantId);
       }
 
-      // Subcollection สำหรับ พนักงานประจำร้าน (Staff / Team Members)
+      // Staff Management Subcollection
       match /staff/{staffUid} {
-        // เจ้าของร้าน หรือ พนักงานคนนั้น อ่านสิทธิ์ของตัวเองได้
-        allow read: if isAuthenticated() 
-          && (get(/databases/$(database)/documents/merchantProfiles/$(merchantId)).data.ownerUid == request.auth.uid || request.auth.uid == staffUid);
-        
-        // เฉพาะเจ้าของร้านเท่านั้น เพิ่ม/ลบ พนักงานประจำร้านได้ + Validate data integrity (staffUid == path {staffUid})
-        allow write: if isAuthenticated()
-          && get(/databases/$(database)/documents/merchantProfiles/$(merchantId)).data.ownerUid == request.auth.uid
-          && (request.resource == null || request.resource.data.staffUid == staffUid);
+        allow read: if isAuthenticated() && (isStoreOwner(merchantId) || request.auth.uid == staffUid);
+        allow write: if isStoreOwner(merchantId) && (request.resource == null || request.resource.data.staffUid == staffUid);
       }
     }
 
-    // 6. Orders Collection (Strict User Ownership Enforced)
+    // ==========================================
+    // 6. ORDERS (Customer, Merchant Store Isolation & Admin)
+    // ==========================================
     match /orders/{orderId} {
-      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      // Orders and payment states are created and updated only by trusted Cloud Functions.
-      // This prevents a browser client from changing amount, paymentStatus, or merchant details.
-      allow create, update, delete: if false;
+      // Customer sees own orders, Merchant sees own store orders, Admin sees all
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.userId == request.auth.uid ||
+        (resource.data.storeId != null && isStoreOwner(resource.data.storeId))
+      );
+
+      // Customer creates own orders
+      allow create: if isAuthenticated() && (
+        isAdmin() ||
+        request.resource.data.userId == request.auth.uid
+      );
+
+      // Merchant of that specific store or Admin updates order status (KDS)
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        (resource.data.storeId != null && isStoreOwner(resource.data.storeId)) ||
+        (resource.data.userId == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['cancelReason', 'status']))
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // ==========================================
+    // 7. SECURITY & AUDIT LOGS (Immutable Append-Only)
+    // ==========================================
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated();
+      allow update, delete: if false; // Immutable audit log
     }
 
   }

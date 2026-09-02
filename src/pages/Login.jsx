@@ -26,7 +26,9 @@ function Login() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
-  const fromDestination = location.state?.from?.pathname || "/home";
+  const fromDestination = typeof location.state?.from === "string"
+    ? location.state.from
+    : (location.state?.from?.pathname ? `${location.state.from.pathname}${location.state.from.search || ""}` : "/home");
   const { user } = useSelector((state) => state.auth);
   const { loginWithGoogle } = useAuth();
 
@@ -293,8 +295,10 @@ function Login() {
       photoURL: defaultPhoto,
       roles: userRoles,
       activeRole: activeRole,
+      provider: "google.com",
       isGoogleUser: true,
       accountId: accountId,
+      lastLoginAt: new Date().toISOString(),
     };
 
     localStorage.setItem("queueup_secure_account_id", accountId);
@@ -309,12 +313,14 @@ function Login() {
           accountId: accountId,
           roles: userRoles,
           activeRole: activeRole,
+          provider: "google.com",
           isGoogleUser: true,
           email: defaultEmail,
           displayName: defaultName,
           fullName: defaultName,
           photo: defaultPhoto,
           photoURL: defaultPhoto,
+          lastLoginAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         },
         { merge: true }
