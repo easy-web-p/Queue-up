@@ -575,6 +575,11 @@ function ProductDetail() {
         onSuccess={handlePaymentSuccess}
         productId={product.id}
         quantity={quantityNumber}
+        modifiers={[
+          { id: "spicy", value: spicyLevel },
+          { id: "topping", value: selectedToppings },
+          { id: "note", value: customerNote },
+        ]}
         booking={{
           date: bookingDate,
           timeSlot: selectedTimeSlot?.time || "12:00",

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { httpsCallable } from "firebase/functions";
 import { doc, onSnapshot } from "firebase/firestore";
@@ -14,6 +14,7 @@ function PaymentModal({
   orderId = "ORD-PENDING",
   productId,
   quantity = 1,
+  modifiers = [],
   couponCode,
   booking,
   storeId = "store_canteen01",
@@ -24,7 +25,7 @@ function PaymentModal({
 }) {
   const navigate = useNavigate();
 
-  // Payment Tabs: 'promptpay' | 'slip' | 'card'
+  // Payment Tabs: 'promptpay' | 'slip'
   const [activePaymentMethod, setActivePaymentMethod] = useState("promptpay");
 
   // Timer State (15:00 minutes countdown)
@@ -34,23 +35,29 @@ function PaymentModal({
   const [serverPaymentData, setServerPaymentData] = useState(null);
   const [isLoadingPayment, setIsLoadingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState(null);
+  const [isCheckingPayment, setIsCheckingPayment] = useState(false);
+  const [checkPaymentMessage, setCheckPaymentMessage] = useState(null);
 
-  // Slip Upload States
+  // Persistent Idempotency Key per checkout attempt
+  const idempotencyKeyRef = useRef(null);
+
+  // Slip Upload States (Demo / Manual Slip Flow)
   const [slipFile, setSlipFile] = useState(null);
   const [slipPreview, setSlipPreview] = useState(null);
   const [isVerifyingSlip, setIsVerifyingSlip] = useState(false);
   const [slipVerified, setSlipVerified] = useState(false);
 
-  // Success & Submitting States
+  // Success State
   const [isPaidSuccess, setIsPaidSuccess] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleClose = useCallback(() => {
     setSlipFile(null);
     setSlipPreview(null);
     setSlipVerified(false);
     setIsPaidSuccess(false);
-    setIsSubmitting(false);
+    setIsCheckingPayment(false);
+    setCheckPaymentMessage(null);
+    idempotencyKeyRef.current = null;
     onClose();
   }, [onClose]);
 
@@ -59,34 +66,65 @@ function PaymentModal({
     if (!isOpen || !productId) return;
     let isMounted = true;
 
-    const initPayment = async () => {
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current = `pay_${productId}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    }
+
+    const runPayment = async () => {
       setIsLoadingPayment(true);
       setPaymentError(null);
       try {
         const createPayment = httpsCallable(functions, "createPromptPayPayment");
-        const idempotencyKey = `pay_${productId}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
         const res = await createPayment({
           productId,
           quantity: Number(quantity) || 1,
+          modifiers: modifiers || [],
           couponCode: couponCode || undefined,
           booking: booking || undefined,
-          idempotencyKey,
+          idempotencyKey: idempotencyKeyRef.current,
         });
 
         if (isMounted && res.data) {
           setServerPaymentData(res.data);
         }
       } catch (err) {
-        console.warn("Cloud function createPromptPayPayment error (using offline promptpay fallback if unconfigured):", err);
-        if (isMounted) setPaymentError(err?.message || "ระบบชำระเงินขัดข้อง");
+        console.warn("Cloud function createPromptPayPayment error:", err);
+        if (isMounted) setPaymentError(err?.message || "ไม่สามารถเชื่อมต่อระบบชำระเงินได้");
       } finally {
         if (isMounted) setIsLoadingPayment(false);
       }
     };
 
-    initPayment();
-    return () => { isMounted = false; };
-  }, [isOpen, productId, quantity, couponCode, booking]);
+    runPayment();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, productId, quantity, modifiers, couponCode, booking]);
+
+  const handleRetryPayment = () => {
+    idempotencyKeyRef.current = `pay_${productId}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    setIsLoadingPayment(true);
+    setPaymentError(null);
+    const createPayment = httpsCallable(functions, "createPromptPayPayment");
+    createPayment({
+      productId,
+      quantity: Number(quantity) || 1,
+      modifiers: modifiers || [],
+      couponCode: couponCode || undefined,
+      booking: booking || undefined,
+      idempotencyKey: idempotencyKeyRef.current,
+    })
+      .then((res) => {
+        if (res.data) setServerPaymentData(res.data);
+      })
+      .catch((err) => {
+        setPaymentError(err?.message || "ไม่สามารถเชื่อมต่อระบบชำระเงินได้");
+      })
+      .finally(() => {
+        setIsLoadingPayment(false);
+      });
+  };
 
   // Real-time Firestore Order Listener for Live Webhook Payment Status
   useEffect(() => {
@@ -144,29 +182,35 @@ function PaymentModal({
     }
   };
 
-  // Confirm Payment
-  const handleConfirmPayment = () => {
-    if (isSubmitting || isPaidSuccess) return;
-    setIsSubmitting(true);
-    setIsPaidSuccess(true);
-    soundManager.playQueueIssuedSound();
+  // Authoritative Check Payment Button: Strictly verifies with backend
+  const handleCheckPaymentStatus = async () => {
+    if (!serverPaymentData?.orderId || isCheckingPayment || isPaidSuccess) return;
+    setIsCheckingPayment(true);
+    setCheckPaymentMessage(null);
 
-    const finalOrderId = serverPaymentData?.orderId || `ORD-${Date.now()}`;
-
-    setTimeout(() => {
-      if (onPaymentSuccess) {
-        onPaymentSuccess(finalOrderId);
+    try {
+      const getStatus = httpsCallable(functions, "getPaymentStatus");
+      const res = await getStatus({ orderId: serverPaymentData.orderId });
+      if (res.data?.paymentStatus === "paid") {
+        setIsPaidSuccess(true);
+        soundManager.playQueueIssuedSound();
+        setTimeout(() => {
+          if (onPaymentSuccess) onPaymentSuccess(serverPaymentData.orderId);
+          handleClose();
+          navigate("/user/account/profile?tab=bookings");
+        }, 1500);
+      } else {
+        setCheckPaymentMessage("ยังไม่พบยอดชำระเงินจากธนาคาร กรุณาสแกน QR และรอสักครู่ (ระบบจะยืนยันอัตโนมัติเมื่อเงินเข้า)");
       }
-      handleClose();
-      navigate("/user/account/profile?tab=bookings");
-    }, 1500);
+    } catch (err) {
+      setCheckPaymentMessage("ไม่สามารถตรวจสอบสถานะได้ชั่วคราว: " + (err?.message || ""));
+    } finally {
+      setIsCheckingPayment(false);
+    }
   };
 
-  // PromptPay QR (Use Server QR from Opn if available, fallback to dynamic PromptPay standard)
-  const qrCodeUrl = serverPaymentData?.qrUrl ||
-    `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=00020101021129370016A000000677010111011300668123456785802TH5303764540${Number(
-      amount
-    ).toFixed(2)}6304`;
+  // Authoritative final amount calculated by Server
+  const finalDisplayAmount = serverPaymentData?.totalAmount ?? amount;
 
   return (
     <div className="payment-modal-backdrop" onClick={handleClose}>
@@ -174,7 +218,7 @@ function PaymentModal({
         {/* Header */}
         <div className="payment-modal-header">
           <h3 className="payment-modal-title">
-            <i className="bi bi-shield-check" /> ชำระเงินด้วย PromptPay / แนบสลิป
+            <i className="bi bi-shield-check" /> ชำระเงินด้วย PromptPay
           </h3>
           <button className="payment-modal-close-btn" onClick={handleClose} aria-label="ปิด">
             <i className="bi bi-x-lg" />
@@ -198,7 +242,7 @@ function PaymentModal({
             </div>
             {storeId && <span className="d-none">{storeId}</span>}
           </div>
-          <div className="payment-summary-amount">฿{Number(amount).toFixed(2)}</div>
+          <div className="payment-summary-amount">฿{Number(finalDisplayAmount).toFixed(2)}</div>
         </div>
 
         {/* Payment Method Selector Tabs */}
@@ -219,7 +263,7 @@ function PaymentModal({
               onClick={() => setActivePaymentMethod("slip")}
             >
               <i className="bi bi-file-earmark-image" />
-              <span>แนบสลิปโอนเงิน</span>
+              <span>แนบสลิป (Demo)</span>
             </button>
           </div>
         )}
@@ -232,7 +276,7 @@ function PaymentModal({
               <i className="bi bi-check-circle-fill text-success display-3 mb-3 d-block" />
               <h4 className="fw-bold text-dark mb-2">ชำระเงินสำเร็จแล้ว!</h4>
               <p className="text-muted small mb-3">
-                คิวอาหารของคุณถูกส่งเข้าสู่ครัวเรียบร้อยแล้ว กำลังนำคุณไปยังหน้าติดตามสถานะคิว...
+                ยืนยันการชำระเงินเรียบร้อยแล้ว กำลังนำคุณไปยังหน้ารายการคิว...
               </p>
               <div className="spinner-border text-danger spinner-border-sm" role="status" />
             </div>
@@ -242,50 +286,70 @@ function PaymentModal({
               {activePaymentMethod === "promptpay" && (
                 <div className="promptpay-qr-container">
                   {isLoadingPayment && (
-                    <div className="py-3">
+                    <div className="py-4">
                       <div className="spinner-border text-danger spinner-border-sm mb-2" role="status" />
-                      <div className="small text-muted">กำลังสร้าง PromptPay QR Code จากเซิร์ฟเวอร์...</div>
+                      <div className="small text-muted">กำลังสร้าง PromptPay QR Code ปลอดภัยจากเซิร์ฟเวอร์...</div>
                     </div>
                   )}
-                  {paymentError && (
-                    <div className="alert alert-warning small py-2 mb-3">
-                      <i className="bi bi-info-circle me-1" /> {paymentError}
+
+                  {paymentError && !isLoadingPayment && (
+                    <div className="alert alert-danger small py-3 mb-3 text-start">
+                      <div className="fw-bold mb-1">
+                        <i className="bi bi-exclamation-triangle-fill me-1" /> ไม่สามารถสร้างรายการชำระเงิน
+                      </div>
+                      <div>{paymentError}</div>
+                      <button className="btn btn-sm btn-outline-danger mt-2" onClick={handleRetryPayment}>
+                        <i className="bi bi-arrow-clockwise me-1" /> ลองใหม่อีกครั้ง
+                      </button>
                     </div>
                   )}
-                  <div className="d-flex align-items-center justify-content-center gap-2 mb-2">
-                    <img
-                      src="/logo.png"
-                      alt="PromptPay Logo"
-                      style={{ height: "28px", objectFit: "contain" }}
-                    />
-                    <span className="fw-bold text-navy" style={{ color: "#004071" }}>
-                      พร้อมเพย์ (PromptPay)
-                    </span>
-                  </div>
 
-                  <div className="promptpay-qr-box">
-                    <img src={qrCodeUrl} alt="PromptPay QR Code" className="promptpay-qr-img" />
-                  </div>
+                  {serverPaymentData?.qrUrl && !isLoadingPayment && (
+                    <>
+                      <div className="d-flex align-items-center justify-content-center gap-2 mb-2">
+                        <img
+                          src="/logo.png"
+                          alt="PromptPay Logo"
+                          style={{ height: "28px", objectFit: "contain" }}
+                        />
+                        <span className="fw-bold text-navy" style={{ color: "#004071" }}>
+                          พร้อมเพย์ (PromptPay)
+                        </span>
+                      </div>
 
-                  <div className="promptpay-timer">
-                    <i className="bi bi-clock me-1 text-danger" />
-                    กรุณาชำระเงินภายใน{" "}
-                    <span className="fw-bold text-danger fs-6">{formatTime(timeLeft)}</span> นาที
-                  </div>
+                      <div className="promptpay-qr-box">
+                        <img src={serverPaymentData.qrUrl} alt="PromptPay QR Code" className="promptpay-qr-img" />
+                      </div>
 
-                  <div className="alert alert-info py-2 px-3 small text-start w-100 mb-0">
-                    <i className="bi bi-info-circle-fill me-1" /> สแกนผ่านแอปธนาคารทุกธนาคาร (SCB,
-                    KBank, Krungthai, KKP, TTBY, GSB) เพื่อชำระยอด ฿
-                    {Number(amount).toFixed(2)}
-                  </div>
+                      <div className="promptpay-timer">
+                        <i className="bi bi-clock me-1 text-danger" />
+                        กรุณาชำระเงินภายใน{" "}
+                        <span className="fw-bold text-danger fs-6">{formatTime(timeLeft)}</span> นาที
+                      </div>
+
+                      <div className="alert alert-info py-2 px-3 small text-start w-100 mb-0">
+                        <i className="bi bi-info-circle-fill me-1" /> สแกนผ่านแอปธนาคารทุกธนาคารเพื่อชำระยอด ฿
+                        {Number(finalDisplayAmount).toFixed(2)}
+                      </div>
+                    </>
+                  )}
+
+                  {checkPaymentMessage && (
+                    <div className="alert alert-warning small py-2 mt-3 mb-0 text-start">
+                      <i className="bi bi-info-circle me-1" /> {checkPaymentMessage}
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* TAB 2: SLIP UPLOAD */}
               {activePaymentMethod === "slip" && (
                 <div className="text-start">
-                  <label className="form-label small fw-bold text-dark">
-                    อัปโหลดสลิปการโอนเงิน (Payment Slip) *
+                  <div className="badge bg-warning text-dark mb-2">
+                    <i className="bi bi-info-circle me-1" /> โหมดสาธิต (Demo Slip Verification)
+                  </div>
+                  <label className="form-label small fw-bold text-dark d-block">
+                    อัปโหลดสลิปการโอนเงิน
                   </label>
                   <input
                     type="file"
@@ -309,14 +373,13 @@ function PaymentModal({
                             className="spinner-border spinner-border-sm me-2"
                             role="status"
                           />
-                          กำลังตรวจสอบยอดสลิปด้วยระบบ AI OCR...
+                          กำลังจำลองการตรวจสอบสลิป...
                         </div>
                       )}
 
                       {slipVerified && (
                         <div className="mt-2 text-success small fw-bold">
-                          <i className="bi bi-check-circle-fill me-1" /> ตรวจสอบสลิปถูกต้อง •
-                          ตรงตามยอด ฿{Number(amount).toFixed(2)}
+                          <i className="bi bi-check-circle-fill me-1" /> ตรวจสอบสลิปเรียบร้อย • ยอด ฿{Number(finalDisplayAmount).toFixed(2)}
                         </div>
                       )}
                     </div>
@@ -346,19 +409,32 @@ function PaymentModal({
             </button>
 
             {activePaymentMethod === "promptpay" && (
-              <button className="btn-pay-now flex-grow-1" onClick={handleConfirmPayment}>
-                <i className="bi bi-check-circle-fill me-1" /> ยืนยันการชำระเงิน ฿
-                {Number(amount).toFixed(2)}
+              <button
+                className="btn-pay-now flex-grow-1"
+                onClick={handleCheckPaymentStatus}
+                disabled={isCheckingPayment || isLoadingPayment || !serverPaymentData?.qrUrl}
+              >
+                {isCheckingPayment ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" role="status" />
+                    กำลังตรวจสอบยอดเงิน...
+                  </>
+                ) : (
+                  <>
+                    <i className="bi bi-arrow-repeat me-1" /> ตรวจสอบสถานะการชำระเงิน ฿
+                    {Number(finalDisplayAmount).toFixed(2)}
+                  </>
+                )}
               </button>
             )}
 
             {activePaymentMethod === "slip" && (
               <button
                 className="btn-pay-now flex-grow-1"
-                onClick={handleConfirmPayment}
+                onClick={handleCheckPaymentStatus}
                 disabled={!slipVerified && !slipFile}
               >
-                <i className="bi bi-send-check-fill me-1" /> ยืนยันส่งสลิปชำระเงิน
+                <i className="bi bi-send-check-fill me-1" /> ส่งสลิปเพื่อตรวจสอบ
               </button>
             )}
           </div>

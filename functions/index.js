@@ -27,12 +27,22 @@ async function retrieveCharge(chargeId, key) {
   return response.json();
 }
 
-// The browser sends only product id/quantity/couponCode/idempotencyKey. Price, stock, discount and final order data are strictly computed and reserved here atomically via Firestore Transaction.
+// Standard Topping & Modifier Catalog Prices
+const TOPPING_PRICES = {
+  "ไข่ดาว": 10,
+  "ไข่เจียว": 10,
+  "หมูกรอบพิเศษ": 15,
+  "กุนเชียง": 10,
+  "ชีส": 15,
+  "เพิ่มเส้น/ข้าว": 10,
+};
+
+// The browser sends only product id/quantity/modifiers/couponCode/idempotencyKey. Price, toppings, slot capacity, stock, discount and final order data are strictly computed and reserved here atomically via Firestore Transaction.
 export const createPromptPayPayment = onCall(
   { region: "asia-southeast1", secrets: [opnSecretKey] },
   async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Sign in is required.");
-    const { productId, quantity = 1, couponCode, booking, idempotencyKey } = request.data || {};
+    const { productId, quantity = 1, modifiers = [], couponCode, booking, idempotencyKey } = request.data || {};
     if (typeof productId !== "string" || !Number.isInteger(quantity) || quantity < 1 || quantity > 20) {
       throw new HttpsError("invalid-argument", "Invalid order details.");
     }
@@ -46,8 +56,8 @@ export const createPromptPayPayment = onCall(
       ? db.collection("idempotency_keys").doc(idempotencyDocId)
       : null;
 
-    // 🔒 Atomic Transaction: Validate stock, check/lock idempotency, decrement stock, and create order atomically
-    const { totalSatang, existingResult } = await db.runTransaction(async (transaction) => {
+    // 🔒 Atomic Transaction: Validate stock, slot capacity, modifiers pricing, check/lock idempotency, decrement stock, and create order atomically
+    const { totalSatang, existingResult, computedDetails } = await db.runTransaction(async (transaction) => {
       if (idempotencyRef) {
         const idempSnap = await transaction.get(idempotencyRef);
         if (idempSnap.exists) {
@@ -61,6 +71,9 @@ export const createPromptPayPayment = onCall(
                   orderId: ord.orderId,
                   paymentId: ord.paymentId,
                   qrUrl: ord.qrUrl,
+                  subtotal: ord.subtotal,
+                  discountAmount: ord.discountAmount,
+                  totalAmount: ord.totalAmount,
                   expiresAt: ord.expiresAt || null,
                 }
               };
@@ -85,9 +98,55 @@ export const createPromptPayPayment = onCall(
         throw new HttpsError("failed-precondition", "Invalid product price in database.");
       }
 
+      // 🔒 Server-Authoritative Modifier & Toppings Calculation
+      let modifierUnitPrice = 0;
+      const sanitizedModifiers = [];
+      if (Array.isArray(modifiers)) {
+        for (const mod of modifiers) {
+          if (mod && mod.id === "topping" && Array.isArray(mod.value)) {
+            for (const topName of mod.value) {
+              const topPrice = Number(TOPPING_PRICES[topName] || (product.toppingPrices && product.toppingPrices[topName]) || 0);
+              modifierUnitPrice += topPrice;
+              sanitizedModifiers.push({ id: "topping", name: topName, price: topPrice });
+            }
+          } else if (mod && mod.id === "spicy") {
+            sanitizedModifiers.push({ id: "spicy", value: String(mod.value || "ปกติ") });
+          } else if (mod && mod.id === "note") {
+            sanitizedModifiers.push({ id: "note", value: String(mod.value || "").slice(0, 100) });
+          }
+        }
+      }
+
+      const effectiveUnitPrice = unitPrice + modifierUnitPrice;
+      const subtotal = effectiveUnitPrice * quantity;
       const storeId = String(product.storeId || product.shopId || "STORE_DEFAULT");
       const storeName = String(product.storeName || product.shopName || "ร้านค้าในโรงเรียน");
-      const subtotal = unitPrice * quantity;
+
+      // 🔒 Server-Side Time-Slot Capacity Check & Reservation Lock
+      if (booking && booking.date && (booking.timeSlot || booking.time)) {
+        const slotTime = String(booking.timeSlot || booking.time).replace(/[^0-9:]/g, "");
+        const slotDate = String(booking.date).replace(/[^0-9-]/g, "");
+        const slotDocId = `${storeId}_${slotDate}_${slotTime}`;
+        const slotRef = db.collection("store_slots").doc(slotDocId);
+        const slotSnap = await transaction.get(slotRef);
+
+        const currentOrders = slotSnap.exists ? Number(slotSnap.data().currentOrders || 0) : 0;
+        const maxCapacity = slotSnap.exists ? Number(slotSnap.data().capacity || 20) : 20;
+
+        if (currentOrders + quantity > maxCapacity) {
+          throw new HttpsError("failed-precondition", `รอบเวลา ${slotTime} วันที่ ${slotDate} เต็มแล้ว (รองรับได้สูงสุด ${maxCapacity} คิว)`);
+        }
+
+        transaction.set(slotRef, {
+          storeId,
+          date: slotDate,
+          timeSlot: slotTime,
+          currentOrders: currentOrders + quantity,
+          capacity: maxCapacity,
+          updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
+
       let discountAmount = 0;
 
       // 🔒 Server-Authoritative & Store-Scoped Coupon Verification
@@ -137,10 +196,14 @@ export const createPromptPayPayment = onCall(
           {
             productId,
             name: product.name,
-            price: unitPrice,
+            basePrice: unitPrice,
+            modifierPrice: modifierUnitPrice,
+            price: effectiveUnitPrice,
             quantity,
+            modifiers: sanitizedModifiers,
           }
         ],
+        modifiers: sanitizedModifiers,
         quantity,
         booking: booking || null,
         subtotal,
@@ -166,7 +229,14 @@ export const createPromptPayPayment = onCall(
       }
 
       transaction.set(orderRef, orderData);
-      return { totalSatang: satang };
+      return {
+        totalSatang: satang,
+        computedDetails: {
+          subtotal,
+          discountAmount,
+          totalAmount: finalAmount,
+        }
+      };
     });
 
     if (existingResult) {
@@ -178,7 +248,15 @@ export const createPromptPayPayment = onCall(
       const qrUrl = charge.source?.scannable_code?.image?.download_uri;
       if (!qrUrl) throw new Error("PromptPay QR was not returned by provider.");
       await orderRef.update({ paymentId: charge.id, qrUrl, updatedAt: FieldValue.serverTimestamp() });
-      return { orderId: orderRef.id, paymentId: charge.id, qrUrl, expiresAt: charge.expires_at || null };
+      return {
+        orderId: orderRef.id,
+        paymentId: charge.id,
+        qrUrl,
+        subtotal: computedDetails.subtotal,
+        discountAmount: computedDetails.discountAmount,
+        totalAmount: computedDetails.totalAmount,
+        expiresAt: charge.expires_at || null
+      };
     } catch (error) {
       await orderRef.update({ paymentStatus: "creation_failed", updatedAt: FieldValue.serverTimestamp() });
       // Revert stock decrement if payment provider rejects charge creation
@@ -192,14 +270,30 @@ export const createPromptPayPayment = onCall(
   }
 );
 
-export const getPaymentStatus = onCall({ region: "asia-southeast1" }, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "Sign in is required.");
-  const orderId = request.data?.orderId;
-  if (typeof orderId !== "string" || !orderId) throw new HttpsError("invalid-argument", "Invalid order id.");
-  const order = await db.collection("orders").doc(orderId).get();
-  if (!order.exists || order.data().userId !== request.auth.uid) throw new HttpsError("not-found", "Order not found.");
-  return { paymentStatus: order.data().paymentStatus, providerStatus: order.data().providerStatus || "pending" };
-});
+// Callable function to safely check payment status on-demand
+export const getPaymentStatus = onCall(
+  { region: "asia-southeast1" },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Sign in is required.");
+    const { orderId } = request.data || {};
+    if (typeof orderId !== "string" || !orderId.trim()) {
+      throw new HttpsError("invalid-argument", "Order ID is required.");
+    }
+    const orderSnap = await db.collection("orders").doc(orderId.trim()).get();
+    if (!orderSnap.exists) throw new HttpsError("not-found", "Order not found.");
+    const order = orderSnap.data();
+    if (order.userId !== request.auth.uid) {
+      throw new HttpsError("permission-denied", "Unauthorized order access.");
+    }
+    return {
+      orderId: order.orderId,
+      paymentStatus: order.paymentStatus,
+      queueStatus: order.queueStatus,
+      status: order.status,
+      totalAmount: order.totalAmount,
+    };
+  }
+);
 
 // Set this function URL as the static webhook endpoint in the Opn dashboard.
 // Never trust the webhook body by itself: retrieve the charge and compare metadata first.
