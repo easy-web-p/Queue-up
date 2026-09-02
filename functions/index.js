@@ -283,7 +283,6 @@ export async function releaseOrderResources(orderDocRef, cancelReason = "Payment
     const productSnap = productRef ? await transaction.get(productRef) : null;
     const slotSnap = slotRef ? await transaction.get(slotRef) : null;
 
-<<<<<<< HEAD
     const warnings = [];
     let stockAfterRelease = null;
     if (productRef) {
@@ -295,18 +294,6 @@ export async function releaseOrderResources(orderDocRef, cancelReason = "Payment
           warnings.push("STOCK_COUNTER_INVALID");
         } else {
           stockAfterRelease = currentStock + qty;
-=======
-        if (slotSnap.exists) {
-          const current = Number(slotSnap.data().currentOrders || 0);
-          if (current < qty) {
-            console.warn(`[DATA_INTEGRITY_WARNING] Store slot ${slotDocId} had currentOrders (${current}) less than released quantity (${qty}). Clamping to 0.`);
-          }
-          const newOrders = Math.max(0, current - qty);
-          transaction.set(slotRef, {
-            currentOrders: newOrders,
-            updatedAt: FieldValue.serverTimestamp(),
-          }, { merge: true });
->>>>>>> 5e0ed1b (fix(transaction-3.10): implement merchant resolution workflow for paid_after_expired orders, resolveExpiredPaymentReview cloud function, and data integrity warnings)
         }
       }
     }
