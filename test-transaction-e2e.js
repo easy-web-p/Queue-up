@@ -578,6 +578,53 @@ async function main() {
     assert.throws(() => attemptTransition('ACCEPTED', 'ACCEPT'), /State machine violation/);
   });
 
+  // Scenario 17: True Order State Machine Forward Progression & Customer Cancellation Guard
+  await runTest('Scenario 17: Validates sequential state progression and blocks illegal backward/arbitrary jumps', async () => {
+    function isValidStatusTransition(oldStatus, newStatus) {
+      return (oldStatus === newStatus) ||
+             (oldStatus === 'TO_SHIP' && (newStatus === 'PREPARING' || newStatus === 'CANCELLED')) ||
+             (oldStatus === 'PREPARING' && (newStatus === 'READY' || newStatus === 'CANCELLED')) ||
+             (oldStatus === 'READY' && newStatus === 'COMPLETED');
+    }
+
+    function canCustomerCancel(status, queueStatus) {
+      return status === 'TO_SHIP' && queueStatus === 'waiting';
+    }
+
+    // Valid forward transitions
+    assert.equal(isValidStatusTransition('TO_SHIP', 'PREPARING'), true);
+    assert.equal(isValidStatusTransition('PREPARING', 'READY'), true);
+    assert.equal(isValidStatusTransition('READY', 'COMPLETED'), true);
+
+    // Illegal backward / jump transitions
+    assert.equal(isValidStatusTransition('COMPLETED', 'TO_SHIP'), false);
+    assert.equal(isValidStatusTransition('READY', 'PREPARING'), false);
+    assert.equal(isValidStatusTransition('CANCELLED', 'TO_SHIP'), false);
+    assert.equal(isValidStatusTransition('TO_SHIP', 'COMPLETED'), false);
+
+    // Customer cancellation guards
+    assert.equal(canCustomerCancel('TO_SHIP', 'waiting'), true);
+    assert.equal(canCustomerCancel('PREPARING', 'cooking'), false);
+    assert.equal(canCustomerCancel('READY', 'ready'), false);
+    assert.equal(canCustomerCancel('COMPLETED', 'completed'), false);
+  });
+
+  // Scenario 18: Reject Products with Missing storeId without Fallback
+  await runTest('Scenario 18: Product missing storeId throws failed-precondition without STORE_DEFAULT fallback', async () => {
+    const invalidProduct = { id: 'p_broken', name: 'ข้าวไข่ดาว', price: 30 }; // No storeId/shopId
+
+    function prepareOrder(product) {
+      const storeId = String(product.storeId || product.shopId || '').trim();
+      if (!storeId) {
+        throw new Error('ข้อมูลสินค้าไม่สมบูรณ์: ไม่พบการระบุรหัสร้านค้า (storeId)');
+      }
+      return { storeId };
+    }
+
+    assert.throws(() => prepareOrder(invalidProduct), /ไม่พบการระบุรหัสร้านค้า/);
+    assert.equal(prepareOrder({ ...invalidProduct, storeId: 'shop_valid_123' }).storeId, 'shop_valid_123');
+  });
+
   const passRate = Math.round((passedTests / totalTests) * 100);
   console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${passRate}%).`);
 

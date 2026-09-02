@@ -38,6 +38,21 @@ service cloud.firestore {
       return val is int || val is float;
     }
 
+    // 🔒 True Order State Machine Validation Helpers
+    function isValidStatusTransition(oldStatus, newStatus) {
+      return (oldStatus == newStatus) ||
+             (oldStatus == 'TO_SHIP' && (newStatus == 'PREPARING' || newStatus == 'CANCELLED')) ||
+             (oldStatus == 'PREPARING' && (newStatus == 'READY' || newStatus == 'CANCELLED')) ||
+             (oldStatus == 'READY' && newStatus == 'COMPLETED');
+    }
+
+    function isValidQueueStatusTransition(oldQueue, newQueue) {
+      return (oldQueue == newQueue) ||
+             (oldQueue == 'waiting' && (newQueue == 'cooking' || newQueue == 'cancelled')) ||
+             (oldQueue == 'cooking' && (newQueue == 'ready' || newQueue == 'cancelled')) ||
+             (oldQueue == 'ready' && newQueue == 'completed');
+    }
+
     // ==========================================
     // 1. FOOD CATEGORIES (Public Read, Admin Write)
     // ==========================================
@@ -116,7 +131,7 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
       
-      // On creation, normal users can only initialize profile data with non-privileged roles
+      // On creation, normal users can only initialize profile data with non-privileged roles and safe keys
       allow create: if isAuthenticated() && (
         isAdmin() || 
         (
@@ -124,7 +139,9 @@ service cloud.firestore {
           (!('roles' in request.resource.data) || request.resource.data.roles == ['customer'] || request.resource.data.roles == ['user']) &&
           (!('isSuperAdmin' in request.resource.data) || request.resource.data.isSuperAdmin == false) &&
           (!('isMerchantVerified' in request.resource.data) || request.resource.data.isMerchantVerified == false) &&
-          (!('isMerchantRegistered' in request.resource.data) || request.resource.data.isMerchantRegistered == false)
+          (!('isMerchantRegistered' in request.resource.data) || request.resource.data.isMerchantRegistered == false) &&
+          (!('activeRole' in request.resource.data) || request.resource.data.activeRole == 'customer' || request.resource.data.activeRole == 'user') &&
+          (!('storeId' in request.resource.data))
         )
       );
 
@@ -134,7 +151,7 @@ service cloud.firestore {
         (
           isOwner(userId) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'name', 'displayName', 'phone', 'school', 'photoURL', 'avatar', 'email', 'updatedAt'
+            'name', 'displayName', 'phone', 'school', 'photo', 'photoURL', 'avatar', 'email', 'updatedAt'
           ])
         )
       );
@@ -168,7 +185,7 @@ service cloud.firestore {
     }
 
     // ==========================================
-    // 6. ORDERS (Canonical Order Storage & State Machine Guard)
+    // 6. ORDERS (Canonical Order Storage & True State Machine Guard)
     // ==========================================
     match /orders/{orderId} {
       // Customer sees own orders, Merchant sees own store orders, Admin sees all
@@ -196,22 +213,26 @@ service cloud.firestore {
         )
       );
 
-      // 🔒 Restricted Update Keys & State Transitions:
-      // Merchant can ONLY update operational KDS fields (queueStatus, status, estimatedReadyTime, merchantNote)
-      // Merchant CANNOT tamper with paymentStatus (must be done via Cloud Function / Admin SDK)
+      // 🔒 Restricted Update Keys & True State Transitions:
+      // Merchant can ONLY advance status forward (TO_SHIP -> PREPARING -> READY -> COMPLETED)
+      // Merchant CANNOT mutate paymentStatus directly (must use resolvePaidAfterExpiredOrder Cloud Function)
       allow update: if isAuthenticated() && (
         isAdmin() ||
         (
           resource.data.storeId != null && 
           isStoreOwner(resource.data.storeId) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['queueStatus', 'status', 'estimatedReadyTime', 'merchantNote', 'updatedAt']) &&
-          (!('status' in request.resource.data) || request.resource.data.status in ['TO_SHIP', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED']) &&
-          (!('queueStatus' in request.resource.data) || request.resource.data.queueStatus in ['waiting', 'cooking', 'ready', 'completed', 'cancelled'])
+          (!('status' in request.resource.data) || isValidStatusTransition(resource.data.status, request.resource.data.status)) &&
+          (!('queueStatus' in request.resource.data) || isValidQueueStatusTransition(resource.data.queueStatus, request.resource.data.queueStatus))
         ) ||
         (
+          // 🔒 Customer can only cancel prior to kitchen preparation (TO_SHIP & waiting)
           resource.data.userId == request.auth.uid &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['cancelReason', 'status']) &&
-          request.resource.data.status == 'CANCELLED'
+          resource.data.status == 'TO_SHIP' &&
+          (resource.data.queueStatus == 'waiting' || !('queueStatus' in resource.data)) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['cancelReason', 'status', 'queueStatus', 'updatedAt']) &&
+          request.resource.data.status == 'CANCELLED' &&
+          (!('queueStatus' in request.resource.data) || request.resource.data.queueStatus == 'cancelled')
         )
       );
 

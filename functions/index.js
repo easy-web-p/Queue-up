@@ -112,7 +112,10 @@ export const createPromptPayPayment = onCall(
 
       const effectiveUnitPrice = unitPrice + modifierUnitPrice;
       const subtotal = effectiveUnitPrice * quantity;
-      const storeId = String(product.storeId || product.shopId || "STORE_DEFAULT");
+      const storeId = String(product.storeId || product.shopId || "").trim();
+      if (!storeId) {
+        throw new HttpsError("failed-precondition", "ข้อมูลสินค้าไม่สมบูรณ์: ไม่พบการระบุรหัสร้านค้า (storeId)");
+      }
       const storeName = String(product.storeName || product.shopName || "ร้านค้าในโรงเรียน");
 
       if (booking && booking.date && (booking.timeSlot || booking.time)) {
