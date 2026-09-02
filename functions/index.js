@@ -39,30 +39,47 @@ export const createPromptPayPayment = onCall(
     const productSnap = await db.collection("products").doc(productId).get();
     if (!productSnap.exists) throw new HttpsError("not-found", "Product is not available for payment.");
     const product = productSnap.data();
+    if (product.isAvailable === false) {
+      throw new HttpsError("failed-precondition", "เมนูนี้ปิดรับออเดอร์ชั่วคราว");
+    }
+    if (typeof product.stock === "number" && product.stock < quantity) {
+      throw new HttpsError("failed-precondition", `สินค้าในสต็อกไม่เพียงพอ (คงเหลือ ${product.stock} รายการ)`);
+    }
+
     const unitPrice = Number(product.price);
     if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
       throw new HttpsError("failed-precondition", "Invalid product price in database.");
     }
 
+    const storeId = String(product.storeId || product.shopId || "STORE_DEFAULT");
+    const storeName = String(product.storeName || product.shopName || "ร้านค้าในโรงเรียน");
     const subtotal = unitPrice * quantity;
     let discountAmount = 0;
 
-    // 🔒 Server-Authoritative Coupon Verification: Check coupons collection
+    // 🔒 Server-Authoritative & Store-Scoped Coupon Verification
     if (typeof couponCode === "string" && couponCode.trim()) {
       const cleanCode = couponCode.trim().toUpperCase();
       const couponSnap = await db.collection("coupons").doc(cleanCode).get();
       if (couponSnap.exists) {
         const coupon = couponSnap.data();
-        if (coupon.status === "Active" && subtotal >= (Number(coupon.minSpend) || 0)) {
-          discountAmount = Math.min(subtotal, Number(coupon.discount) || 0);
+        const minSpend = Number(coupon.minSpend) || 0;
+        const discountVal = Number(coupon.discount) || 0;
+        const isNotExpired = !coupon.expiryDate || new Date(coupon.expiryDate) > new Date();
+        const isStoreMatch = !coupon.storeId || coupon.scope === "platform" || coupon.storeId === storeId;
+
+        if (coupon.status === "Active" && isNotExpired && isStoreMatch && subtotal >= minSpend && discountVal > 0) {
+          if (coupon.discountType === "percent" || coupon.type === "percent") {
+            const percent = Math.min(100, Math.max(0, discountVal));
+            discountAmount = Math.round((subtotal * percent) / 100);
+          } else {
+            discountAmount = Math.min(subtotal, discountVal);
+          }
         }
       }
     }
 
     const finalAmount = Math.max(1, subtotal - discountAmount);
     const totalSatang = Math.round(finalAmount * 100);
-    const storeId = String(product.storeId || product.shopId || "STORE_DEFAULT");
-    const storeName = String(product.storeName || product.shopName || "ร้านค้าในโรงเรียน");
     const totalAmount = finalAmount;
     const orderRef = db.collection("orders").doc();
     await orderRef.set({
@@ -84,6 +101,7 @@ export const createPromptPayPayment = onCall(
       quantity,
       booking: booking || null,
       subtotal: unitPrice * quantity,
+      discountAmount,
       totalAmount,
       totalPrice: totalAmount,
       currency: "THB",
@@ -134,7 +152,13 @@ export const opnWebhook = onRequest(
       const orderRef = db.collection("orders").doc(orderId);
       const orderSnap = await orderRef.get();
       if (!orderSnap.exists || orderSnap.data().paymentId !== charge.id) return res.status(400).send("Order mismatch");
-      const expectedSatang = Math.round(Number(orderSnap.data().totalPrice) * 100);
+
+      // 🔒 Idempotency check: Don't re-process already paid orders
+      if (orderSnap.data().paymentStatus === "paid") {
+        return res.status(200).send("Already processed");
+      }
+
+      const expectedSatang = Math.round(Number(orderSnap.data().totalAmount || orderSnap.data().totalPrice) * 100);
       if (charge.amount !== expectedSatang) return res.status(400).send("Amount mismatch");
       const paymentStatus = charge.status === "successful" ? "paid" : charge.status;
       await orderRef.update({ paymentStatus, providerStatus: charge.status, paidAt: charge.status === "successful" ? FieldValue.serverTimestamp() : null, updatedAt: FieldValue.serverTimestamp() });

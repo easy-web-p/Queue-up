@@ -35,6 +35,7 @@ import {
 import { MenuItem, Order, CustomerProfile, MerchantShop } from '../types';
 import { fetchMenuItemsFromFirestore, fetchOrdersFromFirestore, fetchShopsFromFirestore, fetchUsersFromFirestore } from '../lib/firebase';
 import { db, doc, setDoc, deleteDoc } from '../firebase/config.js';
+import { writeBatch } from 'firebase/firestore';
 
 interface StoreAdminPageProps {
   menuItems?: MenuItem[];
@@ -141,8 +142,11 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
       status: 'Active'
     };
     try {
-      await setDoc(doc(db, "shops", "store_canteen01", "staff", newStaff.id), newStaff, { merge: true });
-      await setDoc(doc(db, "merchantProfiles", "store_canteen01", "staff", newStaff.id), newStaff, { merge: true });
+      const batch = writeBatch(db);
+      batch.set(doc(db, "shops", "store_canteen01", "staff", newStaff.id), newStaff, { merge: true });
+      batch.set(doc(db, "merchantProfiles", "store_canteen01", "staff", newStaff.id), newStaff, { merge: true });
+      await batch.commit();
+
       setStaffList(prev => [...prev, newStaff]);
       setLogs(prev => [{
         id: `L-${Date.now().toString().slice(-4)}`,
@@ -193,39 +197,47 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
   };
 
   const handleToggleStock = async (id: string) => {
-    if (propsOnToggleStock) {
-      propsOnToggleStock(id);
-    }
     const targetItem = menuItems.find((i) => i.id === id);
-    const newAvail = targetItem ? !targetItem.isAvailable : true;
-    setLocalMenuItems((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, isAvailable: newAvail } : item
-      )
-    );
+    if (!targetItem) return;
+    const newAvail = !targetItem.isAvailable;
+
     try {
       await setDoc(doc(db, "products", id), { isAvailable: newAvail }, { merge: true });
+      if (propsOnToggleStock) {
+        propsOnToggleStock(id);
+      }
+      setLocalMenuItems((prev) =>
+        prev.map((item) =>
+          item.id === id ? { ...item, isAvailable: newAvail } : item
+        )
+      );
+      setToastMsg(`อัปเดตสถานะ ${targetItem.name} เป็น ${newAvail ? 'พร้อมขาย' : 'สินค้าหมด'}`);
+      setTimeout(() => setToastMsg(null), 2500);
     } catch (e) {
       console.error("Firestore toggle stock error:", e);
+      setToastMsg(`ไม่สามารถอัปเดตสถานะสินค้าได้: ${(e as any)?.message || e}`);
+      setTimeout(() => setToastMsg(null), 3500);
     }
   };
 
   const handleUpdatePrice = async (id: string, newPrice: number) => {
-    if (onUpdatePrice) {
-      onUpdatePrice(id, newPrice);
-    }
-    setLocalMenuItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, price: newPrice } : item))
-    );
+    const targetItem = menuItems.find((i) => i.id === id);
+    if (!targetItem) return;
+
     try {
       await setDoc(doc(db, "products", id), { price: newPrice }, { merge: true });
-      const itemMatch = menuItems.find((i) => i.id === id);
-      if (itemMatch) {
-        setToastMsg(`อัปเดตราคา ${itemMatch.name} เป็น ฿${newPrice} สำเร็จ`);
-        setTimeout(() => setToastMsg(null), 2500);
+      if (onUpdatePrice) {
+        onUpdatePrice(id, newPrice);
       }
+      setLocalMenuItems((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, price: newPrice } : item))
+      );
+      setToastMsg(`อัปเดตราคา ${targetItem.name} เป็น ฿${newPrice} สำเร็จ`);
+      setTimeout(() => setToastMsg(null), 2500);
     } catch (e) {
       console.error("Firestore update price error:", e);
+      setToastMsg(`ไม่สามารถอัปเดตราคาได้: ${(e as any)?.message || e}`);
+      setTimeout(() => setToastMsg(null), 3500);
     }
   };
 

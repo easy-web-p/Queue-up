@@ -204,7 +204,11 @@ service cloud.firestore {
     // ==========================================
     match /systemEvaluations/{evalId} {
       allow read: if isAdmin();
-      allow create: if isAuthenticated() && isValidNumber(request.resource.data.rating) && request.resource.data.rating >= 1 && request.resource.data.rating <= 5;
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid &&
+        isValidNumber(request.resource.data.rating) && 
+        request.resource.data.rating >= 1 && 
+        request.resource.data.rating <= 5;
       allow update, delete: if false; // Immutable evaluation records
     }
 
