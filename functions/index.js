@@ -2,6 +2,7 @@
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
 
 initializeApp();
@@ -70,7 +71,7 @@ export const createPromptPayPayment = onCall(
           const existingOrderDoc = await transaction.get(db.collection("orders").doc(existingOrderId));
           if (existingOrderDoc.exists) {
             const ord = existingOrderDoc.data();
-            if (ord.paymentStatus !== "creation_failed" && ord.paymentStatus !== "cancelled") {
+            if (ord.paymentStatus !== "creation_failed" && ord.paymentStatus !== "cancelled" && ord.paymentStatus !== "expired") {
               return {
                 existingResult: {
                   orderId: ord.orderId,
@@ -182,9 +183,15 @@ export const createPromptPayPayment = onCall(
         }
 
         const currentOrders = slotSnap.exists ? Number(slotSnap.data().currentOrders || 0) : 0;
-        const maxCapacity = slotSnap.exists && typeof slotSnap.data().capacity === "number"
+        const capacityVal = slotSnap.exists && typeof slotSnap.data().capacity === "number"
           ? Number(slotSnap.data().capacity)
-          : Number(storeConfiguredCapacity || 20);
+          : Number(storeConfiguredCapacity);
+
+        if (typeof capacityVal !== "number" || capacityVal <= 0) {
+          throw new HttpsError("failed-precondition", "ร้านค้ายังไม่ได้กำหนดขีดจำกัดจำนวนออเดอร์สำหรับรอบเวลานี้");
+        }
+
+        const maxCapacity = capacityVal;
 
         if (currentOrders + quantity > maxCapacity) {
           throw new HttpsError("failed-precondition", `รอบเวลา ${slotTime} วันที่ ${slotDate} เต็มแล้ว (รองรับได้สูงสุด ${maxCapacity} คิว)`);
@@ -349,9 +356,13 @@ export const createPromptPayPayment = onCall(
         }
         if (reservedSlotDocId) {
           try {
-            await db.collection("store_slots").doc(reservedSlotDocId).update({
-              currentOrders: FieldValue.increment(-quantity),
-              updatedAt: FieldValue.serverTimestamp()
+            const slotRef = db.collection("store_slots").doc(reservedSlotDocId);
+            await db.runTransaction(async (t) => {
+              const sSnap = await t.get(slotRef);
+              if (sSnap.exists) {
+                const current = Number(sSnap.data().currentOrders || 0);
+                t.set(slotRef, { currentOrders: Math.max(0, current - quantity), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+              }
             });
           } catch (slotErr) {
             console.warn("Revert slot warning:", slotErr);
@@ -363,51 +374,86 @@ export const createPromptPayPayment = onCall(
   }
 );
 
-// 🔒 Idempotent Resource Release Engine: Safely returns stock and time-slot capacity
-export async function releaseOrderResources(orderDocRef, orderData) {
-  if (!orderData || orderData.resourcesReleased) return;
-
-  await db.runTransaction(async (transaction) => {
+// 🔒 Idempotent Resource Release Engine: Safely returns stock and time-slot capacity within a SINGLE atomic transaction
+export async function releaseOrderResources(orderDocRef, cancelReason = "Payment expired") {
+  return await db.runTransaction(async (transaction) => {
     const freshSnap = await transaction.get(orderDocRef);
-    if (!freshSnap.exists || freshSnap.data().resourcesReleased) return;
-
+    if (!freshSnap.exists) return false;
     const data = freshSnap.data();
 
-    // 1. Rollback stock
-    if (data.productId && typeof data.quantity === "number") {
-      const productRef = db.collection("products").doc(data.productId);
-      transaction.update(productRef, {
-        stock: FieldValue.increment(data.quantity),
-        updatedAt: FieldValue.serverTimestamp(),
-      });
+    // 🔒 Safety Guard: NEVER release resources if order is already paid or already released!
+    if (data.paymentStatus === "paid" || data.resourcesReleased === true) {
+      return false;
     }
 
-    // 2. Rollback time-slot
-    if (data.booking?.date && (data.booking.timeSlot || data.booking.time) && data.storeId) {
-      const slotTime = String(data.booking.timeSlot || data.booking.time).trim();
-      const slotDate = String(data.booking.date).trim();
-      const slotDocId = `${data.storeId}_${slotDate}_${slotTime}`;
-      const slotRef = db.collection("store_slots").doc(slotDocId);
-      transaction.update(slotRef, {
-        currentOrders: FieldValue.increment(-data.quantity),
-        updatedAt: FieldValue.serverTimestamp(),
-      });
+    const qty = Number(data.quantity);
+    if (Number.isInteger(qty) && qty > 0) {
+      // 1. Rollback stock
+      if (data.productId) {
+        const productRef = db.collection("products").doc(data.productId);
+        transaction.update(productRef, {
+          stock: FieldValue.increment(qty),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
+
+      // 2. Rollback time-slot with non-negative guard
+      if (data.booking?.date && (data.booking.timeSlot || data.booking.time) && data.storeId) {
+        const slotTime = String(data.booking.timeSlot || data.booking.time).trim();
+        const slotDate = String(data.booking.date).trim();
+        const slotDocId = `${data.storeId}_${slotDate}_${slotTime}`;
+        const slotRef = db.collection("store_slots").doc(slotDocId);
+        const slotSnap = await transaction.get(slotRef);
+
+        if (slotSnap.exists) {
+          const current = Number(slotSnap.data().currentOrders || 0);
+          const newOrders = Math.max(0, current - qty);
+          transaction.set(slotRef, {
+            currentOrders: newOrders,
+            updatedAt: FieldValue.serverTimestamp(),
+          }, { merge: true });
+        }
+      }
     }
 
+    // 3. Atomically cancel order and mark resourcesReleased in the SAME transaction
     transaction.update(orderDocRef, {
+      paymentStatus: "expired",
+      status: "CANCELLED",
+      cancelReason,
       resourcesReleased: true,
       updatedAt: FieldValue.serverTimestamp(),
     });
+
+    return true;
   });
 }
 
-// Callable & periodic function to expire stale pending orders and release stock & slots
+// ⏰ Automated Cloud Scheduler: Periodically expires stale orders every 5 minutes
+export const scheduledExpirePendingOrders = onSchedule(
+  { schedule: "every 5 minutes", region: "asia-southeast1" },
+  async () => {
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const staleSnap = await db.collection("orders")
+      .where("paymentStatus", "in", ["pending", "charge_created_order_pending"])
+      .where("createdAt", "<=", fifteenMinutesAgo)
+      .limit(50)
+      .get();
+
+    for (const doc of staleSnap.docs) {
+      if (!doc.data().resourcesReleased) {
+        await releaseOrderResources(doc.ref, "Payment window expired (15 minutes)");
+      }
+    }
+  }
+);
+
+// Callable function to expire stale pending orders and release stock & slots on-demand
 export const expirePendingOrders = onCall(
   { region: "asia-southeast1" },
   async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Sign in is required.");
 
-    // Query pending orders older than 15 minutes
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
     const staleSnap = await db.collection("orders")
       .where("paymentStatus", "in", ["pending", "charge_created_order_pending"])
@@ -417,17 +463,8 @@ export const expirePendingOrders = onCall(
 
     let expiredCount = 0;
     for (const doc of staleSnap.docs) {
-      const order = doc.data();
-      if (!order.resourcesReleased) {
-        await doc.ref.update({
-          paymentStatus: "expired",
-          status: "CANCELLED",
-          cancelReason: "Payment window expired (15 minutes)",
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-        await releaseOrderResources(doc.ref, order);
-        expiredCount++;
-      }
+      const success = await releaseOrderResources(doc.ref, "Payment window expired (15 minutes)");
+      if (success) expiredCount++;
     }
 
     return { success: true, expiredCount };
@@ -489,15 +526,22 @@ export const opnWebhook = onRequest(
 
       // Handle Expired / Failed Charge Events
       if (charge.status === "expired" || charge.status === "failed") {
+        await releaseOrderResources(orderRef, `Payment provider reported charge ${charge.status}`);
+        return res.status(200).send("Expired/Failed handled");
+      }
+
+      // 🔒 Race condition guard: If webhook arrives after order was expired, flag for merchant review
+      if (orderSnap.data().paymentStatus === "expired" || orderSnap.data().resourcesReleased) {
         await orderRef.update({
           paymentId: charge.id,
-          paymentStatus: charge.status === "expired" ? "expired" : "failed",
+          paymentStatus: "paid_after_expired",
           providerStatus: charge.status,
-          status: "CANCELLED",
+          flaggedForMerchantReview: true,
+          reconciled: true,
+          paidAt: charge.status === "successful" ? FieldValue.serverTimestamp() : null,
           updatedAt: FieldValue.serverTimestamp()
         });
-        await releaseOrderResources(orderRef, orderSnap.data());
-        return res.status(200).send("Expired/Failed handled");
+        return res.status(200).send("Handled as paid_after_expired");
       }
 
       // 🔒 Idempotency check: Don't re-process already paid orders
