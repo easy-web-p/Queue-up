@@ -98,6 +98,12 @@ service cloud.firestore {
         );
         allow update, delete: if isStoreOwner(shopId) || isAdmin();
       }
+
+      // Subcollection for shop staff management
+      match /staff/{staffUid} {
+        allow read: if isAuthenticated() && (isStoreOwner(shopId) || request.auth.uid == staffUid || isAdmin());
+        allow write: if isStoreOwner(shopId) || isAdmin();
+      }
     }
 
     // ==========================================

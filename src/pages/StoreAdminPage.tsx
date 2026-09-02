@@ -130,7 +130,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
     { id: 'L-104', time: '09:30 น.', action: 'เติมสต็อกวัตถุดิบไก่ทอด +50 จาน', user: 'นายสมชาย มีชัย' },
   ]);
 
-  const handleAddStaffSubmit = (e: React.FormEvent) => {
+  const handleAddStaffSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newStaffName.trim()) return;
     const newStaff = {
@@ -140,26 +140,29 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
       phone: newStaffPhone || '080-000-0000',
       status: 'Active'
     };
-    setStaffList(prev => [...prev, newStaff]);
     try {
-      setDoc(doc(db, "shops", "store_canteen01", "staff", newStaff.id), newStaff, { merge: true });
+      await setDoc(doc(db, "shops", "store_canteen01", "staff", newStaff.id), newStaff, { merge: true });
+      await setDoc(doc(db, "merchantProfiles", "store_canteen01", "staff", newStaff.id), newStaff, { merge: true });
+      setStaffList(prev => [...prev, newStaff]);
+      setLogs(prev => [{
+        id: `L-${Date.now().toString().slice(-4)}`,
+        time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
+        action: `เพิ่มพนักงานใหม่: ${newStaffName} (${newStaffRole})`,
+        user: user?.name || 'Admin'
+      }, ...prev]);
+      setShowAddStaffModal(false);
+      setNewStaffName('');
+      setNewStaffPhone('');
+      setToastMsg(`เพิ่มพนักงาน ${newStaffName} สำเร็จ`);
+      setTimeout(() => setToastMsg(null), 2500);
     } catch (e) {
-      console.warn("Firestore save staff error:", e);
+      console.error("Firestore save staff error:", e);
+      setToastMsg(`เกิดข้อผิดพลาดในการบันทึกพนักงาน: ${(e as any)?.message || e}`);
+      setTimeout(() => setToastMsg(null), 3500);
     }
-    setLogs(prev => [{
-      id: `L-${Date.now().toString().slice(-4)}`,
-      time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-      action: `เพิ่มพนักงานใหม่: ${newStaffName} (${newStaffRole})`,
-      user: user?.name || 'Admin'
-    }, ...prev]);
-    setShowAddStaffModal(false);
-    setNewStaffName('');
-    setNewStaffPhone('');
-    setToastMsg(`เพิ่มพนักงาน ${newStaffName} สำเร็จ`);
-    setTimeout(() => setToastMsg(null), 2500);
   };
 
-  const handleAddCouponSubmit = (e: React.FormEvent) => {
+  const handleAddCouponSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCouponCode.trim()) return;
     const newCoupon = {
@@ -169,25 +172,27 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
       minSpend: Number(newCouponMinSpend),
       status: 'Active'
     };
-    setCoupons(prev => [...prev, newCoupon]);
     try {
-      setDoc(doc(db, "coupons", newCoupon.code), newCoupon, { merge: true });
+      await setDoc(doc(db, "coupons", newCoupon.code), newCoupon, { merge: true });
+      setCoupons(prev => [...prev, newCoupon]);
+      setLogs(prev => [{
+        id: `L-${Date.now().toString().slice(-4)}`,
+        time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
+        action: `สร้างโค้ดส่วนลดใหม่: ${newCouponCode.toUpperCase()} (ลด ฿${newCouponDiscount})`,
+        user: user?.name || 'Admin'
+      }, ...prev]);
+      setShowAddCouponModal(false);
+      setNewCouponCode('');
+      setToastMsg(`สร้างคูปอง ${newCoupon.code} สำเร็จ`);
+      setTimeout(() => setToastMsg(null), 2500);
     } catch (e) {
-      console.warn("Firestore save coupon error:", e);
+      console.error("Firestore save coupon error:", e);
+      setToastMsg(`เกิดข้อผิดพลาดในการสร้างคูปอง: ${(e as any)?.message || e}`);
+      setTimeout(() => setToastMsg(null), 3500);
     }
-    setLogs(prev => [{
-      id: `L-${Date.now().toString().slice(-4)}`,
-      time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-      action: `สร้างโค้ดส่วนลดใหม่: ${newCouponCode.toUpperCase()} (ลด ฿${newCouponDiscount})`,
-      user: user?.name || 'Admin'
-    }, ...prev]);
-    setShowAddCouponModal(false);
-    setNewCouponCode('');
-    setToastMsg(`สร้างคูปอง ${newCoupon.code} สำเร็จ`);
-    setTimeout(() => setToastMsg(null), 2500);
   };
 
-  const handleToggleStock = (id: string) => {
+  const handleToggleStock = async (id: string) => {
     if (propsOnToggleStock) {
       propsOnToggleStock(id);
     }
@@ -199,13 +204,13 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
       )
     );
     try {
-      setDoc(doc(db, "products", id), { isAvailable: newAvail }, { merge: true });
+      await setDoc(doc(db, "products", id), { isAvailable: newAvail }, { merge: true });
     } catch (e) {
-      console.warn("Firestore toggle stock error:", e);
+      console.error("Firestore toggle stock error:", e);
     }
   };
 
-  const handleUpdatePrice = (id: string, newPrice: number) => {
+  const handleUpdatePrice = async (id: string, newPrice: number) => {
     if (onUpdatePrice) {
       onUpdatePrice(id, newPrice);
     }
@@ -213,14 +218,14 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
       prev.map((item) => (item.id === id ? { ...item, price: newPrice } : item))
     );
     try {
-      setDoc(doc(db, "products", id), { price: newPrice }, { merge: true });
+      await setDoc(doc(db, "products", id), { price: newPrice }, { merge: true });
+      const itemMatch = menuItems.find((i) => i.id === id);
+      if (itemMatch) {
+        setToastMsg(`อัปเดตราคา ${itemMatch.name} เป็น ฿${newPrice} สำเร็จ`);
+        setTimeout(() => setToastMsg(null), 2500);
+      }
     } catch (e) {
-      console.warn("Firestore update price error:", e);
-    }
-    const itemMatch = menuItems.find((i) => i.id === id);
-    if (itemMatch) {
-      setToastMsg(`อัปเดตราคา ${itemMatch.name} เป็น ฿${newPrice} สำเร็จ`);
-      setTimeout(() => setToastMsg(null), 2500);
+      console.error("Firestore update price error:", e);
     }
   };
 
@@ -235,7 +240,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
     setTimeout(() => setToastMsg(null), 2500);
   };
 
-  const handleAddNewItemSubmit = (e: React.FormEvent) => {
+  const handleAddNewItemSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newItemName.trim()) return;
 
@@ -253,18 +258,22 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
       popular: true,
     };
 
-    if (onAddNewItem) {
-      onAddNewItem(item);
-    }
-    setLocalMenuItems((prev) => [item, ...prev]);
     try {
-      setDoc(doc(db, "products", item.id), item, { merge: true });
+      await setDoc(doc(db, "products", item.id), item, { merge: true });
+      if (onAddNewItem) {
+        onAddNewItem(item);
+      }
+      setLocalMenuItems((prev) => [item, ...prev]);
+      setShowAddItemModal(false);
+      setNewItemName('');
+      setNewItemDesc('');
+      setToastMsg(`เพิ่มเมนู ${item.name} สำเร็จ`);
+      setTimeout(() => setToastMsg(null), 2500);
     } catch (e) {
-      console.warn("Firestore add new product error:", e);
+      console.error("Firestore add new product error:", e);
+      setToastMsg(`เกิดข้อผิดพลาดในการเพิ่มเมนู: ${(e as any)?.message || e}`);
+      setTimeout(() => setToastMsg(null), 3500);
     }
-    setShowAddItemModal(false);
-    setNewItemName('');
-    setNewItemDesc('');
   };
 
   const handleExportCSV = () => {

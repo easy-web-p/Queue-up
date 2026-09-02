@@ -7,7 +7,6 @@ import { defineSecret } from "firebase-functions/params";
 initializeApp();
 const db = getFirestore();
 const opnSecretKey = defineSecret("OPN_SECRET_KEY");
-const ALLOWED_DISCOUNTS = new Set([0, 10, 20, 50]);
 
 async function opnRequest(path, key, body) {
   const response = await fetch(`https://api.omise.co${path}`, {
@@ -28,13 +27,13 @@ async function retrieveCharge(chargeId, key) {
   return response.json();
 }
 
-// The browser sends only product id/quantity. Price and final order data are recomputed here.
+// The browser sends only product id/quantity/couponCode. Price, discount and final order data are strictly computed here on the server.
 export const createPromptPayPayment = onCall(
   { region: "asia-southeast1", secrets: [opnSecretKey] },
   async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Sign in is required.");
-    const { productId, quantity = 1, discountPercent = 0, booking } = request.data || {};
-    if (typeof productId !== "string" || !Number.isInteger(quantity) || quantity < 1 || quantity > 20 || !ALLOWED_DISCOUNTS.has(Number(discountPercent))) {
+    const { productId, quantity = 1, couponCode, booking } = request.data || {};
+    if (typeof productId !== "string" || !Number.isInteger(quantity) || quantity < 1 || quantity > 20) {
       throw new HttpsError("invalid-argument", "Invalid order details.");
     }
     const productSnap = await db.collection("products").doc(productId).get();
@@ -45,15 +44,26 @@ export const createPromptPayPayment = onCall(
       throw new HttpsError("failed-precondition", "Invalid product price in database.");
     }
 
-    let verifiedDiscountPercent = 0;
-    if (ALLOWED_DISCOUNTS.has(Number(discountPercent))) {
-      verifiedDiscountPercent = Number(discountPercent);
+    const subtotal = unitPrice * quantity;
+    let discountAmount = 0;
+
+    // 🔒 Server-Authoritative Coupon Verification: Check coupons collection
+    if (typeof couponCode === "string" && couponCode.trim()) {
+      const cleanCode = couponCode.trim().toUpperCase();
+      const couponSnap = await db.collection("coupons").doc(cleanCode).get();
+      if (couponSnap.exists) {
+        const coupon = couponSnap.data();
+        if (coupon.status === "Active" && subtotal >= (Number(coupon.minSpend) || 0)) {
+          discountAmount = Math.min(subtotal, Number(coupon.discount) || 0);
+        }
+      }
     }
 
-    const totalSatang = Math.round(unitPrice * 100 * quantity * (1 - verifiedDiscountPercent / 100));
+    const finalAmount = Math.max(1, subtotal - discountAmount);
+    const totalSatang = Math.round(finalAmount * 100);
     const storeId = String(product.storeId || product.shopId || "STORE_DEFAULT");
     const storeName = String(product.storeName || product.shopName || "ร้านค้าในโรงเรียน");
-    const totalAmount = totalSatang / 100;
+    const totalAmount = finalAmount;
     const orderRef = db.collection("orders").doc();
     await orderRef.set({
       id: orderRef.id,
