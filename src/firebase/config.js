@@ -8,6 +8,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   sendEmailVerification,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 import {
   getFirestore,
@@ -50,6 +51,7 @@ export {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   sendEmailVerification,
+  sendPasswordResetEmail,
   doc,
   setDoc,
   getDoc,

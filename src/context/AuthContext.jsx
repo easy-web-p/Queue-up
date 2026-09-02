@@ -5,6 +5,8 @@ import { useDispatch } from 'react-redux'
 import { auth, googleProvider, db, doc, getDoc } from '../firebase/config.js'
 import { setUser, clearUser } from '../store/authSlice.js'
 
+import { getEffectiveRoles } from '../utils/authRoles.js'
+
 export const AuthContext = createContext()
 
 export function AuthProvider({ children }) {
@@ -13,7 +15,6 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        const isAdmin = (firebaseUser.email || "").toLowerCase() === "58140@lomsak.ac.th";
         let userDocData = null;
         try {
           const userSnap = await getDoc(doc(db, "users", firebaseUser.uid));
@@ -24,15 +25,20 @@ export function AuthProvider({ children }) {
           console.warn("Could not fetch user profile from Firestore:", e);
         }
 
-        const isMerchant = userDocData?.roles?.includes("merchant") || userDocData?.isMerchantVerified === true;
-        const roles = isAdmin
-          ? ["customer", "merchant", "admin"]
-          : isMerchant
-            ? ["customer", "merchant"]
-            : (userDocData?.roles || ["customer"]);
+        const mergedUser = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email || "",
+          ...userDocData,
+        };
+
+        const roles = getEffectiveRoles(mergedUser);
+        const isAdmin = roles.includes("admin");
+        const isMerchant = roles.includes("merchant");
+        const isMerchantVerified = userDocData?.isMerchantVerified === true || isAdmin;
+        const isMerchantRegistered = userDocData?.isMerchantRegistered === true || isAdmin;
 
         const activeRole = isAdmin
-          ? "admin"
+          ? (userDocData?.activeRole || "admin")
           : (userDocData?.activeRole || (isMerchant ? "merchant" : "customer"));
 
         const isGoogle = Boolean(firebaseUser.providerData?.some(p => p.providerId === 'google.com'));
@@ -47,6 +53,9 @@ export function AuthProvider({ children }) {
           roles: roles,
           activeRole: activeRole,
           isGoogleUser: isGoogle,
+          isMerchantVerified: isMerchantVerified,
+          isMerchantRegistered: isMerchantRegistered,
+          isSuperAdmin: isAdmin,
           storeId: userDocData?.storeId || (isMerchant ? "store_canteen01" : undefined),
         }));
       } else {

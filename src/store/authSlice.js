@@ -1,4 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit'
+import { getEffectiveRoles, isUserSuperAdmin } from '../utils/authRoles.js'
 
 // Read saved user session from LocalStorage for auto-login persistence
 const getInitialUser = () => {
@@ -19,10 +20,11 @@ const getInitialUser = () => {
 // Helper: Filter out sensitive fields and enforce role integrity before saving
 const filterSafeUserSession = (rawUser) => {
   if (!rawUser) return null;
-  const { uid, email, displayName, name, photo, photoURL, activeRole, school, isMerchantVerified, isMerchantRegistered } = rawUser;
-  const isSuperAdmin = (email || "").toLowerCase() === "58140@lomsak.ac.th";
-  const verifiedRoles = isSuperAdmin ? ["customer", "merchant", "admin"] : (isMerchantVerified ? ["customer", "merchant"] : ["customer"]);
-  const verifiedActiveRole = isSuperAdmin ? (activeRole || "admin") : (isMerchantVerified && activeRole === "merchant" ? "merchant" : "customer");
+  const { uid, email, displayName, name, photo, photoURL, activeRole, school, isMerchantVerified, isMerchantRegistered, storeId } = rawUser;
+  const isSuperAdmin = isUserSuperAdmin(rawUser);
+  const verifiedRoles = getEffectiveRoles(rawUser);
+  const isMerchant = verifiedRoles.includes("merchant");
+  const verifiedActiveRole = isSuperAdmin ? (activeRole || "admin") : (isMerchant && activeRole === "merchant" ? "merchant" : "customer");
 
   return {
     uid: uid || "",
@@ -31,8 +33,10 @@ const filterSafeUserSession = (rawUser) => {
     photoURL: photoURL || photo || "/yeti_mascot.jpg",
     activeRole: verifiedActiveRole,
     roles: verifiedRoles,
-    isMerchantVerified: !!isMerchantVerified,
-    isMerchantRegistered: !!isMerchantRegistered,
+    isMerchantVerified: Boolean(isMerchantVerified || isSuperAdmin),
+    isMerchantRegistered: Boolean(isMerchantRegistered || isSuperAdmin),
+    isSuperAdmin: isSuperAdmin,
+    storeId: storeId || (isMerchant ? "store_canteen01" : undefined),
     school: school || "โรงเรียน",
   };
 };

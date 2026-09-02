@@ -3,6 +3,7 @@ import { Navigate, useNavigate, useLocation } from "react-router-dom";
 import Loading from "../pages/Loading.jsx";
 import NotFound from "../pages/NotFound.jsx";
 import { switchRole } from "../store/authSlice.js";
+import { canAccessRole, isUserSuperAdmin } from "../utils/authRoles.js";
 
 /**
  * PROTECTED ROUTE GUARD WITH RBAC (Role-Based Access Control)
@@ -32,30 +33,14 @@ export default function ProtectedRoute({ children, allowedRoles = [] }) {
     return <Navigate to="/login" state={{ from: destinationPath }} replace />;
   }
 
-  // 2. Role-Based Access Control (RBAC) Check
+  // 2. Role-Based Access Control (RBAC) Check using centralized helper
   if (allowedRoles && allowedRoles.length > 0) {
-    // 🔒 Cryptographic/Identity Verification (Prevent LocalStorage Role Spoofing)
-    // Super Admin privilege is strictly tied to verified Super Admin email or Firebase claims
-    const isSuperAdmin = currentUser.email === "58140@lomsak.ac.th" || currentUser.isSuperAdmin === true;
-    
-    // Merchant privilege is strictly verified
-    const isMerchant = isSuperAdmin || currentUser.isMerchantVerified === true || currentUser.isMerchantRegistered === true;
-
-    let hasRole = false;
-    if (isSuperAdmin) {
-      hasRole = true;
-    } else if (allowedRoles.includes("admin")) {
-      // Non-superadmin cannot access admin under any circumstances
-      hasRole = false;
-    } else if (allowedRoles.includes("merchant")) {
-      hasRole = isMerchant;
-    } else if (allowedRoles.includes("customer")) {
-      hasRole = true;
-    }
+    const isSuperAdmin = isUserSuperAdmin(currentUser);
+    const hasRole = allowedRoles.some((role) => canAccessRole(currentUser, role));
 
     if (!hasRole) {
       // 🔒 Security Policy: When a non-admin attempts to access Admin route, render 404 NOT FOUND directly
-      if (allowedRoles.includes("admin")) {
+      if (allowedRoles.includes("admin") && !isSuperAdmin) {
         return <NotFound />;
       }
       // Access Denied Screen for unauthorized role

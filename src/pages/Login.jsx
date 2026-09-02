@@ -13,6 +13,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   sendEmailVerification,
+  sendPasswordResetEmail,
 } from "../firebase/config.js";
 import {
   sanitizeInput,
@@ -32,25 +33,12 @@ function Login() {
   const { user } = useSelector((state) => state.auth);
   const { loginWithGoogle } = useAuth();
 
-  // 1. Redirect if already logged in / Trap Back Button after logout
+  // 1. Redirect if already logged in
   useEffect(() => {
-    const savedUser = localStorage.getItem("queueup_user");
-    if (user || savedUser) {
-      navigate("/home", { replace: true });
-      return;
+    if (user) {
+      navigate(fromDestination, { replace: true });
     }
-
-    const preventBack = () => {
-      window.history.pushState(null, "", window.location.href);
-    };
-
-    window.history.pushState(null, "", window.location.href);
-    window.addEventListener("popstate", preventBack);
-
-    return () => {
-      window.removeEventListener("popstate", preventBack);
-    };
-  }, [user, navigate]);
+  }, [user, navigate, fromDestination]);
 
   const [isSignUp, setIsSignUp] = useState(false);
   const [isCreateProfile, setIsCreateProfile] = useState(false);
@@ -96,11 +84,29 @@ function Login() {
 
   const pwdValidation = validatePassword(password);
 
-  const handleForgotPassword = (e) => {
+  const handleForgotPassword = async (e) => {
     e.preventDefault();
     const inputEmail = prompt("🔒 [ระบบกู้คืนรหัสผ่าน]\nกรุณากรอกอีเมลของคุณเพื่อรับลิงก์รีเซ็ตรหัสผ่าน:", email);
     if (inputEmail && inputEmail.trim()) {
-      alert(`📧 ส่งลิงก์รีเซ็ตรหัสผ่านไปยังอีเมล "${sanitizeInput(inputEmail)}" เรียบร้อยแล้ว!`);
+      const sanitized = sanitizeInput(inputEmail.trim());
+      try {
+        setLoading(true);
+        await sendPasswordResetEmail(auth, sanitized);
+        setLoading(false);
+        alert(`📧 ระบบได้ส่งลิงก์สำหรับตั้งรหัสผ่านใหม่ไปยังอีเมล "${sanitized}" เรียบร้อยแล้ว!\nกรุณาตรวจสอบกล่องจดหมายของคุณ`);
+      } catch (err) {
+        setLoading(false);
+        console.warn("sendPasswordResetEmail error:", err);
+        if (err.code === "auth/user-not-found") {
+          alert("⚠️ ไม่พบบัญชีผู้ใช้ที่ลงทะเบียนด้วยอีเมลนี้");
+        } else if (err.code === "auth/invalid-email") {
+          alert("⚠️ รูปแบบอีเมลไม่ถูกต้อง");
+        } else if (err.code === "auth/too-many-requests") {
+          alert("⚠️ มีการส่งคำขอบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่อีกครั้ง");
+        } else {
+          alert(`⚠️ เกิดข้อผิดพลาดในการส่งลิงก์รีเซ็ตรหัสผ่าน: ${err.message}`);
+        }
+      }
     }
   };
 
@@ -131,7 +137,10 @@ function Login() {
         await setDoc(doc(db, "users", uidToUse), profileData, { merge: true });
         localStorage.setItem("queueup_secure_account_id", finalAccountId);
       } catch (err) {
-        console.warn("Firestore setDoc warning (using offline state):", err);
+        console.error("Firestore setDoc failed during profile creation:", err);
+        setLoading(false);
+        alert(`⚠️ ไม่สามารถบันทึกข้อมูลโปรไฟล์ได้: ${err.message}\nกรุณาลองใหม่อีกครั้ง`);
+        return;
       }
 
       dispatch(
@@ -272,61 +281,60 @@ function Login() {
       return;
     }
 
-    const defaultName = gUser.displayName || gUser.name || "ผู้ใช้งาน Google";
-    const defaultEmail = gUser.email || "";
-    const defaultPhoto = gUser.photoURL || gUser.photo || "/yeti_mascot.jpg";
-    const isAdminAccount = defaultEmail === "58140@lomsak.ac.th";
-    const userRoles = isAdminAccount ? ["customer", "merchant", "admin"] : ["customer"];
-    const activeRole = isAdminAccount ? "admin" : "customer";
-    
-    const studentNum = parseInt(defaultEmail.replace(/\D/g, ""), 10) || Math.floor(10000 + Math.random() * 90000);
-    const accountId = generateSecureAccountId(studentNum);
-
-    const userPayload = {
-      uid: gUser.uid,
-      name: defaultName,
-      displayName: defaultName,
-      email: defaultEmail,
-      photo: defaultPhoto,
-      photoURL: defaultPhoto,
-      roles: userRoles,
-      activeRole: activeRole,
-      provider: "google.com",
-      isGoogleUser: true,
-      accountId: accountId,
-      lastLoginAt: new Date().toISOString(),
-    };
-
-    localStorage.setItem("queueup_secure_account_id", accountId);
-    localStorage.setItem("queueup_user", JSON.stringify(userPayload));
-    dispatch(setUser(userPayload));
-
     try {
-      await setDoc(
-        doc(db, "users", gUser.uid),
-        {
-          uid: gUser.uid,
-          accountId: accountId,
-          roles: userRoles,
-          activeRole: activeRole,
-          provider: "google.com",
-          isGoogleUser: true,
-          email: defaultEmail,
-          displayName: defaultName,
-          fullName: defaultName,
-          photo: defaultPhoto,
-          photoURL: defaultPhoto,
-          lastLoginAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
-    } catch (err) {
-      console.warn("Firestore setDoc on Google login:", err);
-    }
+      const userDocRef = doc(db, "users", gUser.uid);
+      const userSnap = await getDoc(userDocRef);
+      let existingData = {};
+      if (userSnap.exists()) {
+        existingData = userSnap.data();
+      }
 
-    setLoading(false);
-    navigate(fromDestination, { replace: true });
+      const defaultName = existingData.displayName || existingData.fullName || gUser.displayName || "ผู้ใช้งาน Google";
+      const defaultEmail = gUser.email || existingData.email || "";
+      const defaultPhoto = existingData.photoURL || existingData.photo || gUser.photoURL || "/yeti_mascot.jpg";
+      const isAdminAccount = defaultEmail.toLowerCase() === "58140@lomsak.ac.th" || existingData.isSuperAdmin === true;
+      const isMerchant = existingData.roles?.includes("merchant") || existingData.isMerchantVerified === true || existingData.isMerchantRegistered === true;
+      const userRoles = isAdminAccount ? ["customer", "merchant", "admin"] : (isMerchant ? ["customer", "merchant"] : (existingData.roles || ["customer"]));
+      const activeRole = isAdminAccount ? (existingData.activeRole || "admin") : (existingData.activeRole || (isMerchant ? "merchant" : "customer"));
+      
+      const studentNum = parseInt(defaultEmail.replace(/\D/g, ""), 10) || Math.floor(10000 + Math.random() * 90000);
+      const accountId = existingData.accountId || generateSecureAccountId(studentNum);
+
+      const profilePayload = {
+        uid: gUser.uid,
+        accountId: accountId,
+        roles: userRoles,
+        activeRole: activeRole,
+        provider: "google.com",
+        isGoogleUser: true,
+        email: defaultEmail,
+        displayName: defaultName,
+        fullName: defaultName,
+        photo: defaultPhoto,
+        photoURL: defaultPhoto,
+        isMerchantVerified: Boolean(existingData.isMerchantVerified || isAdminAccount),
+        isMerchantRegistered: Boolean(existingData.isMerchantRegistered || isAdminAccount),
+        isSuperAdmin: isAdminAccount,
+        storeId: existingData.storeId || (isMerchant ? "store_canteen01" : undefined),
+        lastLoginAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+
+      await setDoc(userDocRef, profilePayload, { merge: true });
+
+      localStorage.setItem("queueup_secure_account_id", accountId);
+      dispatch(setUser({
+        ...profilePayload,
+        lastLoginAt: new Date().toISOString(),
+      }));
+
+      setLoading(false);
+      navigate(fromDestination, { replace: true });
+    } catch (err) {
+      console.error("Firestore sync error on Google Login:", err);
+      setLoading(false);
+      alert(`⚠️ เข้าสู่ระบบด้วย Google สำเร็จ แต่ไม่สามารถเชื่อมต่อฐานข้อมูลโปรไฟล์ได้: ${err.message}`);
+    }
   };
 
   return (
