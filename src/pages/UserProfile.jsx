@@ -483,17 +483,6 @@ function UserProfile() {
             <div className="small text-muted mt-1" style={{ fontSize: "11px" }}>
               🪙 <b>{userPoints.toLocaleString()}</b> Points
             </div>
-
-            <label className="shopee-change-photo-btn">
-              <i className="bi bi-camera-fill me-1" />
-              แก้ไขรูปโปรไฟล์
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleAvatarUpload}
-                style={{ display: "none" }}
-              />
-            </label>
           </div>
 
           {/* Navigation Links */}
