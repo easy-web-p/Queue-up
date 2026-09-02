@@ -490,7 +490,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
               title={user ? user.name || user.email : "โปรไฟล์ของฉัน"}
             >
               <img
-                src={(user && user.photo) || "/yeti_mascot.jpg"}
+                src={(user && (user.photo || user.photoURL)) || "/yeti_mascot.jpg"}
                 alt="Profile"
                 className="shopee-user-avatar"
                 onError={(e) => {

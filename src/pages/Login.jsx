@@ -263,27 +263,23 @@ function Login() {
         gUser = await loginWithGoogle();
       }
     } catch (error) {
-      console.warn("Google Sign-In warning/fallback:", error);
+      console.warn("Google Sign-In error:", error);
+      alert(`⚠️ เกิดข้อผิดพลาดในการเข้าสู่ระบบด้วย Google: ${error.message || error}`);
     }
 
     if (!gUser) {
-      // Safe fallback for demo environment or preview domains
-      gUser = {
-        uid: "google_student_58140",
-        displayName: "(ม.1/6) -58140 เด็กชายพิสิษฐ์ แก้วกุลพิสิษฐ์",
-        email: "58140@lomsak.ac.th",
-        photoURL: "/yeti_mascot.jpg",
-      };
+      setLoading(false);
+      return;
     }
 
     const defaultName = gUser.displayName || gUser.name || "ผู้ใช้งาน Google";
-    const defaultEmail = gUser.email || "58140@lomsak.ac.th";
+    const defaultEmail = gUser.email || "";
     const defaultPhoto = gUser.photoURL || gUser.photo || "/yeti_mascot.jpg";
     const isAdminAccount = defaultEmail === "58140@lomsak.ac.th";
     const userRoles = isAdminAccount ? ["customer", "merchant", "admin"] : ["customer"];
     const activeRole = isAdminAccount ? "admin" : "customer";
     
-    const studentNum = parseInt(defaultEmail.replace(/\D/g, ""), 10) || 58140;
+    const studentNum = parseInt(defaultEmail.replace(/\D/g, ""), 10) || Math.floor(10000 + Math.random() * 90000);
     const accountId = generateSecureAccountId(studentNum);
 
     const userPayload = {

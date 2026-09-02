@@ -48,33 +48,15 @@ export function AuthProvider({ children }) {
       const result = await signInWithPopup(auth, googleProvider);
       return result.user;
     } catch (err) {
-      console.warn('Firebase Google login popup warning/fallback:', err);
-      // Fallback for popup blocked / unauthorized domain / network timeout
-      if (
-        err.code === 'auth/unauthorized-domain' ||
-        err.code === 'auth/popup-blocked' ||
-        err.code === 'auth/cancelled-popup-request' ||
-        err.code === 'auth/popup-closed-by-user' ||
-        err.message?.includes('popup')
-      ) {
-        const fallbackUser = {
-          uid: "google_student_58140",
-          displayName: "(ม.1/6) -58140 เด็กชายพิสิษฐ์ แก้วกุลพิสิษฐ์",
-          email: "58140@lomsak.ac.th",
-          photoURL: "/yeti_mascot.jpg",
-        };
-        dispatch(setUser({
-          uid: fallbackUser.uid,
-          name: fallbackUser.displayName,
-          displayName: fallbackUser.displayName,
-          email: fallbackUser.email,
-          photo: fallbackUser.photoURL,
-          photoURL: fallbackUser.photoURL,
-          roles: ["customer", "merchant", "admin"],
-          activeRole: "customer",
-          isGoogleUser: true,
-        }));
-        return fallbackUser;
+      console.warn('Firebase Google login popup error:', err);
+      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+        // User closed the popup, cancel gracefully
+        return null;
+      }
+      if (err.code === 'auth/unauthorized-domain') {
+        const currentHostname = typeof window !== 'undefined' ? window.location.hostname : 'queue-up-nu.vercel.app';
+        alert(`⚠️ โดเมน "${currentHostname}" ยังไม่ถูกเพิ่มใน Authorized Domains ของ Firebase Console\n(กรุณาเพิ่มใน Firebase Console > Authentication > Settings > Authorized domains หรือเข้าสู่ระบบด้วยอีเมล/รหัสผ่าน)`);
+        return null;
       }
       throw err;
     }

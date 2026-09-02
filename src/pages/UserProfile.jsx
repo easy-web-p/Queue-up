@@ -7,7 +7,6 @@ import ShopeeSearchBar from "../components/ShopeeSearchBar.jsx";
 import PaymentModal from "../components/PaymentModal.jsx";
 import ChatModal from "../components/ChatModal.jsx";
 import Footer from "../components/Footer.jsx";
-import { generateSecureAccountId } from "../utils/security.js";
 import { getUserBehaviorInsights } from "../services/aiBehaviorEngine.js";
 import { getSecurityHealthReport } from "../services/aiSecurityShield.js";
 import { calculateUserTrustScore } from "../services/aiUserVerificationEngine.js";
@@ -28,21 +27,19 @@ function UserProfile() {
     setSearchParams({ tab: tabName });
   };
 
-  // Editable Profile States (Matching mockup screenshot 1)
-  const [fullName, setFullName] = useState(
-    user ? user.name || "(ม.1/6) -58140 เด็กชายพิสิษฐ์ แก้วกุลพิสิษฐ์" : "(ม.1/6) -58140 เด็กชายพิสิษฐ์ แก้วกุลพิสิษฐ์"
-  );
+  // Editable Profile States (Loaded dynamically from authenticated user session)
+  const [fullName, setFullName] = useState(() => user ? user.name || user.displayName || "" : "");
   const [lastName, setLastName] = useState("");
   const [gender, setGender] = useState("");
   const [birthDate, setBirthDate] = useState("");
-  const [email, setEmail] = useState(user ? user.email : "58140@lomsak.ac.th");
+  const [email, setEmail] = useState(() => user ? user.email || "" : "");
   const [phone, setPhone] = useState("");
   
   // Account ID State (Prioritizes user's set password/ID)
   const [accountId, setAccountId] = useState(() => {
     return localStorage.getItem("queueup_secure_account_id") || "";
   });
-  const [avatar, setAvatar] = useState(user && user.photo ? user.photo : "/yeti_mascot.jpg");
+  const [avatar, setAvatar] = useState(() => user?.photo || user?.photoURL || "/yeti_mascot.jpg");
 
   // Inline Editing Flags
   const [editingField, setEditingField] = useState(null); // 'name' | 'lastname' | 'gender' | 'birthdate' | 'email' | 'phone'
@@ -228,28 +225,25 @@ function UserProfile() {
       getDoc(doc(db, "users", user.uid)).then((docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
-          if (data.fullName) setFullName(data.fullName);
+          if (data.fullName || data.displayName) setFullName(data.fullName || data.displayName);
           if (data.lastName) setLastName(data.lastName);
           if (data.gender) setGender(data.gender);
           if (data.birthDate) setBirthDate(data.birthDate);
           if (data.phone) setPhone(data.phone);
-          if (data.photo) setAvatar(data.photo);
+          if (data.photo || data.photoURL) setAvatar(data.photo || data.photoURL);
           if (data.bankName) setBankName(data.bankName);
           if (data.bankAccountNo) setBankAccountNo(data.bankAccountNo);
           if (data.bankAccountName) setBankAccountName(data.bankAccountName);
           
-          // 🔒 รหัสบัญชี (Account ID) เป็นรหัสสุ่มความปลอดภัยสูง (QUP-YYYYMMDD-...) แยกสัดส่วนเด็ดขาดจากรหัสผ่าน
+          // 🔒 รหัสบัญชี (Account ID)
           const savedId = data.accountId;
           if (savedId) {
             setAccountId(savedId);
             localStorage.setItem("queueup_secure_account_id", savedId);
-          } else {
-            const generated = generateSecureAccountId(58140);
-            setAccountId(generated);
-            localStorage.setItem("queueup_secure_account_id", generated);
-            setDoc(doc(db, "users", user.uid), { accountId: generated }, { merge: true });
           }
         }
+      }).catch((err) => {
+        console.warn("Error fetching user profile doc:", err);
       });
     }
   }, [user]);
@@ -264,8 +258,8 @@ function UserProfile() {
       return;
     }
 
-    if (file.size > 3 * 1024 * 1024) {
-      alert("⚠️ ขนาดไฟล์รูปภาพใหญ่เกินไป (สูงสุด 3MB)");
+    if (file.size > 5 * 1024 * 1024) {
+      alert("⚠️ ขนาดไฟล์รูปภาพใหญ่เกินไป (สูงสุด 5MB)");
       return;
     }
 
@@ -275,31 +269,37 @@ function UserProfile() {
       const newAvatarUrl = event.target.result;
       setAvatar(newAvatarUrl);
 
+      const updatedUser = {
+        ...(user || {}),
+        photo: newAvatarUrl,
+        photoURL: newAvatarUrl,
+        name: fullName || user?.name || user?.displayName || "ผู้ใช้งาน",
+        displayName: fullName || user?.displayName || user?.name || "ผู้ใช้งาน",
+        email: email || user?.email || "",
+      };
+
       if (user && user.uid) {
         try {
-          await setDoc(doc(db, "users", user.uid), { photo: newAvatarUrl }, { merge: true });
+          await setDoc(
+            doc(db, "users", user.uid),
+            {
+              photo: newAvatarUrl,
+              photoURL: newAvatarUrl,
+              fullName: fullName || user?.name || "",
+              displayName: fullName || user?.displayName || "",
+            },
+            { merge: true }
+          );
         } catch (err) {
-          console.warn("Save avatar error:", err);
+          console.warn("Save avatar Firestore error:", err);
         }
       }
 
-      dispatch(
-        setUser({
-          uid: user ? user.uid : `user-${Date.now()}`,
-          name: fullName,
-          email: email,
-          photo: newAvatarUrl,
-        })
-      );
-
-      const savedUserData = localStorage.getItem("queueup_user");
-      if (savedUserData) {
-        try {
-          const parsed = JSON.parse(savedUserData);
-          localStorage.setItem("queueup_user", JSON.stringify({ ...parsed, photo: newAvatarUrl }));
-        } catch (err) {
-          console.warn("LocalStorage save error:", err);
-        }
+      dispatch(setUser(updatedUser));
+      try {
+        localStorage.setItem("queueup_user", JSON.stringify(updatedUser));
+      } catch (err) {
+        console.warn("LocalStorage save error:", err);
       }
 
       setTimeout(() => {
