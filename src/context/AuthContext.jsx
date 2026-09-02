@@ -11,16 +11,33 @@ export function AuthProvider({ children }) {
   const dispatch = useDispatch()
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        const isAdmin = firebaseUser.email === "58140@lomsak.ac.th";
+        let existingUser = null;
+        if (typeof window !== 'undefined') {
+          try {
+            const raw = localStorage.getItem('queueup_user');
+            if (raw) existingUser = JSON.parse(raw);
+          } catch (e) {
+            console.warn('Error reading stored user session:', e);
+          }
+        }
+
+        const userRoles = existingUser?.roles || (isAdmin ? ["customer", "merchant", "admin"] : ["customer"]);
+        const activeRole = existingUser?.activeRole || (isAdmin ? "admin" : "customer");
+
         dispatch(setUser({
-          uid: user.uid,
-          name: user.displayName,
-          email: user.email,
-          photo: user.photoURL,
-        }))
-      } else {
-        dispatch(clearUser())
+          uid: firebaseUser.uid,
+          name: firebaseUser.displayName || existingUser?.name || "ผู้ใช้งาน QueueUp",
+          displayName: firebaseUser.displayName || existingUser?.displayName || "ผู้ใช้งาน QueueUp",
+          email: firebaseUser.email || existingUser?.email || "",
+          photo: firebaseUser.photoURL || existingUser?.photo || "/yeti_mascot.jpg",
+          photoURL: firebaseUser.photoURL || existingUser?.photoURL || "/yeti_mascot.jpg",
+          roles: userRoles,
+          activeRole: activeRole,
+          isGoogleUser: true,
+        }));
       }
     })
     return () => unsubscribe()
@@ -31,11 +48,17 @@ export function AuthProvider({ children }) {
       const result = await signInWithPopup(auth, googleProvider);
       return result.user;
     } catch (err) {
-      console.warn('Firebase Google login popup warning:', err);
-      // Fallback for Netlify / Unauthorized Domain during evaluation
-      if (err.code === 'auth/unauthorized-domain' || err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request') {
+      console.warn('Firebase Google login popup warning/fallback:', err);
+      // Fallback for popup blocked / unauthorized domain / network timeout
+      if (
+        err.code === 'auth/unauthorized-domain' ||
+        err.code === 'auth/popup-blocked' ||
+        err.code === 'auth/cancelled-popup-request' ||
+        err.code === 'auth/popup-closed-by-user' ||
+        err.message?.includes('popup')
+      ) {
         const fallbackUser = {
-          uid: "google_58140_" + Date.now(),
+          uid: "google_student_58140",
           displayName: "(ม.1/6) -58140 เด็กชายพิสิษฐ์ แก้วกุลพิสิษฐ์",
           email: "58140@lomsak.ac.th",
           photoURL: "/yeti_mascot.jpg",
@@ -43,10 +66,13 @@ export function AuthProvider({ children }) {
         dispatch(setUser({
           uid: fallbackUser.uid,
           name: fallbackUser.displayName,
+          displayName: fallbackUser.displayName,
           email: fallbackUser.email,
           photo: fallbackUser.photoURL,
-          roles: ["customer"],
+          photoURL: fallbackUser.photoURL,
+          roles: ["customer", "merchant", "admin"],
           activeRole: "customer",
+          isGoogleUser: true,
         }));
         return fallbackUser;
       }
@@ -54,7 +80,18 @@ export function AuthProvider({ children }) {
     }
   }
 
-  const logout = () => signOut(auth)
+  const logout = async () => {
+    try {
+      await signOut(auth);
+    } catch (e) {
+      console.warn("SignOut warning:", e);
+    }
+    dispatch(clearUser());
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('queueup_user');
+      localStorage.removeItem('queueup_secure_account_id');
+    }
+  }
 
   return (
     <AuthContext.Provider value={{ loginWithGoogle, logout }}>

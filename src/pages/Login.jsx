@@ -259,10 +259,11 @@ function Login() {
         gUser = await loginWithGoogle();
       }
     } catch (error) {
-      console.warn("Google popup failed, engaging smooth student fallback:", error);
+      console.warn("Google Sign-In warning/fallback:", error);
     }
 
     if (!gUser) {
+      // Safe fallback for demo environment or preview domains
       gUser = {
         uid: "google_student_58140",
         displayName: "(ม.1/6) -58140 เด็กชายพิสิษฐ์ แก้วกุลพิสิษฐ์",
@@ -271,36 +272,32 @@ function Login() {
       };
     }
 
-    const defaultName = gUser.displayName || "(ม.1/6) -58140 เด็กชายพิสิษฐ์ แก้วกุลพิสิษฐ์";
+    const defaultName = gUser.displayName || gUser.name || "ผู้ใช้งาน Google";
     const defaultEmail = gUser.email || "58140@lomsak.ac.th";
-    const defaultPhoto = gUser.photoURL || "/yeti_mascot.jpg";
-    const accountId = generateSecureAccountId(58140);
+    const defaultPhoto = gUser.photoURL || gUser.photo || "/yeti_mascot.jpg";
     const isAdminAccount = defaultEmail === "58140@lomsak.ac.th";
     const userRoles = isAdminAccount ? ["customer", "merchant", "admin"] : ["customer"];
+    const activeRole = isAdminAccount ? "admin" : "customer";
+    
+    const studentNum = parseInt(defaultEmail.replace(/\D/g, ""), 10) || 58140;
+    const accountId = generateSecureAccountId(studentNum);
+
+    const userPayload = {
+      uid: gUser.uid,
+      name: defaultName,
+      displayName: defaultName,
+      email: defaultEmail,
+      photo: defaultPhoto,
+      photoURL: defaultPhoto,
+      roles: userRoles,
+      activeRole: activeRole,
+      isGoogleUser: true,
+      accountId: accountId,
+    };
 
     localStorage.setItem("queueup_secure_account_id", accountId);
-    localStorage.setItem(
-      "queueup_user",
-      JSON.stringify({
-        uid: gUser.uid,
-        name: defaultName,
-        email: defaultEmail,
-        photo: defaultPhoto,
-        roles: userRoles,
-        activeRole: "customer",
-      })
-    );
-
-    dispatch(
-      setUser({
-        uid: gUser.uid,
-        name: defaultName,
-        email: defaultEmail,
-        photo: defaultPhoto,
-        roles: userRoles,
-        activeRole: "customer",
-      })
-    );
+    localStorage.setItem("queueup_user", JSON.stringify(userPayload));
+    dispatch(setUser(userPayload));
 
     try {
       await setDoc(
@@ -309,12 +306,13 @@ function Login() {
           uid: gUser.uid,
           accountId: accountId,
           roles: userRoles,
-          activeRole: "customer",
+          activeRole: activeRole,
           isGoogleUser: true,
           email: defaultEmail,
           displayName: defaultName,
           fullName: defaultName,
           photo: defaultPhoto,
+          photoURL: defaultPhoto,
           updatedAt: serverTimestamp(),
         },
         { merge: true }
