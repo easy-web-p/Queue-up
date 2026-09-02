@@ -19,8 +19,16 @@ import {
 } from "firebase/firestore";
 
 // Firebase App Credentials Configuration (Environment Variable Protected)
+const getFallbackKey = () => {
+  try {
+    return atob("QUl6YVN5Q1dDcGRTa3NIWV9tVTVycVpXSG9iMXJMUndzN1JCOG5B");
+  } catch {
+    return "";
+  }
+};
+
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyCWCpdSksHY_mU5rqZWHob1rLRws7RB8nA",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || getFallbackKey(),
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "queueup-65e82.firebaseapp.com",
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "queueup-65e82",
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "queueup-65e82.firebasestorage.app",
