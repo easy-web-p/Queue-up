@@ -2,7 +2,6 @@ import { AuthProvider } from "./context/AuthContext.jsx";
 import { PreferencesProvider } from "./context/PreferencesContext.jsx";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
-import Loading from "./pages/Loading.jsx";
 import Login from "./pages/Login.jsx";
 import Home from "./pages/Home.jsx";
 import SearchResults from "./pages/SearchResults.jsx";
@@ -36,7 +35,7 @@ function App() {
           <CookieConsentBanner />
           <ErrorBoundary>
             <Routes>
-            <Route path="/" element={<Loading />} />
+            <Route path="/" element={<Queueup />} />
             <Route path="/queueup" element={<Queueup />} />
             <Route path="/Queueup" element={<Queueup />} />
             <Route path="/about" element={<Queueup />} />
