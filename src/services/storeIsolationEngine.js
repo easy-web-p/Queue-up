@@ -59,7 +59,7 @@ export function generateStoreQueueNo(storeId = "STORE-DEMO01", index = 1) {
 
 /**
  * Record Security Audit Log in Firestore
- * Collection: auditLogs/{auditId}
+ * Collection: audit_logs/{auditId}
  */
 export async function recordAuditLog(db, { action, actorUid, merchantId, metadata = {} }) {
   if (!db) return null;
@@ -72,7 +72,7 @@ export async function recordAuditLog(db, { action, actorUid, merchantId, metadat
       createdAt: new Date().toISOString(),
       timestamp: Date.now(),
     };
-    const ref = await addDoc(collection(db, "auditLogs"), auditData);
+    const ref = await addDoc(collection(db, "audit_logs"), auditData);
     return ref.id;
   } catch (err) {
     console.warn("Audit Log Warning:", err);

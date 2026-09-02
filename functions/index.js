@@ -41,10 +41,41 @@ export const createPromptPayPayment = onCall(
     if (!productSnap.exists) throw new HttpsError("not-found", "Product is not available for payment.");
     const product = productSnap.data();
     const unitPrice = Number(product.price);
-    if (!Number.isFinite(unitPrice) || unitPrice <= 0) throw new HttpsError("failed-precondition", "Invalid product price.");
     const totalSatang = Math.round(unitPrice * 100 * quantity * (1 - Number(discountPercent) / 100));
+    const storeId = String(product.storeId || product.shopId || "STORE_DEFAULT");
+    const storeName = String(product.storeName || product.shopName || "ร้านค้าในโรงเรียน");
+    const totalAmount = totalSatang / 100;
     const orderRef = db.collection("orders").doc();
-    await orderRef.set({ userId: request.auth.uid, productId, itemTitle: String(product.name || "QueueUp order").slice(0, 250), quantity, booking: booking || null, totalPrice: totalSatang / 100, currency: "THB", paymentProvider: "opn", paymentMethod: "promptpay", paymentStatus: "pending", createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+    await orderRef.set({
+      id: orderRef.id,
+      orderId: orderRef.id,
+      userId: request.auth.uid,
+      storeId,
+      storeName,
+      productId,
+      itemTitle: String(product.name || "QueueUp order").slice(0, 250),
+      items: [
+        {
+          productId,
+          name: product.name,
+          price: unitPrice,
+          quantity,
+        }
+      ],
+      quantity,
+      booking: booking || null,
+      subtotal: unitPrice * quantity,
+      totalAmount,
+      totalPrice: totalAmount,
+      currency: "THB",
+      paymentProvider: "opn",
+      paymentMethod: "promptpay",
+      paymentStatus: "pending",
+      queueStatus: "waiting",
+      status: "TO_SHIP",
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp()
+    });
     try {
       const charge = await opnRequest("/charges", opnSecretKey.value(), { amount: totalSatang, currency: "THB", description: `QueueUp ${orderRef.id}`, metadata: { orderId: orderRef.id, uid: request.auth.uid }, source: { type: "promptpay" } });
       const qrUrl = charge.source?.scannable_code?.image?.download_uri;

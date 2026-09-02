@@ -1,4 +1,4 @@
-﻿export type QueueStatus = 'waiting' | 'pending_slip' | 'cooking' | 'ready' | 'completed' | 'cancelled';
+export type QueueStatus = 'waiting' | 'pending_slip' | 'cooking' | 'ready' | 'completed' | 'cancelled';
 
 export interface MenuItem {
   id: string;
@@ -36,23 +36,29 @@ export interface CartItem {
 
 export interface Order {
   id: string;
+  orderId?: string;
+  userId?: string;
   queueNumber: string;
   customerName: string;
   customerPhone?: string;
+  subtotal?: number;
   totalAmount: number;
   finalAmount?: number;
   discountApplied?: number;
   pointsEarned?: number;
   items: CartItem[];
   queueStatus: QueueStatus;
-  paymentMethod: 'promptpay' | 'cash' | 'card';
-  paymentStatus: 'pending' | 'verified' | 'failed';
+  status?: string;
+  paymentMethod: 'promptpay' | 'cash' | 'card' | string;
+  paymentStatus: 'pending' | 'verified' | 'failed' | 'cancelled';
   pickupTime: string;
   createdAt: string;
+  updatedAt?: string;
   estimatedReadyTime?: string;
   slipUrl?: string;
   storeId?: string;
   shopName?: string;
+  storeName?: string;
   customInstructions?: string;
 }
 
