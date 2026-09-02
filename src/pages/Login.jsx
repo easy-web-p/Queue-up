@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { useAuth } from "../context/AuthContext.jsx";
 import { setUser } from "../store/authSlice.js";
@@ -25,6 +25,8 @@ import "./Login.css";
 function Login() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
+  const fromDestination = location.state?.from?.pathname || "/home";
   const { user } = useSelector((state) => state.auth);
   const { loginWithGoogle } = useAuth();
 
@@ -238,7 +240,7 @@ function Login() {
           })
         );
         setLoading(false);
-        navigate("/home", { replace: true });
+        navigate(fromDestination, { replace: true });
         return;
       } catch (err) {
         console.warn("Firebase Auth sign-in error:", err);
@@ -322,7 +324,7 @@ function Login() {
     }
 
     setLoading(false);
-    navigate("/home", { replace: true });
+    navigate(fromDestination, { replace: true });
   };
 
   return (
