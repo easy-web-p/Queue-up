@@ -16,21 +16,11 @@ export default function ProtectedRoute({ children, allowedRoles = [] }) {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  let savedUser = null;
-  if (typeof window !== "undefined") {
-    try {
-      const raw = localStorage.getItem("queueup_user");
-      if (raw) savedUser = JSON.parse(raw);
-    } catch (e) {
-      console.warn("ProtectedRoute JSON parse error:", e);
-    }
-  }
-
-  const currentUser = user || savedUser;
-
   if (isLoading) {
     return <Loading />;
   }
+
+  const currentUser = user;
 
   // 1. If not logged in -> Redirect to /login
   if (!currentUser) {

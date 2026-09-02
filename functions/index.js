@@ -27,14 +27,35 @@ async function retrieveCharge(chargeId, key) {
   return response.json();
 }
 
-// The browser sends only product id/quantity/couponCode. Price, stock, discount and final order data are strictly computed and reserved here atomically via Firestore Transaction.
+// The browser sends only product id/quantity/couponCode/idempotencyKey. Price, stock, discount and final order data are strictly computed and reserved here atomically via Firestore Transaction.
 export const createPromptPayPayment = onCall(
   { region: "asia-southeast1", secrets: [opnSecretKey] },
   async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Sign in is required.");
-    const { productId, quantity = 1, couponCode, booking } = request.data || {};
+    const { productId, quantity = 1, couponCode, booking, idempotencyKey } = request.data || {};
     if (typeof productId !== "string" || !Number.isInteger(quantity) || quantity < 1 || quantity > 20) {
       throw new HttpsError("invalid-argument", "Invalid order details.");
+    }
+
+    // 🔒 Idempotency Check: Return existing active payment if client retries with the same idempotency key
+    if (typeof idempotencyKey === "string" && idempotencyKey.trim()) {
+      const existingQuery = await db.collection("orders")
+        .where("userId", "==", request.auth.uid)
+        .where("idempotencyKey", "==", idempotencyKey.trim())
+        .limit(1)
+        .get();
+
+      if (!existingQuery.empty) {
+        const existingOrder = existingQuery.docs[0].data();
+        if (existingOrder.paymentStatus !== "creation_failed" && existingOrder.paymentStatus !== "cancelled") {
+          return {
+            orderId: existingOrder.orderId,
+            paymentId: existingOrder.paymentId,
+            qrUrl: existingOrder.qrUrl,
+            expiresAt: existingOrder.expiresAt || null,
+          };
+        }
+      }
     }
 
     const orderRef = db.collection("orders").doc();
@@ -100,6 +121,7 @@ export const createPromptPayPayment = onCall(
       const orderData = {
         id: orderRef.id,
         orderId: orderRef.id,
+        idempotencyKey: typeof idempotencyKey === "string" ? idempotencyKey.trim() : null,
         userId: request.auth.uid,
         storeId,
         storeName,
@@ -137,7 +159,7 @@ export const createPromptPayPayment = onCall(
       const charge = await opnRequest("/charges", opnSecretKey.value(), { amount: totalSatang, currency: "THB", description: `QueueUp ${orderRef.id}`, metadata: { orderId: orderRef.id, uid: request.auth.uid }, source: { type: "promptpay" } });
       const qrUrl = charge.source?.scannable_code?.image?.download_uri;
       if (!qrUrl) throw new Error("PromptPay QR was not returned by provider.");
-      await orderRef.update({ paymentId: charge.id, updatedAt: FieldValue.serverTimestamp() });
+      await orderRef.update({ paymentId: charge.id, qrUrl, updatedAt: FieldValue.serverTimestamp() });
       return { orderId: orderRef.id, paymentId: charge.id, qrUrl, expiresAt: charge.expires_at || null };
     } catch (error) {
       await orderRef.update({ paymentStatus: "creation_failed", updatedAt: FieldValue.serverTimestamp() });
