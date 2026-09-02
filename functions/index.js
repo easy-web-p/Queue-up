@@ -28,10 +28,7 @@ async function retrieveCharge(chargeId, key) {
   return response.json();
 }
 
-// Allowed standard pickup timeslots
 const ALLOWED_SLOTS = ["11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00"];
-
-// Standard Topping & Modifier Catalog Prices
 const TOPPING_PRICES = {
   "ไข่ดาว": 10,
   "ไข่เจียว": 10,
@@ -41,7 +38,6 @@ const TOPPING_PRICES = {
   "เพิ่มเส้น/ข้าว": 10,
 };
 
-// The browser sends only product id/quantity/modifiers/couponCode/idempotencyKey. Price, toppings, slot capacity, stock, discount and final order data are strictly computed and reserved here atomically via Firestore Transaction.
 export const createPromptPayPayment = onCall(
   { region: "asia-southeast1", secrets: [opnSecretKey] },
   async (request) => {
@@ -56,13 +52,9 @@ export const createPromptPayPayment = onCall(
     const idempotencyDocId = typeof idempotencyKey === "string" && idempotencyKey.trim()
       ? `${request.auth.uid}_${idempotencyKey.trim()}`
       : null;
-    const idempotencyRef = idempotencyDocId
-      ? db.collection("idempotency_keys").doc(idempotencyDocId)
-      : null;
-
+    const idempotencyRef = idempotencyDocId ? db.collection("idempotency_keys").doc(idempotencyDocId) : null;
     let reservedSlotDocId = null;
 
-    // 🔒 Atomic Transaction: Validate stock, slot capacity, modifiers pricing, check/lock idempotency, decrement stock, and create order atomically
     const { totalSatang, existingResult, computedDetails } = await db.runTransaction(async (transaction) => {
       if (idempotencyRef) {
         const idempSnap = await transaction.get(idempotencyRef);
@@ -91,20 +83,14 @@ export const createPromptPayPayment = onCall(
       const productSnap = await transaction.get(productRef);
       if (!productSnap.exists) throw new HttpsError("not-found", "Product is not available for payment.");
       const product = productSnap.data();
-
-      if (product.isAvailable === false) {
-        throw new HttpsError("failed-precondition", "เมนูนี้ปิดรับออเดอร์ชั่วคราว");
-      }
+      if (product.isAvailable === false) throw new HttpsError("failed-precondition", "เมนูนี้ปิดรับออเดอร์ชั่วคราว");
       if (typeof product.stock === "number" && product.stock < quantity) {
         throw new HttpsError("failed-precondition", `สินค้าในสต็อกไม่เพียงพอ (คงเหลือ ${product.stock} รายการ)`);
       }
 
       const unitPrice = Number(product.price);
-      if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
-        throw new HttpsError("failed-precondition", "Invalid product price in database.");
-      }
+      if (!Number.isFinite(unitPrice) || unitPrice <= 0) throw new HttpsError("failed-precondition", "Invalid product price in database.");
 
-      // 🔒 Strict Server-Authoritative Modifier & Toppings Calculation (Rejects unknown options)
       let modifierUnitPrice = 0;
       const sanitizedModifiers = [];
       if (Array.isArray(modifiers)) {
@@ -112,9 +98,7 @@ export const createPromptPayPayment = onCall(
           if (mod && mod.id === "topping" && Array.isArray(mod.value)) {
             for (const topName of mod.value) {
               const topPrice = TOPPING_PRICES[topName] ?? product.toppingPrices?.[topName];
-              if (typeof topPrice !== "number" || topPrice < 0) {
-                throw new HttpsError("invalid-argument", `ไม่พบตัวเลือกท็อปปิ้ง: ${topName}`);
-              }
+              if (typeof topPrice !== "number" || topPrice < 0) throw new HttpsError("invalid-argument", `ไม่พบตัวเลือกท็อปปิ้ง: ${topName}`);
               modifierUnitPrice += topPrice;
               sanitizedModifiers.push({ id: "topping", name: topName, price: topPrice });
             }
@@ -131,44 +115,28 @@ export const createPromptPayPayment = onCall(
       const storeId = String(product.storeId || product.shopId || "STORE_DEFAULT");
       const storeName = String(product.storeName || product.shopName || "ร้านค้าในโรงเรียน");
 
-      // 🔒 Strict Time-Slot Validation & Atomic Capacity Check
       if (booking && booking.date && (booking.timeSlot || booking.time)) {
         const slotTime = String(booking.timeSlot || booking.time).trim();
         const slotDate = String(booking.date).trim();
-
-        if (!ALLOWED_SLOTS.includes(slotTime)) {
-          throw new HttpsError("invalid-argument", `รอบเวลารับประทานไม่ถูกต้อง (${slotTime})`);
-        }
+        if (!ALLOWED_SLOTS.includes(slotTime)) throw new HttpsError("invalid-argument", `รอบเวลารับประทานไม่ถูกต้อง (${slotTime})`);
         const parsedDate = new Date(slotDate);
-        if (isNaN(parsedDate.getTime())) {
-          throw new HttpsError("invalid-argument", "รูปแบบวันที่ไม่ถูกต้อง");
-        }
+        if (isNaN(parsedDate.getTime())) throw new HttpsError("invalid-argument", "รูปแบบวันที่ไม่ถูกต้อง");
 
-        // Time check in GMT+7 (Bangkok)
         const nowUtc = new Date();
         const thaiTimeStr = nowUtc.toLocaleString("en-US", { timeZone: "Asia/Bangkok" });
         const thaiNow = new Date(thaiTimeStr);
         const currentThaiYmd = `${thaiNow.getFullYear()}-${String(thaiNow.getMonth() + 1).padStart(2, "0")}-${String(thaiNow.getDate()).padStart(2, "0")}`;
-
-        if (slotDate < currentThaiYmd) {
-          throw new HttpsError("invalid-argument", "ไม่สามารถเลือกวันที่ย้อนหลังได้");
-        }
-
-        // Reject past time slots for current day
+        if (slotDate < currentThaiYmd) throw new HttpsError("invalid-argument", "ไม่สามารถเลือกวันที่ย้อนหลังได้");
         if (slotDate === currentThaiYmd) {
           const [slotHour, slotMinute] = slotTime.split(":").map(Number);
-          const currentHour = thaiNow.getHours();
-          const currentMinute = thaiNow.getMinutes();
-          if (slotHour < currentHour || (slotHour === currentHour && slotMinute <= currentMinute)) {
+          if (slotHour < thaiNow.getHours() || (slotHour === thaiNow.getHours() && slotMinute <= thaiNow.getMinutes())) {
             throw new HttpsError("invalid-argument", `รอบเวลา ${slotTime} ของวันนี้ผ่านไปแล้ว กรุณาเลือกรอบเวลาถัดไป`);
           }
         }
 
-        // Store-specific Slot & Capacity Config Check
         const shopRef = db.collection("shops").doc(storeId);
         const shopSnap = await transaction.get(shopRef);
         const shopData = shopSnap.exists ? shopSnap.data() : null;
-
         if (shopData?.pickupSlots && Array.isArray(shopData.pickupSlots) && !shopData.pickupSlots.includes(slotTime)) {
           throw new HttpsError("failed-precondition", `ร้านค้านี้ไม่เปิดรับออเดอร์ในรอบเวลา ${slotTime}`);
         }
@@ -177,70 +145,39 @@ export const createPromptPayPayment = onCall(
         reservedSlotDocId = `${storeId}_${slotDate}_${slotTime}`;
         const slotRef = db.collection("store_slots").doc(reservedSlotDocId);
         const slotSnap = await transaction.get(slotRef);
-
         if (typeof storeConfiguredCapacity !== "number" && !slotSnap.exists) {
           throw new HttpsError("failed-precondition", "ร้านค้ายังไม่ได้เปิดการตั้งค่าความจุสำหรับรอบเวลานี้");
         }
-
         const currentOrders = slotSnap.exists ? Number(slotSnap.data().currentOrders || 0) : 0;
-        const capacityVal = slotSnap.exists && typeof slotSnap.data().capacity === "number"
-          ? Number(slotSnap.data().capacity)
-          : Number(storeConfiguredCapacity);
-
-        if (typeof capacityVal !== "number" || capacityVal <= 0) {
-          throw new HttpsError("failed-precondition", "ร้านค้ายังไม่ได้กำหนดขีดจำกัดจำนวนออเดอร์สำหรับรอบเวลานี้");
+        const capacityVal = slotSnap.exists && typeof slotSnap.data().capacity === "number" ? Number(slotSnap.data().capacity) : Number(storeConfiguredCapacity);
+        if (!Number.isFinite(capacityVal) || capacityVal <= 0) throw new HttpsError("failed-precondition", "ร้านค้ายังไม่ได้กำหนดขีดจำกัดจำนวนออเดอร์สำหรับรอบเวลานี้");
+        if (currentOrders + quantity > capacityVal) {
+          throw new HttpsError("failed-precondition", `รอบเวลา ${slotTime} วันที่ ${slotDate} เต็มแล้ว (รองรับได้สูงสุด ${capacityVal} คิว)`);
         }
-
-        const maxCapacity = capacityVal;
-
-        if (currentOrders + quantity > maxCapacity) {
-          throw new HttpsError("failed-precondition", `รอบเวลา ${slotTime} วันที่ ${slotDate} เต็มแล้ว (รองรับได้สูงสุด ${maxCapacity} คิว)`);
-        }
-
-        transaction.set(slotRef, {
-          storeId,
-          date: slotDate,
-          timeSlot: slotTime,
-          currentOrders: currentOrders + quantity,
-          capacity: maxCapacity,
-          updatedAt: FieldValue.serverTimestamp(),
-        }, { merge: true });
+        transaction.set(slotRef, { storeId, date: slotDate, timeSlot: slotTime, currentOrders: currentOrders + quantity, capacity: capacityVal, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
       }
 
       let discountAmount = 0;
-
-      // 🔒 Server-Authoritative & Store-Scoped Coupon Verification
       if (typeof couponCode === "string" && couponCode.trim()) {
         const cleanCode = couponCode.trim().toUpperCase();
-        const couponRef = db.collection("coupons").doc(cleanCode);
-        const couponSnap = await transaction.get(couponRef);
+        const couponSnap = await transaction.get(db.collection("coupons").doc(cleanCode));
         if (couponSnap.exists) {
           const coupon = couponSnap.data();
           const minSpend = Number(coupon.minSpend) || 0;
           const discountVal = Number(coupon.discount) || 0;
           const isNotExpired = !coupon.expiryDate || new Date(coupon.expiryDate) > new Date();
           const isStoreMatch = !coupon.storeId || coupon.scope === "platform" || coupon.storeId === storeId;
-
           if (coupon.status === "Active" && isNotExpired && isStoreMatch && subtotal >= minSpend && discountVal > 0) {
-            if (coupon.discountType === "percent" || coupon.type === "percent") {
-              const percent = Math.min(100, Math.max(0, discountVal));
-              discountAmount = Math.round((subtotal * percent) / 100);
-            } else {
-              discountAmount = Math.min(subtotal, discountVal);
-            }
+            if (coupon.discountType === "percent" || coupon.type === "percent") discountAmount = Math.round((subtotal * Math.min(100, Math.max(0, discountVal))) / 100);
+            else discountAmount = Math.min(subtotal, discountVal);
           }
         }
       }
 
       const finalAmount = Math.max(1, subtotal - discountAmount);
       const satang = Math.round(finalAmount * 100);
-
-      // 🔒 Atomic stock decrement to prevent race conditions
       if (typeof product.stock === "number") {
-        transaction.update(productRef, {
-          stock: product.stock - quantity,
-          updatedAt: FieldValue.serverTimestamp(),
-        });
+        transaction.update(productRef, { stock: product.stock - quantity, updatedAt: FieldValue.serverTimestamp() });
       }
 
       const orderData = {
@@ -252,19 +189,11 @@ export const createPromptPayPayment = onCall(
         storeName,
         productId,
         itemTitle: String(product.name || "QueueUp order").slice(0, 250),
-        items: [
-          {
-            productId,
-            name: product.name,
-            basePrice: unitPrice,
-            modifierPrice: modifierUnitPrice,
-            price: effectiveUnitPrice,
-            quantity,
-            modifiers: sanitizedModifiers,
-          }
-        ],
+        items: [{ productId, name: product.name, basePrice: unitPrice, modifierPrice: modifierUnitPrice, price: effectiveUnitPrice, quantity, modifiers: sanitizedModifiers }],
         modifiers: sanitizedModifiers,
         quantity,
+        reservedQuantity: quantity,
+        releasedQuantity: 0,
         booking: booking || null,
         subtotal,
         discountAmount,
@@ -280,37 +209,18 @@ export const createPromptPayPayment = onCall(
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp()
       };
-
-      if (idempotencyRef) {
-        transaction.set(idempotencyRef, {
-          orderId: orderRef.id,
-          userId: request.auth.uid,
-          createdAt: FieldValue.serverTimestamp(),
-        });
-      }
-
+      if (idempotencyRef) transaction.set(idempotencyRef, { orderId: orderRef.id, userId: request.auth.uid, createdAt: FieldValue.serverTimestamp() });
       transaction.set(orderRef, orderData);
-      return {
-        totalSatang: satang,
-        computedDetails: {
-          subtotal,
-          discountAmount,
-          totalAmount: finalAmount,
-        }
-      };
+      return { totalSatang: satang, computedDetails: { subtotal, discountAmount, totalAmount: finalAmount } };
     });
 
     if (existingResult) {
-      // 🔒 Charge Recovery: If order was created but QR was missing on previous network drop, recover it directly from Opn API
       if (!existingResult.qrUrl && existingResult.paymentId) {
         try {
           const recoveredCharge = await retrieveCharge(existingResult.paymentId, opnSecretKey.value());
           const recoveredQr = recoveredCharge.source?.scannable_code?.image?.download_uri;
           if (recoveredQr) {
-            await db.collection("orders").doc(existingResult.orderId).update({
-              qrUrl: recoveredQr,
-              updatedAt: FieldValue.serverTimestamp(),
-            });
+            await db.collection("orders").doc(existingResult.orderId).update({ qrUrl: recoveredQr, updatedAt: FieldValue.serverTimestamp() });
             existingResult.qrUrl = recoveredQr;
           }
         } catch (recoverErr) {
@@ -325,111 +235,124 @@ export const createPromptPayPayment = onCall(
       createdCharge = await opnRequest("/charges", opnSecretKey.value(), { amount: totalSatang, currency: "THB", description: `QueueUp ${orderRef.id}`, metadata: { orderId: orderRef.id, uid: request.auth.uid }, source: { type: "promptpay" } });
       const qrUrl = createdCharge.source?.scannable_code?.image?.download_uri;
       if (!qrUrl) throw new Error("PromptPay QR was not returned by provider.");
-      await orderRef.update({ paymentId: createdCharge.id, qrUrl, updatedAt: FieldValue.serverTimestamp() });
-      return {
-        orderId: orderRef.id,
-        paymentId: createdCharge.id,
-        qrUrl,
-        subtotal: computedDetails.subtotal,
-        discountAmount: computedDetails.discountAmount,
-        totalAmount: computedDetails.totalAmount,
-        expiresAt: createdCharge.expires_at || null
-      };
+      await orderRef.update({ paymentId: createdCharge.id, qrUrl, expiresAt: createdCharge.expires_at || null, updatedAt: FieldValue.serverTimestamp() });
+      return { orderId: orderRef.id, paymentId: createdCharge.id, qrUrl, subtotal: computedDetails.subtotal, discountAmount: computedDetails.discountAmount, totalAmount: computedDetails.totalAmount, expiresAt: createdCharge.expires_at || null };
     } catch (error) {
-      const failureUpdate = {
-        paymentStatus: "creation_failed",
-        error: String(error?.message || "Payment provider error"),
-        updatedAt: FieldValue.serverTimestamp()
-      };
+      const failureUpdate = { paymentStatus: "creation_failed", error: String(error?.message || "Payment provider error"), updatedAt: FieldValue.serverTimestamp() };
       if (createdCharge?.id) {
         failureUpdate.paymentId = createdCharge.id;
         failureUpdate.paymentStatus = "charge_created_order_pending";
       }
       await orderRef.update(failureUpdate);
-
-      // Revert stock & time-slot reservations only if NO charge was created with provider
       if (!createdCharge?.id) {
-        try {
-          await productRef.update({ stock: FieldValue.increment(quantity) });
-        } catch (stockErr) {
-          console.warn("Revert stock warning:", stockErr);
-        }
-        if (reservedSlotDocId) {
-          try {
-            const slotRef = db.collection("store_slots").doc(reservedSlotDocId);
-            await db.runTransaction(async (t) => {
-              const sSnap = await t.get(slotRef);
-              if (sSnap.exists) {
-                const current = Number(sSnap.data().currentOrders || 0);
-                t.set(slotRef, { currentOrders: Math.max(0, current - quantity), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-              }
-            });
-          } catch (slotErr) {
-            console.warn("Revert slot warning:", slotErr);
-          }
-        }
+        try { await releaseOrderResources(orderRef, "Payment charge creation failed"); }
+        catch (releaseErr) { console.warn("Atomic release after charge creation failure warning:", releaseErr); }
       }
       throw error;
     }
   }
 );
 
-// 🔒 Idempotent Resource Release Engine: Safely returns stock and time-slot capacity within a SINGLE atomic transaction
+// 🔒 Atomic, idempotent release. ALL transaction reads happen before any transaction write.
 export async function releaseOrderResources(orderDocRef, cancelReason = "Payment expired") {
-  return await db.runTransaction(async (transaction) => {
+  return db.runTransaction(async (transaction) => {
     const freshSnap = await transaction.get(orderDocRef);
     if (!freshSnap.exists) return false;
     const data = freshSnap.data();
+    if (data.paymentStatus === "paid" || data.paymentStatus === "paid_after_expired" || data.resourcesReleased === true) return false;
 
-    // 🔒 Safety Guard: NEVER release resources if order is already paid or already released!
-    if (data.paymentStatus === "paid" || data.resourcesReleased === true) {
-      return false;
+    const qty = Number(data.reservedQuantity ?? data.quantity);
+    if (!Number.isInteger(qty) || qty <= 0) {
+      transaction.update(orderDocRef, {
+        paymentStatus: "expired",
+        status: "CANCELLED",
+        cancelReason,
+        resourcesReleased: true,
+        releasedQuantity: 0,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      return true;
     }
 
-    const qty = Number(data.quantity);
-    if (Number.isInteger(qty) && qty > 0) {
-      // 1. Rollback stock
-      if (data.productId) {
-        const productRef = db.collection("products").doc(data.productId);
-        transaction.update(productRef, {
-          stock: FieldValue.increment(qty),
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-      }
+    const productRef = data.productId ? db.collection("products").doc(data.productId) : null;
+    const slotRef = data.booking?.date && (data.booking.timeSlot || data.booking.time) && data.storeId
+      ? db.collection("store_slots").doc(`${data.storeId}_${String(data.booking.date).trim()}_${String(data.booking.timeSlot || data.booking.time).trim()}`)
+      : null;
 
-      // 2. Rollback time-slot with non-negative guard
-      if (data.booking?.date && (data.booking.timeSlot || data.booking.time) && data.storeId) {
-        const slotTime = String(data.booking.timeSlot || data.booking.time).trim();
-        const slotDate = String(data.booking.date).trim();
-        const slotDocId = `${data.storeId}_${slotDate}_${slotTime}`;
-        const slotRef = db.collection("store_slots").doc(slotDocId);
-        const slotSnap = await transaction.get(slotRef);
+    // IMPORTANT: Firestore requires all transaction reads before writes.
+    const productSnap = productRef ? await transaction.get(productRef) : null;
+    const slotSnap = slotRef ? await transaction.get(slotRef) : null;
 
-        if (slotSnap.exists) {
-          const current = Number(slotSnap.data().currentOrders || 0);
-          const newOrders = Math.max(0, current - qty);
-          transaction.set(slotRef, {
-            currentOrders: newOrders,
-            updatedAt: FieldValue.serverTimestamp(),
-          }, { merge: true });
+    const warnings = [];
+    let stockAfterRelease = null;
+    if (productRef) {
+      if (!productSnap?.exists) {
+        warnings.push("PRODUCT_MISSING");
+      } else {
+        const currentStock = Number(productSnap.data().stock);
+        if (!Number.isFinite(currentStock) || currentStock < 0) {
+          warnings.push("STOCK_COUNTER_INVALID");
+        } else {
+          stockAfterRelease = currentStock + qty;
         }
       }
     }
 
-    // 3. Atomically cancel order and mark resourcesReleased in the SAME transaction
+    let slotAfterRelease = null;
+    if (slotRef) {
+      if (!slotSnap?.exists) {
+        warnings.push("SLOT_MISSING");
+      } else {
+        const currentOrders = Number(slotSnap.data().currentOrders);
+        if (!Number.isFinite(currentOrders) || currentOrders < 0) {
+          warnings.push("SLOT_COUNTER_INVALID");
+          slotAfterRelease = 0;
+        } else {
+          if (currentOrders < qty) warnings.push("SLOT_COUNTER_INCONSISTENCY");
+          slotAfterRelease = Math.max(0, currentOrders - qty);
+        }
+      }
+    }
+
+    // Writes begin only after every read is complete.
+    if (productRef && productSnap?.exists && stockAfterRelease !== null) {
+      transaction.update(productRef, { stock: stockAfterRelease, updatedAt: FieldValue.serverTimestamp() });
+    }
+    if (slotRef && slotSnap?.exists && slotAfterRelease !== null) {
+      transaction.update(slotRef, { currentOrders: slotAfterRelease, updatedAt: FieldValue.serverTimestamp() });
+    }
+
+    const releaseAuditRef = db.collection("audit_logs").doc(`resource_release_${orderDocRef.id}`);
+    transaction.set(releaseAuditRef, {
+      actorUid: "system",
+      actorType: "system",
+      action: "RESOURCE_RELEASE",
+      orderId: orderDocRef.id,
+      productId: data.productId || null,
+      storeId: data.storeId || null,
+      quantity: qty,
+      warnings,
+      stockAfterRelease,
+      slotAfterRelease,
+      reason: cancelReason,
+      createdAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+
     transaction.update(orderDocRef, {
       paymentStatus: "expired",
       status: "CANCELLED",
       cancelReason,
       resourcesReleased: true,
+      releasedQuantity: qty,
+      resourceReleaseWarnings: warnings,
+      resourceReleaseReason: cancelReason,
       updatedAt: FieldValue.serverTimestamp(),
     });
-
     return true;
   });
 }
 
-// ⏰ Automated Cloud Scheduler: Periodically expires stale orders every 5 minutes
+// ⏰ Automated Cloud Scheduler: expires stale orders every 5 minutes.
 export const scheduledExpirePendingOrders = onSchedule(
   { schedule: "every 5 minutes", region: "asia-southeast1" },
   async () => {
@@ -439,65 +362,122 @@ export const scheduledExpirePendingOrders = onSchedule(
       .where("createdAt", "<=", fifteenMinutesAgo)
       .limit(50)
       .get();
-
-    for (const doc of staleSnap.docs) {
-      if (!doc.data().resourcesReleased) {
-        await releaseOrderResources(doc.ref, "Payment window expired (15 minutes)");
-      }
-    }
+    for (const doc of staleSnap.docs) await releaseOrderResources(doc.ref, "Payment window expired (15 minutes)");
   }
 );
 
-// Callable function to expire stale pending orders and release stock & slots on-demand
 export const expirePendingOrders = onCall(
   { region: "asia-southeast1" },
   async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Sign in is required.");
-
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
     const staleSnap = await db.collection("orders")
       .where("paymentStatus", "in", ["pending", "charge_created_order_pending"])
       .where("createdAt", "<=", fifteenMinutesAgo)
       .limit(50)
       .get();
-
     let expiredCount = 0;
-    for (const doc of staleSnap.docs) {
-      const success = await releaseOrderResources(doc.ref, "Payment window expired (15 minutes)");
-      if (success) expiredCount++;
-    }
-
+    for (const doc of staleSnap.docs) if (await releaseOrderResources(doc.ref, "Payment window expired (15 minutes)")) expiredCount++;
     return { success: true, expiredCount };
   }
 );
 
-// Callable function to safely check payment status on-demand
+// Merchant/Admin resolution workflow for payments that completed after resources were released.
+export const resolvePaidAfterExpiredOrder = onCall(
+  { region: "asia-southeast1", secrets: [opnSecretKey] },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Sign in is required.");
+    const { orderId, decision, merchantNote = "" } = request.data || {};
+    if (typeof orderId !== "string" || !orderId.trim()) throw new HttpsError("invalid-argument", "Order ID is required.");
+    if (!['ACCEPT', 'REFUND'].includes(decision)) throw new HttpsError("invalid-argument", "Decision must be ACCEPT or REFUND.");
+
+    const orderRef = db.collection("orders").doc(orderId.trim());
+    const orderSnap = await orderRef.get();
+    if (!orderSnap.exists) throw new HttpsError("not-found", "Order not found.");
+    const order = orderSnap.data();
+
+    const shopSnap = order.storeId ? await db.collection("shops").doc(order.storeId).get() : null;
+    const profileSnap = order.storeId ? await db.collection("merchantProfiles").doc(order.storeId).get() : null;
+    const isAdmin = request.auth.token?.admin === true || request.auth.token?.email === "58140@lomsak.ac.th";
+    const isOwner = (shopSnap?.exists && shopSnap.data().ownerUid === request.auth.uid) || (profileSnap?.exists && profileSnap.data().ownerUid === request.auth.uid);
+    if (!isAdmin && !isOwner) throw new HttpsError("permission-denied", "Only the store owner or platform admin can resolve this order.");
+    if (order.paymentStatus !== "paid_after_expired" || order.flaggedForMerchantReview !== true) {
+      throw new HttpsError("failed-precondition", "Order is not awaiting paid-after-expired reconciliation.");
+    }
+
+    if (decision === "ACCEPT") {
+      await orderRef.update({
+        paymentStatus: "paid",
+        status: "TO_SHIP",
+        queueStatus: "waiting",
+        flaggedForMerchantReview: false,
+        reconciled: true,
+        reconciliationStatus: "ACCEPTED",
+        merchantNote: String(merchantNote).slice(0, 500),
+        reconciledBy: request.auth.uid,
+        reconciledAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      await db.collection("audit_logs").doc(`reconcile_${orderRef.id}`).set({
+        actorUid: request.auth.uid,
+        action: "PAID_AFTER_EXPIRED_ACCEPTED",
+        orderId: orderRef.id,
+        storeId: order.storeId || null,
+        createdAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+      return { success: true, status: "ACCEPTED" };
+    }
+
+    const paymentId = String(order.paymentId || "").trim();
+    if (!paymentId) throw new HttpsError("failed-precondition", "No provider payment ID is available for refund.");
+    const amountSatang = Math.round(Number(order.totalAmount) * 100);
+    if (!Number.isFinite(amountSatang) || amountSatang <= 0) throw new HttpsError("failed-precondition", "Invalid order amount for refund.");
+
+    const refund = await opnRequest(`/charges/${encodeURIComponent(paymentId)}/refunds`, opnSecretKey.value(), {
+      amount: amountSatang,
+      metadata: { order_id: orderRef.id, reason: "paid_after_expired" },
+    });
+    const refundId = refund.id || null;
+    await orderRef.update({
+      paymentStatus: "paid_after_expired",
+      status: "CANCELLED",
+      flaggedForMerchantReview: false,
+      reconciled: true,
+      reconciliationStatus: "REFUNDED",
+      refundId,
+      refundedAmount: Number(order.totalAmount),
+      merchantNote: String(merchantNote).slice(0, 500),
+      reconciledBy: request.auth.uid,
+      reconciledAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    await db.collection("audit_logs").doc(`reconcile_${orderRef.id}`).set({
+      actorUid: request.auth.uid,
+      action: "PAID_AFTER_EXPIRED_REFUNDED",
+      orderId: orderRef.id,
+      storeId: order.storeId || null,
+      refundId,
+      amount: Number(order.totalAmount),
+      createdAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    return { success: true, status: "REFUNDED", refundId };
+  }
+);
+
 export const getPaymentStatus = onCall(
   { region: "asia-southeast1" },
   async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Sign in is required.");
     const { orderId } = request.data || {};
-    if (typeof orderId !== "string" || !orderId.trim()) {
-      throw new HttpsError("invalid-argument", "Order ID is required.");
-    }
+    if (typeof orderId !== "string" || !orderId.trim()) throw new HttpsError("invalid-argument", "Order ID is required.");
     const orderSnap = await db.collection("orders").doc(orderId.trim()).get();
     if (!orderSnap.exists) throw new HttpsError("not-found", "Order not found.");
     const order = orderSnap.data();
-    if (order.userId !== request.auth.uid) {
-      throw new HttpsError("permission-denied", "Unauthorized order access.");
-    }
-    return {
-      orderId: order.orderId,
-      paymentStatus: order.paymentStatus,
-      queueStatus: order.queueStatus,
-      status: order.status,
-      totalAmount: order.totalAmount,
-    };
+    if (order.userId !== request.auth.uid) throw new HttpsError("permission-denied", "Unauthorized order access.");
+    return { orderId: order.orderId, paymentStatus: order.paymentStatus, queueStatus: order.queueStatus, status: order.status, totalAmount: order.totalAmount };
   }
 );
 
-// Set this function URL as the static webhook endpoint in the Opn dashboard.
-// Never trust the webhook body by itself: retrieve the charge and compare metadata first.
 export const opnWebhook = onRequest(
   { region: "asia-southeast1", secrets: [opnSecretKey] },
   async (req, res) => {
@@ -510,47 +490,40 @@ export const opnWebhook = onRequest(
       const charge = await retrieveCharge(chargeId, opnSecretKey.value());
       const orderId = charge.metadata?.orderId;
       const chargeUid = charge.metadata?.uid;
-
-      if (!orderId || !chargeUid || charge.currency !== "THB") {
-        return res.status(400).send("Invalid payment metadata");
-      }
+      if (!orderId || !chargeUid || charge.currency !== "THB") return res.status(400).send("Invalid payment metadata");
 
       const orderRef = db.collection("orders").doc(orderId);
       const orderSnap = await orderRef.get();
       if (!orderSnap.exists) return res.status(400).send("Order mismatch");
+      const order = orderSnap.data();
+      if (order.userId !== chargeUid) return res.status(400).send("User ID mismatch");
 
-      // 🔒 Strict Cross-Check: charge metadata UID must strictly match order.userId
-      if (orderSnap.data().userId !== chargeUid) {
-        return res.status(400).send("User ID mismatch");
-      }
+      // Verify amount before accepting any successful payment state, including the late-payment branch.
+      const expectedSatang = Math.round(Number(order.totalAmount || order.totalPrice) * 100);
+      if (!Number.isFinite(expectedSatang) || charge.amount !== expectedSatang) return res.status(400).send("Amount mismatch");
 
-      // Handle Expired / Failed Charge Events
       if (charge.status === "expired" || charge.status === "failed") {
         await releaseOrderResources(orderRef, `Payment provider reported charge ${charge.status}`);
         return res.status(200).send("Expired/Failed handled");
       }
 
-      // 🔒 Race condition guard: If webhook arrives after order was expired, flag for merchant review
-      if (orderSnap.data().paymentStatus === "expired" || orderSnap.data().resourcesReleased) {
+      // Late success after resource release: record it for reconciliation, never silently re-reserve stock/slot.
+      if (order.paymentStatus === "expired" || order.resourcesReleased) {
         await orderRef.update({
           paymentId: charge.id,
           paymentStatus: "paid_after_expired",
           providerStatus: charge.status,
           flaggedForMerchantReview: true,
-          reconciled: true,
+          reconciliationStatus: "PENDING_REVIEW",
+          reconciled: false,
           paidAt: charge.status === "successful" ? FieldValue.serverTimestamp() : null,
           updatedAt: FieldValue.serverTimestamp()
         });
         return res.status(200).send("Handled as paid_after_expired");
       }
 
-      // 🔒 Idempotency check: Don't re-process already paid orders
-      if (orderSnap.data().paymentStatus === "paid") {
-        return res.status(200).send("Already processed");
-      }
+      if (order.paymentStatus === "paid") return res.status(200).send("Already processed");
 
-      const expectedSatang = Math.round(Number(orderSnap.data().totalAmount || orderSnap.data().totalPrice) * 100);
-      if (charge.amount !== expectedSatang) return res.status(400).send("Amount mismatch");
       const paymentStatus = charge.status === "successful" ? "paid" : charge.status;
       await orderRef.update({
         paymentId: charge.id,
