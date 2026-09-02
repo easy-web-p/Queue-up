@@ -246,7 +246,7 @@ function PaymentModal({
         </div>
 
         {/* Payment Method Selector Tabs */}
-        {!isPaidSuccess && (
+        {!isPaidSuccess && (import.meta.env.DEV || (typeof window !== "undefined" && window.location.hostname === "localhost")) && (
           <div className="payment-methods-nav">
             <button
               className={`payment-method-tab ${

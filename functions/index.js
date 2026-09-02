@@ -27,6 +27,9 @@ async function retrieveCharge(chargeId, key) {
   return response.json();
 }
 
+// Allowed standard pickup timeslots
+const ALLOWED_SLOTS = ["11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00"];
+
 // Standard Topping & Modifier Catalog Prices
 const TOPPING_PRICES = {
   "ไข่ดาว": 10,
@@ -55,6 +58,8 @@ export const createPromptPayPayment = onCall(
     const idempotencyRef = idempotencyDocId
       ? db.collection("idempotency_keys").doc(idempotencyDocId)
       : null;
+
+    let reservedSlotDocId = null;
 
     // 🔒 Atomic Transaction: Validate stock, slot capacity, modifiers pricing, check/lock idempotency, decrement stock, and create order atomically
     const { totalSatang, existingResult, computedDetails } = await db.runTransaction(async (transaction) => {
@@ -98,14 +103,17 @@ export const createPromptPayPayment = onCall(
         throw new HttpsError("failed-precondition", "Invalid product price in database.");
       }
 
-      // 🔒 Server-Authoritative Modifier & Toppings Calculation
+      // 🔒 Strict Server-Authoritative Modifier & Toppings Calculation (Rejects unknown options)
       let modifierUnitPrice = 0;
       const sanitizedModifiers = [];
       if (Array.isArray(modifiers)) {
         for (const mod of modifiers) {
           if (mod && mod.id === "topping" && Array.isArray(mod.value)) {
             for (const topName of mod.value) {
-              const topPrice = Number(TOPPING_PRICES[topName] || (product.toppingPrices && product.toppingPrices[topName]) || 0);
+              const topPrice = TOPPING_PRICES[topName] ?? product.toppingPrices?.[topName];
+              if (typeof topPrice !== "number" || topPrice < 0) {
+                throw new HttpsError("invalid-argument", `ไม่พบตัวเลือกท็อปปิ้ง: ${topName}`);
+              }
               modifierUnitPrice += topPrice;
               sanitizedModifiers.push({ id: "topping", name: topName, price: topPrice });
             }
@@ -122,12 +130,26 @@ export const createPromptPayPayment = onCall(
       const storeId = String(product.storeId || product.shopId || "STORE_DEFAULT");
       const storeName = String(product.storeName || product.shopName || "ร้านค้าในโรงเรียน");
 
-      // 🔒 Server-Side Time-Slot Capacity Check & Reservation Lock
+      // 🔒 Strict Time-Slot Validation & Atomic Capacity Check
       if (booking && booking.date && (booking.timeSlot || booking.time)) {
-        const slotTime = String(booking.timeSlot || booking.time).replace(/[^0-9:]/g, "");
-        const slotDate = String(booking.date).replace(/[^0-9-]/g, "");
-        const slotDocId = `${storeId}_${slotDate}_${slotTime}`;
-        const slotRef = db.collection("store_slots").doc(slotDocId);
+        const slotTime = String(booking.timeSlot || booking.time).trim();
+        const slotDate = String(booking.date).trim();
+
+        if (!ALLOWED_SLOTS.includes(slotTime)) {
+          throw new HttpsError("invalid-argument", `รอบเวลารับประทานไม่ถูกต้อง (${slotTime})`);
+        }
+        const parsedDate = new Date(slotDate);
+        if (isNaN(parsedDate.getTime())) {
+          throw new HttpsError("invalid-argument", "รูปแบบวันที่ไม่ถูกต้อง");
+        }
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (parsedDate < today) {
+          throw new HttpsError("invalid-argument", "ไม่สามารถเลือกวันที่ย้อนหลังได้");
+        }
+
+        reservedSlotDocId = `${storeId}_${slotDate}_${slotTime}`;
+        const slotRef = db.collection("store_slots").doc(reservedSlotDocId);
         const slotSnap = await transaction.get(slotRef);
 
         const currentOrders = slotSnap.exists ? Number(slotSnap.data().currentOrders || 0) : 0;
@@ -243,27 +265,50 @@ export const createPromptPayPayment = onCall(
       return existingResult;
     }
 
+    let createdCharge = null;
     try {
-      const charge = await opnRequest("/charges", opnSecretKey.value(), { amount: totalSatang, currency: "THB", description: `QueueUp ${orderRef.id}`, metadata: { orderId: orderRef.id, uid: request.auth.uid }, source: { type: "promptpay" } });
-      const qrUrl = charge.source?.scannable_code?.image?.download_uri;
+      createdCharge = await opnRequest("/charges", opnSecretKey.value(), { amount: totalSatang, currency: "THB", description: `QueueUp ${orderRef.id}`, metadata: { orderId: orderRef.id, uid: request.auth.uid }, source: { type: "promptpay" } });
+      const qrUrl = createdCharge.source?.scannable_code?.image?.download_uri;
       if (!qrUrl) throw new Error("PromptPay QR was not returned by provider.");
-      await orderRef.update({ paymentId: charge.id, qrUrl, updatedAt: FieldValue.serverTimestamp() });
+      await orderRef.update({ paymentId: createdCharge.id, qrUrl, updatedAt: FieldValue.serverTimestamp() });
       return {
         orderId: orderRef.id,
-        paymentId: charge.id,
+        paymentId: createdCharge.id,
         qrUrl,
         subtotal: computedDetails.subtotal,
         discountAmount: computedDetails.discountAmount,
         totalAmount: computedDetails.totalAmount,
-        expiresAt: charge.expires_at || null
+        expiresAt: createdCharge.expires_at || null
       };
     } catch (error) {
-      await orderRef.update({ paymentStatus: "creation_failed", updatedAt: FieldValue.serverTimestamp() });
-      // Revert stock decrement if payment provider rejects charge creation
-      try {
-        await productRef.update({ stock: FieldValue.increment(quantity) });
-      } catch (stockErr) {
-        console.warn("Revert stock warning:", stockErr);
+      const failureUpdate = {
+        paymentStatus: "creation_failed",
+        error: String(error?.message || "Payment provider error"),
+        updatedAt: FieldValue.serverTimestamp()
+      };
+      if (createdCharge?.id) {
+        failureUpdate.paymentId = createdCharge.id;
+        failureUpdate.paymentStatus = "charge_created_order_pending";
+      }
+      await orderRef.update(failureUpdate);
+
+      // Revert stock & time-slot reservations only if NO charge was created with provider
+      if (!createdCharge?.id) {
+        try {
+          await productRef.update({ stock: FieldValue.increment(quantity) });
+        } catch (stockErr) {
+          console.warn("Revert stock warning:", stockErr);
+        }
+        if (reservedSlotDocId) {
+          try {
+            await db.collection("store_slots").doc(reservedSlotDocId).update({
+              currentOrders: FieldValue.increment(-quantity),
+              updatedAt: FieldValue.serverTimestamp()
+            });
+          } catch (slotErr) {
+            console.warn("Revert slot warning:", slotErr);
+          }
+        }
       }
       throw error;
     }
@@ -311,7 +356,7 @@ export const opnWebhook = onRequest(
       if (!orderId || charge.currency !== "THB") return res.status(400).send("Invalid payment metadata");
       const orderRef = db.collection("orders").doc(orderId);
       const orderSnap = await orderRef.get();
-      if (!orderSnap.exists || orderSnap.data().paymentId !== charge.id) return res.status(400).send("Order mismatch");
+      if (!orderSnap.exists) return res.status(400).send("Order mismatch");
 
       // 🔒 Idempotency check: Don't re-process already paid orders
       if (orderSnap.data().paymentStatus === "paid") {
@@ -321,7 +366,14 @@ export const opnWebhook = onRequest(
       const expectedSatang = Math.round(Number(orderSnap.data().totalAmount || orderSnap.data().totalPrice) * 100);
       if (charge.amount !== expectedSatang) return res.status(400).send("Amount mismatch");
       const paymentStatus = charge.status === "successful" ? "paid" : charge.status;
-      await orderRef.update({ paymentStatus, providerStatus: charge.status, paidAt: charge.status === "successful" ? FieldValue.serverTimestamp() : null, updatedAt: FieldValue.serverTimestamp() });
+      await orderRef.update({
+        paymentId: charge.id,
+        paymentStatus,
+        providerStatus: charge.status,
+        reconciled: true,
+        paidAt: charge.status === "successful" ? FieldValue.serverTimestamp() : null,
+        updatedAt: FieldValue.serverTimestamp()
+      });
       return res.status(200).send("OK");
     } catch (error) {
       console.error("Opn webhook error", error);
