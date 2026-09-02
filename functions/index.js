@@ -283,6 +283,7 @@ export async function releaseOrderResources(orderDocRef, cancelReason = "Payment
     const productSnap = productRef ? await transaction.get(productRef) : null;
     const slotSnap = slotRef ? await transaction.get(slotRef) : null;
 
+<<<<<<< HEAD
     const warnings = [];
     let stockAfterRelease = null;
     if (productRef) {
@@ -294,6 +295,18 @@ export async function releaseOrderResources(orderDocRef, cancelReason = "Payment
           warnings.push("STOCK_COUNTER_INVALID");
         } else {
           stockAfterRelease = currentStock + qty;
+=======
+        if (slotSnap.exists) {
+          const current = Number(slotSnap.data().currentOrders || 0);
+          if (current < qty) {
+            console.warn(`[DATA_INTEGRITY_WARNING] Store slot ${slotDocId} had currentOrders (${current}) less than released quantity (${qty}). Clamping to 0.`);
+          }
+          const newOrders = Math.max(0, current - qty);
+          transaction.set(slotRef, {
+            currentOrders: newOrders,
+            updatedAt: FieldValue.serverTimestamp(),
+          }, { merge: true });
+>>>>>>> 5e0ed1b (fix(transaction-3.10): implement merchant resolution workflow for paid_after_expired orders, resolveExpiredPaymentReview cloud function, and data integrity warnings)
         }
       }
     }
@@ -387,9 +400,11 @@ export const resolvePaidAfterExpiredOrder = onCall(
   { region: "asia-southeast1", secrets: [opnSecretKey] },
   async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Sign in is required.");
-    const { orderId, decision, merchantNote = "" } = request.data || {};
+    const { orderId, decision, action, merchantNote = "" } = request.data || {};
+    const effectiveDecision = decision || (action === "accept_special_queue" ? "ACCEPT" : action === "request_refund" ? "REFUND" : null);
+
     if (typeof orderId !== "string" || !orderId.trim()) throw new HttpsError("invalid-argument", "Order ID is required.");
-    if (!['ACCEPT', 'REFUND'].includes(decision)) throw new HttpsError("invalid-argument", "Decision must be ACCEPT or REFUND.");
+    if (!['ACCEPT', 'REFUND'].includes(effectiveDecision)) throw new HttpsError("invalid-argument", "Decision must be ACCEPT or REFUND.");
 
     const orderRef = db.collection("orders").doc(orderId.trim());
     const orderSnap = await orderRef.get();
@@ -399,13 +414,13 @@ export const resolvePaidAfterExpiredOrder = onCall(
     const shopSnap = order.storeId ? await db.collection("shops").doc(order.storeId).get() : null;
     const profileSnap = order.storeId ? await db.collection("merchantProfiles").doc(order.storeId).get() : null;
     const isAdmin = request.auth.token?.admin === true || request.auth.token?.email === "58140@lomsak.ac.th";
-    const isOwner = (shopSnap?.exists && shopSnap.data().ownerUid === request.auth.uid) || (profileSnap?.exists && profileSnap.data().ownerUid === request.auth.uid);
+    const isOwner = (shopSnap?.exists && (shopSnap.data().ownerUid === request.auth.uid || shopSnap.data().ownerId === request.auth.uid || shopSnap.data().merchantId === request.auth.uid)) || (profileSnap?.exists && profileSnap.data().ownerUid === request.auth.uid);
     if (!isAdmin && !isOwner) throw new HttpsError("permission-denied", "Only the store owner or platform admin can resolve this order.");
-    if (order.paymentStatus !== "paid_after_expired" || order.flaggedForMerchantReview !== true) {
+    if (order.paymentStatus !== "paid_after_expired" && order.flaggedForMerchantReview !== true) {
       throw new HttpsError("failed-precondition", "Order is not awaiting paid-after-expired reconciliation.");
     }
 
-    if (decision === "ACCEPT") {
+    if (effectiveDecision === "ACCEPT") {
       await orderRef.update({
         paymentStatus: "paid",
         status: "TO_SHIP",
@@ -414,6 +429,7 @@ export const resolvePaidAfterExpiredOrder = onCall(
         reconciled: true,
         reconciliationStatus: "ACCEPTED",
         merchantNote: String(merchantNote).slice(0, 500),
+        merchantReviewAction: "accepted_special_queue",
         reconciledBy: request.auth.uid,
         reconciledAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
@@ -429,41 +445,75 @@ export const resolvePaidAfterExpiredOrder = onCall(
     }
 
     const paymentId = String(order.paymentId || "").trim();
-    if (!paymentId) throw new HttpsError("failed-precondition", "No provider payment ID is available for refund.");
+    if (!paymentId) {
+      // Offline / Slip / Simulated refund fallback
+      await orderRef.update({
+        paymentStatus: "refund_requested",
+        status: "CANCELLED",
+        flaggedForMerchantReview: false,
+        reconciled: true,
+        reconciliationStatus: "REFUND_REQUESTED",
+        merchantNote: String(merchantNote).slice(0, 500),
+        merchantReviewAction: "refund_requested",
+        reconciledBy: request.auth.uid,
+        reconciledAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      return { success: true, status: "REFUND_REQUESTED" };
+    }
+
     const amountSatang = Math.round(Number(order.totalAmount) * 100);
     if (!Number.isFinite(amountSatang) || amountSatang <= 0) throw new HttpsError("failed-precondition", "Invalid order amount for refund.");
 
-    const refund = await opnRequest(`/charges/${encodeURIComponent(paymentId)}/refunds`, opnSecretKey.value(), {
-      amount: amountSatang,
-      metadata: { order_id: orderRef.id, reason: "paid_after_expired" },
-    });
-    const refundId = refund.id || null;
-    await orderRef.update({
-      paymentStatus: "paid_after_expired",
-      status: "CANCELLED",
-      flaggedForMerchantReview: false,
-      reconciled: true,
-      reconciliationStatus: "REFUNDED",
-      refundId,
-      refundedAmount: Number(order.totalAmount),
-      merchantNote: String(merchantNote).slice(0, 500),
-      reconciledBy: request.auth.uid,
-      reconciledAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-    await db.collection("audit_logs").doc(`reconcile_${orderRef.id}`).set({
-      actorUid: request.auth.uid,
-      action: "PAID_AFTER_EXPIRED_REFUNDED",
-      orderId: orderRef.id,
-      storeId: order.storeId || null,
-      refundId,
-      amount: Number(order.totalAmount),
-      createdAt: FieldValue.serverTimestamp(),
-    }, { merge: true });
-    return { success: true, status: "REFUNDED", refundId };
+    try {
+      const refund = await opnRequest(`/charges/${encodeURIComponent(paymentId)}/refunds`, opnSecretKey.value(), {
+        amount: amountSatang,
+        metadata: { order_id: orderRef.id, reason: "paid_after_expired" },
+      });
+      const refundId = refund.id || null;
+      await orderRef.update({
+        paymentStatus: "paid_after_expired",
+        status: "CANCELLED",
+        flaggedForMerchantReview: false,
+        reconciled: true,
+        reconciliationStatus: "REFUNDED",
+        refundId,
+        refundedAmount: Number(order.totalAmount),
+        merchantNote: String(merchantNote).slice(0, 500),
+        merchantReviewAction: "refunded",
+        reconciledBy: request.auth.uid,
+        reconciledAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      await db.collection("audit_logs").doc(`reconcile_${orderRef.id}`).set({
+        actorUid: request.auth.uid,
+        action: "PAID_AFTER_EXPIRED_REFUNDED",
+        orderId: orderRef.id,
+        storeId: order.storeId || null,
+        refundId,
+        amount: Number(order.totalAmount),
+        createdAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+      return { success: true, status: "REFUNDED", refundId };
+    } catch (refundErr) {
+      console.warn("Opn automated refund warning, marked for manual refund:", refundErr);
+      await orderRef.update({
+        paymentStatus: "refund_requested",
+        status: "CANCELLED",
+        flaggedForMerchantReview: false,
+        reconciled: true,
+        reconciliationStatus: "MANUAL_REFUND_PENDING",
+        refundError: String(refundErr?.message || "Provider refund failed"),
+        merchantNote: String(merchantNote).slice(0, 500),
+        merchantReviewAction: "refund_requested",
+        reconciledBy: request.auth.uid,
+        reconciledAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      return { success: true, status: "MANUAL_REFUND_PENDING" };
+    }
   }
 );
-
 export const getPaymentStatus = onCall(
   { region: "asia-southeast1" },
   async (request) => {

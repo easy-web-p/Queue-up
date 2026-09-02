@@ -793,10 +793,71 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                       </span>
                       <span className="font-extrabold text-xs text-slate-900">{order.id}</span>
                     </div>
-                    <span className="text-xs font-extrabold text-emerald-600">
-                      {order.totalAmount} ฿ ({order.paymentStatus})
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {(order.paymentStatus === 'paid_after_expired' || (order as any).flaggedForMerchantReview) && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500 text-white font-extrabold flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" /> จ่ายหลังหมดเวลา (รอพิจารณา)
+                        </span>
+                      )}
+                      <span className="text-xs font-extrabold text-emerald-600">
+                        {order.totalAmount} ฿ ({order.paymentStatus})
+                      </span>
+                    </div>
                   </div>
+
+                  {/* Special Reconciliation Card for paid_after_expired */}
+                  {(order.paymentStatus === 'paid_after_expired' || (order as any).flaggedForMerchantReview) && (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
+                      <div className="text-xs text-amber-900 font-bold">
+                        ⚠️ ลูกค้าชำระเงินสำเร็จหลังจากคิวหมดเวลา 15 นาที: ยืนยันการจัดคิวพิเศษหรือยกเลิกและประสานงานคืนเงิน
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={async () => {
+                            try {
+                              const orderRef = doc(db, 'orders', order.id);
+                              await setDoc(orderRef, {
+                                paymentStatus: 'paid',
+                                queueStatus: 'waiting',
+                                status: 'TO_SHIP',
+                                merchantReviewAction: 'accepted_special_queue',
+                                flaggedForMerchantReview: false,
+                                updatedAt: new Date().toISOString()
+                              }, { merge: true });
+                              setOrders((prev) => prev.map((o) => o.id === order.id ? { ...o, paymentStatus: 'paid', queueStatus: 'waiting', status: 'TO_SHIP' as any, flaggedForMerchantReview: false } as any : o));
+                              setToastMsg('ยอมรับและจัดคิวพิเศษเรียบร้อยแล้ว');
+                            } catch (e: any) {
+                              setToastMsg('เกิดข้อผิดพลาด: ' + e.message);
+                            }
+                          }}
+                          className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-lg transition-colors cursor-pointer"
+                        >
+                          รับคิวพิเศษ (จัดอาหาร)
+                        </button>
+                        <button
+                          onClick={async () => {
+                            try {
+                              const orderRef = doc(db, 'orders', order.id);
+                              await setDoc(orderRef, {
+                                paymentStatus: 'refund_requested',
+                                status: 'CANCELLED',
+                                merchantReviewAction: 'refund_requested',
+                                flaggedForMerchantReview: false,
+                                updatedAt: new Date().toISOString()
+                              }, { merge: true });
+                              setOrders((prev) => prev.map((o) => o.id === order.id ? { ...o, paymentStatus: 'refund_requested' as any, status: 'CANCELLED' as any, flaggedForMerchantReview: false } as any : o));
+                              setToastMsg('บันทึกคำขอยกเลิกและคืนเงินเรียบร้อยแล้ว');
+                            } catch (e: any) {
+                              setToastMsg('เกิดข้อผิดพลาด: ' + e.message);
+                            }
+                          }}
+                          className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-lg transition-colors cursor-pointer"
+                        >
+                          ยกเลิก & คืนเงิน
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="space-y-1 text-xs">
                     <div className="font-bold text-slate-800">ลูกค้า: {order.customerName} ({order.customerPhone})</div>
