@@ -48,7 +48,8 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
       items: cartItems,
       queueStatus: paymentMethod === 'promptpay' ? 'waiting' : 'waiting',
       paymentMethod,
-      paymentStatus: paymentMethod === 'promptpay' ? 'verified' : 'pending',
+      paymentStatus: 'pending',
+      paymentVerificationMethod: paymentMethod === 'promptpay' ? 'slip_submitted' : 'counter_cash',
       pickupTime,
       createdAt: new Date().toISOString(),
       estimatedReadyTime: `${pickupTime} น.`

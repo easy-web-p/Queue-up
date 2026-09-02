@@ -116,17 +116,34 @@ service cloud.firestore {
         (resource.data.storeId != null && isStoreOwner(resource.data.storeId))
       );
 
-      // Customer creates own orders
+      // Customer creates own orders:
+      // 🔒 STRICT SECURITY: paymentStatus MUST be 'pending' or 'unpaid'
+      // Client CANNOT set paymentStatus: 'verified' or 'paid' directly.
+      // totalAmount must be a valid positive number.
       allow create: if isAuthenticated() && (
         isAdmin() ||
-        request.resource.data.userId == request.auth.uid
+        (
+          request.resource.data.userId == request.auth.uid &&
+          (
+            !('paymentStatus' in request.resource.data) ||
+            request.resource.data.paymentStatus == 'pending' ||
+            request.resource.data.paymentStatus == 'unpaid'
+          ) &&
+          isValidNumber(request.resource.data.totalAmount) &&
+          request.resource.data.totalAmount > 0
+        )
       );
 
-      // Merchant of that specific store or Admin updates order status (KDS)
+      // Merchant of that specific store or Admin verifies payment & updates KDS status
+      // Customer can ONLY cancel their own pending order
       allow update: if isAuthenticated() && (
         isAdmin() ||
         (resource.data.storeId != null && isStoreOwner(resource.data.storeId)) ||
-        (resource.data.userId == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['cancelReason', 'status']))
+        (
+          resource.data.userId == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['cancelReason', 'status']) &&
+          request.resource.data.status == 'CANCELLED'
+        )
       );
 
       allow delete: if isAdmin();

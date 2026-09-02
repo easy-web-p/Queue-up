@@ -297,9 +297,11 @@ function ProductDetail() {
       },
       subtotal: totalCalculatedPrice,
       total: totalCalculatedPrice,
+      totalAmount: totalCalculatedPrice,
       paymentMethod: "PROMPTPAY_QR",
-      paymentStatus: "PAID",
-      orderStatus: "PREPARING",
+      paymentStatus: "pending",
+      paymentVerificationMethod: "promptpay_slip",
+      orderStatus: "TO_SHIP",
       queueNumber: currentQueueNo,
     };
 

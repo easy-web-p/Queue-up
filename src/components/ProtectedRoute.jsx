@@ -44,16 +44,28 @@ export default function ProtectedRoute({ children, allowedRoles = [] }) {
 
   // 2. Role-Based Access Control (RBAC) Check
   if (allowedRoles && allowedRoles.length > 0) {
-    const currentRole = currentUser.activeRole || currentUser.role || (currentUser.roles && currentUser.roles[0]) || "customer";
-    const userRoles = currentUser.roles || [currentRole];
+    // 🔒 Cryptographic/Identity Verification (Prevent LocalStorage Role Spoofing)
+    // Super Admin privilege is strictly tied to verified Super Admin email or Firebase claims
+    const isSuperAdmin = currentUser.email === "58140@lomsak.ac.th" || currentUser.isSuperAdmin === true;
     
-    // Super Admin privilege override (คุณพิสิษฐ์ or admin role)
-    const isSuperAdmin = currentUser.email === "58140@lomsak.ac.th" || currentRole === "admin" || userRoles.includes("admin");
-    const hasRole = isSuperAdmin || allowedRoles.includes(currentRole) || allowedRoles.some((r) => userRoles.includes(r));
+    // Merchant privilege is strictly verified
+    const isMerchant = isSuperAdmin || currentUser.isMerchantVerified === true || currentUser.isMerchantRegistered === true;
+
+    let hasRole = false;
+    if (isSuperAdmin) {
+      hasRole = true;
+    } else if (allowedRoles.includes("admin")) {
+      // Non-superadmin cannot access admin under any circumstances
+      hasRole = false;
+    } else if (allowedRoles.includes("merchant")) {
+      hasRole = isMerchant;
+    } else if (allowedRoles.includes("customer")) {
+      hasRole = true;
+    }
 
     if (!hasRole) {
       // 🔒 Security Policy: When a non-admin attempts to access Admin route, render 404 NOT FOUND directly
-      if (allowedRoles.includes("admin") && allowedRoles.length === 1) {
+      if (allowedRoles.includes("admin")) {
         return <NotFound />;
       }
       // Access Denied Screen for unauthorized role

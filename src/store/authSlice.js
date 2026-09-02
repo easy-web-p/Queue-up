@@ -4,28 +4,35 @@ import { createSlice } from '@reduxjs/toolkit'
 const getInitialUser = () => {
   if (typeof window !== 'undefined') {
     try {
-      const savedUser = localStorage.getItem('queueup_user')
+      const savedUser = localStorage.getItem('queueup_user');
       if (savedUser) {
-        return JSON.parse(savedUser)
+        const parsed = JSON.parse(savedUser);
+        return filterSafeUserSession(parsed);
       }
     } catch (err) {
-      console.warn('Error reading saved user session:', err)
+      console.warn('Error reading saved user session:', err);
     }
   }
-  return null
-}
+  return null;
+};
 
-// Helper: Filter out sensitive fields before saving user session to LocalStorage
+// Helper: Filter out sensitive fields and enforce role integrity before saving
 const filterSafeUserSession = (rawUser) => {
   if (!rawUser) return null;
-  const { uid, email, displayName, name, photo, photoURL, activeRole, roles, role, school } = rawUser;
+  const { uid, email, displayName, name, photo, photoURL, activeRole, school, isMerchantVerified, isMerchantRegistered } = rawUser;
+  const isSuperAdmin = (email || "").toLowerCase() === "58140@lomsak.ac.th";
+  const verifiedRoles = isSuperAdmin ? ["customer", "merchant", "admin"] : (isMerchantVerified ? ["customer", "merchant"] : ["customer"]);
+  const verifiedActiveRole = isSuperAdmin ? (activeRole || "admin") : (isMerchantVerified && activeRole === "merchant" ? "merchant" : "customer");
+
   return {
     uid: uid || "",
     email: email || "",
     displayName: displayName || name || "ผู้ใช้งาน QueueUp",
     photoURL: photoURL || photo || "/yeti_mascot.jpg",
-    activeRole: activeRole || role || "customer",
-    roles: roles || [activeRole || role || "customer"],
+    activeRole: verifiedActiveRole,
+    roles: verifiedRoles,
+    isMerchantVerified: !!isMerchantVerified,
+    isMerchantRegistered: !!isMerchantRegistered,
     school: school || "โรงเรียน",
   };
 };
