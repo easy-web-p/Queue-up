@@ -403,6 +403,13 @@ export const resolvePaidAfterExpiredOrder = onCall(
     const isAdmin = request.auth.token?.admin === true || request.auth.token?.email === "58140@lomsak.ac.th";
     const isOwner = (shopSnap?.exists && (shopSnap.data().ownerUid === request.auth.uid || shopSnap.data().ownerId === request.auth.uid || shopSnap.data().merchantId === request.auth.uid)) || (profileSnap?.exists && profileSnap.data().ownerUid === request.auth.uid);
     if (!isAdmin && !isOwner) throw new HttpsError("permission-denied", "Only the store owner or platform admin can resolve this order.");
+
+    // 🔒 Idempotency Guard: Terminal state protection against duplicate refunds or re-resolution
+    const TERMINAL_RECONCILED_STATES = ["ACCEPTED", "REFUNDED", "REFUND_REQUESTED", "MANUAL_REFUND_PENDING"];
+    if (TERMINAL_RECONCILED_STATES.includes(order.reconciliationStatus) || order.paymentStatus === "refunded") {
+      throw new HttpsError("failed-precondition", `ออเดอร์นี้ได้รับการจัดการแล้ว (${order.reconciliationStatus || order.paymentStatus})`);
+    }
+
     if (order.paymentStatus !== "paid_after_expired" && order.flaggedForMerchantReview !== true) {
       throw new HttpsError("failed-precondition", "Order is not awaiting paid-after-expired reconciliation.");
     }
@@ -435,7 +442,7 @@ export const resolvePaidAfterExpiredOrder = onCall(
     if (!paymentId) {
       // Offline / Slip / Simulated refund fallback
       await orderRef.update({
-        paymentStatus: "refund_requested",
+        paymentStatus: "refunded",
         status: "CANCELLED",
         flaggedForMerchantReview: false,
         reconciled: true,
@@ -459,7 +466,7 @@ export const resolvePaidAfterExpiredOrder = onCall(
       });
       const refundId = refund.id || null;
       await orderRef.update({
-        paymentStatus: "paid_after_expired",
+        paymentStatus: "refunded",
         status: "CANCELLED",
         flaggedForMerchantReview: false,
         reconciled: true,
@@ -534,6 +541,12 @@ export const opnWebhook = onRequest(
       if (!orderSnap.exists) return res.status(400).send("Order mismatch");
       const order = orderSnap.data();
       if (order.userId !== chargeUid) return res.status(400).send("User ID mismatch");
+
+      // 🔒 Terminal Reconciled State Guard: Never re-open or downgrade orders after merchant resolution
+      const TERMINAL_RECONCILED_STATES = ["ACCEPTED", "REFUNDED", "REFUND_REQUESTED", "MANUAL_REFUND_PENDING"];
+      if (TERMINAL_RECONCILED_STATES.includes(order.reconciliationStatus) || order.paymentStatus === "refunded") {
+        return res.status(200).send("Already resolved in terminal reconciliation state");
+      }
 
       // Verify amount before accepting any successful payment state, including the late-payment branch.
       const expectedSatang = Math.round(Number(order.totalAmount || order.totalPrice) * 100);
