@@ -34,8 +34,9 @@ import {
 } from 'lucide-react';
 import { MenuItem, Order, CustomerProfile, MerchantShop } from '../types';
 import { fetchMenuItemsFromFirestore, fetchOrdersFromFirestore, fetchShopsFromFirestore, fetchUsersFromFirestore } from '../lib/firebase';
-import { db, doc, setDoc, deleteDoc } from '../firebase/config.js';
+import { db, doc, setDoc, deleteDoc, functions } from '../firebase/config.js';
 import { writeBatch } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 
 interface StoreAdminPageProps {
   menuItems?: MenuItem[];
@@ -815,19 +816,12 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                         <button
                           onClick={async () => {
                             try {
-                              const orderRef = doc(db, 'orders', order.id);
-                              await setDoc(orderRef, {
-                                paymentStatus: 'paid',
-                                queueStatus: 'waiting',
-                                status: 'TO_SHIP',
-                                merchantReviewAction: 'accepted_special_queue',
-                                flaggedForMerchantReview: false,
-                                updatedAt: new Date().toISOString()
-                              }, { merge: true });
+                              const resolveFn = httpsCallable(functions, 'resolvePaidAfterExpiredOrder');
+                              await resolveFn({ orderId: order.id, decision: 'ACCEPT', merchantNote: 'ร้านค้ายืนยันรับคิวพิเศษ' });
                               setOrders((prev) => prev.map((o) => o.id === order.id ? { ...o, paymentStatus: 'paid', queueStatus: 'waiting', status: 'TO_SHIP' as any, flaggedForMerchantReview: false } as any : o));
                               setToastMsg('ยอมรับและจัดคิวพิเศษเรียบร้อยแล้ว');
                             } catch (e: any) {
-                              setToastMsg('เกิดข้อผิดพลาด: ' + e.message);
+                              setToastMsg('เกิดข้อผิดพลาด: ' + (e?.message || e));
                             }
                           }}
                           className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-lg transition-colors cursor-pointer"
@@ -837,18 +831,12 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                         <button
                           onClick={async () => {
                             try {
-                              const orderRef = doc(db, 'orders', order.id);
-                              await setDoc(orderRef, {
-                                paymentStatus: 'refund_requested',
-                                status: 'CANCELLED',
-                                merchantReviewAction: 'refund_requested',
-                                flaggedForMerchantReview: false,
-                                updatedAt: new Date().toISOString()
-                              }, { merge: true });
-                              setOrders((prev) => prev.map((o) => o.id === order.id ? { ...o, paymentStatus: 'refund_requested' as any, status: 'CANCELLED' as any, flaggedForMerchantReview: false } as any : o));
-                              setToastMsg('บันทึกคำขอยกเลิกและคืนเงินเรียบร้อยแล้ว');
+                              const resolveFn = httpsCallable(functions, 'resolvePaidAfterExpiredOrder');
+                              await resolveFn({ orderId: order.id, decision: 'REFUND', merchantNote: 'ร้านค้ายืนยันยกเลิกและคืนเงิน' });
+                              setOrders((prev) => prev.map((o) => o.id === order.id ? { ...o, paymentStatus: 'refunded' as any, status: 'CANCELLED' as any, flaggedForMerchantReview: false } as any : o));
+                              setToastMsg('ดำเนินการยกเลิกและคืนเงินเรียบร้อยแล้ว');
                             } catch (e: any) {
-                              setToastMsg('เกิดข้อผิดพลาด: ' + e.message);
+                              setToastMsg('เกิดข้อผิดพลาด: ' + (e?.message || e));
                             }
                           }}
                           className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-lg transition-colors cursor-pointer"
