@@ -107,7 +107,7 @@ export const fetchShopsFromFirestore = async () => {
 // FIRESTORE PRODUCTS COLLECTION HELPERS
 // ==========================================================================
 
-// ฟังก์ชันดึงรายการอาหารทั้งหมดจาก Firestore (พร้อม Seeding อัตโนมัติหากยังไม่มีข้อมูล)
+// ฟังก์ชันดึงรายการอาหารทั้งหมดจาก Firestore
 export const fetchProductsFromFirestore = async () => {
   try {
     const querySnapshot = await getDocs(collection(db, "products"));
@@ -120,11 +120,9 @@ export const fetchProductsFromFirestore = async () => {
       return products;
     }
 
-    // หากยังไม่มีข้อมูลใน Firestore ให้ Auto-seed ข้อมูลเริ่มต้นไปยัง Firestore
-    await saveProductsToFirestore(INITIAL_PRODUCTS);
     return INITIAL_PRODUCTS;
   } catch (error) {
-    console.warn("Firestore fetchProducts warning, using local fallback:", error);
+    console.warn("Firestore fetchProducts warning, using local catalog:", error);
     return INITIAL_PRODUCTS;
   }
 };

@@ -13,34 +13,27 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
-        const isAdmin = firebaseUser.email === "58140@lomsak.ac.th";
-        let existingUser = null;
-        if (typeof window !== 'undefined') {
-          try {
-            const raw = localStorage.getItem('queueup_user');
-            if (raw) existingUser = JSON.parse(raw);
-          } catch (e) {
-            console.warn('Error reading stored user session:', e);
-          }
-        }
-
-        const userRoles = existingUser?.roles || (isAdmin ? ["customer", "merchant", "admin"] : ["customer"]);
-        const activeRole = existingUser?.activeRole || (isAdmin ? "admin" : "customer");
+        const isAdmin = (firebaseUser.email || "").toLowerCase() === "58140@lomsak.ac.th";
+        const userRoles = isAdmin ? ["customer", "merchant", "admin"] : ["customer"];
+        const activeRole = isAdmin ? "admin" : "customer";
 
         dispatch(setUser({
           uid: firebaseUser.uid,
-          name: firebaseUser.displayName || existingUser?.name || "ผู้ใช้งาน QueueUp",
-          displayName: firebaseUser.displayName || existingUser?.displayName || "ผู้ใช้งาน QueueUp",
-          email: firebaseUser.email || existingUser?.email || "",
-          photo: firebaseUser.photoURL || existingUser?.photo || "/yeti_mascot.jpg",
-          photoURL: firebaseUser.photoURL || existingUser?.photoURL || "/yeti_mascot.jpg",
+          name: firebaseUser.displayName || "ผู้ใช้งาน QueueUp",
+          displayName: firebaseUser.displayName || "ผู้ใช้งาน QueueUp",
+          email: firebaseUser.email || "",
+          photo: firebaseUser.photoURL || "/yeti_mascot.jpg",
+          photoURL: firebaseUser.photoURL || "/yeti_mascot.jpg",
           roles: userRoles,
           activeRole: activeRole,
           isGoogleUser: true,
         }));
+      } else {
+        // When Firebase session expires / signs out externally, clear state
+        dispatch(clearUser());
       }
-    })
-    return () => unsubscribe()
+    });
+    return () => unsubscribe();
   }, [dispatch])
 
   const loginWithGoogle = async () => {

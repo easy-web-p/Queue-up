@@ -41,7 +41,16 @@ export const createPromptPayPayment = onCall(
     if (!productSnap.exists) throw new HttpsError("not-found", "Product is not available for payment.");
     const product = productSnap.data();
     const unitPrice = Number(product.price);
-    const totalSatang = Math.round(unitPrice * 100 * quantity * (1 - Number(discountPercent) / 100));
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+      throw new HttpsError("failed-precondition", "Invalid product price in database.");
+    }
+
+    let verifiedDiscountPercent = 0;
+    if (ALLOWED_DISCOUNTS.has(Number(discountPercent))) {
+      verifiedDiscountPercent = Number(discountPercent);
+    }
+
+    const totalSatang = Math.round(unitPrice * 100 * quantity * (1 - verifiedDiscountPercent / 100));
     const storeId = String(product.storeId || product.shopId || "STORE_DEFAULT");
     const storeName = String(product.storeName || product.shopName || "ร้านค้าในโรงเรียน");
     const totalAmount = totalSatang / 100;
