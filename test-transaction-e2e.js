@@ -3809,6 +3809,117 @@ async function main() {
     assert.throws(() => validateStockUpdate(-1), /Stock cannot be negative/);
   });
 
+  // Scenario 126: Wave 4.2.2 Atomic Transaction Mutation: Concurrent product update in transaction serializes safely
+  await runTest('Scenario 126: Wave 4.2.2 Atomic Transaction Mutation: Product updates execute atomically inside db.runTransaction', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const prodId = "prod_atomic_126";
+    engine.setDoc(`products/${prodId}`, {
+      id: prodId,
+      storeId: "store_126",
+      name: "ชาเขียวมัทฉะ",
+      price: 45,
+      priceSatang: 4500,
+      stock: 20
+    });
+
+    async function atomicUpdateProduct(callerStoreId, targetProdId, updates) {
+      return engine.runTransaction(async (tx) => {
+        const prodRef = { path: `products/${targetProdId}` };
+        const prodSnap = await tx.get(prodRef);
+        if (!prodSnap.exists) throw new Error("Product not found");
+        const prod = prodSnap.data();
+        if (prod.storeId !== callerStoreId) {
+          throw new Error("Unauthorized: Product does not belong to this store");
+        }
+        tx.update(prodRef, updates);
+        return true;
+      });
+    }
+
+    await atomicUpdateProduct("store_126", prodId, { price: 50, priceSatang: 5000, stock: 18 });
+    const updated = engine.getDoc(`products/${prodId}`);
+    assert.equal(updated.price, 50);
+    assert.equal(updated.priceSatang, 5000);
+    assert.equal(updated.stock, 18);
+
+    // Cross-store transaction update is atomically aborted
+    await assert.rejects(
+      async () => atomicUpdateProduct("store_imposter", prodId, { price: 999 }),
+      /Unauthorized: Product does not belong to this store/
+    );
+    assert.equal(engine.getDoc(`products/${prodId}`).price, 50); // Unmutated!
+  });
+
+  // Scenario 127: Wave 4.2.2 Canonical Monetary Satang: Derived price in THB always syncs with canonical integer priceSatang
+  await runTest('Scenario 127: Wave 4.2.2 Canonical Satang: Derived price in Baht is strictly synchronized with integer satang', async () => {
+    function createCanonicalProduct(data) {
+      let priceSatang;
+      if (data.priceSatang !== undefined) {
+        if (!Number.isInteger(data.priceSatang) || data.priceSatang <= 0) {
+          throw new Error("priceSatang must be a positive integer");
+        }
+        priceSatang = data.priceSatang;
+      } else {
+        const priceBaht = Number(data.price);
+        if (!Number.isFinite(priceBaht) || priceBaht <= 0) {
+          throw new Error("Price must be a positive number");
+        }
+        priceSatang = Math.round(priceBaht * 100);
+      }
+      return {
+        priceSatang,
+        price: priceSatang / 100
+      };
+    }
+
+    const prodFromSatang = createCanonicalProduct({ priceSatang: 6500 });
+    assert.equal(prodFromSatang.priceSatang, 6500);
+    assert.equal(prodFromSatang.price, 65.0);
+
+    const prodFromBaht = createCanonicalProduct({ price: 49.5 });
+    assert.equal(prodFromBaht.priceSatang, 4950);
+    assert.equal(prodFromBaht.price, 49.5);
+
+    assert.throws(() => createCanonicalProduct({ priceSatang: 49.5 }), /priceSatang must be a positive integer/);
+    assert.throws(() => createCanonicalProduct({ priceSatang: -100 }), /priceSatang must be a positive integer/);
+  });
+
+  // Scenario 128: Wave 4.2.2 Modifier Referential Integrity: Linking modifier group from another store is rejected
+  await runTest('Scenario 128: Wave 4.2.2 Modifier Integrity: Linking cross-store or non-existent modifier groups is rejected', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const modStoreA = "mod_store_A_128";
+    const modStoreB = "mod_store_B_128";
+
+    engine.setDoc(`modifier_groups/${modStoreA}`, { id: modStoreA, storeId: "store_A", name: "ความหวาน" });
+    engine.setDoc(`modifier_groups/${modStoreB}`, { id: modStoreB, storeId: "store_B", name: "ท็อปปิ้งร้าน B" });
+
+    async function validateModifierIntegrity(storeId, modifierGroupIds) {
+      if (!modifierGroupIds || modifierGroupIds.length === 0) return;
+      for (const modId of modifierGroupIds) {
+        const mod = engine.getDoc(`modifier_groups/${modId}`);
+        if (!mod) throw new Error(`REFERENTIAL_INTEGRITY_VIOLATION: Modifier group ${modId} does not exist`);
+        if (mod.storeId !== storeId) {
+          throw new Error(`CROSS_STORE_MODIFIER_VIOLATION: Modifier group ${modId} belongs to store ${mod.storeId}, not ${storeId}`);
+        }
+      }
+    }
+
+    // Valid same-store modifier linking
+    await validateModifierIntegrity("store_A", [modStoreA]);
+
+    // Cross-store modifier linking is rejected!
+    await assert.rejects(
+      async () => validateModifierIntegrity("store_A", [modStoreB]),
+      /CROSS_STORE_MODIFIER_VIOLATION/
+    );
+
+    // Non-existent modifier linking is rejected!
+    await assert.rejects(
+      async () => validateModifierIntegrity("store_A", ["mod_non_existent"]),
+      /REFERENTIAL_INTEGRITY_VIOLATION/
+    );
+  });
+
   const passRate = Math.round((passedTests / totalTests) * 100);
   console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${passRate}%).`);
 

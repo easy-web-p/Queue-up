@@ -1,6 +1,6 @@
 ﻿/**
- * 📦 QueueUp Catalog Service (Wave 4.2.1 Hardened)
- * Store-Isolated Catalog & Profile Management adhering strictly to Firestore Rules.
+ * 📦 QueueUp Catalog Service (Wave 4.2.2 Hardened)
+ * Atomic Mutations, Monetary Single-Source of Truth & Referential Integrity.
  */
 
 import {
@@ -10,7 +10,7 @@ import {
   getDocs,
   setDoc,
   updateDoc,
-  deleteDoc,
+  runTransaction,
   query,
   where,
   serverTimestamp,
@@ -136,7 +136,7 @@ export async function createStoreCategory(
 }
 
 /**
- * 🍲 3. PRODUCTS & MENU ITEMS (Store Isolated & Exact Validation)
+ * 🍲 3. PRODUCTS & MENU ITEMS (Atomic Mutations & Canonical Satang Integrity)
  */
 
 export async function fetchStoreProducts(db: Firestore, storeId: string): Promise<MenuItem[]> {
@@ -151,6 +151,31 @@ export async function fetchStoreProducts(db: Firestore, storeId: string): Promis
   return items;
 }
 
+/**
+ * Helper to validate modifierGroupIds refer strictly to modifier groups owned by the same store.
+ */
+export async function validateModifierReferentialIntegrity(
+  db: Firestore,
+  storeId: string,
+  modifierGroupIds?: string[]
+): Promise<void> {
+  if (!modifierGroupIds || modifierGroupIds.length === 0) return;
+
+  for (const modId of modifierGroupIds) {
+    const modRef = doc(db, 'modifier_groups', modId);
+    const modSnap = await getDoc(modRef);
+    if (!modSnap.exists()) {
+      throw new Error(`REFERENTIAL_INTEGRITY_VIOLATION: Modifier group ${modId} does not exist`);
+    }
+    const modData = modSnap.data();
+    if (modData.storeId !== storeId) {
+      throw new Error(
+        `CROSS_STORE_MODIFIER_VIOLATION: Modifier group ${modId} belongs to store ${modData.storeId}, not ${storeId}`
+      );
+    }
+  }
+}
+
 export async function createStoreProduct(
   db: Firestore,
   storeId: string,
@@ -159,26 +184,41 @@ export async function createStoreProduct(
   if (!storeId) throw new Error('storeId is required');
   if (!productData.name || !productData.name.trim()) throw new Error('Product name is required');
 
-  const priceBaht = Number(productData.price);
-  if (!Number.isFinite(priceBaht) || priceBaht <= 0) {
-    throw new Error('Price must be a positive number');
+  // 🔒 Finding #2: priceSatang is Canonical Single Source of Truth
+  let priceSatang: number;
+  if (productData.priceSatang !== undefined) {
+    if (!Number.isInteger(productData.priceSatang) || productData.priceSatang <= 0) {
+      throw new Error('priceSatang must be a positive integer');
+    }
+    priceSatang = productData.priceSatang;
+  } else {
+    const priceBaht = Number(productData.price);
+    if (!Number.isFinite(priceBaht) || priceBaht <= 0) {
+      throw new Error('Price must be a positive number');
+    }
+    priceSatang = Math.round(priceBaht * 100);
+  }
+  const derivedPriceBaht = priceSatang / 100;
+
+  // 🔒 Finding #3: Validate modifierGroupIds referential integrity
+  if (productData.modifierGroupIds && productData.modifierGroupIds.length > 0) {
+    await validateModifierReferentialIntegrity(db, storeId, productData.modifierGroupIds);
   }
 
-  // 🔒 Finding #3 Fix: Strictly REJECT negative stock input (no loose normalization)
+  // Strictly reject negative stock input
   if (productData.stock !== undefined && (typeof productData.stock !== 'number' || productData.stock < 0)) {
     throw new Error('Stock cannot be negative');
   }
 
-  const priceSatang = productData.priceSatang ?? Math.round(priceBaht * 100);
   const stock = typeof productData.stock === 'number' ? productData.stock : 20;
-
   const prodRef = doc(collection(db, 'products'));
+
   const newProduct: MenuItem = {
     ...productData,
     id: prodRef.id,
     storeId,
     name: productData.name.trim(),
-    price: priceBaht,
+    price: derivedPriceBaht,
     priceSatang,
     stock,
     isAvailable: productData.isAvailable ?? true,
@@ -194,6 +234,9 @@ export async function createStoreProduct(
   return newProduct;
 }
 
+/**
+ * 🔒 Finding #1 Fix: Atomic Product Update in a Firestore Transaction
+ */
 export async function updateStoreProduct(
   db: Firestore,
   storeId: string,
@@ -202,63 +245,89 @@ export async function updateStoreProduct(
 ) {
   if (!storeId || !productId) throw new Error('storeId and productId are required');
 
-  const prodRef = doc(db, 'products', productId);
-
-  // 🔒 Finding #1 Fix: Verify product exists and matches caller storeId before update
-  const prodSnap = await getDoc(prodRef);
-  if (!prodSnap.exists()) throw new Error('Product not found');
-  const existingProduct = prodSnap.data();
-  if (existingProduct.storeId !== storeId) {
-    throw new Error('Unauthorized: Product does not belong to this store');
+  // Validate modifier referential integrity if modifierGroupIds updated
+  if (updates.modifierGroupIds && updates.modifierGroupIds.length > 0) {
+    await validateModifierReferentialIntegrity(db, storeId, updates.modifierGroupIds);
   }
 
-  const cleanUpdates: Record<string, unknown> = {
-    updatedAt: serverTimestamp()
-  };
+  return await runTransaction(db, async (tx) => {
+    const prodRef = doc(db, 'products', productId);
+    const prodSnap = await tx.get(prodRef);
 
-  if (updates.name !== undefined) cleanUpdates.name = updates.name.trim();
-  if (updates.category !== undefined) cleanUpdates.category = updates.category;
-  if (updates.categoryId !== undefined) cleanUpdates.categoryId = updates.categoryId;
-  if (updates.description !== undefined) cleanUpdates.description = updates.description;
-  if (updates.imageUrl !== undefined || updates.image !== undefined) {
-    cleanUpdates.imageUrl = updates.imageUrl || updates.image;
-  }
-  if (updates.isAvailable !== undefined) cleanUpdates.isAvailable = Boolean(updates.isAvailable);
-  if (updates.stock !== undefined) {
-    if (typeof updates.stock !== 'number' || updates.stock < 0) {
-      throw new Error('Stock cannot be negative');
+    if (!prodSnap.exists()) {
+      throw new Error('Product not found');
     }
-    cleanUpdates.stock = updates.stock;
-  }
-  if (updates.price !== undefined) {
-    const p = Number(updates.price);
-    if (p <= 0) throw new Error('Price must be positive');
-    cleanUpdates.price = p;
-    cleanUpdates.priceSatang = Math.round(p * 100);
-  }
-  if (updates.modifierGroupIds !== undefined) {
-    cleanUpdates.modifierGroupIds = updates.modifierGroupIds;
-  }
 
-  await updateDoc(prodRef, cleanUpdates);
-  return { success: true, productId };
+    const existingProduct = prodSnap.data();
+    if (existingProduct.storeId !== storeId) {
+      throw new Error('Unauthorized: Product does not belong to this store');
+    }
+
+    const cleanUpdates: Record<string, unknown> = {
+      updatedAt: serverTimestamp()
+    };
+
+    if (updates.name !== undefined) cleanUpdates.name = updates.name.trim();
+    if (updates.category !== undefined) cleanUpdates.category = updates.category;
+    if (updates.categoryId !== undefined) cleanUpdates.categoryId = updates.categoryId;
+    if (updates.description !== undefined) cleanUpdates.description = updates.description;
+    if (updates.imageUrl !== undefined || updates.image !== undefined) {
+      cleanUpdates.imageUrl = updates.imageUrl || updates.image;
+    }
+    if (updates.isAvailable !== undefined) cleanUpdates.isAvailable = Boolean(updates.isAvailable);
+
+    if (updates.stock !== undefined) {
+      if (typeof updates.stock !== 'number' || updates.stock < 0) {
+        throw new Error('Stock cannot be negative');
+      }
+      cleanUpdates.stock = updates.stock;
+    }
+
+    // 🔒 Canonical Satang update
+    if (updates.priceSatang !== undefined) {
+      if (!Number.isInteger(updates.priceSatang) || updates.priceSatang <= 0) {
+        throw new Error('priceSatang must be a positive integer');
+      }
+      cleanUpdates.priceSatang = updates.priceSatang;
+      cleanUpdates.price = updates.priceSatang / 100;
+    } else if (updates.price !== undefined) {
+      const p = Number(updates.price);
+      if (p <= 0) throw new Error('Price must be positive');
+      cleanUpdates.priceSatang = Math.round(p * 100);
+      cleanUpdates.price = p;
+    }
+
+    if (updates.modifierGroupIds !== undefined) {
+      cleanUpdates.modifierGroupIds = updates.modifierGroupIds;
+    }
+
+    tx.update(prodRef, cleanUpdates);
+    return { success: true, productId };
+  });
 }
 
+/**
+ * 🔒 Finding #1 Fix: Atomic Product Deletion in a Firestore Transaction
+ */
 export async function deleteStoreProduct(db: Firestore, storeId: string, productId: string) {
   if (!storeId || !productId) throw new Error('storeId and productId are required');
 
-  const prodRef = doc(db, 'products', productId);
+  return await runTransaction(db, async (tx) => {
+    const prodRef = doc(db, 'products', productId);
+    const prodSnap = await tx.get(prodRef);
 
-  // 🔒 Finding #2 Fix: Verify product exists and matches caller storeId before deletion
-  const prodSnap = await getDoc(prodRef);
-  if (!prodSnap.exists()) throw new Error('Product not found');
-  const existingProduct = prodSnap.data();
-  if (existingProduct.storeId !== storeId) {
-    throw new Error('Unauthorized: Product does not belong to this store');
-  }
+    if (!prodSnap.exists()) {
+      throw new Error('Product not found');
+    }
 
-  await deleteDoc(prodRef);
-  return { success: true, productId };
+    const existingProduct = prodSnap.data();
+    if (existingProduct.storeId !== storeId) {
+      throw new Error('Unauthorized: Product does not belong to this store');
+    }
+
+    tx.delete(prodRef);
+    return { success: true, productId };
+  });
 }
 
 /**
@@ -293,12 +362,18 @@ export async function createStoreModifierGroup(
     name: modData.name.trim(),
     isRequired: Boolean(modData.isRequired),
     selectionType: modData.selectionType || 'single',
-    options: (modData.options || []).map((opt) => ({
-      ...opt,
-      priceModifier: Number(opt.priceModifier) || 0,
-      priceModifierSatang: opt.priceModifierSatang ?? Math.round((Number(opt.priceModifier) || 0) * 100),
-      isOutOfStock: Boolean(opt.isOutOfStock)
-    }))
+    options: (modData.options || []).map((opt) => {
+      const priceSatang = opt.priceModifierSatang !== undefined
+        ? opt.priceModifierSatang
+        : Math.round((Number(opt.priceModifier) || 0) * 100);
+
+      return {
+        ...opt,
+        priceModifier: priceSatang / 100,
+        priceModifierSatang: priceSatang,
+        isOutOfStock: Boolean(opt.isOutOfStock)
+      };
+    })
   };
 
   await setDoc(modRef, {
