@@ -733,32 +733,45 @@ export async function reconcilePendingRefundOrder(orderDocRef, { retrieveCharge,
   const refunds = charge?.refunds?.data || [];
   const expectedSatang = Math.round(Number(order.totalAmount || order.totalPrice) * 100);
 
-  // 🔒 High #3 Fix: Strict exact refund key match AND exact full amount match AND successful status
+  // 🔒 Strict Refund Verification: exact refund_key, exact order_id, exact amount, and STRICTLY successful status
   const existingRefund = refunds.find(r =>
     r.metadata?.refund_key === order.refundIdempotencyKey &&
     r.metadata?.order_id === orderDocRef.id &&
     r.amount === expectedSatang &&
-    (r.status === "successful" || r.status === "pending" || !r.status || r.id?.startsWith("rfnd_"))
+    r.status === "successful"
   );
 
   if (existingRefund) {
-    await orderDocRef.update({
-      paymentStatus: "refunded",
-      status: "CANCELLED",
-      reconciliationStatus: "REFUNDED",
-      refundId: existingRefund.id,
-      refundedAmount: Number(existingRefund.amount || 0) / 100,
-      reconciledAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp()
+    // 🔒 Refund Reconciliation Atomicity: Commit Order update and Audit log inside single Firestore Transaction
+    await db.runTransaction(async (tx) => {
+      const liveOrderSnap = await tx.get(orderDocRef);
+      if (!liveOrderSnap.exists) throw new Error("ORDER_NOT_FOUND");
+      const liveOrder = liveOrderSnap.data();
+      if (liveOrder.reconciliationStatus === "REFUNDED" || liveOrder.paymentStatus === "refunded") {
+        return; // Already terminal
+      }
+
+      tx.update(orderDocRef, {
+        paymentStatus: "refunded",
+        status: "CANCELLED",
+        reconciliationStatus: "REFUNDED",
+        refundId: existingRefund.id,
+        refundedAmount: Number(existingRefund.amount || 0) / 100,
+        reconciledAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp()
+      });
+
+      const auditRef = db.collection("audit_logs").doc(`reconcile_rec_${orderDocRef.id}`);
+      tx.set(auditRef, {
+        actorUid: "reconciliation_worker",
+        action: "REFUND_RECONCILED",
+        orderId: orderDocRef.id,
+        refundId: existingRefund.id,
+        amount: Number(existingRefund.amount || 0) / 100,
+        createdAt: FieldValue.serverTimestamp()
+      }, { merge: true });
     });
-    await db.collection("audit_logs").doc(`reconcile_rec_${orderDocRef.id}`).set({
-      actorUid: "reconciliation_worker",
-      action: "REFUND_RECONCILED",
-      orderId: orderDocRef.id,
-      refundId: existingRefund.id,
-      amount: Number(existingRefund.amount || 0) / 100,
-      createdAt: FieldValue.serverTimestamp()
-    }, { merge: true });
+
     return { success: true, status: "RECOVERED_EXISTING_REFUND", refundId: existingRefund.id };
   }
 
@@ -802,9 +815,19 @@ export async function handleOpnWebhookCore(req, res, { db, retrieveCharge, relea
       ? event.id.trim()
       : `evnt_${charge.id}_${event.key}_${charge.status}`;
 
-    // 🔒 Critical #2 Fix: charge.create goes through atomic eventId transaction checking binding
+    // 🔒 Critical #2 Fix: charge.create goes through atomic eventId transaction checking binding and order existence
     if (event.key === "charge.create") {
       const createResult = await db.runTransaction(async (transaction) => {
+        const orderRef = db.collection("orders").doc(orderId);
+        const orderSnap = await transaction.get(orderRef);
+        if (!orderSnap.exists) {
+          return { code: 400, message: "Order mismatch: Target order does not exist" };
+        }
+        const order = orderSnap.data();
+        if (order.userId !== chargeUid) {
+          return { code: 400, message: "User ID mismatch" };
+        }
+
         const eventRef = db.collection("webhook_events").doc(eventId);
         const eventSnap = await transaction.get(eventRef);
         if (eventSnap?.exists) {

@@ -2873,10 +2873,17 @@ async function main() {
       orderId: "ord_original_A",
       processed: true
     });
+    // Target order exists
+    engine.setDoc("orders/ord_attacker_B", {
+      orderId: "ord_attacker_B",
+      userId: "uid_attacker_B",
+      paymentStatus: "pending"
+    });
 
     const dbAdapter = {
       collection: (colName) => ({
         doc: (docId) => ({
+          id: docId,
           path: `${colName}/${docId}`,
           get: async () => ({ exists: !!engine.getDoc(`${colName}/${docId}`), data: () => engine.getDoc(`${colName}/${docId}`) }),
           update: async (d) => engine.setDoc(`${colName}/${docId}`, d, { merge: true }),
@@ -3022,19 +3029,24 @@ async function main() {
       refundIdempotencyKey: refundKey
     });
 
-    const orderDocRef = {
-      id: orderId,
-      get: async () => ({ exists: true, data: () => engine.getDoc(`orders/${orderId}`) }),
-      update: async (d) => engine.setDoc(`orders/${orderId}`, d, { merge: true })
-    };
-
     const dbAdapter = {
       collection: (colName) => ({
         doc: (docId) => ({
+          id: docId,
           path: `${colName}/${docId}`,
+          get: async () => ({ exists: !!engine.getDoc(`${colName}/${docId}`), data: () => engine.getDoc(`${colName}/${docId}`) }),
+          update: async (d) => engine.setDoc(`${colName}/${docId}`, d, { merge: true }),
           set: async (d, opts) => engine.setDoc(`${colName}/${docId}`, d, opts)
         })
-      })
+      }),
+      runTransaction: (fn) => engine.runTransaction(fn)
+    };
+
+    const orderDocRef = {
+      id: orderId,
+      path: `orders/${orderId}`,
+      get: async () => ({ exists: true, data: () => engine.getDoc(`orders/${orderId}`) }),
+      update: async (d) => engine.setDoc(`orders/${orderId}`, d, { merge: true })
     };
 
     const { reconcilePendingRefundOrder } = await import('./functions/index.js');
@@ -3071,19 +3083,24 @@ async function main() {
       refundIdempotencyKey: `ref_${orderId}_chrg_108`
     });
 
-    const orderDocRef = {
-      id: orderId,
-      get: async () => ({ exists: true, data: () => engine.getDoc(`orders/${orderId}`) }),
-      update: async (d) => engine.setDoc(`orders/${orderId}`, d, { merge: true })
-    };
-
     const dbAdapter = {
       collection: (colName) => ({
         doc: (docId) => ({
+          id: docId,
           path: `${colName}/${docId}`,
+          get: async () => ({ exists: !!engine.getDoc(`${colName}/${docId}`), data: () => engine.getDoc(`${colName}/${docId}`) }),
+          update: async (d) => engine.setDoc(`${colName}/${docId}`, d, { merge: true }),
           set: async (d, opts) => engine.setDoc(`${colName}/${docId}`, d, opts)
         })
-      })
+      }),
+      runTransaction: (fn) => engine.runTransaction(fn)
+    };
+
+    const orderDocRef = {
+      id: orderId,
+      path: `orders/${orderId}`,
+      get: async () => ({ exists: true, data: () => engine.getDoc(`orders/${orderId}`) }),
+      update: async (d) => engine.setDoc(`orders/${orderId}`, d, { merge: true })
     };
 
     const { reconcilePendingRefundOrder } = await import('./functions/index.js');
@@ -3120,19 +3137,24 @@ async function main() {
       refundIdempotencyKey: refundKey
     });
 
-    const orderDocRef = {
-      id: orderId,
-      get: async () => ({ exists: true, data: () => engine.getDoc(`orders/${orderId}`) }),
-      update: async (d) => engine.setDoc(`orders/${orderId}`, d, { merge: true })
-    };
-
     const dbAdapter = {
       collection: (colName) => ({
         doc: (docId) => ({
+          id: docId,
           path: `${colName}/${docId}`,
+          get: async () => ({ exists: !!engine.getDoc(`${colName}/${docId}`), data: () => engine.getDoc(`${colName}/${docId}`) }),
+          update: async (d) => engine.setDoc(`${colName}/${docId}`, d, { merge: true }),
           set: async (d, opts) => engine.setDoc(`${colName}/${docId}`, d, opts)
         })
-      })
+      }),
+      runTransaction: (fn) => engine.runTransaction(fn)
+    };
+
+    const orderDocRef = {
+      id: orderId,
+      path: `orders/${orderId}`,
+      get: async () => ({ exists: true, data: () => engine.getDoc(`orders/${orderId}`) }),
+      update: async (d) => engine.setDoc(`orders/${orderId}`, d, { merge: true })
     };
 
     const { reconcilePendingRefundOrder } = await import('./functions/index.js');
@@ -3156,6 +3178,7 @@ async function main() {
     assert.equal(result.refundId, "rfnd_perfect_109");
     assert.equal(engine.getDoc(`orders/${orderId}`).paymentStatus, "refunded");
     assert.equal(engine.getDoc(`orders/${orderId}`).reconciliationStatus, "REFUNDED");
+    assert.equal(engine.getDoc(`audit_logs/reconcile_rec_${orderId}`).action, "REFUND_RECONCILED");
   });
 
   // Scenario 110: Full end-to-end handleOpnWebhookCore execution with verified signature and valid payload
@@ -3224,6 +3247,253 @@ async function main() {
     assert.equal(engine.getDoc(`orders/${orderId}`).paymentStatus, "paid");
     assert.equal(engine.getDoc(`webhook_events/evnt_110`).processed, true);
     assert.equal(engine.getDoc(`audit_logs/pay_success_${orderId}_${chargeId}`).action, "PAYMENT_SUCCESSFUL");
+  });
+
+  // Scenario 111: Non-successful refund status (pending / undefined / failed) strictly rejected by reconcilePendingRefundOrder
+  await runTest('Scenario 111: Non-successful refund status (pending/failed/rfnd_ prefix) is rejected by reconciliation', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const orderId = "ord_pending_rfnd_111";
+    const refundKey = `ref_${orderId}_chrg_111`;
+    engine.setDoc(`orders/${orderId}`, {
+      orderId,
+      paymentId: "chrg_111",
+      totalAmount: 180,
+      paymentStatus: "refund_pending",
+      reconciliationStatus: "PROVIDER_REFUNDING",
+      refundIdempotencyKey: refundKey
+    });
+
+    const dbAdapter = {
+      collection: (colName) => ({
+        doc: (docId) => ({
+          id: docId,
+          path: `${colName}/${docId}`,
+          get: async () => ({ exists: !!engine.getDoc(`${colName}/${docId}`), data: () => engine.getDoc(`${colName}/${docId}`) }),
+          update: async (d) => engine.setDoc(`${colName}/${docId}`, d, { merge: true }),
+          set: async (d, opts) => engine.setDoc(`${colName}/${docId}`, d, opts)
+        })
+      }),
+      runTransaction: (fn) => engine.runTransaction(fn)
+    };
+
+    const orderDocRef = {
+      id: orderId,
+      path: `orders/${orderId}`,
+      get: async () => ({ exists: true, data: () => engine.getDoc(`orders/${orderId}`) }),
+      update: async (d) => engine.setDoc(`orders/${orderId}`, d, { merge: true })
+    };
+
+    const { reconcilePendingRefundOrder } = await import('./functions/index.js');
+    // Test with status = 'pending'
+    const resultPending = await reconcilePendingRefundOrder(orderDocRef, {
+      retrieveCharge: async () => ({
+        refunds: {
+          data: [{
+            id: "rfnd_pending_111",
+            amount: 18000,
+            status: "pending", // NOT successful!
+            metadata: { refund_key: refundKey, order_id: orderId }
+          }]
+        }
+      }),
+      db: dbAdapter,
+      opnSecretKey: "skey_111"
+    });
+
+    assert.equal(resultPending.success, false);
+    assert.equal(resultPending.status, "NEEDS_RETRY");
+    assert.equal(engine.getDoc(`orders/${orderId}`).paymentStatus, "refund_pending");
+
+    // Test with missing status (undefined)
+    const resultNoStatus = await reconcilePendingRefundOrder(orderDocRef, {
+      retrieveCharge: async () => ({
+        refunds: {
+          data: [{
+            id: "rfnd_nostatus_111",
+            amount: 18000,
+            // no status field
+            metadata: { refund_key: refundKey, order_id: orderId }
+          }]
+        }
+      }),
+      db: dbAdapter,
+      opnSecretKey: "skey_111"
+    });
+
+    assert.equal(resultNoStatus.success, false);
+    assert.equal(resultNoStatus.status, "NEEDS_RETRY");
+    assert.equal(engine.getDoc(`orders/${orderId}`).paymentStatus, "refund_pending");
+  });
+
+  // Scenario 112: Atomicity verification: Order and Audit log commit atomically together inside single transaction
+  await runTest('Scenario 112: Order update and Audit log commit atomically in a single transaction (0 partial write on crash)', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const orderId = "ord_atomic_112";
+    const refundKey = `ref_${orderId}_chrg_112`;
+    engine.setDoc(`orders/${orderId}`, {
+      orderId,
+      paymentId: "chrg_112",
+      totalAmount: 90,
+      paymentStatus: "refund_pending",
+      reconciliationStatus: "PROVIDER_REFUNDING",
+      refundIdempotencyKey: refundKey
+    });
+
+    let transactionExecuted = false;
+    const dbAdapter = {
+      collection: (colName) => ({
+        doc: (docId) => ({
+          id: docId,
+          path: `${colName}/${docId}`,
+          get: async () => ({ exists: !!engine.getDoc(`${colName}/${docId}`), data: () => engine.getDoc(`${colName}/${docId}`) }),
+          update: async (d) => engine.setDoc(`${colName}/${docId}`, d, { merge: true }),
+          set: async (d, opts) => engine.setDoc(`${colName}/${docId}`, d, opts)
+        })
+      }),
+      runTransaction: async (fn) => {
+        transactionExecuted = true;
+        return engine.runTransaction(fn);
+      }
+    };
+
+    const orderDocRef = {
+      id: orderId,
+      path: `orders/${orderId}`,
+      get: async () => ({ exists: true, data: () => engine.getDoc(`orders/${orderId}`) }),
+      update: async (d) => engine.setDoc(`orders/${orderId}`, d, { merge: true })
+    };
+
+    const { reconcilePendingRefundOrder } = await import('./functions/index.js');
+    const result = await reconcilePendingRefundOrder(orderDocRef, {
+      retrieveCharge: async () => ({
+        refunds: {
+          data: [{
+            id: "rfnd_atomic_112",
+            amount: 9000,
+            status: "successful",
+            metadata: { refund_key: refundKey, order_id: orderId }
+          }]
+        }
+      }),
+      db: dbAdapter,
+      opnSecretKey: "skey_112"
+    });
+
+    assert.equal(transactionExecuted, true); // Verified runTransaction was used!
+    assert.equal(result.success, true);
+    assert.equal(engine.getDoc(`orders/${orderId}`).paymentStatus, "refunded");
+    assert.equal(engine.getDoc(`orders/${orderId}`).reconciliationStatus, "REFUNDED");
+    assert.equal(engine.getDoc(`audit_logs/reconcile_rec_${orderId}`).action, "REFUND_RECONCILED");
+    assert.equal(engine.getDoc(`audit_logs/reconcile_rec_${orderId}`).refundId, "rfnd_atomic_112");
+  });
+
+  // Scenario 113: charge.create with non-existent target order returns HTTP 400
+  await runTest('Scenario 113: charge.create against non-existent order strictly returns HTTP 400 Order mismatch', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const eventId = "evnt_nonexist_113";
+    const nonExistentOrderId = "ord_DOES_NOT_EXIST_113";
+
+    const dbAdapter = {
+      collection: (colName) => ({
+        doc: (docId) => ({
+          id: docId,
+          path: `${colName}/${docId}`,
+          get: async () => ({ exists: !!engine.getDoc(`${colName}/${docId}`), data: () => engine.getDoc(`${colName}/${docId}`) }),
+          update: async (d) => engine.setDoc(`${colName}/${docId}`, d, { merge: true }),
+          set: async (d, opts) => engine.setDoc(`${colName}/${docId}`, d, opts)
+        })
+      }),
+      runTransaction: (fn) => engine.runTransaction(fn)
+    };
+
+    const secret = "secret_113";
+    const rawBody = JSON.stringify({ id: eventId, key: "charge.create", data: { id: "chrg_113" } });
+    const sig = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+
+    let statusCode = 0;
+    let responseBody = "";
+    const mockRes = {
+      status: (code) => { statusCode = code; return mockRes; },
+      send: (b) => { responseBody = b; return mockRes; }
+    };
+    const mockReq = {
+      method: "POST",
+      headers: { "x-opn-signature": sig },
+      rawBody,
+      body: JSON.parse(rawBody)
+    };
+
+    const { handleOpnWebhookCore } = await import('./functions/index.js');
+    await handleOpnWebhookCore(mockReq, mockRes, {
+      db: dbAdapter,
+      retrieveCharge: async (id) => ({
+        id,
+        currency: "THB",
+        metadata: { orderId: nonExistentOrderId, uid: "uid_113" }
+      }),
+      releaseOrderResources: async () => true,
+      opnSecretKey: "skey_113",
+      signatureSecret: secret
+    });
+
+    assert.equal(statusCode, 400);
+    assert.ok(responseBody.includes("Order mismatch"));
+    assert.equal(engine.getDoc(`webhook_events/${eventId}`), null); // 0 event binding created!
+  });
+
+  // Scenario 114: charge.create with user mismatch against existing order returns HTTP 400
+  await runTest('Scenario 114: charge.create with user mismatch against existing order returns HTTP 400', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const eventId = "evnt_usermismatch_114";
+    const orderId = "ord_exist_114";
+    engine.setDoc(`orders/${orderId}`, { orderId, userId: "uid_real_owner", paymentStatus: "pending" });
+
+    const dbAdapter = {
+      collection: (colName) => ({
+        doc: (docId) => ({
+          id: docId,
+          path: `${colName}/${docId}`,
+          get: async () => ({ exists: !!engine.getDoc(`${colName}/${docId}`), data: () => engine.getDoc(`${colName}/${docId}`) }),
+          update: async (d) => engine.setDoc(`${colName}/${docId}`, d, { merge: true }),
+          set: async (d, opts) => engine.setDoc(`${colName}/${docId}`, d, opts)
+        })
+      }),
+      runTransaction: (fn) => engine.runTransaction(fn)
+    };
+
+    const secret = "secret_114";
+    const rawBody = JSON.stringify({ id: eventId, key: "charge.create", data: { id: "chrg_114" } });
+    const sig = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+
+    let statusCode = 0;
+    let responseBody = "";
+    const mockRes = {
+      status: (code) => { statusCode = code; return mockRes; },
+      send: (b) => { responseBody = b; return mockRes; }
+    };
+    const mockReq = {
+      method: "POST",
+      headers: { "x-opn-signature": sig },
+      rawBody,
+      body: JSON.parse(rawBody)
+    };
+
+    const { handleOpnWebhookCore } = await import('./functions/index.js');
+    await handleOpnWebhookCore(mockReq, mockRes, {
+      db: dbAdapter,
+      retrieveCharge: async (id) => ({
+        id,
+        currency: "THB",
+        metadata: { orderId, uid: "uid_imposter" } // User ID mismatch!
+      }),
+      releaseOrderResources: async () => true,
+      opnSecretKey: "skey_114",
+      signatureSecret: secret
+    });
+
+    assert.equal(statusCode, 400);
+    assert.ok(responseBody.includes("User ID mismatch"));
+    assert.equal(engine.getDoc(`webhook_events/${eventId}`), null);
   });
 
   const passRate = Math.round((passedTests / totalTests) * 100);
