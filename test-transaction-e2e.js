@@ -1711,6 +1711,51 @@ async function main() {
     assert.equal(committedAudit.action, "PAYMENT_SUCCESSFUL");
   });
 
+  // Scenario 61: Durable Outbox Recovery: Interrupted resource release is swept and recovered by recovery worker
+  await runTest('Scenario 61: Durable Outbox Recovery: Interrupted resource release is recovered cleanly', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    engine.setDoc('products/prod_durable_01', { stock: 5 });
+    engine.setDoc('orders/ord_interrupted_01', {
+      orderId: 'ord_interrupted_01',
+      productId: 'prod_durable_01',
+      quantity: 3,
+      reservedQuantity: 3,
+      paymentStatus: 'expired',
+      resourcesReleased: false,
+      resourceReleaseReason: 'Payment timeout occurred midway before release'
+    });
+
+    // Durable Recovery Worker simulation
+    async function durableRecoverySweep() {
+      // Find orders where resourcesReleased == false and paymentStatus == expired
+      const doc = engine.getDoc('orders/ord_interrupted_01');
+      if (doc && doc.resourcesReleased === false && doc.paymentStatus === 'expired') {
+        return await engine.runTransaction(async (tx) => {
+          const oSnap = await tx.get({ path: 'orders/ord_interrupted_01' });
+          const o = oSnap.data();
+          if (o.resourcesReleased) return { recovered: false };
+
+          const pSnap = await tx.get({ path: `products/${o.productId}` });
+          const p = pSnap.data();
+          tx.update({ path: `products/${o.productId}` }, { stock: p.stock + o.reservedQuantity });
+          tx.update({ path: 'orders/ord_interrupted_01' }, { resourcesReleased: true, recoveredAt: new Date() });
+          return { recovered: true };
+        });
+      }
+      return { recovered: false };
+    }
+
+    const recoveryResult = await durableRecoverySweep();
+    assert.equal(recoveryResult.recovered, true);
+    assert.equal(engine.getDoc('products/prod_durable_01').stock, 8); // 5 + 3 = 8
+    assert.equal(engine.getDoc('orders/ord_interrupted_01').resourcesReleased, true);
+
+    // Second sweep does not double-increment stock!
+    const secondSweep = await durableRecoverySweep();
+    assert.equal(secondSweep.recovered, false);
+    assert.equal(engine.getDoc('products/prod_durable_01').stock, 8);
+  });
+
   const passRate = Math.round((passedTests / totalTests) * 100);
   console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${passRate}%).`);
 

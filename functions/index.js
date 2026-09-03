@@ -393,7 +393,7 @@ export async function releaseOrderResources(orderDocRef, cancelReason = "Payment
   });
 }
 
-// ⏰ Automated Cloud Scheduler: expires stale orders every 5 minutes.
+// ⏰ Automated Cloud Scheduler: expires stale orders and durable recovery worker for unreleased resources every 5 minutes.
 export const scheduledExpirePendingOrders = onSchedule(
   { schedule: "every 5 minutes", region: "asia-southeast1" },
   async () => {
@@ -404,6 +404,16 @@ export const scheduledExpirePendingOrders = onSchedule(
       .limit(50)
       .get();
     for (const doc of staleSnap.docs) await releaseOrderResources(doc.ref, "Payment window expired (15 minutes)");
+
+    // Durable Recovery Worker: Sweep any orders where payment failed/expired but resource release was interrupted
+    const unreleasedSnap = await db.collection("orders")
+      .where("resourcesReleased", "==", false)
+      .where("paymentStatus", "in", ["expired", "failed", "creation_failed"])
+      .limit(50)
+      .get();
+    for (const doc of unreleasedSnap.docs) {
+      await releaseOrderResources(doc.ref, doc.data().resourceReleaseReason || "Durable recovery: Pending resource release retry");
+    }
   }
 );
 
@@ -421,9 +431,17 @@ export const expirePendingOrders = onCall(
       .where("createdAt", "<=", fifteenMinutesAgo)
       .limit(50)
       .get();
-    let expiredCount = 0;
-    for (const doc of staleSnap.docs) if (await releaseOrderResources(doc.ref, "Payment window expired (15 minutes)")) expiredCount++;
-    return { success: true, expiredCount };
+    for (const doc of staleSnap.docs) await releaseOrderResources(doc.ref, "Payment window expired (15 minutes)");
+
+    const unreleasedSnap = await db.collection("orders")
+      .where("resourcesReleased", "==", false)
+      .where("paymentStatus", "in", ["expired", "failed", "creation_failed"])
+      .limit(50)
+      .get();
+    for (const doc of unreleasedSnap.docs) {
+      await releaseOrderResources(doc.ref, doc.data().resourceReleaseReason || "Durable recovery: Pending resource release retry");
+    }
+    return { success: true, expiredCount: staleSnap.size, recoveredCount: unreleasedSnap.size };
   }
 );
 
