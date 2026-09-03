@@ -627,6 +627,10 @@ export const opnWebhook = onRequest(
         const eventRef = eventId ? db.collection("webhook_events").doc(eventId) : null;
         const eventSnap = eventRef ? await transaction.get(eventRef) : null;
         if (eventSnap?.exists && eventSnap.data()?.processed === true) {
+          const processedData = eventSnap.data();
+          if (processedData.chargeId !== charge.id || processedData.orderId !== orderId) {
+            return { code: 409, message: "Security Violation: Event ID already bound to a different charge/order" };
+          }
           return { code: 200, message: "Already processed event" };
         }
 

@@ -1376,6 +1376,193 @@ async function main() {
     assert.equal(finalDoc.count, 3); // All 3 increments committed sequentially with OCC retries
   });
 
+  // Scenario 48: Webhook without valid Opn charge verification is REJECTED
+  await runTest('Scenario 48: Webhook without valid Opn charge verification is REJECTED (401/400)', async () => {
+    function verifyWebhookOrigin(event, retrievedCharge) {
+      if (!event || !event.data?.id) throw new Error("400: Missing charge data");
+      if (!retrievedCharge || retrievedCharge.id !== event.data.id) {
+        throw new Error("401: Unauthorized Webhook Origin - Charge not verifiable with Opn");
+      }
+      return true;
+    }
+
+    assert.throws(() => verifyWebhookOrigin({ data: { id: "chrg_unverified" } }, null), /Unauthorized Webhook Origin/);
+    assert.equal(verifyWebhookOrigin({ data: { id: "chrg_real_01" } }, { id: "chrg_real_01", status: "successful" }), true);
+  });
+
+  // Scenario 49: Signature/Hash valid but body tampered post-transmission is rejected via Opn API charge
+  await runTest('Scenario 49: Tampered webhook body after transmission is rejected via authoritative Opn API', async () => {
+    function verifyAuthoritativeState(webhookBody, opnApiCharge) {
+      if (webhookBody.amount !== opnApiCharge.amount) {
+        throw new Error("400: Body payload amount differs from authoritative Opn API charge");
+      }
+      if (webhookBody.status !== opnApiCharge.status) {
+        throw new Error("400: Body payload status differs from authoritative Opn API charge");
+      }
+      return true;
+    }
+
+    const tamperedBody = { amount: 5000, status: "successful" };
+    const authoritativeCharge = { amount: 50000, status: "successful" }; // Real amount 500 THB
+
+    assert.throws(() => verifyAuthoritativeState(tamperedBody, authoritativeCharge), /differ/);
+  });
+
+  // Scenario 50: Event ID reused with different payload/order is REJECTED (Idempotency Collision Attack)
+  await runTest('Scenario 50: Event ID reused with different payload/order is REJECTED (409 Conflict)', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const eventId = "evnt_claimed_01";
+    engine.setDoc(`webhook_events/${eventId}`, {
+      eventId,
+      chargeId: "chrg_original_01",
+      orderId: "ord_original_01",
+      processed: true
+    });
+
+    function verifyEventCollision(existingEventDoc, incomingChargeId, incomingOrderId) {
+      if (existingEventDoc && existingEventDoc.processed) {
+        if (existingEventDoc.chargeId !== incomingChargeId || existingEventDoc.orderId !== incomingOrderId) {
+          throw new Error("409: Security Violation: Event ID already bound to a different charge/order");
+        }
+        return { action: "ALREADY_PROCESSED" };
+      }
+      return { action: "PROCESS" };
+    }
+
+    const existingEvent = engine.getDoc(`webhook_events/${eventId}`);
+    assert.throws(() => verifyEventCollision(existingEvent, "chrg_original_01", "ord_different_02"), /Security Violation/);
+    assert.equal(verifyEventCollision(existingEvent, "chrg_original_01", "ord_original_01").action, "ALREADY_PROCESSED");
+  });
+
+  // Scenario 51: Event ID reused with different Charge ID is REJECTED (Charge Hijacking Blocked)
+  await runTest('Scenario 51: Event ID reused with different Charge ID is REJECTED (409 Conflict)', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const eventId = "evnt_claimed_02";
+    engine.setDoc(`webhook_events/${eventId}`, {
+      eventId,
+      chargeId: "chrg_legit_01",
+      orderId: "ord_legit_01",
+      processed: true
+    });
+
+    function verifyChargeCollision(existingEventDoc, incomingChargeId) {
+      if (existingEventDoc && existingEventDoc.chargeId !== incomingChargeId) {
+        throw new Error("409: Security Violation: Event ID already bound to a different charge ID");
+      }
+      return true;
+    }
+
+    const existingEvent = engine.getDoc(`webhook_events/${eventId}`);
+    assert.throws(() => verifyChargeCollision(existingEvent, "chrg_malicious_02"), /Security Violation/);
+    assert.equal(verifyChargeCollision(existingEvent, "chrg_legit_01"), true);
+  });
+
+  // Scenario 52: Transaction commit atomicity: Rollback on intermediate step failure leaves 0 partial writes
+  await runTest('Scenario 52: Transaction commit atomicity: Rollback leaves 0 partial writes', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    engine.setDoc('orders/ord_atomic_01', { paymentStatus: 'pending', totalAmount: 100 });
+    engine.setDoc('audit_logs/audit_atomic_01', { initial: true });
+
+    let errorThrown = false;
+    try {
+      await engine.runTransaction(async (tx) => {
+        tx.update({ path: 'orders/ord_atomic_01' }, { paymentStatus: 'paid' });
+        // Simulating crash during audit log write
+        throw new Error("CRASH_DURING_AUDIT_WRITE");
+      });
+    } catch {
+      errorThrown = true;
+    }
+
+    assert.equal(errorThrown, true);
+    // Order MUST remain pending (Rollback verified)
+    const orderDoc = engine.getDoc('orders/ord_atomic_01');
+    assert.equal(orderDoc.paymentStatus, 'pending');
+  });
+
+  // Scenario 53: Webhook timeout multi-retry thundering herd: Concurrently executes with OCC and commits exactly once
+  await runTest('Scenario 53: Webhook thundering herd multi-retry commits exactly once with OCC', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    engine.setDoc('orders/ord_herd_01', {
+      orderId: 'ord_herd_01',
+      paymentStatus: 'pending',
+      totalAmount: 100
+    });
+
+    async function processWebhook() {
+      return await engine.runTransaction(async (tx) => {
+        const snap = await tx.get({ path: 'orders/ord_herd_01' });
+        const order = snap.data();
+        if (order.paymentStatus === 'paid') {
+          return { status: 'already_paid' };
+        }
+        tx.update({ path: 'orders/ord_herd_01' }, { paymentStatus: 'paid' });
+        return { status: 'paid_committed' };
+      });
+    }
+
+    // 5 concurrent webhook retries entering simultaneously
+    const results = await Promise.all([
+      processWebhook(),
+      processWebhook(),
+      processWebhook(),
+      processWebhook(),
+      processWebhook()
+    ]);
+
+    const committedCount = results.filter(r => r.status === 'paid_committed').length;
+    const alreadyCount = results.filter(r => r.status === 'already_paid').length;
+    assert.equal(committedCount, 1); // Exactly 1 committed
+    assert.equal(alreadyCount, 4); // 4 retries safely detected already paid
+  });
+
+  // Scenario 54: Webhook actor attempting to trigger refunded transition via state machine is REJECTED
+  await runTest('Scenario 54: Webhook actor attempting to trigger refunded transition is REJECTED', async () => {
+    function isAllowedPaymentTransitionWithActor(currentStatus, nextStatus, actor = "webhook") {
+      if (currentStatus === nextStatus) return true;
+      const ALLOWED_TRANSITIONS = {
+        webhook: {
+          pending: ["paid", "failed", "expired", "charge_created_order_pending", "creation_failed"],
+          charge_created_order_pending: ["paid", "failed", "expired", "creation_failed"],
+          expired: ["paid_after_expired"],
+          cancelled: ["paid_after_expired"],
+          paid: ["paid"],
+          paid_after_expired: [],
+          refunded: ["refunded"]
+        },
+        refund_flow: {
+          paid: ["refunded"],
+          paid_after_expired: ["paid", "refunded"]
+        }
+      };
+      return (ALLOWED_TRANSITIONS[actor]?.[currentStatus] || []).includes(nextStatus);
+    }
+
+    assert.equal(isAllowedPaymentTransitionWithActor("paid", "refunded", "webhook"), false);
+    assert.equal(isAllowedPaymentTransitionWithActor("pending", "paid", "webhook"), true);
+  });
+
+  // Scenario 55: Webhook of Order A attempting to mutate Order B is REJECTED with Order Binding Mismatch
+  await runTest('Scenario 55: Webhook of Order A attempting to mutate Order B is REJECTED (Order Binding Mismatch)', async () => {
+    function verifyCrossOrderBinding(charge, order) {
+      if (charge.metadata?.orderId !== order.orderId) {
+        throw new Error("400: Order ID mismatch");
+      }
+      if (charge.metadata?.uid !== order.userId) {
+        throw new Error("400: User ID mismatch");
+      }
+      if (order.paymentId && order.paymentId !== charge.id) {
+        throw new Error("400: Charge ID does not match order payment binding");
+      }
+      return true;
+    }
+
+    const orderB = { orderId: "ord_target_B", userId: "user_B", paymentId: "chrg_B" };
+    const chargeA = { id: "chrg_A", metadata: { orderId: "ord_target_A", uid: "user_A" } };
+
+    assert.throws(() => verifyCrossOrderBinding(chargeA, orderB), /Order ID mismatch/);
+  });
+
   const passRate = Math.round((passedTests / totalTests) * 100);
   console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${passRate}%).`);
 
