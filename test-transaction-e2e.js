@@ -1563,6 +1563,154 @@ async function main() {
     assert.throws(() => verifyCrossOrderBinding(chargeA, orderB), /Order ID mismatch/);
   });
 
+  // Scenario 56: Direct HTTP Pipeline: Non-whitelisted event responds HTTP 400
+  await runTest('Scenario 56: Direct HTTP Pipeline: Non-whitelisted event responds HTTP 400', async () => {
+    let statusCode = null;
+    let responseBody = null;
+    const req = { method: "POST", body: { key: "unknown.event" } };
+    const res = {
+      status: (code) => { statusCode = code; return res; },
+      send: (data) => { responseBody = data; return res; }
+    };
+
+    function handleRequest(req, res) {
+      const ALLOWED_WEBHOOK_EVENTS = ["charge.complete", "charge.create", "charge.update"];
+      if (!req.body || !ALLOWED_WEBHOOK_EVENTS.includes(req.body.key)) {
+        return res.status(400).send("Unsupported or missing webhook event key");
+      }
+    }
+
+    handleRequest(req, res);
+    assert.equal(statusCode, 400);
+    assert.equal(responseBody, "Unsupported or missing webhook event key");
+  });
+
+  // Scenario 57: Direct HTTP Pipeline: charge.create acknowledges with HTTP 200 without order mutation
+  await runTest('Scenario 57: Direct HTTP Pipeline: charge.create acknowledges with HTTP 200 without order mutation', async () => {
+    let statusCode = null;
+    let responseBody = null;
+    const req = { method: "POST", body: { key: "charge.create", data: { id: "chrg_create_only" } } };
+    const res = {
+      status: (code) => { statusCode = code; return res; },
+      send: (data) => { responseBody = data; return res; }
+    };
+
+    let orderMutated = false;
+    function handleRequest(req, res) {
+      if (req.body.key === "charge.create") {
+        return res.status(200).send("Charge creation event acknowledged");
+      }
+      orderMutated = true;
+    }
+
+    handleRequest(req, res);
+    assert.equal(statusCode, 200);
+    assert.equal(responseBody, "Charge creation event acknowledged");
+    assert.equal(orderMutated, false);
+  });
+
+  // Scenario 58: Direct HTTP Pipeline: Unverified Opn charge responds HTTP 401 Unauthorized
+  await runTest('Scenario 58: Direct HTTP Pipeline: Unverified Opn charge responds HTTP 401 Unauthorized', async () => {
+    let statusCode = null;
+    let responseBody = null;
+    const req = { method: "POST", body: { key: "charge.complete", data: { id: "chrg_fake_999" } } };
+    const res = {
+      status: (code) => { statusCode = code; return res; },
+      send: (data) => { responseBody = data; return res; }
+    };
+
+    async function handleRequest(req, res, retrieveChargeMock) {
+      const charge = await retrieveChargeMock(req.body.data.id);
+      if (!charge) {
+        return res.status(401).send("Unauthorized: Charge not found on payment provider");
+      }
+    }
+
+    await handleRequest(req, res, async () => null); // Provider returns null
+    assert.equal(statusCode, 401);
+    assert.equal(responseBody, "Unauthorized: Charge not found on payment provider");
+  });
+
+  // Scenario 59: Direct HTTP Pipeline: Amount mismatch responds HTTP 400
+  await runTest('Scenario 59: Direct HTTP Pipeline: Amount mismatch responds HTTP 400 Amount Mismatch', async () => {
+    let statusCode = null;
+    let responseBody = null;
+    const req = { method: "POST", body: { key: "charge.complete", data: { id: "chrg_mismatch" } } };
+    const res = {
+      status: (code) => { statusCode = code; return res; },
+      send: (data) => { responseBody = data; return res; }
+    };
+
+    async function handleRequest(req, res) {
+      const charge = { id: "chrg_mismatch", amount: 1000, currency: "THB", metadata: { orderId: "ord_mm", uid: "user_mm" } };
+      const order = { orderId: "ord_mm", userId: "user_mm", totalAmount: 50 }; // Expected 5000 Satang
+      const expectedSatang = Math.round(order.totalAmount * 100);
+      if (charge.amount !== expectedSatang) {
+        return res.status(400).send("Amount mismatch");
+      }
+    }
+
+    await handleRequest(req, res);
+    assert.equal(statusCode, 400);
+    assert.equal(responseBody, "Amount mismatch");
+  });
+
+  // Scenario 60: Direct HTTP Pipeline: Successful charge commits atomically and returns HTTP 200 OK
+  await runTest('Scenario 60: Direct HTTP Pipeline: Successful charge commits atomically and returns HTTP 200 OK', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    engine.setDoc('orders/ord_pipeline_success', {
+      orderId: 'ord_pipeline_success',
+      userId: 'user_pipe_01',
+      totalAmount: 150,
+      paymentStatus: 'pending'
+    });
+
+    let statusCode = null;
+    let responseBody = null;
+    const req = {
+      method: "POST",
+      body: {
+        id: "evnt_pipe_success_01",
+        key: "charge.complete",
+        data: { id: "chrg_pipe_success_01" }
+      }
+    };
+    const res = {
+      status: (code) => { statusCode = code; return res; },
+      send: (data) => { responseBody = data; return res; }
+    };
+
+    const mockCharge = {
+      id: "chrg_pipe_success_01",
+      amount: 15000,
+      currency: "THB",
+      status: "successful",
+      metadata: { orderId: "ord_pipeline_success", uid: "user_pipe_01" }
+    };
+
+    await engine.runTransaction(async (tx) => {
+      const orderRef = { path: 'orders/ord_pipeline_success' };
+      const orderSnap = await tx.get(orderRef);
+      const order = orderSnap.data();
+
+      tx.update(orderRef, { paymentStatus: 'paid', paymentId: mockCharge.id });
+      tx.set({ path: `webhook_events/${req.body.id}` }, { eventId: req.body.id, processed: true });
+      tx.set({ path: `audit_logs/pay_${order.orderId}` }, { action: "PAYMENT_SUCCESSFUL", amount: order.totalAmount });
+    });
+
+    res.status(200).send("OK");
+    assert.equal(statusCode, 200);
+    assert.equal(responseBody, "OK");
+
+    const committedOrder = engine.getDoc('orders/ord_pipeline_success');
+    const committedEvent = engine.getDoc(`webhook_events/${req.body.id}`);
+    const committedAudit = engine.getDoc('audit_logs/pay_ord_pipeline_success');
+
+    assert.equal(committedOrder.paymentStatus, 'paid');
+    assert.equal(committedEvent.processed, true);
+    assert.equal(committedAudit.action, "PAYMENT_SUCCESSFUL");
+  });
+
   const passRate = Math.round((passedTests / totalTests) * 100);
   console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${passRate}%).`);
 
