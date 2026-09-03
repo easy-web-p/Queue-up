@@ -28,16 +28,19 @@ export function AuthProvider({ children }) {
         const mergedUser = {
           uid: firebaseUser.uid,
           email: firebaseUser.email || "",
+          isVerifiedAuth: true,
+          isTokenVerified: true,
+          isFromCache: false,
           ...userDocData,
         };
 
         const roles = getEffectiveRoles(mergedUser);
-        const isAdmin = roles.includes("admin");
+        const isAdminUser = roles.includes("admin");
         const isMerchant = roles.includes("merchant");
-        const isMerchantVerified = userDocData?.isMerchantVerified === true || isAdmin;
-        const isMerchantRegistered = userDocData?.isMerchantRegistered === true || isAdmin;
+        const isMerchantVerified = userDocData?.isMerchantVerified === true || isAdminUser;
+        const isMerchantRegistered = userDocData?.isMerchantRegistered === true || isAdminUser;
 
-        const activeRole = isAdmin
+        const activeRole = isAdminUser
           ? (userDocData?.activeRole || "admin")
           : (userDocData?.activeRole || (isMerchant ? "merchant" : "customer"));
 
@@ -55,7 +58,10 @@ export function AuthProvider({ children }) {
           isGoogleUser: isGoogle,
           isMerchantVerified: isMerchantVerified,
           isMerchantRegistered: isMerchantRegistered,
-          isSuperAdmin: isAdmin,
+          isSuperAdmin: isAdminUser,
+          isVerifiedAuth: true,
+          isTokenVerified: true,
+          isFromCache: false,
           storeId: userDocData?.storeId || (isMerchant ? "store_canteen01" : undefined),
         }));
       } else {

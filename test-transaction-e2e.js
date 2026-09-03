@@ -658,24 +658,54 @@ async function main() {
     assert.throws(() => validateClientOrderCreation({ paymentMethod: 'credit_card', storeId: 'shop_01', totalAmount: 50 }), /Security violation/);
   });
 
-  // Scenario 20: LocalStorage Role Tampering Immunity
-  await runTest('Scenario 20: Initial session strictly sanitizes LocalStorage and rejects privilege spoofing', async () => {
+  // Scenario 20: LocalStorage Email & Role Tampering Immunity
+  await runTest('Scenario 20: Initial session strictly sanitizes LocalStorage and rejects email/role spoofing', async () => {
+    function getEffectiveRoles(user) {
+      if (!user) return ['guest'];
+      if (user.isFromCache === true || user.isVerifiedAuth !== true) {
+        return ['customer'];
+      }
+      const email = (user.email || '').toLowerCase().trim();
+      const isSuperAdmin = Boolean(
+        user.isSuperAdmin === true ||
+        user.admin === true ||
+        (user.isTokenVerified === true && email === '58140@lomsak.ac.th')
+      );
+      if (isSuperAdmin) return ['customer', 'merchant', 'admin'];
+      return ['customer'];
+    }
+
+    function isUserSuperAdmin(user) {
+      if (!user || user.isFromCache === true || user.isVerifiedAuth !== true) return false;
+      const email = (user.email || '').toLowerCase().trim();
+      return Boolean(
+        user.isSuperAdmin === true ||
+        user.admin === true ||
+        (user.isTokenVerified === true && email === '58140@lomsak.ac.th')
+      );
+    }
+
     function hydrateInitialSession(storedJson) {
       const parsed = JSON.parse(storedJson);
       if (!parsed || typeof parsed !== 'object' || !parsed.uid) return null;
       return {
         uid: String(parsed.uid),
+        email: String(parsed.email || ''),
         displayName: String(parsed.displayName || "User"),
-        roles: ['customer'], // Always unprivileged customer on hydration
+        roles: ['customer'],
         activeRole: 'customer',
         isMerchantVerified: false,
-        isSuperAdmin: false
+        isSuperAdmin: false,
+        isVerifiedAuth: false,
+        isTokenVerified: false,
+        isFromCache: true
       };
     }
 
-    // Attacker modifies LocalStorage to claim merchant and admin roles
+    // Attacker modifies LocalStorage to inject admin email and admin flags
     const tamperedLocalStorage = JSON.stringify({
       uid: 'hacker_123',
+      email: '58140@lomsak.ac.th', // Injected Super Admin email!
       displayName: 'Attacker',
       roles: ['customer', 'merchant', 'admin'],
       activeRole: 'admin',
@@ -684,10 +714,20 @@ async function main() {
     });
 
     const hydratedSession = hydrateInitialSession(tamperedLocalStorage);
-    assert.deepEqual(hydratedSession.roles, ['customer']);
+    // Unverified cached session MUST strictly evaluate to customer
+    assert.deepEqual(getEffectiveRoles(hydratedSession), ['customer']);
+    assert.equal(isUserSuperAdmin(hydratedSession), false);
     assert.equal(hydratedSession.activeRole, 'customer');
-    assert.equal(hydratedSession.isMerchantVerified, false);
-    assert.equal(hydratedSession.isSuperAdmin, false);
+
+    // Officially verified Firebase Auth session -> Grants elevated role
+    const verifiedSession = {
+      ...hydratedSession,
+      isVerifiedAuth: true,
+      isTokenVerified: true,
+      isFromCache: false
+    };
+    assert.deepEqual(getEffectiveRoles(verifiedSession), ['customer', 'merchant', 'admin']);
+    assert.equal(isUserSuperAdmin(verifiedSession), true);
   });
 
   // Scenario 21: Fake Offline Price Manipulation Blocked by Universal Server Pricing

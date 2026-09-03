@@ -20,6 +20,9 @@ const getInitialUser = () => {
           isMerchantVerified: false,
           isMerchantRegistered: false,
           isSuperAdmin: false,
+          isVerifiedAuth: false,
+          isTokenVerified: false,
+          isFromCache: true,
           storeId: undefined,
           school: String(parsed.school || "โรงเรียน"),
         };
@@ -50,6 +53,9 @@ const filterSafeUserSession = (rawUser) => {
     isMerchantVerified: Boolean(isMerchantVerified || isSuperAdmin),
     isMerchantRegistered: Boolean(isMerchantRegistered || isSuperAdmin),
     isSuperAdmin: isSuperAdmin,
+    isVerifiedAuth: false, // 🔒 Stored cache is marked unverified
+    isTokenVerified: false,
+    isFromCache: true,
     storeId: storeId || (isMerchant ? "store_canteen01" : undefined),
     school: school || "โรงเรียน",
   };

@@ -1,25 +1,42 @@
 /**
  * Centralized Role-Based Access Control (RBAC) & Authorization Helpers
  * Single source of truth across UI, Redux, Context, and Route Guards.
+ * 
+ * 🔒 Security Policy:
+ * 1. Unverified cached sessions (e.g. from LocalStorage) can NEVER claim privileged roles.
+ * 2. Super Admin & Merchant roles are granted ONLY when `user.isVerifiedAuth === true` (officially verified by Firebase Auth).
  */
 
 export const SUPER_ADMIN_EMAIL = "58140@lomsak.ac.th";
 
 /**
  * Derives the list of effective roles for a user.
- * Super Admin strictly has ['customer', 'merchant', 'admin'].
- * Verified Merchant has ['customer', 'merchant'].
- * Normal Customer has ['customer'].
+ * - If user session is unverified / from cache -> strictly ['customer'].
+ * - Super Admin -> ['customer', 'merchant', 'admin'].
+ * - Verified Merchant -> ['customer', 'merchant'].
+ * - Normal Customer -> ['customer'].
  */
 export function getEffectiveRoles(user) {
   if (!user) return ["guest"];
 
+  // 🔒 LocalStorage Spoofing Guard: Unverified cached objects CANNOT claim elevated roles
+  if (user.isFromCache === true || user.isVerifiedAuth !== true) {
+    return ["customer"];
+  }
+
+  // Super Admin privilege (only for verified Firebase Auth sessions)
   const email = (user.email || "").toLowerCase().trim();
-  const isSuperAdmin = email === SUPER_ADMIN_EMAIL || user.isSuperAdmin === true || user.admin === true;
+  const isSuperAdmin = Boolean(
+    user.isSuperAdmin === true ||
+    user.admin === true ||
+    (user.isTokenVerified === true && email === SUPER_ADMIN_EMAIL)
+  );
+
   if (isSuperAdmin) {
     return ["customer", "merchant", "admin"];
   }
 
+  // Merchant privilege (only for verified Firebase Auth sessions)
   const isMerchant = Boolean(
     (Array.isArray(user.roles) && user.roles.includes("merchant")) ||
     user.isMerchantVerified === true ||
@@ -50,9 +67,13 @@ export function canAccessRole(user, targetRole) {
  * Checks if user is Super Admin
  */
 export function isUserSuperAdmin(user) {
-  if (!user) return false;
+  if (!user || user.isFromCache === true || user.isVerifiedAuth !== true) return false;
   const email = (user.email || "").toLowerCase().trim();
-  return email === SUPER_ADMIN_EMAIL || user.isSuperAdmin === true || user.admin === true;
+  return Boolean(
+    user.isSuperAdmin === true ||
+    user.admin === true ||
+    (user.isTokenVerified === true && email === SUPER_ADMIN_EMAIL)
+  );
 }
 
 /**
