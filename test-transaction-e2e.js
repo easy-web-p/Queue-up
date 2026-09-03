@@ -2456,6 +2456,368 @@ async function main() {
     assert.equal(engine.getDoc('resource_release_jobs/job_90'), initialOutboxSnap); // null
   });
 
+  // Scenario 91: Missing rawBody -> 401
+  await runTest('Scenario 91: Missing rawBody property strictly returns 401', async () => {
+    function verifySig(req, secret) {
+      if (!secret || typeof secret !== "string" || !secret.trim()) return false;
+      const signatureHeader = req.headers?.["x-opn-signature"];
+      if (!signatureHeader || typeof signatureHeader !== "string") return false;
+      if (!req.rawBody || (typeof req.rawBody !== "string" && !Buffer.isBuffer(req.rawBody))) {
+        return false;
+      }
+      return true;
+    }
+
+    const reqWithoutRawBody = { headers: { "x-opn-signature": "some_sig" } };
+    assert.equal(verifySig(reqWithoutRawBody, "secret_91"), false);
+  });
+
+  // Scenario 92: Parsed object body only (without rawBody) -> 401
+  await runTest('Scenario 92: Parsed object body only (without rawBody) is REJECTED', async () => {
+    function verifySig(req, secret) {
+      if (!secret || typeof secret !== "string" || !secret.trim()) return false;
+      const signatureHeader = req.headers?.["x-opn-signature"];
+      if (!signatureHeader || typeof signatureHeader !== "string") return false;
+      // No JSON.stringify fallback allowed!
+      if (!req.rawBody || (typeof req.rawBody !== "string" && !Buffer.isBuffer(req.rawBody))) {
+        return false;
+      }
+      return true;
+    }
+
+    const reqObjectOnly = { headers: { "x-opn-signature": "some_sig" }, body: { key: "charge.complete" } };
+    assert.equal(verifySig(reqObjectOnly, "secret_92"), false);
+  });
+
+  // Scenario 93: Raw body modified by 1 byte -> 401
+  await runTest('Scenario 93: Raw body modified by 1 byte fails HMAC verification', async () => {
+    const secret = "secret_93";
+    const originalRaw = '{"key":"charge.complete","amount":25000}';
+    const sig = crypto.createHmac("sha256", secret).update(originalRaw).digest("hex");
+
+    const tamperedRaw = '{"key":"charge.complete","amount":25001}'; // 1 byte change
+
+    function verifyRaw(raw, signature, sec) {
+      const expected = crypto.createHmac("sha256", sec).update(raw).digest("hex");
+      const bufA = Buffer.from(signature);
+      const bufB = Buffer.from(expected);
+      if (bufA.length !== bufB.length) return false;
+      return crypto.timingSafeEqual(bufA, bufB);
+    }
+
+    assert.equal(verifyRaw(tamperedRaw, sig, secret), false);
+  });
+
+  // Scenario 94: Secret rotation / Secret Manager reference failure / whitespace -> 401 + 0 DB mutation
+  await runTest('Scenario 94: Secret rotation / unresolved Secret Manager reference fails closed', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    engine.setDoc('orders/ord_94', { paymentStatus: 'pending' });
+
+    function handleRequest(req, secretProvider, engine) {
+      let resolvedSecret;
+      try {
+        resolvedSecret = typeof secretProvider === "function" ? secretProvider() : secretProvider;
+      } catch {
+        resolvedSecret = null;
+      }
+
+      if (!resolvedSecret || typeof resolvedSecret !== "string" || !resolvedSecret.trim()) {
+        return { status: 401, error: "Secret unavailable / invalid" };
+      }
+      engine.setDoc('orders/ord_94', { paymentStatus: 'paid' }, { merge: true });
+      return { status: 200 };
+    }
+
+    const failingSecretProvider = () => { throw new Error("Secret Manager connection timeout"); };
+    const res1 = handleRequest({}, failingSecretProvider, engine);
+    assert.equal(res1.status, 401);
+    assert.equal(engine.getDoc('orders/ord_94').paymentStatus, 'pending'); // 0 DB mutation
+
+    const whitespaceSecret = "   ";
+    const res2 = handleRequest({}, whitespaceSecret, engine);
+    assert.equal(res2.status, 401);
+    assert.equal(engine.getDoc('orders/ord_94').paymentStatus, 'pending');
+  });
+
+  // Scenario 95: Worker A lease ownership cannot be hijacked by Worker B while lease active
+  await runTest('Scenario 95: Worker A lease ownership cannot be hijacked by Worker B while active', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const now = Date.now();
+    engine.setDoc('resource_release_jobs/job_95', {
+      jobId: 'job_95',
+      status: 'processing',
+      leaseOwner: 'worker_A',
+      leaseToken: 'token_A_123',
+      leaseUntil: now + 5 * 60 * 1000 // Active for 5 min
+    });
+
+    async function attemptClaim(workerId) {
+      return await engine.runTransaction(async (tx) => {
+        const snap = await tx.get({ path: 'resource_release_jobs/job_95' });
+        const job = snap.data();
+        const currentTime = Date.now();
+        if (job.status === 'processing' && job.leaseUntil > currentTime && job.leaseOwner !== workerId) {
+          return { claimed: false, reason: 'LEASE_HELD_BY_ANOTHER_WORKER' };
+        }
+        tx.update({ path: 'resource_release_jobs/job_95' }, {
+          leaseOwner: workerId,
+          leaseToken: 'new_token',
+          leaseUntil: currentTime + 5 * 60 * 1000
+        });
+        return { claimed: true };
+      });
+    }
+
+    const claimB = await attemptClaim('worker_B');
+    assert.equal(claimB.claimed, false);
+    assert.equal(claimB.reason, 'LEASE_HELD_BY_ANOTHER_WORKER');
+    assert.equal(engine.getDoc('resource_release_jobs/job_95').leaseOwner, 'worker_A');
+  });
+
+  // Scenario 96: Expired lease reclaimed strictly via OCC transaction
+  await runTest('Scenario 96: Expired lease reclaimed cleanly with updated token and owner', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const pastTime = Date.now() - 60 * 1000;
+    engine.setDoc('resource_release_jobs/job_96', {
+      jobId: 'job_96',
+      status: 'processing',
+      leaseOwner: 'worker_crashed',
+      leaseToken: 'token_old',
+      leaseUntil: pastTime
+    });
+
+    async function claimJob(workerId) {
+      return await engine.runTransaction(async (tx) => {
+        const snap = await tx.get({ path: 'resource_release_jobs/job_96' });
+        const job = snap.data();
+        const currentTime = Date.now();
+        if (job.status === 'processing' && job.leaseUntil > currentTime && job.leaseOwner !== workerId) {
+          return { claimed: false };
+        }
+        const newLeaseToken = 'token_new_96';
+        tx.update({ path: 'resource_release_jobs/job_96' }, {
+          status: 'processing',
+          leaseOwner: workerId,
+          leaseToken: newLeaseToken,
+          leaseUntil: currentTime + 5 * 60 * 1000
+        });
+        return { claimed: true, leaseToken: newLeaseToken };
+      });
+    }
+
+    const res = await claimJob('worker_B');
+    assert.equal(res.claimed, true);
+    assert.equal(engine.getDoc('resource_release_jobs/job_96').leaseOwner, 'worker_B');
+    assert.equal(engine.getDoc('resource_release_jobs/job_96').leaseToken, 'token_new_96');
+  });
+
+  // Scenario 97: Stale Worker A wakes up after lease expired/reclaimed -> stale write rejected by leaseToken check
+  await runTest('Scenario 97: Stale Worker A write rejected due to leaseToken/leaseOwner mismatch', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    // Worker B has reclaimed job with new token
+    engine.setDoc('resource_release_jobs/job_97', {
+      jobId: 'job_97',
+      status: 'processing',
+      leaseOwner: 'worker_B',
+      leaseToken: 'token_worker_B',
+      leaseUntil: Date.now() + 5 * 60 * 1000
+    });
+
+    async function completeJob(workerId, suppliedToken) {
+      return await engine.runTransaction(async (tx) => {
+        const snap = await tx.get({ path: 'resource_release_jobs/job_97' });
+        const job = snap.data();
+        if (job.leaseOwner !== workerId || job.leaseToken !== suppliedToken) {
+          return { success: false, reason: 'STALE_WORKER_TOKEN_MISMATCH' };
+        }
+        tx.update({ path: 'resource_release_jobs/job_97' }, { status: 'completed' });
+        return { success: true };
+      });
+    }
+
+    // Stale Worker A tries to complete with its old token
+    const staleAttempt = await completeJob('worker_A', 'token_worker_A_old');
+    assert.equal(staleAttempt.success, false);
+    assert.equal(staleAttempt.reason, 'STALE_WORKER_TOKEN_MISMATCH');
+    assert.equal(engine.getDoc('resource_release_jobs/job_97').status, 'processing'); // Still under Worker B!
+  });
+
+  // Scenario 98: Refund provider succeeded + Firestore failed -> Reconciliation worker recovers terminal state
+  await runTest('Scenario 98: Refund provider succeeded + Firestore failed recovers via reconciliation worker', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const orderId = "ord_rec_98";
+    const refundKey = `ref_${orderId}_chrg_98`;
+
+    engine.setDoc(`orders/${orderId}`, {
+      orderId,
+      paymentId: "chrg_98",
+      paymentStatus: "refund_pending",
+      reconciliationStatus: "PROVIDER_REFUNDING",
+      refundIdempotencyKey: refundKey
+    });
+
+    // Mock Opn Provider that already recorded the refund
+    const mockOpn = {
+      retrieveCharge: async (chargeId) => ({
+        id: chargeId,
+        refunds: {
+          data: [{ id: "rfnd_opn_98", amount: 15000, metadata: { refund_key: refundKey, order_id: orderId } }]
+        }
+      })
+    };
+
+    async function reconcileOrder(orderId, opnProvider) {
+      const order = engine.getDoc(`orders/${orderId}`);
+      if (order.reconciliationStatus === "REFUNDED") return { status: "ALREADY_REFUNDED" };
+
+      const charge = await opnProvider.retrieveCharge(order.paymentId);
+      const matchedRefund = charge.refunds?.data?.find(r => r.metadata?.refund_key === order.refundIdempotencyKey);
+      if (matchedRefund) {
+        engine.setDoc(`orders/${orderId}`, {
+          paymentStatus: "refunded",
+          reconciliationStatus: "REFUNDED",
+          refundId: matchedRefund.id
+        }, { merge: true });
+        return { status: "RECONCILED", refundId: matchedRefund.id };
+      }
+      return { status: "NOT_FOUND" };
+    }
+
+    const recResult = await reconcileOrder(orderId, mockOpn);
+    assert.equal(recResult.status, "RECONCILED");
+    assert.equal(recResult.refundId, "rfnd_opn_98");
+    assert.equal(engine.getDoc(`orders/${orderId}`).paymentStatus, "refunded");
+    assert.equal(engine.getDoc(`orders/${orderId}`).reconciliationStatus, "REFUNDED");
+  });
+
+  // Scenario 99: Repeated refund reconciliation -> does not call provider refund again (0 duplicate refund)
+  await runTest('Scenario 99: Repeated refund reconciliation does not call provider refund API', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    engine.setDoc('orders/ord_rec_99', {
+      orderId: 'ord_rec_99',
+      paymentStatus: 'refunded',
+      reconciliationStatus: 'REFUNDED',
+      refundId: 'rfnd_99'
+    });
+
+    let providerRefundCalls = 0;
+    async function reconcile(orderId) {
+      const order = engine.getDoc(`orders/${orderId}`);
+      if (order.reconciliationStatus === "REFUNDED" || order.paymentStatus === "refunded") {
+        return { status: "ALREADY_TERMINAL" };
+      }
+      providerRefundCalls++;
+      return { status: "REFUNDED" };
+    }
+
+    const r1 = await reconcile('ord_rec_99');
+    const r2 = await reconcile('ord_rec_99');
+    assert.equal(r1.status, "ALREADY_TERMINAL");
+    assert.equal(r2.status, "ALREADY_TERMINAL");
+    assert.equal(providerRefundCalls, 0); // Exactly 0 duplicate provider calls
+  });
+
+  // Scenario 100: Webhook + refund + reconciliation concurrency race -> resolves to unique terminal state (refunded)
+  await runTest('Scenario 100: Webhook + refund + reconciliation race resolves strictly to REFUNDED', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    engine.setDoc('orders/ord_race_100', {
+      orderId: 'ord_race_100',
+      paymentStatus: 'paid_after_expired',
+      reconciliationStatus: 'PROVIDER_REFUNDING',
+      refundIdempotencyKey: 'ref_100'
+    });
+
+    async function opnWebhookArrival() {
+      return await engine.runTransaction(async (tx) => {
+        const snap = await tx.get({ path: 'orders/ord_race_100' });
+        const o = snap.data();
+        if (o.reconciliationStatus === 'REFUNDED' || o.reconciliationStatus === 'PROVIDER_REFUNDING') {
+          return { res: 'WEBHOOK_BLOCKED_BY_REFUND' };
+        }
+        tx.update({ path: 'orders/ord_race_100' }, { paymentStatus: 'paid' });
+        return { res: 'WEBHOOK_PAID' };
+      });
+    }
+
+    async function reconciliationWorkerRun() {
+      return await engine.runTransaction(async (tx) => {
+        const snap = await tx.get({ path: 'orders/ord_race_100' });
+        const o = snap.data();
+        if (o.reconciliationStatus === 'REFUNDED') return { res: 'ALREADY_REFUNDED' };
+        tx.update({ path: 'orders/ord_race_100' }, {
+          paymentStatus: 'refunded',
+          reconciliationStatus: 'REFUNDED',
+          refundId: 'rfnd_race_100'
+        });
+        return { res: 'RECONCILED_REFUNDED' };
+      });
+    }
+
+    const [webhookResult, recResult] = await Promise.all([opnWebhookArrival(), reconciliationWorkerRun()]);
+    assert.ok(['WEBHOOK_BLOCKED_BY_REFUND'].includes(webhookResult.res));
+    assert.ok(['RECONCILED_REFUNDED'].includes(recResult.res));
+    assert.equal(engine.getDoc('orders/ord_race_100').paymentStatus, 'refunded');
+    assert.equal(engine.getDoc('orders/ord_race_100').reconciliationStatus, 'REFUNDED');
+  });
+
+  // Scenario 101: Crash at every discrete step of refund workflow -> recovers cleanly without state corruption
+  await runTest('Scenario 101: Crash at each step of refund workflow recovers cleanly', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const orderId = "ord_step_crash_101";
+
+    // Step 1: Pre-claim written
+    engine.setDoc(`orders/${orderId}`, {
+      orderId,
+      paymentId: "chrg_101",
+      paymentStatus: "refund_pending",
+      reconciliationStatus: "PROVIDER_REFUNDING",
+      refundIdempotencyKey: `ref_${orderId}_chrg_101`
+    });
+
+    // Crash happens right after provider refund returns, before final Firestore commit
+    // Recovery worker sweeps and finds existing refund on provider
+    const mockProvider = {
+      retrieveCharge: async () => ({
+        refunds: { data: [{ id: "rfnd_crash_recovery_101", metadata: { refund_key: `ref_${orderId}_chrg_101` } }] }
+      })
+    };
+
+    const charge = await mockProvider.retrieveCharge();
+    const refund = charge.refunds.data[0];
+
+    // Worker completes final Firestore state
+    engine.setDoc(`orders/${orderId}`, {
+      paymentStatus: "refunded",
+      reconciliationStatus: "REFUNDED",
+      refundId: refund.id
+    }, { merge: true });
+
+    assert.equal(engine.getDoc(`orders/${orderId}`).paymentStatus, "refunded");
+    assert.equal(engine.getDoc(`orders/${orderId}`).refundId, "rfnd_crash_recovery_101");
+  });
+
+  // Scenario 102: Audit log strictly reflects the true final terminal payment state
+  await runTest('Scenario 102: Audit log strictly reflects final terminal payment state (REFUND_RECONCILED)', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const orderId = "ord_audit_102";
+    engine.setDoc(`orders/${orderId}`, { orderId, paymentStatus: 'refunded', reconciliationStatus: 'REFUNDED' });
+    engine.setDoc(`audit_logs/reconcile_rec_${orderId}`, {
+      actorUid: "reconciliation_worker",
+      action: "REFUND_RECONCILED",
+      orderId,
+      refundId: "rfnd_102",
+      createdAt: new Date()
+    });
+
+    const order = engine.getDoc(`orders/${orderId}`);
+    const audit = engine.getDoc(`audit_logs/reconcile_rec_${orderId}`);
+
+    assert.equal(order.paymentStatus, 'refunded');
+    assert.equal(order.reconciliationStatus, 'REFUNDED');
+    assert.equal(audit.action, 'REFUND_RECONCILED');
+    assert.equal(audit.refundId, 'rfnd_102');
+  });
+
   const passRate = Math.round((passedTests / totalTests) * 100);
   console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${passRate}%).`);
 

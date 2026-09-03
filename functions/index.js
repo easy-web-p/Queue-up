@@ -642,9 +642,14 @@ export function verifyOpnWebhookSignature(req, secret) {
   if (!secret || typeof secret !== "string" || !secret.trim()) return false;
   const signatureHeader = req.headers?.["x-opn-signature"] || req.headers?.["x-signature"] || req.headers?.["omise-signature"];
   if (!signatureHeader || typeof signatureHeader !== "string" || !signatureHeader.trim()) return false;
+
+  // 🔒 Strict Raw-Body Enforcement: No JSON.stringify fallback allowed
+  if (!req.rawBody || (typeof req.rawBody !== "string" && !Buffer.isBuffer(req.rawBody))) {
+    return false;
+  }
+
   try {
-    const rawBody = typeof req.rawBody === "string" ? req.rawBody : (typeof req.body === "string" ? req.body : JSON.stringify(req.body));
-    if (typeof rawBody !== "string") return false;
+    const rawBody = Buffer.isBuffer(req.rawBody) ? req.rawBody : Buffer.from(req.rawBody, "utf8");
     const expectedSig = crypto.createHmac("sha256", secret.trim()).update(rawBody).digest("hex");
     const bufA = Buffer.from(signatureHeader.trim());
     const bufB = Buffer.from(expectedSig);
@@ -653,6 +658,95 @@ export function verifyOpnWebhookSignature(req, secret) {
   } catch {
     return false;
   }
+}
+
+export async function claimOutboxJob(db, jobId, workerId, leaseDurationMs = 5 * 60 * 1000) {
+  return await db.runTransaction(async (tx) => {
+    const jobRef = db.collection("resource_release_jobs").doc(jobId);
+    const snap = await tx.get(jobRef);
+    if (!snap.exists) return { success: false, reason: "JOB_NOT_FOUND" };
+    const job = snap.data();
+    const now = Date.now();
+    if (job.status === "completed") return { success: false, reason: "ALREADY_COMPLETED" };
+    if (job.status === "processing" && (job.leaseUntil || 0) > now && job.leaseOwner !== workerId) {
+      return { success: false, reason: "LEASE_HELD_BY_ANOTHER_WORKER", leaseOwner: job.leaseOwner };
+    }
+    const leaseToken = crypto.randomUUID();
+    const leaseUntil = now + leaseDurationMs;
+    tx.update(jobRef, {
+      status: "processing",
+      leaseOwner: workerId,
+      leaseToken,
+      leaseUntil,
+      attemptCount: (job.attemptCount || 0) + 1,
+      lastClaimedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp()
+    });
+    return { success: true, leaseToken, leaseUntil };
+  });
+}
+
+export async function completeOutboxJob(db, jobId, workerId, leaseToken) {
+  return await db.runTransaction(async (tx) => {
+    const jobRef = db.collection("resource_release_jobs").doc(jobId);
+    const snap = await tx.get(jobRef);
+    if (!snap.exists) return { success: false, reason: "JOB_NOT_FOUND" };
+    const job = snap.data();
+    if (job.status === "completed") return { success: true, reason: "ALREADY_COMPLETED" };
+    // Stale worker protection: token & owner must match
+    if (job.leaseOwner !== workerId || job.leaseToken !== leaseToken) {
+      return { success: false, reason: "STALE_WORKER_TOKEN_MISMATCH" };
+    }
+    tx.update(jobRef, {
+      status: "completed",
+      completedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp()
+    });
+    return { success: true };
+  });
+}
+
+export async function reconcilePendingRefundOrder(orderDocRef, { retrieveCharge, db, opnSecretKey }) {
+  const orderSnap = await orderDocRef.get();
+  if (!orderSnap.exists) return { success: false, reason: "NOT_FOUND" };
+  const order = orderSnap.data();
+
+  if (order.reconciliationStatus === "REFUNDED" || order.paymentStatus === "refunded") {
+    return { success: true, status: "ALREADY_REFUNDED" };
+  }
+
+  if (order.reconciliationStatus !== "PROVIDER_REFUNDING" && order.paymentStatus !== "refund_pending") {
+    return { success: false, reason: "NOT_IN_REFUND_PENDING_STATE" };
+  }
+
+  const paymentId = String(order.paymentId || "").trim();
+  if (!paymentId) return { success: false, reason: "NO_PAYMENT_ID" };
+
+  const charge = await retrieveCharge(paymentId, opnSecretKey);
+  const refunds = charge?.refunds?.data || [];
+  const existingRefund = refunds.find(r => r.metadata?.refund_key === order.refundIdempotencyKey || r.metadata?.order_id === orderDocRef.id);
+
+  if (existingRefund) {
+    await orderDocRef.update({
+      paymentStatus: "refunded",
+      status: "CANCELLED",
+      reconciliationStatus: "REFUNDED",
+      refundId: existingRefund.id,
+      refundedAmount: Number(existingRefund.amount || 0) / 100,
+      reconciledAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp()
+    });
+    await db.collection("audit_logs").doc(`reconcile_rec_${orderDocRef.id}`).set({
+      actorUid: "reconciliation_worker",
+      action: "REFUND_RECONCILED",
+      orderId: orderDocRef.id,
+      refundId: existingRefund.id,
+      createdAt: FieldValue.serverTimestamp()
+    }, { merge: true });
+    return { success: true, status: "RECOVERED_EXISTING_REFUND", refundId: existingRefund.id };
+  }
+
+  return { success: false, status: "NEEDS_RETRY" };
 }
 
 export async function handleOpnWebhookCore(req, res, { db, retrieveCharge, releaseOrderResources, opnSecretKey, signatureSecret }) {
