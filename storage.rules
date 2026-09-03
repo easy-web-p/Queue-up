@@ -1,0 +1,49 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == '58140@lomsak.ac.th' ||
+        request.auth.token.admin == true
+      );
+    }
+
+    function isImageBelowSize(maxSizeMB) {
+      return request.resource.contentType.matches('image/.*') &&
+             request.resource.size < maxSizeMB * 1024 * 1024;
+    }
+
+    // 1. User Profile Photos & Avatars
+    match /users/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if (isOwner(userId) || isAdmin()) && isImageBelowSize(5);
+    }
+
+    // 2. Product Images & Menus
+    match /products/{productId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAuthenticated() && isImageBelowSize(10);
+    }
+
+    // 3. Shop Banners & Logos
+    match /shops/{shopId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAuthenticated() && isImageBelowSize(10);
+    }
+
+    // 4. Default Deny for everything else
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
