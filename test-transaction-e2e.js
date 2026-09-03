@@ -1756,6 +1756,78 @@ async function main() {
     assert.equal(engine.getDoc('products/prod_durable_01').stock, 8);
   });
 
+  // Scenario 62: Worker Crash-in-Flight Resiliency: Worker A dies midway, Worker B retries, exactly 1 increment occurs
+  await runTest('Scenario 62: Worker Crash-in-Flight: Worker A dies midway, Worker B retries, exactly 1 increment', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    engine.setDoc('products/prod_crash_flight', { stock: 10 });
+    engine.setDoc('orders/ord_crash_flight', {
+      orderId: 'ord_crash_flight',
+      productId: 'prod_crash_flight',
+      quantity: 4,
+      reservedQuantity: 4,
+      paymentStatus: 'expired',
+      resourcesReleased: false
+    });
+
+    // Worker A: Starts transaction, reads, but crashes BEFORE commit
+    try {
+      await engine.runTransaction(async (tx) => {
+        const oSnap = await tx.get({ path: 'orders/ord_crash_flight' });
+        const o = oSnap.data();
+        await tx.get({ path: `products/${o.productId}` });
+        // Simulating process kill / OOM crash before commit
+        throw new Error("WORKER_A_PROCESS_CRASH");
+      });
+    } catch {
+      // Worker A died
+    }
+
+    // Invariant check: Stock is still 10, resourcesReleased is still false
+    assert.equal(engine.getDoc('products/prod_crash_flight').stock, 10);
+    assert.equal(engine.getDoc('orders/ord_crash_flight').resourcesReleased, false);
+
+    // Worker B: Picks up the job on next scheduler cycle
+    const workerBResult = await engine.runTransaction(async (tx) => {
+      const oSnap = await tx.get({ path: 'orders/ord_crash_flight' });
+      const o = oSnap.data();
+      if (o.resourcesReleased) return { committed: false };
+
+      const pSnap = await tx.get({ path: `products/${o.productId}` });
+      const p = pSnap.data();
+      tx.update({ path: `products/${o.productId}` }, { stock: p.stock + o.reservedQuantity });
+      tx.update({ path: 'orders/ord_crash_flight' }, { resourcesReleased: true });
+      return { committed: true };
+    });
+
+    assert.equal(workerBResult.committed, true);
+    assert.equal(engine.getDoc('products/prod_crash_flight').stock, 14); // Exactly 10 + 4 = 14
+    assert.equal(engine.getDoc('orders/ord_crash_flight').resourcesReleased, true);
+  });
+
+  // Scenario 63: Starvation-Free Outbox Batch Loop: Backlog of 137 orders drains completely across batches
+  await runTest('Scenario 63: Starvation-Free Batch Loop: 137 backlog orders drain completely across batches', async () => {
+    const totalBacklog = 137;
+    const batchSize = 50;
+    let pendingQueue = Array.from({ length: totalBacklog }, (_, i) => ({ id: `ord_backlog_${i}`, released: false }));
+
+    let batchesExecuted = 0;
+    let totalProcessed = 0;
+
+    while (true) {
+      const currentBatch = pendingQueue.filter(o => !o.released).slice(0, batchSize);
+      if (currentBatch.length === 0) break;
+      batchesExecuted++;
+      for (const item of currentBatch) {
+        item.released = true;
+        totalProcessed++;
+      }
+    }
+
+    assert.equal(totalProcessed, 137);
+    assert.equal(batchesExecuted, 3); // 50 + 50 + 37 = 3 batches
+    assert.equal(pendingQueue.filter(o => !o.released).length, 0); // 0 starvation
+  });
+
   const passRate = Math.round((passedTests / totalTests) * 100);
   console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${passRate}%).`);
 

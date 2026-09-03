@@ -273,5 +273,12 @@ service cloud.firestore {
       allow read, write: if false; // 🔒 Universal Backend-Only: Managed exclusively by Cloud Functions Admin SDK
     }
 
+    // ==========================================
+    // 12. RESOURCE RELEASE JOBS (Outbox Worker Backend Only)
+    // ==========================================
+    match /resource_release_jobs/{jobId} {
+      allow read, write: if false; // 🔒 Universal Backend-Only: Managed exclusively by Cloud Functions Admin SDK
+    }
+
   }
 }

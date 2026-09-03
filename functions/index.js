@@ -379,11 +379,24 @@ export async function releaseOrderResources(orderDocRef, cancelReason = "Payment
       createdAt: FieldValue.serverTimestamp(),
     }, { merge: true });
 
+    const jobRef = db.collection("resource_release_jobs").doc(`job_rel_${orderDocRef.id}`);
+    transaction.set(jobRef, {
+      jobId: `job_rel_${orderDocRef.id}`,
+      orderId: orderDocRef.id,
+      productId: data.productId || null,
+      storeId: data.storeId || null,
+      quantity: qty,
+      status: "completed",
+      completedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp()
+    }, { merge: true });
+
     transaction.update(orderDocRef, {
-      paymentStatus: "expired",
+      paymentStatus: data.paymentStatus === "paid" ? "paid" : "expired",
       status: "CANCELLED",
       cancelReason,
       resourcesReleased: true,
+      pendingResourceRelease: false,
       releasedQuantity: qty,
       resourceReleaseWarnings: warnings,
       resourceReleaseReason: cancelReason,
@@ -393,27 +406,48 @@ export async function releaseOrderResources(orderDocRef, cancelReason = "Payment
   });
 }
 
-// ⏰ Automated Cloud Scheduler: expires stale orders and durable recovery worker for unreleased resources every 5 minutes.
-export const scheduledExpirePendingOrders = onSchedule(
-  { schedule: "every 5 minutes", region: "asia-southeast1" },
-  async () => {
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+// 🔄 Starvation-Free Outbox Recovery Engine (Processes batches in loop up to maxBatches)
+export async function processOutboxRecoveryWorker(db, maxBatches = 5, batchLimit = 50) {
+  let totalExpired = 0;
+  let totalRecovered = 0;
+  const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+
+  // 1. Starvation-free batch sweep for stale pending orders
+  for (let batch = 0; batch < maxBatches; batch++) {
     const staleSnap = await db.collection("orders")
       .where("paymentStatus", "in", ["pending", "charge_created_order_pending"])
       .where("createdAt", "<=", fifteenMinutesAgo)
-      .limit(50)
+      .limit(batchLimit)
       .get();
-    for (const doc of staleSnap.docs) await releaseOrderResources(doc.ref, "Payment window expired (15 minutes)");
+    if (staleSnap.empty) break;
+    for (const doc of staleSnap.docs) {
+      if (await releaseOrderResources(doc.ref, "Payment window expired (15 minutes)")) totalExpired++;
+    }
+    if (staleSnap.size < batchLimit) break;
+  }
 
-    // Durable Recovery Worker: Sweep any orders where payment failed/expired but resource release was interrupted
+  // 2. Starvation-free batch sweep for unreleased resource recovery
+  for (let batch = 0; batch < maxBatches; batch++) {
     const unreleasedSnap = await db.collection("orders")
       .where("resourcesReleased", "==", false)
       .where("paymentStatus", "in", ["expired", "failed", "creation_failed"])
-      .limit(50)
+      .limit(batchLimit)
       .get();
+    if (unreleasedSnap.empty) break;
     for (const doc of unreleasedSnap.docs) {
-      await releaseOrderResources(doc.ref, doc.data().resourceReleaseReason || "Durable recovery: Pending resource release retry");
+      if (await releaseOrderResources(doc.ref, doc.data().resourceReleaseReason || "Durable recovery: Pending resource release retry")) totalRecovered++;
     }
+    if (unreleasedSnap.size < batchLimit) break;
+  }
+
+  return { totalExpired, totalRecovered };
+}
+
+// ⏰ Automated Cloud Scheduler: executes starvation-free outbox recovery every 5 minutes.
+export const scheduledExpirePendingOrders = onSchedule(
+  { schedule: "every 5 minutes", region: "asia-southeast1" },
+  async () => {
+    await processOutboxRecoveryWorker(db, 5, 50);
   }
 );
 
@@ -425,23 +459,8 @@ export const expirePendingOrders = onCall(
     if (!isAdmin) {
       throw new HttpsError("permission-denied", "Only platform administrators can manually trigger order expiration.");
     }
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
-    const staleSnap = await db.collection("orders")
-      .where("paymentStatus", "in", ["pending", "charge_created_order_pending"])
-      .where("createdAt", "<=", fifteenMinutesAgo)
-      .limit(50)
-      .get();
-    for (const doc of staleSnap.docs) await releaseOrderResources(doc.ref, "Payment window expired (15 minutes)");
-
-    const unreleasedSnap = await db.collection("orders")
-      .where("resourcesReleased", "==", false)
-      .where("paymentStatus", "in", ["expired", "failed", "creation_failed"])
-      .limit(50)
-      .get();
-    for (const doc of unreleasedSnap.docs) {
-      await releaseOrderResources(doc.ref, doc.data().resourceReleaseReason || "Durable recovery: Pending resource release retry");
-    }
-    return { success: true, expiredCount: staleSnap.size, recoveredCount: unreleasedSnap.size };
+    const result = await processOutboxRecoveryWorker(db, 5, 50);
+    return { success: true, expiredCount: result.totalExpired, recoveredCount: result.totalRecovered };
   }
 );
 

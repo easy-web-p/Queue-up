@@ -151,6 +151,11 @@ function evaluateRules({ collection, action, auth, resource, requestResource }) 
     return false; // allow read, write: if false; (Universal Backend-Only)
   }
 
+  // --- Collection: /resource_release_jobs ---
+  if (collection === 'resource_release_jobs') {
+    return false; // allow read, write: if false; (Universal Backend-Only)
+  }
+
   return false;
 }
 
@@ -349,6 +354,24 @@ async function main() {
     });
     assert.equal(updateAllowed, false);
     assert.equal(deleteAllowed, false);
+  });
+
+  // Test 17: Client attempting to create/update/delete /resource_release_jobs is DENIED (Backend-Only)
+  await runTest('Test 17: Client creating or mutating /resource_release_jobs is strictly DENIED', async () => {
+    const createAllowed = evaluateRules({
+      collection: 'resource_release_jobs',
+      action: 'create',
+      auth: { uid: 'attacker_uid', token: { email: 'attacker@test.com' } },
+      requestResource: { id: 'job_fake_01', data: { status: 'completed' } }
+    });
+    const updateAllowed = evaluateRules({
+      collection: 'resource_release_jobs',
+      action: 'update',
+      auth: { uid: 'attacker_uid', token: { email: 'attacker@test.com' } },
+      requestResource: { data: { status: 'failed' } }
+    });
+    assert.equal(createAllowed, false);
+    assert.equal(updateAllowed, false);
   });
 
   const passRate = Math.round((passedTests / totalTests) * 100);
