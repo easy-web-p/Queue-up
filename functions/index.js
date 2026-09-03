@@ -9,6 +9,7 @@ import { defineSecret } from "firebase-functions/params";
 initializeApp();
 const db = getFirestore();
 const opnSecretKey = defineSecret("OPN_SECRET_KEY");
+const opnWebhookSignatureSecret = defineSecret("OPN_WEBHOOK_SIGNATURE_SECRET");
 
 async function opnRequest(path, key, body) {
   const response = await fetch(`https://api.omise.co${path}`, {
@@ -693,6 +694,11 @@ export async function completeOutboxJob(db, jobId, workerId, leaseToken) {
     if (!snap.exists) return { success: false, reason: "JOB_NOT_FOUND" };
     const job = snap.data();
     if (job.status === "completed") return { success: true, reason: "ALREADY_COMPLETED" };
+    const now = Date.now();
+    // 🔒 Strict Lease Invariant: Must not be expired AND token + owner must match
+    if ((job.leaseUntil || 0) <= now) {
+      return { success: false, reason: "LEASE_EXPIRED" };
+    }
     // Stale worker protection: token & owner must match
     if (job.leaseOwner !== workerId || job.leaseToken !== leaseToken) {
       return { success: false, reason: "STALE_WORKER_TOKEN_MISMATCH" };
@@ -722,9 +728,18 @@ export async function reconcilePendingRefundOrder(orderDocRef, { retrieveCharge,
   const paymentId = String(order.paymentId || "").trim();
   if (!paymentId) return { success: false, reason: "NO_PAYMENT_ID" };
 
-  const charge = await retrieveCharge(paymentId, opnSecretKey);
+  const rawOpnKey = typeof opnSecretKey === "object" && opnSecretKey?.value ? opnSecretKey.value() : opnSecretKey;
+  const charge = await retrieveCharge(paymentId, rawOpnKey);
   const refunds = charge?.refunds?.data || [];
-  const existingRefund = refunds.find(r => r.metadata?.refund_key === order.refundIdempotencyKey || r.metadata?.order_id === orderDocRef.id);
+  const expectedSatang = Math.round(Number(order.totalAmount || order.totalPrice) * 100);
+
+  // 🔒 High #3 Fix: Strict exact refund key match AND exact full amount match AND successful status
+  const existingRefund = refunds.find(r =>
+    r.metadata?.refund_key === order.refundIdempotencyKey &&
+    r.metadata?.order_id === orderDocRef.id &&
+    r.amount === expectedSatang &&
+    (r.status === "successful" || r.status === "pending" || !r.status || r.id?.startsWith("rfnd_"))
+  );
 
   if (existingRefund) {
     await orderDocRef.update({
@@ -741,6 +756,7 @@ export async function reconcilePendingRefundOrder(orderDocRef, { retrieveCharge,
       action: "REFUND_RECONCILED",
       orderId: orderDocRef.id,
       refundId: existingRefund.id,
+      amount: Number(existingRefund.amount || 0) / 100,
       createdAt: FieldValue.serverTimestamp()
     }, { merge: true });
     return { success: true, status: "RECOVERED_EXISTING_REFUND", refundId: existingRefund.id };
@@ -752,7 +768,9 @@ export async function reconcilePendingRefundOrder(orderDocRef, { retrieveCharge,
 export async function handleOpnWebhookCore(req, res, { db, retrieveCharge, releaseOrderResources, opnSecretKey, signatureSecret }) {
   if (req.method !== "POST") return res.status(405).send("Method not allowed");
   try {
-    if (signatureSecret && !verifyOpnWebhookSignature(req, signatureSecret)) {
+    const rawSecret = typeof signatureSecret === "object" && signatureSecret?.value ? signatureSecret.value() : signatureSecret;
+    // 🔒 Critical #1: Strictly fail-closed mandatory signature verification
+    if (!verifyOpnWebhookSignature(req, rawSecret)) {
       return res.status(401).send("Unauthorized: Invalid webhook signature");
     }
 
@@ -762,28 +780,13 @@ export async function handleOpnWebhookCore(req, res, { db, retrieveCharge, relea
       return res.status(400).send("Unsupported or missing webhook event key");
     }
 
-    // charge.create is recorded in webhook_events for tracking, but never transitions orders to paid
-    if (event.key === "charge.create") {
-      const eventId = String(event.id || event.data?.id || "").trim();
-      if (eventId) {
-        await db.collection("webhook_events").doc(eventId).set({
-          eventId,
-          eventKey: "charge.create",
-          chargeId: event.data?.id || null,
-          processed: true,
-          orderMutated: false,
-          createdAt: FieldValue.serverTimestamp()
-        }, { merge: true });
-      }
-      return res.status(200).send("Charge creation event acknowledged");
-    }
-
     const chargeId = event.data?.id;
     if (typeof chargeId !== "string" || !chargeId.trim() || !chargeId.startsWith("chrg_")) {
       return res.status(400).send("Invalid or missing Opn charge ID format");
     }
 
-    const charge = await retrieveCharge(chargeId.trim(), typeof opnSecretKey === "object" && opnSecretKey.value ? opnSecretKey.value() : opnSecretKey);
+    const rawOpnKey = typeof opnSecretKey === "object" && opnSecretKey?.value ? opnSecretKey.value() : opnSecretKey;
+    const charge = await retrieveCharge(chargeId.trim(), rawOpnKey);
     if (!charge || typeof charge !== "object") {
       return res.status(401).send("Unauthorized: Charge not found on payment provider");
     }
@@ -798,6 +801,32 @@ export async function handleOpnWebhookCore(req, res, { db, retrieveCharge, relea
     const eventId = (typeof event.id === "string" && event.id.trim())
       ? event.id.trim()
       : `evnt_${charge.id}_${event.key}_${charge.status}`;
+
+    // 🔒 Critical #2 Fix: charge.create goes through atomic eventId transaction checking binding
+    if (event.key === "charge.create") {
+      const createResult = await db.runTransaction(async (transaction) => {
+        const eventRef = db.collection("webhook_events").doc(eventId);
+        const eventSnap = await transaction.get(eventRef);
+        if (eventSnap?.exists) {
+          const prev = eventSnap.data();
+          if (prev.chargeId !== charge.id || prev.orderId !== orderId) {
+            return { code: 409, message: "Security Violation: Event ID already bound to a different charge/order" };
+          }
+          return { code: 200, message: "Charge creation event acknowledged" };
+        }
+        transaction.set(eventRef, {
+          eventId,
+          eventKey: "charge.create",
+          chargeId: charge.id,
+          orderId,
+          processed: true,
+          orderMutated: false,
+          createdAt: FieldValue.serverTimestamp()
+        });
+        return { code: 200, message: "Charge creation event acknowledged" };
+      });
+      return res.status(createResult.code).send(createResult.message);
+    }
 
     const txResult = await db.runTransaction(async (transaction) => {
       const eventRef = eventId ? db.collection("webhook_events").doc(eventId) : null;
@@ -930,8 +959,8 @@ export async function handleOpnWebhookCore(req, res, { db, retrieveCharge, relea
 }
 
 export const opnWebhook = onRequest(
-  { region: "asia-southeast1", secrets: [opnSecretKey] },
+  { region: "asia-southeast1", secrets: [opnSecretKey, opnWebhookSignatureSecret] },
   async (req, res) => {
-    return await handleOpnWebhookCore(req, res, { db, retrieveCharge, releaseOrderResources, opnSecretKey });
+    return await handleOpnWebhookCore(req, res, { db, retrieveCharge, releaseOrderResources, opnSecretKey, signatureSecret: opnWebhookSignatureSecret });
   }
 );

@@ -2818,6 +2818,414 @@ async function main() {
     assert.equal(audit.refundId, 'rfnd_102');
   });
 
+  // Scenario 103: handleOpnWebhookCore with missing/null secret strictly fails closed with HTTP 401
+  await runTest('Scenario 103: handleOpnWebhookCore with missing/null secret strictly fails closed (401)', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const dbAdapter = {
+      collection: (colName) => ({
+        doc: (docId) => ({
+          path: `${colName}/${docId}`,
+          get: async () => ({ exists: !!engine.getDoc(`${colName}/${docId}`), data: () => engine.getDoc(`${colName}/${docId}`) }),
+          update: async (d) => engine.setDoc(`${colName}/${docId}`, d, { merge: true }),
+          set: async (d, opts) => engine.setDoc(`${colName}/${docId}`, d, opts)
+        })
+      }),
+      runTransaction: (fn) => engine.runTransaction(fn)
+    };
+
+    let statusCode = 0;
+    let responseBody = "";
+    const mockRes = {
+      status: (code) => { statusCode = code; return mockRes; },
+      send: (body) => { responseBody = body; return mockRes; }
+    };
+
+    const mockReq = {
+      method: "POST",
+      headers: { "x-opn-signature": "some_sig" },
+      rawBody: '{"key":"charge.complete"}',
+      body: { key: "charge.complete" }
+    };
+
+    // Calling with undefined/null signatureSecret
+    const { handleOpnWebhookCore } = await import('./functions/index.js');
+    await handleOpnWebhookCore(mockReq, mockRes, {
+      db: dbAdapter,
+      retrieveCharge: async () => ({ id: "chrg_103" }),
+      releaseOrderResources: async () => true,
+      opnSecretKey: "skey_103",
+      signatureSecret: null // Missing/null secret!
+    });
+
+    assert.equal(statusCode, 401);
+    assert.ok(responseBody.includes("Unauthorized"));
+  });
+
+  // Scenario 104: charge.create event ID conflict against different charge/order returns HTTP 409 Conflict
+  await runTest('Scenario 104: charge.create with bound conflicting event ID strictly returns HTTP 409 Conflict', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const eventId = "evnt_conflict_104";
+    // Pre-existing event bound to charge_A
+    engine.setDoc(`webhook_events/${eventId}`, {
+      eventId,
+      eventKey: "charge.create",
+      chargeId: "chrg_original_A",
+      orderId: "ord_original_A",
+      processed: true
+    });
+
+    const dbAdapter = {
+      collection: (colName) => ({
+        doc: (docId) => ({
+          path: `${colName}/${docId}`,
+          get: async () => ({ exists: !!engine.getDoc(`${colName}/${docId}`), data: () => engine.getDoc(`${colName}/${docId}`) }),
+          update: async (d) => engine.setDoc(`${colName}/${docId}`, d, { merge: true }),
+          set: async (d, opts) => engine.setDoc(`${colName}/${docId}`, d, opts)
+        })
+      }),
+      runTransaction: (fn) => engine.runTransaction(fn)
+    };
+
+    const secret = "secret_104";
+    const rawBody = JSON.stringify({ id: eventId, key: "charge.create", data: { id: "chrg_attacker_B" } });
+    const sig = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+
+    let statusCode = 0;
+    let responseBody = "";
+    const mockRes = {
+      status: (code) => { statusCode = code; return mockRes; },
+      send: (body) => { responseBody = body; return mockRes; }
+    };
+    const mockReq = {
+      method: "POST",
+      headers: { "x-opn-signature": sig },
+      rawBody,
+      body: JSON.parse(rawBody)
+    };
+
+    const { handleOpnWebhookCore } = await import('./functions/index.js');
+    await handleOpnWebhookCore(mockReq, mockRes, {
+      db: dbAdapter,
+      retrieveCharge: async (id) => ({
+        id,
+        currency: "THB",
+        metadata: { orderId: "ord_attacker_B", uid: "uid_attacker_B" }
+      }),
+      releaseOrderResources: async () => true,
+      opnSecretKey: "skey_104",
+      signatureSecret: secret
+    });
+
+    assert.equal(statusCode, 409);
+    assert.ok(responseBody.includes("Security Violation"));
+  });
+
+  // Scenario 105: charge.create acknowledges atomically without mutating order payment state
+  await runTest('Scenario 105: charge.create acknowledges atomically without mutating order payment state', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const eventId = "evnt_create_105";
+    const orderId = "ord_105";
+    engine.setDoc(`orders/${orderId}`, { orderId, userId: "uid_105", paymentStatus: "pending", totalAmount: 120 });
+
+    const dbAdapter = {
+      collection: (colName) => ({
+        doc: (docId) => ({
+          path: `${colName}/${docId}`,
+          get: async () => ({ exists: !!engine.getDoc(`${colName}/${docId}`), data: () => engine.getDoc(`${colName}/${docId}`) }),
+          update: async (d) => engine.setDoc(`${colName}/${docId}`, d, { merge: true }),
+          set: async (d, opts) => engine.setDoc(`${colName}/${docId}`, d, opts)
+        })
+      }),
+      runTransaction: (fn) => engine.runTransaction(fn)
+    };
+
+    const secret = "secret_105";
+    const rawBody = JSON.stringify({ id: eventId, key: "charge.create", data: { id: "chrg_105" } });
+    const sig = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+
+    let statusCode = 0;
+    const mockRes = {
+      status: (code) => { statusCode = code; return mockRes; },
+      send: () => mockRes
+    };
+    const mockReq = {
+      method: "POST",
+      headers: { "x-opn-signature": sig },
+      rawBody,
+      body: JSON.parse(rawBody)
+    };
+
+    const { handleOpnWebhookCore } = await import('./functions/index.js');
+    await handleOpnWebhookCore(mockReq, mockRes, {
+      db: dbAdapter,
+      retrieveCharge: async (id) => ({
+        id,
+        currency: "THB",
+        metadata: { orderId, uid: "uid_105" }
+      }),
+      releaseOrderResources: async () => true,
+      opnSecretKey: "skey_105",
+      signatureSecret: secret
+    });
+
+    assert.equal(statusCode, 200);
+    // Invariant check: Webhook event is recorded, order payment state is strictly unchanged (pending)
+    assert.equal(engine.getDoc(`webhook_events/${eventId}`).processed, true);
+    assert.equal(engine.getDoc(`orders/${orderId}`).paymentStatus, "pending");
+  });
+
+  // Scenario 106: completeOutboxJob strictly fails when lease has expired
+  await runTest('Scenario 106: completeOutboxJob strictly fails when leaseUntil has expired', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const jobId = "job_expired_106";
+    const workerId = "worker_slow";
+    const leaseToken = "token_106";
+    const now = Date.now();
+
+    // Expired lease
+    engine.setDoc(`resource_release_jobs/${jobId}`, {
+      jobId,
+      status: "processing",
+      leaseOwner: workerId,
+      leaseToken,
+      leaseUntil: now - 1000 // 1 sec in the past
+    });
+
+    const dbAdapter = {
+      collection: (colName) => ({
+        doc: (docId) => ({
+          path: `${colName}/${docId}`
+        })
+      }),
+      runTransaction: (fn) => engine.runTransaction(fn)
+    };
+
+    const { completeOutboxJob } = await import('./functions/index.js');
+    const res = await completeOutboxJob(dbAdapter, jobId, workerId, leaseToken);
+
+    assert.equal(res.success, false);
+    assert.equal(res.reason, "LEASE_EXPIRED");
+    assert.equal(engine.getDoc(`resource_release_jobs/${jobId}`).status, "processing"); // Not completed!
+  });
+
+  // Scenario 107: reconcilePendingRefundOrder rejects partial amount refund from full terminal resolution
+  await runTest('Scenario 107: reconcilePendingRefundOrder rejects partial amount refund', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const orderId = "ord_partial_107";
+    const refundKey = `ref_${orderId}_chrg_107`;
+    engine.setDoc(`orders/${orderId}`, {
+      orderId,
+      paymentId: "chrg_107",
+      totalAmount: 150, // Expected 15000 Satang
+      paymentStatus: "refund_pending",
+      reconciliationStatus: "PROVIDER_REFUNDING",
+      refundIdempotencyKey: refundKey
+    });
+
+    const orderDocRef = {
+      id: orderId,
+      get: async () => ({ exists: true, data: () => engine.getDoc(`orders/${orderId}`) }),
+      update: async (d) => engine.setDoc(`orders/${orderId}`, d, { merge: true })
+    };
+
+    const dbAdapter = {
+      collection: (colName) => ({
+        doc: (docId) => ({
+          path: `${colName}/${docId}`,
+          set: async (d, opts) => engine.setDoc(`${colName}/${docId}`, d, opts)
+        })
+      })
+    };
+
+    const { reconcilePendingRefundOrder } = await import('./functions/index.js');
+    const result = await reconcilePendingRefundOrder(orderDocRef, {
+      retrieveCharge: async () => ({
+        refunds: {
+          data: [{
+            id: "rfnd_partial_107",
+            amount: 5000, // Only 50 THB instead of 150 THB!
+            status: "successful",
+            metadata: { refund_key: refundKey, order_id: orderId }
+          }]
+        }
+      }),
+      db: dbAdapter,
+      opnSecretKey: "skey_107"
+    });
+
+    assert.equal(result.success, false);
+    assert.equal(result.status, "NEEDS_RETRY");
+    assert.equal(engine.getDoc(`orders/${orderId}`).paymentStatus, "refund_pending"); // Not marked refunded!
+  });
+
+  // Scenario 108: reconcilePendingRefundOrder rejects mismatched refund_key
+  await runTest('Scenario 108: reconcilePendingRefundOrder rejects mismatched refund_key', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const orderId = "ord_mismatch_108";
+    engine.setDoc(`orders/${orderId}`, {
+      orderId,
+      paymentId: "chrg_108",
+      totalAmount: 200,
+      paymentStatus: "refund_pending",
+      reconciliationStatus: "PROVIDER_REFUNDING",
+      refundIdempotencyKey: `ref_${orderId}_chrg_108`
+    });
+
+    const orderDocRef = {
+      id: orderId,
+      get: async () => ({ exists: true, data: () => engine.getDoc(`orders/${orderId}`) }),
+      update: async (d) => engine.setDoc(`orders/${orderId}`, d, { merge: true })
+    };
+
+    const dbAdapter = {
+      collection: (colName) => ({
+        doc: (docId) => ({
+          path: `${colName}/${docId}`,
+          set: async (d, opts) => engine.setDoc(`${colName}/${docId}`, d, opts)
+        })
+      })
+    };
+
+    const { reconcilePendingRefundOrder } = await import('./functions/index.js');
+    const result = await reconcilePendingRefundOrder(orderDocRef, {
+      retrieveCharge: async () => ({
+        refunds: {
+          data: [{
+            id: "rfnd_other_108",
+            amount: 20000,
+            status: "successful",
+            metadata: { refund_key: "ref_DIFFERENT_KEY", order_id: orderId }
+          }]
+        }
+      }),
+      db: dbAdapter,
+      opnSecretKey: "skey_108"
+    });
+
+    assert.equal(result.success, false);
+    assert.equal(result.status, "NEEDS_RETRY");
+  });
+
+  // Scenario 109: reconcilePendingRefundOrder with exact amount, key, and status reconciles cleanly
+  await runTest('Scenario 109: reconcilePendingRefundOrder reconciles exact matching full refund cleanly', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const orderId = "ord_clean_109";
+    const refundKey = `ref_${orderId}_chrg_109`;
+    engine.setDoc(`orders/${orderId}`, {
+      orderId,
+      paymentId: "chrg_109",
+      totalAmount: 300,
+      paymentStatus: "refund_pending",
+      reconciliationStatus: "PROVIDER_REFUNDING",
+      refundIdempotencyKey: refundKey
+    });
+
+    const orderDocRef = {
+      id: orderId,
+      get: async () => ({ exists: true, data: () => engine.getDoc(`orders/${orderId}`) }),
+      update: async (d) => engine.setDoc(`orders/${orderId}`, d, { merge: true })
+    };
+
+    const dbAdapter = {
+      collection: (colName) => ({
+        doc: (docId) => ({
+          path: `${colName}/${docId}`,
+          set: async (d, opts) => engine.setDoc(`${colName}/${docId}`, d, opts)
+        })
+      })
+    };
+
+    const { reconcilePendingRefundOrder } = await import('./functions/index.js');
+    const result = await reconcilePendingRefundOrder(orderDocRef, {
+      retrieveCharge: async () => ({
+        refunds: {
+          data: [{
+            id: "rfnd_perfect_109",
+            amount: 30000,
+            status: "successful",
+            metadata: { refund_key: refundKey, order_id: orderId }
+          }]
+        }
+      }),
+      db: dbAdapter,
+      opnSecretKey: "skey_109"
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(result.status, "RECOVERED_EXISTING_REFUND");
+    assert.equal(result.refundId, "rfnd_perfect_109");
+    assert.equal(engine.getDoc(`orders/${orderId}`).paymentStatus, "refunded");
+    assert.equal(engine.getDoc(`orders/${orderId}`).reconciliationStatus, "REFUNDED");
+  });
+
+  // Scenario 110: Full end-to-end handleOpnWebhookCore execution with verified signature and valid payload
+  await runTest('Scenario 110: Full end-to-end handleOpnWebhookCore executes with verified HMAC and updates order', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const orderId = "ord_e2e_110";
+    const chargeId = "chrg_e2e_110";
+    engine.setDoc(`orders/${orderId}`, {
+      orderId,
+      userId: "uid_110",
+      totalAmount: 250,
+      paymentStatus: "pending",
+      status: "TO_SHIP",
+      queueStatus: "waiting"
+    });
+
+    const dbAdapter = {
+      collection: (colName) => ({
+        doc: (docId) => ({
+          id: docId,
+          path: `${colName}/${docId}`,
+          get: async () => ({ exists: !!engine.getDoc(`${colName}/${docId}`), data: () => engine.getDoc(`${colName}/${docId}`) }),
+          update: async (d) => engine.setDoc(`${colName}/${docId}`, d, { merge: true }),
+          set: async (d, opts) => engine.setDoc(`${colName}/${docId}`, d, opts)
+        })
+      }),
+      runTransaction: (fn) => engine.runTransaction(fn)
+    };
+
+    const secret = "secret_e2e_110";
+    const rawBody = JSON.stringify({
+      id: "evnt_110",
+      key: "charge.complete",
+      data: { id: chargeId }
+    });
+    const sig = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+
+    let statusCode = 0;
+    const mockRes = {
+      status: (code) => { statusCode = code; return mockRes; },
+      send: () => mockRes
+    };
+    const mockReq = {
+      method: "POST",
+      headers: { "x-opn-signature": sig },
+      rawBody,
+      body: JSON.parse(rawBody)
+    };
+
+    const { handleOpnWebhookCore } = await import('./functions/index.js');
+    await handleOpnWebhookCore(mockReq, mockRes, {
+      db: dbAdapter,
+      retrieveCharge: async () => ({
+        id: chargeId,
+        amount: 25000,
+        currency: "THB",
+        status: "successful",
+        metadata: { orderId, uid: "uid_110" }
+      }),
+      releaseOrderResources: async () => true,
+      opnSecretKey: "skey_110",
+      signatureSecret: secret
+    });
+
+    assert.equal(statusCode, 200);
+    assert.equal(engine.getDoc(`orders/${orderId}`).paymentStatus, "paid");
+    assert.equal(engine.getDoc(`webhook_events/evnt_110`).processed, true);
+    assert.equal(engine.getDoc(`audit_logs/pay_success_${orderId}_${chargeId}`).action, "PAYMENT_SUCCESSFUL");
+  });
+
   const passRate = Math.round((passedTests / totalTests) * 100);
   console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${passRate}%).`);
 
