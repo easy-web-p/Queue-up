@@ -578,29 +578,36 @@ async function main() {
     assert.throws(() => attemptTransition('ACCEPTED', 'ACCEPT'), /State machine violation/);
   });
 
-  // Scenario 17: True Order State Machine Forward Progression & Customer Cancellation Guard
-  await runTest('Scenario 17: Validates sequential state progression and blocks illegal backward/arbitrary jumps', async () => {
-    function isValidStatusTransition(oldStatus, newStatus) {
-      return (oldStatus === newStatus) ||
-             (oldStatus === 'TO_SHIP' && (newStatus === 'PREPARING' || newStatus === 'CANCELLED')) ||
-             (oldStatus === 'PREPARING' && (newStatus === 'READY' || newStatus === 'CANCELLED')) ||
-             (oldStatus === 'READY' && newStatus === 'COMPLETED');
+  // Scenario 17: Synchronized Coupled Order State Machine & Customer Cancellation Guard
+  await runTest('Scenario 17: Validates synchronized coupled state progression and blocks mismatched pairs', async () => {
+    function isValidOrderStateTransition(oldStatus, oldQueue, newStatus, newQueue) {
+      return (oldStatus === newStatus && oldQueue === newQueue) ||
+             (oldStatus === 'TO_SHIP' && oldQueue === 'waiting' && newStatus === 'PREPARING' && newQueue === 'cooking') ||
+             (oldStatus === 'PREPARING' && oldQueue === 'cooking' && newStatus === 'READY' && newQueue === 'ready') ||
+             (oldStatus === 'READY' && oldQueue === 'ready' && newStatus === 'COMPLETED' && newQueue === 'completed') ||
+             ((oldStatus === 'TO_SHIP' || oldStatus === 'PREPARING') && newStatus === 'CANCELLED' && newQueue === 'cancelled');
     }
 
     function canCustomerCancel(status, queueStatus) {
       return status === 'TO_SHIP' && queueStatus === 'waiting';
     }
 
-    // Valid forward transitions
-    assert.equal(isValidStatusTransition('TO_SHIP', 'PREPARING'), true);
-    assert.equal(isValidStatusTransition('PREPARING', 'READY'), true);
-    assert.equal(isValidStatusTransition('READY', 'COMPLETED'), true);
+    // Valid synchronized forward transitions
+    assert.equal(isValidOrderStateTransition('TO_SHIP', 'waiting', 'PREPARING', 'cooking'), true);
+    assert.equal(isValidOrderStateTransition('PREPARING', 'cooking', 'READY', 'ready'), true);
+    assert.equal(isValidOrderStateTransition('READY', 'ready', 'COMPLETED', 'completed'), true);
+    assert.equal(isValidOrderStateTransition('TO_SHIP', 'waiting', 'CANCELLED', 'cancelled'), true);
+    assert.equal(isValidOrderStateTransition('PREPARING', 'cooking', 'CANCELLED', 'cancelled'), true);
 
-    // Illegal backward / jump transitions
-    assert.equal(isValidStatusTransition('COMPLETED', 'TO_SHIP'), false);
-    assert.equal(isValidStatusTransition('READY', 'PREPARING'), false);
-    assert.equal(isValidStatusTransition('CANCELLED', 'TO_SHIP'), false);
-    assert.equal(isValidStatusTransition('TO_SHIP', 'COMPLETED'), false);
+    // Mismatched / uncoupled transitions (e.g. status advances but queueStatus stays behind)
+    assert.equal(isValidOrderStateTransition('TO_SHIP', 'waiting', 'PREPARING', 'waiting'), false);
+    assert.equal(isValidOrderStateTransition('PREPARING', 'cooking', 'READY', 'cooking'), false);
+    assert.equal(isValidOrderStateTransition('READY', 'ready', 'COMPLETED', 'ready'), false);
+
+    // Illegal backward transitions
+    assert.equal(isValidOrderStateTransition('COMPLETED', 'completed', 'TO_SHIP', 'waiting'), false);
+    assert.equal(isValidOrderStateTransition('READY', 'ready', 'PREPARING', 'cooking'), false);
+    assert.equal(isValidOrderStateTransition('CANCELLED', 'cancelled', 'TO_SHIP', 'waiting'), false);
 
     // Customer cancellation guards
     assert.equal(canCustomerCancel('TO_SHIP', 'waiting'), true);

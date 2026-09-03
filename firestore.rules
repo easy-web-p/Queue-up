@@ -38,19 +38,13 @@ service cloud.firestore {
       return val is int || val is float;
     }
 
-    // 🔒 True Order State Machine Validation Helpers
-    function isValidStatusTransition(oldStatus, newStatus) {
-      return (oldStatus == newStatus) ||
-             (oldStatus == 'TO_SHIP' && (newStatus == 'PREPARING' || newStatus == 'CANCELLED')) ||
-             (oldStatus == 'PREPARING' && (newStatus == 'READY' || newStatus == 'CANCELLED')) ||
-             (oldStatus == 'READY' && newStatus == 'COMPLETED');
-    }
-
-    function isValidQueueStatusTransition(oldQueue, newQueue) {
-      return (oldQueue == newQueue) ||
-             (oldQueue == 'waiting' && (newQueue == 'cooking' || newQueue == 'cancelled')) ||
-             (oldQueue == 'cooking' && (newQueue == 'ready' || newQueue == 'cancelled')) ||
-             (oldQueue == 'ready' && newQueue == 'completed');
+    // 🔒 Coupled Order State Machine Validation (Ensures status and queueStatus advance in synchronized pairs)
+    function isValidOrderStateTransition(oldStatus, oldQueue, newStatus, newQueue) {
+      return (oldStatus == newStatus && oldQueue == newQueue) ||
+             (oldStatus == 'TO_SHIP' && oldQueue == 'waiting' && newStatus == 'PREPARING' && newQueue == 'cooking') ||
+             (oldStatus == 'PREPARING' && oldQueue == 'cooking' && newStatus == 'READY' && newQueue == 'ready') ||
+             (oldStatus == 'READY' && oldQueue == 'ready' && newStatus == 'COMPLETED' && newQueue == 'completed') ||
+             ((oldStatus == 'TO_SHIP' || oldStatus == 'PREPARING') && newStatus == 'CANCELLED' && newQueue == 'cancelled');
     }
 
     // ==========================================
@@ -200,8 +194,8 @@ service cloud.firestore {
       // Direct client-side creation is blocked completely (Admin SDK on Cloud Functions bypasses rules).
       allow create: if false;
 
-      // 🔒 Restricted Update Keys & True State Transitions:
-      // Merchant can ONLY advance status forward (TO_SHIP -> PREPARING -> READY -> COMPLETED)
+      // 🔒 Restricted Update Keys & Synchronized State Transitions:
+      // Merchant can ONLY advance status forward in synchronized pairs (TO_SHIP/waiting -> PREPARING/cooking -> READY/ready -> COMPLETED/completed)
       // Merchant CANNOT mutate paymentStatus directly (must use resolvePaidAfterExpiredOrder Cloud Function)
       allow update: if isAuthenticated() && (
         isAdmin() ||
@@ -209,8 +203,12 @@ service cloud.firestore {
           resource.data.storeId != null && 
           isStoreOwner(resource.data.storeId) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['queueStatus', 'status', 'estimatedReadyTime', 'merchantNote', 'updatedAt']) &&
-          (!('status' in request.resource.data) || isValidStatusTransition(resource.data.status, request.resource.data.status)) &&
-          (!('queueStatus' in request.resource.data) || isValidQueueStatusTransition(resource.data.queueStatus, request.resource.data.queueStatus))
+          isValidOrderStateTransition(
+            resource.data.status,
+            resource.data.queueStatus,
+            ('status' in request.resource.data ? request.resource.data.status : resource.data.status),
+            ('queueStatus' in request.resource.data ? request.resource.data.queueStatus : resource.data.queueStatus)
+          )
         ) ||
         (
           // 🔒 Customer can only cancel prior to kitchen preparation (TO_SHIP & waiting)
