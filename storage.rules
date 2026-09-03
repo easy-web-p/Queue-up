@@ -20,14 +20,14 @@ service firebase.storage {
       );
     }
 
+    // 🔒 Source of Truth: Strictly query Firestore document ownership
     function isStoreOwner(shopId) {
       return isAuthenticated() && (
         isAdmin() ||
         (firestore.exists(/databases/(default)/documents/shops/$(shopId)) && 
          firestore.get(/databases/(default)/documents/shops/$(shopId)).data.ownerUid == request.auth.uid) ||
         (firestore.exists(/databases/(default)/documents/merchantProfiles/$(shopId)) && 
-         firestore.get(/databases/(default)/documents/merchantProfiles/$(shopId)).data.ownerUid == request.auth.uid) ||
-        request.auth.token.storeId == shopId
+         firestore.get(/databases/(default)/documents/merchantProfiles/$(shopId)).data.ownerUid == request.auth.uid)
       );
     }
 
@@ -51,19 +51,27 @@ service firebase.storage {
       allow delete: if isStoreOwner(shopId);
     }
 
-    // 3. Product Images (Store Owner / Admin only)
+    // 3. Product Images (Strict Firestore-backed Store Ownership & Metadata Integrity)
     match /products/{productId}/{allPaths=**} {
       allow read: if true;
       allow create, update: if isAuthenticated() && (
         isAdmin() ||
-        (firestore.exists(/databases/(default)/documents/products/$(productId)) && 
-         isStoreOwner(firestore.get(/databases/(default)/documents/products/$(productId)).data.storeId)) ||
-        (request.resource.metadata != null && isStoreOwner(request.resource.metadata.storeId))
+        (
+          firestore.exists(/databases/(default)/documents/products/$(productId)) && 
+          isStoreOwner(firestore.get(/databases/(default)/documents/products/$(productId)).data.storeId) &&
+          (
+            request.resource.metadata == null ||
+            request.resource.metadata.storeId == null ||
+            request.resource.metadata.storeId == firestore.get(/databases/(default)/documents/products/$(productId)).data.storeId
+          )
+        )
       ) && isValidImage(10);
       allow delete: if isAuthenticated() && (
         isAdmin() ||
-        (firestore.exists(/databases/(default)/documents/products/$(productId)) && 
-         isStoreOwner(firestore.get(/databases/(default)/documents/products/$(productId)).data.storeId))
+        (
+          firestore.exists(/databases/(default)/documents/products/$(productId)) && 
+          isStoreOwner(firestore.get(/databases/(default)/documents/products/$(productId)).data.storeId)
+        )
       );
     }
 

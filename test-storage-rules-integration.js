@@ -1,7 +1,8 @@
 /**
  * 🧪 QueueUp Firebase Storage Security Rules Integration Matrix
  * Validates storage.rules against multi-tenant isolation, MIME whitelists,
- * payload size boundaries, role-based store ownership, and deletion guards.
+ * payload size boundaries, role-based store ownership via Firestore lookups,
+ * and metadata spoofing prevention.
  */
 
 import assert from 'node:assert/strict';
@@ -30,10 +31,29 @@ async function runTest(name, fn) {
 }
 
 // ---------------------------------------------------------
-// Storage Rule Evaluator Model
+// Mock Firestore Database for Cross-Service Rules Lookups
 // ---------------------------------------------------------
 
-function evaluateStorageRules({ path: filePath, action, auth, resource, requestResource }) {
+const mockFirestoreDb = {
+  shops: {
+    store_A: { ownerUid: 'merchant_A_uid' },
+    store_B: { ownerUid: 'merchant_B_uid' },
+  },
+  merchantProfiles: {
+    store_A: { ownerUid: 'merchant_A_uid' },
+    store_B: { ownerUid: 'merchant_B_uid' },
+  },
+  products: {
+    prod_A1: { storeId: 'store_A' },
+    prod_B1: { storeId: 'store_B' },
+  }
+};
+
+// ---------------------------------------------------------
+// Storage Rule Evaluator Model (Exact match with storage.rules AST)
+// ---------------------------------------------------------
+
+function evaluateStorageRules({ path: filePath, action, auth, requestResource, db = mockFirestoreDb }) {
   const isAuthenticated = auth !== null;
   const isOwner = (uid) => isAuthenticated && auth.uid === uid;
   const isAdmin = () => isAuthenticated && (
@@ -43,10 +63,13 @@ function evaluateStorageRules({ path: filePath, action, auth, resource, requestR
     auth.token?.email === '58140@lomsak.ac.th'
   );
 
-  const isStoreOwner = (storeId) => {
+  const isStoreOwner = (shopId) => {
     if (!isAuthenticated) return false;
     if (isAdmin()) return true;
-    return auth.storeId === storeId || auth.merchantId === storeId;
+    const shopDoc = db.shops[shopId];
+    const profileDoc = db.merchantProfiles[shopId];
+    return (shopDoc && shopDoc.ownerUid === auth.uid) ||
+           (profileDoc && profileDoc.ownerUid === auth.uid);
   };
 
   const isValidImage = (maxSizeMB) => {
@@ -85,14 +108,29 @@ function evaluateStorageRules({ path: filePath, action, auth, resource, requestR
 
   // 3. /products/{productId}/*
   if (filePath.startsWith('/products/')) {
+    const segments = filePath.split('/').filter(Boolean);
+    const targetProductId = segments[1];
     if (action === 'read') return true;
+    
+    const productDoc = db.products[targetProductId];
+    const productExists = Boolean(productDoc);
+    const productStoreId = productDoc?.storeId;
+    
+    const isOwnerOfProductStore = productExists && isStoreOwner(productStoreId);
+    const metadataStoreId = requestResource?.metadata?.storeId;
+    const isMetadataConsistent = metadataStoreId == null || metadataStoreId === productStoreId;
+
     if (action === 'create' || action === 'update') {
-      const productStoreId = requestResource?.metadata?.storeId || resource?.metadata?.storeId;
-      return isAuthenticated && (isAdmin() || (productStoreId && isStoreOwner(productStoreId))) && isValidImage(10);
+      return isAuthenticated && (
+        isAdmin() ||
+        (productExists && isOwnerOfProductStore && isMetadataConsistent)
+      ) && isValidImage(10);
     }
     if (action === 'delete') {
-      const productStoreId = resource?.metadata?.storeId;
-      return isAuthenticated && (isAdmin() || (productStoreId && isStoreOwner(productStoreId)));
+      return isAuthenticated && (
+        isAdmin() ||
+        (productExists && isOwnerOfProductStore)
+      );
     }
   }
 
@@ -114,7 +152,7 @@ async function main() {
   // Test 2: Unauthenticated upload is DENIED
   await runTest('Test 2: Unauthenticated upload to any storage path is DENIED', async () => {
     const isAllowed = evaluateStorageRules({
-      path: '/shops/store_01/banner.jpg',
+      path: '/shops/store_A/banner.jpg',
       action: 'create',
       auth: null,
       requestResource: { contentType: 'image/jpeg', size: 1024 * 100 }
@@ -125,7 +163,7 @@ async function main() {
   // Test 3: Customer uploading to /shops/{shopId} is DENIED
   await runTest('Test 3: Customer uploading shop banner is DENIED', async () => {
     const isAllowed = evaluateStorageRules({
-      path: '/shops/store_01/banner.jpg',
+      path: '/shops/store_A/banner.jpg',
       action: 'create',
       auth: { uid: 'user_cust_01', token: { role: 'customer' } },
       requestResource: { contentType: 'image/jpeg', size: 1024 * 500 }
@@ -138,7 +176,7 @@ async function main() {
     const isAllowed = evaluateStorageRules({
       path: '/shops/store_B/logo.png',
       action: 'create',
-      auth: { uid: 'merchant_A_uid', storeId: 'store_A', token: { role: 'merchant' } },
+      auth: { uid: 'merchant_A_uid', token: { role: 'merchant' } },
       requestResource: { contentType: 'image/png', size: 1024 * 200 }
     });
     assert.equal(isAllowed, false);
@@ -149,7 +187,7 @@ async function main() {
     const isAllowed = evaluateStorageRules({
       path: '/shops/store_A/logo.png',
       action: 'create',
-      auth: { uid: 'merchant_A_uid', storeId: 'store_A', token: { role: 'merchant' } },
+      auth: { uid: 'merchant_A_uid', token: { role: 'merchant' } },
       requestResource: { contentType: 'image/png', size: 1024 * 200 }
     });
     assert.equal(isAllowed, true);
@@ -205,6 +243,50 @@ async function main() {
       path: '/shops/store_A/banner.jpg',
       action: 'delete',
       auth: { uid: 'user_cust_01', token: { role: 'customer' } }
+    });
+    assert.equal(isAllowed, false);
+  });
+
+  // Test 11: Merchant A uploading image for Product A1 (belongs to Store A) is ALLOWED
+  await runTest('Test 11: Merchant A uploading image for Product A1 (Store A) is ALLOWED', async () => {
+    const isAllowed = evaluateStorageRules({
+      path: '/products/prod_A1/photo.jpg',
+      action: 'create',
+      auth: { uid: 'merchant_A_uid', token: { role: 'merchant' } },
+      requestResource: { contentType: 'image/jpeg', size: 1024 * 400, metadata: { storeId: 'store_A' } }
+    });
+    assert.equal(isAllowed, true);
+  });
+
+  // Test 12: Merchant B uploading image for Product A1 (belongs to Store A) is DENIED
+  await runTest('Test 12: Merchant B uploading image for Product A1 (Store A) is DENIED', async () => {
+    const isAllowed = evaluateStorageRules({
+      path: '/products/prod_A1/photo.jpg',
+      action: 'create',
+      auth: { uid: 'merchant_B_uid', token: { role: 'merchant' } },
+      requestResource: { contentType: 'image/jpeg', size: 1024 * 400, metadata: { storeId: 'store_A' } }
+    });
+    assert.equal(isAllowed, false);
+  });
+
+  // Test 13: Product image upload with spoofed metadata (metadata claims Store A, but product belongs to Store B) is DENIED
+  await runTest('Test 13: Product image upload with spoofed metadata storeId is DENIED', async () => {
+    const isAllowed = evaluateStorageRules({
+      path: '/products/prod_B1/photo.jpg',
+      action: 'create',
+      auth: { uid: 'merchant_A_uid', token: { role: 'merchant' } },
+      requestResource: { contentType: 'image/jpeg', size: 1024 * 400, metadata: { storeId: 'store_A' } }
+    });
+    assert.equal(isAllowed, false);
+  });
+
+  // Test 14: Product image upload for non-existent product in Firestore is DENIED
+  await runTest('Test 14: Product image upload for non-existent product in Firestore is DENIED', async () => {
+    const isAllowed = evaluateStorageRules({
+      path: '/products/prod_nonexistent/photo.jpg',
+      action: 'create',
+      auth: { uid: 'merchant_A_uid', token: { role: 'merchant' } },
+      requestResource: { contentType: 'image/jpeg', size: 1024 * 400, metadata: { storeId: 'store_A' } }
     });
     assert.equal(isAllowed, false);
   });
