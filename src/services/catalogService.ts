@@ -1,11 +1,12 @@
 ﻿/**
- * 📦 QueueUp Catalog Service (Wave 4.2.1)
+ * 📦 QueueUp Catalog Service (Wave 4.2.1 Hardened)
  * Store-Isolated Catalog & Profile Management adhering strictly to Firestore Rules.
  */
 
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   setDoc,
   updateDoc,
@@ -135,7 +136,7 @@ export async function createStoreCategory(
 }
 
 /**
- * 🍲 3. PRODUCTS & MENU ITEMS (Store Isolated & Satang Integer)
+ * 🍲 3. PRODUCTS & MENU ITEMS (Store Isolated & Exact Validation)
  */
 
 export async function fetchStoreProducts(db: Firestore, storeId: string): Promise<MenuItem[]> {
@@ -163,8 +164,13 @@ export async function createStoreProduct(
     throw new Error('Price must be a positive number');
   }
 
+  // 🔒 Finding #3 Fix: Strictly REJECT negative stock input (no loose normalization)
+  if (productData.stock !== undefined && (typeof productData.stock !== 'number' || productData.stock < 0)) {
+    throw new Error('Stock cannot be negative');
+  }
+
   const priceSatang = productData.priceSatang ?? Math.round(priceBaht * 100);
-  const stock = typeof productData.stock === 'number' ? Math.max(0, productData.stock) : 20;
+  const stock = typeof productData.stock === 'number' ? productData.stock : 20;
 
   const prodRef = doc(collection(db, 'products'));
   const newProduct: MenuItem = {
@@ -196,6 +202,16 @@ export async function updateStoreProduct(
 ) {
   if (!storeId || !productId) throw new Error('storeId and productId are required');
 
+  const prodRef = doc(db, 'products', productId);
+
+  // 🔒 Finding #1 Fix: Verify product exists and matches caller storeId before update
+  const prodSnap = await getDoc(prodRef);
+  if (!prodSnap.exists()) throw new Error('Product not found');
+  const existingProduct = prodSnap.data();
+  if (existingProduct.storeId !== storeId) {
+    throw new Error('Unauthorized: Product does not belong to this store');
+  }
+
   const cleanUpdates: Record<string, unknown> = {
     updatedAt: serverTimestamp()
   };
@@ -209,7 +225,10 @@ export async function updateStoreProduct(
   }
   if (updates.isAvailable !== undefined) cleanUpdates.isAvailable = Boolean(updates.isAvailable);
   if (updates.stock !== undefined) {
-    cleanUpdates.stock = Math.max(0, Number(updates.stock));
+    if (typeof updates.stock !== 'number' || updates.stock < 0) {
+      throw new Error('Stock cannot be negative');
+    }
+    cleanUpdates.stock = updates.stock;
   }
   if (updates.price !== undefined) {
     const p = Number(updates.price);
@@ -221,13 +240,23 @@ export async function updateStoreProduct(
     cleanUpdates.modifierGroupIds = updates.modifierGroupIds;
   }
 
-  const prodRef = doc(db, 'products', productId);
   await updateDoc(prodRef, cleanUpdates);
   return { success: true, productId };
 }
 
-export async function deleteStoreProduct(db: Firestore, productId: string) {
+export async function deleteStoreProduct(db: Firestore, storeId: string, productId: string) {
+  if (!storeId || !productId) throw new Error('storeId and productId are required');
+
   const prodRef = doc(db, 'products', productId);
+
+  // 🔒 Finding #2 Fix: Verify product exists and matches caller storeId before deletion
+  const prodSnap = await getDoc(prodRef);
+  if (!prodSnap.exists()) throw new Error('Product not found');
+  const existingProduct = prodSnap.data();
+  if (existingProduct.storeId !== storeId) {
+    throw new Error('Unauthorized: Product does not belong to this store');
+  }
+
   await deleteDoc(prodRef);
   return { success: true, productId };
 }

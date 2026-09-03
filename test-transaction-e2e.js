@@ -3660,15 +3660,18 @@ async function main() {
     assert.equal(updated.ownerUid, "merchant_119"); // Preserved!
   });
 
-  // Scenario 120: Catalog Service: Create Product automatically calculates priceSatang and prevents negative stock
-  await runTest('Scenario 120: Catalog Service: Create Product enforces integer priceSatang and stock >= 0', async () => {
+  // Scenario 120: Catalog Service: Create Product enforces integer priceSatang and STRICTLY rejects negative stock
+  await runTest('Scenario 120: Catalog Service: Create Product enforces integer priceSatang and strictly rejects negative stock', async () => {
     const storeId = "store_catalog_120";
 
     function validateAndPrepareProduct(storeId, data) {
       if (!storeId) throw new Error("storeId is required");
       const priceBaht = Number(data.price);
       if (!Number.isFinite(priceBaht) || priceBaht <= 0) throw new Error("Price must be positive");
-      const stock = typeof data.stock === "number" ? Math.max(0, data.stock) : 20;
+      if (data.stock !== undefined && (typeof data.stock !== "number" || data.stock < 0)) {
+        throw new Error("Stock cannot be negative");
+      }
+      const stock = typeof data.stock === "number" ? data.stock : 20;
       return {
         storeId,
         name: data.name.trim(),
@@ -3683,9 +3686,8 @@ async function main() {
     assert.equal(validProd.priceSatang, 5950);
     assert.equal(validProd.stock, 15);
 
-    const zeroStockProd = validateAndPrepareProduct(storeId, { name: "เมนูหมด", price: 40, stock: -10 });
-    assert.equal(zeroStockProd.stock, 0); // Normalized to 0!
-
+    // Negative stock is strictly REJECTED (Finding #3)
+    assert.throws(() => validateAndPrepareProduct(storeId, { name: "เมนูผิด", price: 40, stock: -10 }), /Stock cannot be negative/);
     assert.throws(() => validateAndPrepareProduct(storeId, { name: "ฟรี", price: 0 }), /Price must be positive/);
   });
 
@@ -3735,6 +3737,76 @@ async function main() {
     const check = isShopAcceptingOrders(shop);
     assert.equal(check.accepting, false);
     assert.equal(check.reason, "ครัวแน่น ชะลอรับคิวชั่วคราว");
+  });
+
+  // Scenario 123: Pre-read Product Update: Attempting to update product of Store B using Store A credentials is rejected
+  await runTest('Scenario 123: Pre-read Product Update: Cross-store product update is strictly rejected before write', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const prodId = "prod_store_B_123";
+    engine.setDoc(`products/${prodId}`, {
+      id: prodId,
+      storeId: "store_B",
+      name: "เมนูของร้าน B",
+      price: 50
+    });
+
+    async function secureUpdateProduct(callerStoreId, targetProdId, updates) {
+      const prod = engine.getDoc(`products/${targetProdId}`);
+      if (!prod) throw new Error("Product not found");
+      if (prod.storeId !== callerStoreId) {
+        throw new Error("Unauthorized: Product does not belong to this store");
+      }
+      engine.setDoc(`products/${targetProdId}`, { ...prod, ...updates }, { merge: true });
+    }
+
+    // Caller from Store A tries to update product of Store B
+    await assert.rejects(
+      async () => secureUpdateProduct("store_A", prodId, { price: 99 }),
+      /Unauthorized: Product does not belong to this store/
+    );
+    assert.equal(engine.getDoc(`products/${prodId}`).price, 50); // Unmutated!
+  });
+
+  // Scenario 124: Pre-read Product Deletion: Attempting to delete product of Store B using Store A credentials is rejected
+  await runTest('Scenario 124: Pre-read Product Deletion: Cross-store product deletion is strictly rejected before write', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const prodId = "prod_store_B_124";
+    engine.setDoc(`products/${prodId}`, {
+      id: prodId,
+      storeId: "store_B",
+      name: "เมนูของร้าน B",
+      price: 50
+    });
+
+    async function secureDeleteProduct(callerStoreId, targetProdId) {
+      const prod = engine.getDoc(`products/${targetProdId}`);
+      if (!prod) throw new Error("Product not found");
+      if (prod.storeId !== callerStoreId) {
+        throw new Error("Unauthorized: Product does not belong to this store");
+      }
+      engine.storage.delete(`products/${targetProdId}`);
+    }
+
+    // Caller from Store A tries to delete product of Store B
+    await assert.rejects(
+      async () => secureDeleteProduct("store_A", prodId),
+      /Unauthorized: Product does not belong to this store/
+    );
+    assert.ok(engine.getDoc(`products/${prodId}`) !== null); // Still exists!
+  });
+
+  // Scenario 125: Product Update Negative Stock: Updating existing product with stock < 0 is strictly rejected
+  await runTest('Scenario 125: Product Update Negative Stock: Updating existing product with stock < 0 is strictly rejected', async () => {
+    function validateStockUpdate(newStock) {
+      if (typeof newStock !== "number" || newStock < 0) {
+        throw new Error("Stock cannot be negative");
+      }
+      return newStock;
+    }
+
+    assert.equal(validateStockUpdate(10), 10);
+    assert.equal(validateStockUpdate(0), 0);
+    assert.throws(() => validateStockUpdate(-1), /Stock cannot be negative/);
   });
 
   const passRate = Math.round((passedTests / totalTests) * 100);
