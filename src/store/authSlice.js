@@ -1,14 +1,28 @@
 import { createSlice } from '@reduxjs/toolkit'
 import { getEffectiveRoles, isUserSuperAdmin } from '../utils/authRoles.js'
 
-// Read saved user session from LocalStorage for auto-login persistence
+// Read saved user session from LocalStorage for initial UI display cache
+// 🔒 Security Policy: Roles NEVER trust LocalStorage and always default to ['customer'] until AuthContext onAuthStateChanged authoritatively verifies from Firebase Auth & Firestore
 const getInitialUser = () => {
   if (typeof window !== 'undefined') {
     try {
       const savedUser = localStorage.getItem('queueup_user');
       if (savedUser) {
         const parsed = JSON.parse(savedUser);
-        return filterSafeUserSession(parsed);
+        if (!parsed || typeof parsed !== 'object' || !parsed.uid) return null;
+        return {
+          uid: String(parsed.uid),
+          email: String(parsed.email || ""),
+          displayName: String(parsed.displayName || parsed.name || "ผู้ใช้งาน QueueUp"),
+          photoURL: String(parsed.photoURL || parsed.photo || "/yeti_mascot.jpg"),
+          roles: ["customer"],
+          activeRole: "customer",
+          isMerchantVerified: false,
+          isMerchantRegistered: false,
+          isSuperAdmin: false,
+          storeId: undefined,
+          school: String(parsed.school || "โรงเรียน"),
+        };
       }
     } catch (err) {
       console.warn('Error reading saved user session:', err);
@@ -17,7 +31,7 @@ const getInitialUser = () => {
   return null;
 };
 
-// Helper: Filter out sensitive fields and enforce role integrity before saving
+// Helper: Filter out sensitive fields and enforce role integrity before saving cache
 const filterSafeUserSession = (rawUser) => {
   if (!rawUser) return null;
   const { uid, email, displayName, name, photo, photoURL, activeRole, school, isMerchantVerified, isMerchantRegistered, storeId } = rawUser;

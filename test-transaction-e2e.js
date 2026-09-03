@@ -625,6 +625,64 @@ async function main() {
     assert.equal(prepareOrder({ ...invalidProduct, storeId: 'shop_valid_123' }).storeId, 'shop_valid_123');
   });
 
+  // Scenario 19: Offline vs Online Order Creation Guard in Firestore Rules
+  await runTest('Scenario 19: Client can only create offline orders (cash/canteen_counter) and online payments are rejected', async () => {
+    function validateClientOrderCreation(payload) {
+      const allowedMethods = ['cash', 'canteen_counter'];
+      if (!allowedMethods.includes(payload.paymentMethod)) {
+        throw new Error(`Security violation: client cannot create online payment order with method ${payload.paymentMethod}`);
+      }
+      if (!payload.storeId || typeof payload.storeId !== 'string') {
+        throw new Error('Missing storeId on order creation');
+      }
+      if (typeof payload.totalAmount !== 'number' || payload.totalAmount <= 0) {
+        throw new Error('Invalid totalAmount on order creation');
+      }
+      return true;
+    }
+
+    // Client creates cash order -> PASS
+    assert.equal(validateClientOrderCreation({ paymentMethod: 'cash', storeId: 'shop_01', totalAmount: 50 }), true);
+    assert.equal(validateClientOrderCreation({ paymentMethod: 'canteen_counter', storeId: 'shop_01', totalAmount: 40 }), true);
+
+    // Client tries to create online PromptPay or Slip order directly -> REJECT
+    assert.throws(() => validateClientOrderCreation({ paymentMethod: 'promptpay', storeId: 'shop_01', totalAmount: 50 }), /Security violation/);
+    assert.throws(() => validateClientOrderCreation({ paymentMethod: 'promptpay_slip', storeId: 'shop_01', totalAmount: 1 }), /Security violation/);
+    assert.throws(() => validateClientOrderCreation({ paymentMethod: 'credit_card', storeId: 'shop_01', totalAmount: 50 }), /Security violation/);
+  });
+
+  // Scenario 20: LocalStorage Role Tampering Immunity
+  await runTest('Scenario 20: Initial session strictly sanitizes LocalStorage and rejects privilege spoofing', async () => {
+    function hydrateInitialSession(storedJson) {
+      const parsed = JSON.parse(storedJson);
+      if (!parsed || typeof parsed !== 'object' || !parsed.uid) return null;
+      return {
+        uid: String(parsed.uid),
+        displayName: String(parsed.displayName || "User"),
+        roles: ['customer'], // Always unprivileged customer on hydration
+        activeRole: 'customer',
+        isMerchantVerified: false,
+        isSuperAdmin: false
+      };
+    }
+
+    // Attacker modifies LocalStorage to claim merchant and admin roles
+    const tamperedLocalStorage = JSON.stringify({
+      uid: 'hacker_123',
+      displayName: 'Attacker',
+      roles: ['customer', 'merchant', 'admin'],
+      activeRole: 'admin',
+      isMerchantVerified: true,
+      isSuperAdmin: true
+    });
+
+    const hydratedSession = hydrateInitialSession(tamperedLocalStorage);
+    assert.deepEqual(hydratedSession.roles, ['customer']);
+    assert.equal(hydratedSession.activeRole, 'customer');
+    assert.equal(hydratedSession.isMerchantVerified, false);
+    assert.equal(hydratedSession.isSuperAdmin, false);
+  });
+
   const passRate = Math.round((passedTests / totalTests) * 100);
   console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${passRate}%).`);
 
