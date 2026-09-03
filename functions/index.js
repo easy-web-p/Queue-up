@@ -639,13 +639,14 @@ export function isAllowedPaymentTransition(currentStatus, nextStatus, actor = "w
 }
 
 export function verifyOpnWebhookSignature(req, secret) {
-  if (!secret) return true;
+  if (!secret || typeof secret !== "string" || !secret.trim()) return false;
   const signatureHeader = req.headers?.["x-opn-signature"] || req.headers?.["x-signature"] || req.headers?.["omise-signature"];
-  if (!signatureHeader || typeof signatureHeader !== "string") return false;
+  if (!signatureHeader || typeof signatureHeader !== "string" || !signatureHeader.trim()) return false;
   try {
     const rawBody = typeof req.rawBody === "string" ? req.rawBody : (typeof req.body === "string" ? req.body : JSON.stringify(req.body));
-    const expectedSig = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
-    const bufA = Buffer.from(signatureHeader);
+    if (typeof rawBody !== "string") return false;
+    const expectedSig = crypto.createHmac("sha256", secret.trim()).update(rawBody).digest("hex");
+    const bufA = Buffer.from(signatureHeader.trim());
     const bufB = Buffer.from(expectedSig);
     if (bufA.length !== bufB.length) return false;
     return crypto.timingSafeEqual(bufA, bufB);

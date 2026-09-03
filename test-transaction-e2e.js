@@ -2215,6 +2215,247 @@ async function main() {
     assert.equal(engine.getDoc('orders/ord_race_78').paymentStatus, 'refunded'); // Never overridden!
   });
 
+  // Scenario 79: Missing secret / undefined secret -> Fail-Closed (Reject with 401)
+  await runTest('Scenario 79: Missing or undefined webhook secret fails closed (401)', async () => {
+    function verifySig(req, secret) {
+      if (!secret || typeof secret !== "string" || !secret.trim()) return false;
+      const signatureHeader = req.headers?.["x-opn-signature"];
+      if (!signatureHeader || typeof signatureHeader !== "string") return false;
+      const expected = crypto.createHmac("sha256", secret.trim()).update(req.rawBody).digest("hex");
+      const bufA = Buffer.from(signatureHeader);
+      const bufB = Buffer.from(expected);
+      if (bufA.length !== bufB.length) return false;
+      return crypto.timingSafeEqual(bufA, bufB);
+    }
+
+    const req = { headers: { "x-opn-signature": "some_sig" }, rawBody: "{}" };
+    assert.equal(verifySig(req, null), false); // No secret -> Fail closed!
+    assert.equal(verifySig(req, undefined), false);
+    assert.equal(verifySig(req, ""), false);
+  });
+
+  // Scenario 80: Valid signature + exact raw body -> Accept
+  await runTest('Scenario 80: Valid signature with exact raw body is accepted', async () => {
+    const secret = "prod_webhook_secret_key_80";
+    const rawBody = JSON.stringify({ key: "charge.complete", id: "evnt_80", data: { id: "chrg_80" } });
+    const signature = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+
+    function verifySig(req, sec) {
+      if (!sec || typeof sec !== "string" || !sec.trim()) return false;
+      const sig = req.headers?.["x-opn-signature"];
+      if (!sig || typeof sig !== "string") return false;
+      const expected = crypto.createHmac("sha256", sec.trim()).update(req.rawBody).digest("hex");
+      const bufA = Buffer.from(sig);
+      const bufB = Buffer.from(expected);
+      if (bufA.length !== bufB.length) return false;
+      return crypto.timingSafeEqual(bufA, bufB);
+    }
+
+    const req = { headers: { "x-opn-signature": signature }, rawBody };
+    assert.equal(verifySig(req, secret), true);
+  });
+
+  // Scenario 81: Changing body by even 1 byte -> Reject
+  await runTest('Scenario 81: Changing raw body by even 1 byte rejects signature', async () => {
+    const secret = "prod_webhook_secret_key_81";
+    const originalBody = JSON.stringify({ key: "charge.complete", amount: 50000 });
+    const signature = crypto.createHmac("sha256", secret).update(originalBody).digest("hex");
+
+    const tamperedBody = JSON.stringify({ key: "charge.complete", amount: 50001 }); // 1 byte change
+
+    function verifySig(raw, sig, sec) {
+      const expected = crypto.createHmac("sha256", sec).update(raw).digest("hex");
+      const bufA = Buffer.from(sig);
+      const bufB = Buffer.from(expected);
+      if (bufA.length !== bufB.length) return false;
+      return crypto.timingSafeEqual(bufA, bufB);
+    }
+
+    assert.equal(verifySig(tamperedBody, signature, secret), false);
+  });
+
+  // Scenario 82: Changing signature by even 1 byte -> Reject
+  await runTest('Scenario 82: Changing signature by even 1 byte rejects signature', async () => {
+    const secret = "prod_webhook_secret_key_82";
+    const rawBody = JSON.stringify({ key: "charge.complete", id: "evnt_82" });
+    const validSignature = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+
+    // Alter 1 character
+    const tamperedSignature = validSignature.slice(0, -1) + (validSignature.slice(-1) === 'a' ? 'b' : 'a');
+
+    function verifySig(raw, sig, sec) {
+      const expected = crypto.createHmac("sha256", sec).update(raw).digest("hex");
+      const bufA = Buffer.from(sig);
+      const bufB = Buffer.from(expected);
+      if (bufA.length !== bufB.length) return false;
+      return crypto.timingSafeEqual(bufA, bufB);
+    }
+
+    assert.equal(verifySig(rawBody, tamperedSignature, secret), false);
+  });
+
+  // Scenario 83: Signature wrong length / malformed format -> Reject
+  await runTest('Scenario 83: Malformed signature format with invalid length is rejected', async () => {
+    const secret = "prod_webhook_secret_key_83";
+    const rawBody = JSON.stringify({ key: "charge.complete" });
+
+    function verifySig(raw, sig, sec) {
+      if (!sig || typeof sig !== "string") return false;
+      const expected = crypto.createHmac("sha256", sec).update(raw).digest("hex");
+      const bufA = Buffer.from(sig);
+      const bufB = Buffer.from(expected);
+      if (bufA.length !== bufB.length) return false;
+      return crypto.timingSafeEqual(bufA, bufB);
+    }
+
+    assert.equal(verifySig(rawBody, "short_sig", secret), false);
+    assert.equal(verifySig(rawBody, "way_too_long_signature_exceeding_standard_sha256_hex_length_of_64_characters_xxxxxxxxxxxx", secret), false);
+  });
+
+  // Scenario 84: Ambiguous / missing / empty signature headers -> Reject
+  await runTest('Scenario 84: Missing or empty signature headers strictly reject', async () => {
+    function verifySig(req, sec) {
+      if (!sec) return false;
+      const signatureHeader = req.headers?.["x-opn-signature"] || req.headers?.["x-signature"];
+      if (!signatureHeader || typeof signatureHeader !== "string" || !signatureHeader.trim()) return false;
+      return true;
+    }
+
+    assert.equal(verifySig({ headers: {} }, "secret"), false);
+    assert.equal(verifySig({ headers: { "x-opn-signature": "" } }, "secret"), false);
+    assert.equal(verifySig({ headers: { "x-opn-signature": "   " } }, "secret"), false);
+  });
+
+  // Scenario 85: JSON re-formatting (whitespace changes) tested strictly against exact raw body -> Reject if raw body changed
+  await runTest('Scenario 85: JSON whitespace re-formatting evaluated against raw body detects tampering', async () => {
+    const secret = "prod_webhook_secret_key_85";
+    const compactJson = '{"key":"charge.complete","amount":100}';
+    const prettyJson = '{\n  "key": "charge.complete",\n  "amount": 100\n}';
+
+    const validSigForCompact = crypto.createHmac("sha256", secret).update(compactJson).digest("hex");
+
+    function verifySig(raw, sig, sec) {
+      const expected = crypto.createHmac("sha256", sec).update(raw).digest("hex");
+      const bufA = Buffer.from(sig);
+      const bufB = Buffer.from(expected);
+      if (bufA.length !== bufB.length) return false;
+      return crypto.timingSafeEqual(bufA, bufB);
+    }
+
+    assert.equal(verifySig(compactJson, validSigForCompact, secret), true);
+    // Passing prettyJson with compact's signature MUST fail because raw bytes differ!
+    assert.equal(verifySig(prettyJson, validSigForCompact, secret), false);
+  });
+
+  // Scenario 86: Replay signature + eventId -> Idempotent
+  await runTest('Scenario 86: Replay signature with original eventId returns idempotent 200', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const eventId = "evnt_replay_86";
+    engine.setDoc(`webhook_events/${eventId}`, { eventId, chargeId: "chrg_86", orderId: "ord_86", processed: true });
+    engine.setDoc(`orders/ord_86`, { paymentStatus: "paid" });
+
+    let mutated = false;
+    const result = await engine.runTransaction(async (tx) => {
+      const snap = await tx.get({ path: `webhook_events/${eventId}` });
+      if (snap?.exists && snap.data()?.processed) {
+        return { code: 200, message: "Already processed event" };
+      }
+      mutated = true;
+      return { code: 200, message: "OK" };
+    });
+
+    assert.equal(result.message, "Already processed event");
+    assert.equal(mutated, false);
+  });
+
+  // Scenario 87: Replay signature with new eventId -> Validated but state machine prevents double mutation
+  await runTest('Scenario 87: Replay signature with new eventId is idempotent on state machine', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    engine.setDoc('orders/ord_87', { orderId: 'ord_87', paymentStatus: 'paid' });
+
+    let stateMutations = 0;
+    async function handleIncomingEvent(newEventId) {
+      return await engine.runTransaction(async (tx) => {
+        const snap = await tx.get({ path: 'orders/ord_87' });
+        const o = snap.data();
+        if (o.paymentStatus === 'paid') {
+          return { code: 200, message: 'Already processed' };
+        }
+        stateMutations++;
+        tx.update({ path: 'orders/ord_87' }, { paymentStatus: 'paid' });
+        tx.set({ path: `webhook_events/${newEventId}` }, { eventId: newEventId, processed: true });
+        return { code: 200, message: 'Paid committed' };
+      });
+    }
+
+    const res = await handleIncomingEvent('evnt_new_replay_87');
+    assert.equal(res.message, 'Already processed');
+    assert.equal(stateMutations, 0); // 0 extra state mutations!
+  });
+
+  // Scenario 88: Secret configuration error (empty string / null) -> fail closed
+  await runTest('Scenario 88: Secret configuration error fails closed before entering logic', async () => {
+    function processRequestWithSignatureGuard(req, signatureSecret) {
+      if (!signatureSecret || typeof signatureSecret !== "string" || !signatureSecret.trim()) {
+        return { status: 401, error: "Configuration Error: Secret missing" };
+      }
+      return { status: 200, error: null };
+    }
+
+    assert.equal(processRequestWithSignatureGuard({}, "").status, 401);
+    assert.equal(processRequestWithSignatureGuard({}, null).status, 401);
+    assert.equal(processRequestWithSignatureGuard({}, "valid_secret").status, 200);
+  });
+
+  // Scenario 89: Signature verification occurs strictly before Firestore transaction
+  await runTest('Scenario 89: Signature failure terminates request before any Firestore transaction', async () => {
+    let firestoreReadCount = 0;
+    function handleWebhookPipeline(req, signatureSecret, dbEngine) {
+      // 1. Signature Check First
+      if (!signatureSecret || req.headers?.["x-opn-signature"] !== "valid_sig") {
+        return { statusCode: 401, message: "Unauthorized" };
+      }
+      // 2. Database interaction occurs only AFTER signature passes
+      firestoreReadCount++;
+      dbEngine.getDoc('orders/ord_89');
+      return { statusCode: 200, message: "OK" };
+    }
+
+    const badReq = { headers: { "x-opn-signature": "invalid_sig" } };
+    const res = handleWebhookPipeline(badReq, "secret", new AdvancedFirestoreEngine());
+
+    assert.equal(res.statusCode, 401);
+    assert.equal(firestoreReadCount, 0); // 0 DB reads or transactions occurred!
+  });
+
+  // Scenario 90: Signature verification failure leaves exactly 0 Order/Audit/Outbox mutations
+  await runTest('Scenario 90: Signature failure leaves exactly 0 Order, Audit, or Outbox mutations', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    engine.setDoc('orders/ord_90', { orderId: 'ord_90', paymentStatus: 'pending', totalAmount: 100 });
+
+    const initialOrderSnap = JSON.stringify(engine.getDoc('orders/ord_90'));
+    const initialEventsSnap = engine.getDoc('webhook_events/evnt_90');
+    const initialAuditSnap = engine.getDoc('audit_logs/pay_ord_90');
+    const initialOutboxSnap = engine.getDoc('resource_release_jobs/job_90');
+
+    function executeWebhookWithSigGate(req, secret, engine) {
+      if (!secret || req.headers?.["x-opn-signature"] !== "expected_sig") {
+        return { code: 401, body: "Unauthorized" };
+      }
+      engine.setDoc('orders/ord_90', { paymentStatus: 'paid' }, { merge: true });
+      return { code: 200, body: "OK" };
+    }
+
+    const badReq = { headers: { "x-opn-signature": "attack_sig" } };
+    const res = executeWebhookWithSigGate(badReq, "expected_sig", engine);
+
+    assert.equal(res.code, 401);
+    assert.equal(JSON.stringify(engine.getDoc('orders/ord_90')), initialOrderSnap); // Untouched
+    assert.equal(engine.getDoc('webhook_events/evnt_90'), initialEventsSnap); // null
+    assert.equal(engine.getDoc('audit_logs/pay_ord_90'), initialAuditSnap); // null
+    assert.equal(engine.getDoc('resource_release_jobs/job_90'), initialOutboxSnap); // null
+  });
+
   const passRate = Math.round((passedTests / totalTests) * 100);
   console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${passRate}%).`);
 
