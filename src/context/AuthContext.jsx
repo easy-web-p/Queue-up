@@ -13,17 +13,31 @@ export function AuthProvider({ children }) {
   const dispatch = useDispatch()
 
   useEffect(() => {
+    let currentSeq = 0;
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
+      const thisSeq = ++currentSeq;
+
+      if (!firebaseUser) {
+        // Explicitly clear user session and turn off loading
+        dispatch(clearUser());
+        return;
+      }
+
+      try {
         let userDocData = null;
         try {
           const userSnap = await getDoc(doc(db, "users", firebaseUser.uid));
+          // If a subsequent auth event or logout occurred while awaiting Firestore, drop this stale execution
+          if (thisSeq !== currentSeq) return;
           if (userSnap.exists()) {
             userDocData = userSnap.data();
           }
-        } catch (e) {
-          console.warn("Could not fetch user profile from Firestore:", e);
+        } catch (docErr) {
+          console.warn("Could not fetch user profile from Firestore:", docErr);
         }
+
+        if (thisSeq !== currentSeq) return;
 
         const mergedUser = {
           uid: firebaseUser.uid,
@@ -64,12 +78,35 @@ export function AuthProvider({ children }) {
           isFromCache: false,
           storeId: userDocData?.storeId || (isMerchant ? "store_canteen01" : undefined),
         }));
-      } else {
-        // When Firebase session expires / signs out externally, clear state
-        dispatch(clearUser());
+      } catch (fatalErr) {
+        console.error("Fatal error during auth state resolution:", fatalErr);
+        // Fallback: Dispatch safe customer session with verified auth so user is NEVER left in infinite loading
+        if (thisSeq === currentSeq) {
+          dispatch(setUser({
+            uid: firebaseUser.uid,
+            name: firebaseUser.displayName || "ผู้ใช้งาน QueueUp",
+            displayName: firebaseUser.displayName || "ผู้ใช้งาน QueueUp",
+            email: firebaseUser.email || "",
+            photo: firebaseUser.photoURL || "/yeti_mascot.jpg",
+            photoURL: firebaseUser.photoURL || "/yeti_mascot.jpg",
+            roles: ["customer"],
+            activeRole: "customer",
+            isGoogleUser: Boolean(firebaseUser.providerData?.some(p => p.providerId === 'google.com')),
+            isMerchantVerified: false,
+            isMerchantRegistered: false,
+            isSuperAdmin: false,
+            isVerifiedAuth: true,
+            isTokenVerified: true,
+            isFromCache: false,
+          }));
+        }
       }
     });
-    return () => unsubscribe();
+
+    return () => {
+      currentSeq++;
+      unsubscribe();
+    };
   }, [dispatch])
 
   const loginWithGoogle = async () => {

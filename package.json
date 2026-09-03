@@ -8,7 +8,9 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test:transaction": "node test-transaction-e2e.js"
+    "test:transaction": "node test-transaction-e2e.js",
+    "test:auth": "node test-auth-lifecycle.js",
+    "test": "node test-transaction-e2e.js && node test-auth-lifecycle.js"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.12.0",
