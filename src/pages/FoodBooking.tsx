@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Clock, Utensils, QrCode, CheckCircle2, ArrowLeft, ShieldCheck, Sparkles, MapPin, AlertCircle } from 'lucide-react';
-import { MenuItem, CartItem, Order, CustomerProfile } from '../types';
-import { saveOrderToFirestore } from '../lib/firebase';
+﻿import React, { useState } from 'react';
+import { Utensils, QrCode, CheckCircle2, ArrowLeft, Sparkles, AlertCircle } from 'lucide-react';
+import { CartItem, Order, CustomerProfile } from '../types';
+import { db } from '../firebase/config.js';
+import { createAuthoritativeStoreOrder } from '../services/orderCreationService';
 import { soundManager } from '../utils/audioNotification.js';
 
 interface FoodBookingPageProps {
@@ -20,8 +21,8 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
   const [pickupTime, setPickupTime] = useState('12:15');
   const [paymentMethod, setPaymentMethod] = useState<'promptpay' | 'cash'>('promptpay');
   const [customInstructions, setCustomInstructions] = useState('');
-  const [slipUrl, setSlipUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [orderError, setOrderError] = useState<string | null>(null);
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
 
   const calculateTotal = () => {
@@ -33,48 +34,48 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
     if (cartItems.length === 0) return;
 
     setIsSubmitting(true);
+    setOrderError(null);
 
-    const total = calculateTotal();
-    const queueNum = `A${Math.floor(10 + Math.random() * 90)}`;
-    const newOrder: Order = {
-      id: `ORD-${Date.now()}`,
-      queueNumber: queueNum,
-      customerName: currentUser?.name || 'นักเรียน QueueUp',
-      customerPhone: currentUser?.phone || '081-234-5678',
-      totalAmount: total,
-      finalAmount: total,
-      discountApplied: 0,
-      pointsEarned: Math.floor(total / 10),
-      items: cartItems,
-      queueStatus: paymentMethod === 'promptpay' ? 'waiting' : 'waiting',
-      paymentMethod,
-      paymentStatus: 'pending',
-      paymentVerificationMethod: paymentMethod === 'promptpay' ? 'slip_submitted' : 'counter_cash',
-      pickupTime,
-      createdAt: new Date().toISOString(),
-      estimatedReadyTime: `${pickupTime} น.`
-    };
+    const storeId = cartItems[0]?.menuItem?.storeId || 'store_canteen01';
+    const userId = currentUser?.id || currentUser?.uid || 'guest_user';
 
     try {
-      await saveOrderToFirestore(newOrder);
-    } catch (err) {
-      console.warn("Direct firestore order save fallback to local state:", err);
-    }
+      const result = await createAuthoritativeStoreOrder(db, {
+        storeId,
+        userId,
+        customerName: currentUser?.name || 'นักเรียน QueueUp',
+        customerPhone: currentUser?.phone || '081-234-5678',
+        pickupTime,
+        paymentMethod,
+        items: cartItems.map((c) => ({
+          productId: c.menuItem.id,
+          quantity: c.quantity,
+          customNotes: c.customNotes || customInstructions || '',
+          selectedModifiers: []
+        }))
+      });
 
-    // Save to user local order history
-    try {
-      const existing = JSON.parse(localStorage.getItem("queueup_user_orders") || "[]");
-      localStorage.setItem("queueup_user_orders", JSON.stringify([newOrder, ...existing]));
-    } catch {
-      // ignore
-    }
+      const orderData = result.order as Order;
 
-    soundManager.playQueueIssuedSound();
-    setIsSubmitting(false);
-    setCreatedOrder(newOrder);
+      // Update local history cache for instant UI rendering
+      try {
+        const existing = JSON.parse(localStorage.getItem('queueup_user_orders') || '[]');
+        localStorage.setItem('queueup_user_orders', JSON.stringify([orderData, ...existing]));
+      } catch {
+        // ignore
+      }
 
-    if (onBookingSuccess) {
-      onBookingSuccess(newOrder);
+      soundManager.playQueueIssuedSound();
+      setCreatedOrder(orderData);
+
+      if (onBookingSuccess) {
+        onBookingSuccess(orderData);
+      }
+    } catch (err: any) {
+      console.error('Order creation failed:', err);
+      setOrderError(err?.message || 'เกิดข้อผิดพลาดในการสร้างคำสั่งซื้อ กรุณาลองใหม่อีกครั้ง');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -103,6 +104,14 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
             รับแต้มสะสม CRM x2
           </div>
         </div>
+
+        {/* Error Alert */}
+        {orderError && (
+          <div className="bg-red-50 border-2 border-red-200 text-red-800 p-4 rounded-2xl flex items-center gap-3 animate-fade-in">
+            <AlertCircle className="w-6 h-6 text-red-600 shrink-0" />
+            <div className="text-xs font-bold">{orderError}</div>
+          </div>
+        )}
 
         {createdOrder ? (
           /* Digital Queue Ticket View */
@@ -201,6 +210,20 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
               </div>
             </div>
 
+            {/* Custom instructions */}
+            <div>
+              <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2">
+                คำสั่งพิเศษถึงร้านค้า (ถ้ามี)
+              </label>
+              <input
+                type="text"
+                value={customInstructions}
+                onChange={(e) => setCustomInstructions(e.target.value)}
+                placeholder="เช่น เผ็ดน้อย, ไม่ใส่ผัก, ขอช้อนส้อม"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium focus:outline-none focus:border-[#8B0000]"
+              />
+            </div>
+
             {/* Payment Method Select */}
             <div>
               <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2">
@@ -241,7 +264,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
               className="w-full py-4 bg-gradient-to-r from-[#8B0000] via-[#A50000] to-[#800000] hover:from-[#700000] hover:to-[#8B0000] text-white font-black text-base rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
             >
               <QrCode className="w-5 h-5" />
-              <span>{isSubmitting ? 'กำลังออกคิว...' : 'ยืนยันจองคิวอาหาร'}</span>
+              <span>{isSubmitting ? 'กำลังตรวจสอบโควตาและสร้างคิว...' : 'ยืนยันจองคิวอาหาร'}</span>
             </button>
 
           </form>

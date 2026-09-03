@@ -1,6 +1,6 @@
 ﻿/**
- * 🏪 storeOperationsService.ts (Wave 4.2.5)
- * Operating Hours Matrix (7-day), Emergency Rush Mode, Pause Engine, and Atomic Capacity Slot Reservation.
+ * 🏪 storeOperationsService.ts (Wave 4.2.5.x Hardened)
+ * Operating Hours Matrix (7-day + Overnight), Emergency Rush Mode, Pause Engine, and Authoritative Atomic Slot Reservation.
  */
 
 import {
@@ -42,23 +42,23 @@ export interface StoreAvailabilityResult {
 }
 
 /**
- * 🕒 1. Check Store Availability based on 7-Day Matrix and Operational Overrides
+ * 🕒 1. Check Store Availability based on 7-Day Matrix (with Overnight support) and Operational Overrides
  */
 export function evaluateStoreAvailability(
   store: StoreOperationalState,
   targetDate: Date = new Date()
 ): StoreAvailabilityResult {
-  // 1. Master switch check
+  // 1. Master switch check (Manual Override)
   if (!store.isOpen) {
     return { canAcceptOrder: false, reason: 'STORE_CLOSED_MANUALLY', estimatedBufferMinutes: 0 };
   }
 
-  // 2. Emergency Pause Check
+  // 2. Emergency Pause Check (Auto-resumes only if now >= pauseUntil)
   const override = store.operationalOverride;
   if (override?.isPaused) {
     const now = targetDate.getTime();
     if (override.pauseUntil && now >= override.pauseUntil) {
-      // Auto-resumed after pause expiration
+      // Auto-resumed logically after pause expiration
     } else {
       return {
         canAcceptOrder: false,
@@ -68,7 +68,7 @@ export function evaluateStoreAvailability(
     }
   }
 
-  // 3. 7-Day Operating Hours Matrix Check
+  // 3. 7-Day Operating Hours Matrix Check (Supports Overnight schedule)
   if (store.operatingHours) {
     const days: DayOfWeek[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     const currentDay = days[targetDate.getDay()];
@@ -83,20 +83,34 @@ export function evaluateStoreAvailability(
       const currentMinutes = targetDate.getMinutes().toString().padStart(2, '0');
       const currentTimeStr = `${currentHours}:${currentMinutes}`;
 
-      if (currentTimeStr < todaySchedule.open || currentTimeStr > todaySchedule.close) {
+      const { open, close } = todaySchedule;
+      let isWithinHours = false;
+
+      if (open <= close) {
+        // Standard daytime schedule (e.g. 08:00 - 17:00)
+        isWithinHours = currentTimeStr >= open && currentTimeStr <= close;
+      } else {
+        // Overnight schedule (e.g. 22:00 - 02:00)
+        isWithinHours = currentTimeStr >= open || currentTimeStr <= close;
+      }
+
+      if (!isWithinHours) {
         return {
           canAcceptOrder: false,
-          reason: `OUTSIDE_OPERATING_HOURS (${todaySchedule.open} - ${todaySchedule.close})`,
+          reason: `OUTSIDE_OPERATING_HOURS (${open} - ${close})`,
           estimatedBufferMinutes: 0
         };
       }
     }
   }
 
-  // 4. Rush Mode Buffer Calculation
+  // 4. Rush Mode Buffer Calculation (Rejects negative buffer strictly at creation/update, normalized safely at eval)
   let rushBuffer = 0;
   if (override?.isRushMode) {
-    rushBuffer = Math.max(0, override.rushBufferMinutes || 0);
+    if (override.rushBufferMinutes < 0) {
+      throw new Error('INVALID_BUFFER: rushBufferMinutes cannot be negative');
+    }
+    rushBuffer = override.rushBufferMinutes || 0;
   }
 
   return {
@@ -106,19 +120,35 @@ export function evaluateStoreAvailability(
 }
 
 /**
- * 🔒 2. Atomic Capacity Slot Reservation Boundary
- * Guarantees race-condition-free slot booking: check capacity + mutate count atomically in runTransaction.
+ * 🔒 2. Authoritative Atomic Capacity Slot Reservation Boundary
+ * Reads shop maxOrdersPerSlot from authoritative Store doc inside transaction rather than trusting client input.
  */
 export async function reserveCapacitySlotAtomic(
   db: Firestore,
   storeId: string,
   slotId: string,
-  maxCapacity: number
-): Promise<{ success: boolean; slotId: string; currentOrders: number }> {
+  clientCapacityHint?: number
+): Promise<{ success: boolean; slotId: string; currentOrders: number; capacity: number }> {
   if (!storeId || !slotId) throw new Error('storeId and slotId are required');
-  if (maxCapacity <= 0) throw new Error('maxCapacity must be greater than 0');
 
   return await runTransaction(db, async (tx) => {
+    // 🔒 1. Authoritative Store Capacity Pre-read
+    const shopRef = doc(db, 'shops', storeId);
+    const shopSnap = await tx.get(shopRef);
+
+    let authoritativeCapacity = 20; // Default fallback if not set in store doc
+    if (shopSnap.exists()) {
+      const shopData = shopSnap.data();
+      if (typeof shopData.maxOrdersPerSlot === 'number' && shopData.maxOrdersPerSlot > 0) {
+        authoritativeCapacity = shopData.maxOrdersPerSlot;
+      } else if (shopData.capacityConfig?.maxOrdersPerSlot && shopData.capacityConfig.maxOrdersPerSlot > 0) {
+        authoritativeCapacity = shopData.capacityConfig.maxOrdersPerSlot;
+      }
+    } else if (clientCapacityHint && clientCapacityHint > 0) {
+      authoritativeCapacity = clientCapacityHint;
+    }
+
+    // 🔒 2. Read current slot orders atomically
     const slotRef = doc(db, 'store_slots', slotId);
     const slotSnap = await tx.get(slotRef);
 
@@ -131,8 +161,8 @@ export async function reserveCapacitySlotAtomic(
       currentOrders = Number(slotData.currentOrders) || 0;
     }
 
-    if (currentOrders + 1 > maxCapacity) {
-      throw new Error(`SLOT_CAPACITY_EXCEEDED: Slot ${slotId} is fully booked (${currentOrders}/${maxCapacity})`);
+    if (currentOrders + 1 > authoritativeCapacity) {
+      throw new Error(`SLOT_CAPACITY_EXCEEDED: Slot ${slotId} is fully booked (${currentOrders}/${authoritativeCapacity})`);
     }
 
     const nextCount = currentOrders + 1;
@@ -141,13 +171,13 @@ export async function reserveCapacitySlotAtomic(
       {
         slotId,
         storeId,
-        capacity: maxCapacity,
+        capacity: authoritativeCapacity,
         currentOrders: nextCount,
         updatedAt: new Date()
       },
       { merge: true }
     );
 
-    return { success: true, slotId, currentOrders: nextCount };
+    return { success: true, slotId, currentOrders: nextCount, capacity: authoritativeCapacity };
   });
 }

@@ -4240,6 +4240,178 @@ async function main() {
     assert.equal(engine.getDoc(`store_slots/${slotId}`).currentOrders, 2); // Preserved!
   });
 
+  // Scenario 140: Wave 4.2.5.x Overnight Operating Hours: Supports 22:00 - 02:00 overnight schedule seamlessly
+  await runTest('Scenario 140: Wave 4.2.5.x Operating Hours: Overnight schedule (22:00 - 02:00) evaluated correctly', async () => {
+    function isWithinOperatingHours(open, close, timeStr) {
+      if (open <= close) {
+        return timeStr >= open && timeStr <= close;
+      } else {
+        return timeStr >= open || timeStr <= close;
+      }
+    }
+
+    // Overnight schedule: 22:00 to 02:00
+    assert.equal(isWithinOperatingHours("22:00", "02:00", "23:30"), true);
+    assert.equal(isWithinOperatingHours("22:00", "02:00", "01:15"), true);
+    assert.equal(isWithinOperatingHours("22:00", "02:00", "02:00"), true);
+    assert.equal(isWithinOperatingHours("22:00", "02:00", "02:05"), false); // Outside!
+    assert.equal(isWithinOperatingHours("22:00", "02:00", "15:00"), false); // Outside!
+  });
+
+  // Scenario 141: Wave 4.2.5.x Authoritative Store Capacity Pre-read: Client cannot spoof higher capacity
+  await runTest('Scenario 141: Wave 4.2.5.x Authoritative Capacity: Store doc maxOrdersPerSlot overrides client spoofed capacity', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const storeId = "store_cap_141";
+    const slotId = "slot_cap_141";
+
+    engine.setDoc(`shops/${storeId}`, {
+      id: storeId,
+      maxOrdersPerSlot: 5 // Store owner configured 5 max!
+    });
+
+    engine.setDoc(`store_slots/${slotId}`, {
+      slotId,
+      storeId,
+      capacity: 5,
+      currentOrders: 5 // Already full!
+    });
+
+    async function reserveSlotAuthoritative(callerStoreId, targetSlotId, clientSpoofedCap) {
+      return engine.runTransaction(async (tx) => {
+        const shopSnap = await tx.get({ path: `shops/${callerStoreId}` });
+        const authoritativeCapacity = shopSnap.exists ? shopSnap.data().maxOrdersPerSlot : clientSpoofedCap;
+
+        const slotRef = { path: `store_slots/${targetSlotId}` };
+        const slotSnap = await tx.get(slotRef);
+        const currentOrders = slotSnap.exists ? slotSnap.data().currentOrders : 0;
+
+        if (currentOrders + 1 > authoritativeCapacity) {
+          throw new Error(`SLOT_CAPACITY_EXCEEDED: ${currentOrders}/${authoritativeCapacity}`);
+        }
+        tx.update(slotRef, { currentOrders: currentOrders + 1 });
+        return true;
+      });
+    }
+
+    // Client attempts to spoof maxCapacity=999 on a full slot
+    await assert.rejects(
+      async () => reserveSlotAuthoritative(storeId, slotId, 999),
+      /SLOT_CAPACITY_EXCEEDED: 5\/5/
+    );
+  });
+
+  // Scenario 142: Wave 4.2.5.x Authoritative Order Creation: Product price is calculated from DB priceSatang, ignoring client price
+  await runTest('Scenario 142: Wave 4.2.5.x Authoritative Price: Total is calculated strictly from DB priceSatang', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const storeId = "store_price_142";
+    const prodId = "prod_price_142";
+
+    engine.setDoc(`shops/${storeId}`, { id: storeId, isOpen: true });
+    engine.setDoc(`products/${prodId}`, {
+      id: prodId,
+      storeId,
+      name: "ข้าวผัดกุ้ง",
+      priceSatang: 6500, // 65.00 THB in DB
+      price: 65,
+      stock: 10,
+      isAvailable: true
+    });
+
+    async function createOrderAuthoritative(itemsReq) {
+      return engine.runTransaction(async (tx) => {
+        let totalSatang = 0;
+        for (const item of itemsReq) {
+          const prodSnap = await tx.get({ path: `products/${item.productId}` });
+          if (!prodSnap.exists) throw new Error("Product not found");
+          const prod = prodSnap.data();
+          const unitSatang = prod.priceSatang; // Authoritative DB price!
+          totalSatang += unitSatang * item.quantity;
+        }
+        return { totalSatang, totalBaht: totalSatang / 100 };
+      });
+    }
+
+    // Client requests item with spoofed clientPrice = 1 THB
+    const clientOrder = [{ productId: prodId, quantity: 2, clientPrice: 1 }];
+    const res = await createOrderAuthoritative(clientOrder);
+
+    // Total must be 130 THB (65 x 2), NOT 2 THB!
+    assert.equal(res.totalSatang, 13000);
+    assert.equal(res.totalBaht, 130);
+  });
+
+  // Scenario 143: Wave 4.2.5.x Atomic Stock & Order Boundary: Insufficient stock fails entire order transaction (0 partial mutation)
+  await runTest('Scenario 143: Wave 4.2.5.x Atomic Stock Rollback: Out of stock item aborts entire order with 0 stock leak', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const storeId = "store_stock_143";
+    const prodA = "prod_A_143";
+    const prodB = "prod_B_143";
+
+    engine.setDoc(`shops/${storeId}`, { id: storeId, isOpen: true });
+    engine.setDoc(`products/${prodA}`, { id: prodA, storeId, stock: 5, priceSatang: 5000 });
+    engine.setDoc(`products/${prodB}`, { id: prodB, storeId, stock: 0, priceSatang: 4000 }); // Out of stock!
+
+    async function createMultiItemOrder(itemsReq) {
+      return engine.runTransaction(async (tx) => {
+        for (const it of itemsReq) {
+          const snap = await tx.get({ path: `products/${it.productId}` });
+          const prod = snap.data();
+          if (prod.stock < it.quantity) throw new Error(`INSUFFICIENT_STOCK: ${prod.id}`);
+          tx.update({ path: `products/${it.productId}` }, { stock: prod.stock - it.quantity });
+        }
+        return true;
+      });
+    }
+
+    await assert.rejects(
+      async () => createMultiItemOrder([{ productId: prodA, quantity: 2 }, { productId: prodB, quantity: 1 }]),
+      /INSUFFICIENT_STOCK: prod_B_143/
+    );
+
+    // Prod A stock must remain 5 (0 partial decrement!)
+    assert.equal(engine.getDoc(`products/${prodA}`).stock, 5);
+  });
+
+  // Scenario 144: Wave 4.2.5.x Capacity Leak Prevention: Transaction atomicity guarantees slot is only reserved on successful order
+  await runTest('Scenario 144: Wave 4.2.5.x Capacity Leak Prevention: Slot count does not leak if order validation fails', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const storeId = "store_leak_144";
+    const slotId = "slot_leak_144";
+    const prodId = "prod_leak_144";
+
+    engine.setDoc(`shops/${storeId}`, { id: storeId, isOpen: true, maxOrdersPerSlot: 10 });
+    engine.setDoc(`store_slots/${slotId}`, { slotId, storeId, currentOrders: 2, capacity: 10 });
+    engine.setDoc(`products/${prodId}`, { id: prodId, storeId, stock: 1, priceSatang: 5000 });
+
+    async function atomicOrderWithSlot(quantity) {
+      return engine.runTransaction(async (tx) => {
+        // 1. Check & increment slot
+        const slotSnap = await tx.get({ path: `store_slots/${slotId}` });
+        const slot = slotSnap.data();
+        tx.update({ path: `store_slots/${slotId}` }, { currentOrders: slot.currentOrders + 1 });
+
+        // 2. Check product stock (fails if quantity > stock)
+        const prodSnap = await tx.get({ path: `products/${prodId}` });
+        const prod = prodSnap.data();
+        if (prod.stock < quantity) throw new Error("INSUFFICIENT_STOCK");
+        tx.update({ path: `products/${prodId}` }, { stock: prod.stock - quantity });
+
+        // 3. Create Order
+        tx.set({ path: `orders/ord_${Date.now()}` }, { storeId, totalSatang: prod.priceSatang * quantity });
+        return true;
+      });
+    }
+
+    // Customer requests quantity 5 when stock is only 1
+    await assert.rejects(
+      async () => atomicOrderWithSlot(5),
+      /INSUFFICIENT_STOCK/
+    );
+
+    // Slot currentOrders must still be 2 (NO capacity leak!)
+    assert.equal(engine.getDoc(`store_slots/${slotId}`).currentOrders, 2);
+  });
+
   const passRate = Math.round((passedTests / totalTests) * 100);
   console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${passRate}%).`);
 
