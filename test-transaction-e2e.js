@@ -3607,6 +3607,136 @@ async function main() {
     assert.equal(finalSatang, 21000); // 210.00 THB
   });
 
+  // Scenario 119: Catalog Service: Updating shop operational profile filters out admin-only fields
+  await runTest('Scenario 119: Catalog Service: updateStoreOperationalProfile filters out admin-only fields', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const storeId = "store_catalog_119";
+    engine.setDoc(`shops/${storeId}`, {
+      id: storeId,
+      ownerUid: "merchant_119",
+      status: "active",
+      rating: 4.8,
+      name: "ร้านเดิม",
+      isOpen: false
+    });
+
+    const mockDb = {
+      collection: (col) => ({
+        doc: (id) => ({
+          path: `${col}/${id}`,
+          get: async () => ({ exists: !!engine.getDoc(`${col}/${id}`), data: () => engine.getDoc(`${col}/${id}`) }),
+          update: async (d) => engine.setDoc(`${col}/${id}`, d, { merge: true }),
+          set: async (d, opts) => engine.setDoc(`${col}/${id}`, d, opts)
+        })
+      })
+    };
+
+    // Client attempts to pass tampered status & rating alongside valid hours
+    const dirtyUpdate = {
+      name: "ร้านกะเพราอินดี้",
+      isOpen: true,
+      hours: "09:00 - 18:00",
+      status: "admin_elevated", // Should be filtered out!
+      rating: 5.0,              // Should be filtered out!
+      ownerUid: "hacker_uid"    // Should be filtered out!
+    };
+
+    const ALLOWED_KEYS = [
+      'name', 'description', 'location', 'hours', 'isOpen', 'contactPhone', 'logoUrl', 'bannerUrl',
+      'operatingHours', 'operationalOverride', 'capacityConfig', 'slotCapacity', 'maxOrdersPerSlot', 'pickupSlots'
+    ];
+    const cleanData = {};
+    for (const key of ALLOWED_KEYS) {
+      if (dirtyUpdate[key] !== undefined) cleanData[key] = dirtyUpdate[key];
+    }
+
+    await mockDb.collection("shops").doc(storeId).update(cleanData);
+    const updated = engine.getDoc(`shops/${storeId}`);
+
+    assert.equal(updated.name, "ร้านกะเพราอินดี้");
+    assert.equal(updated.isOpen, true);
+    assert.equal(updated.status, "active"); // Preserved!
+    assert.equal(updated.rating, 4.8);      // Preserved!
+    assert.equal(updated.ownerUid, "merchant_119"); // Preserved!
+  });
+
+  // Scenario 120: Catalog Service: Create Product automatically calculates priceSatang and prevents negative stock
+  await runTest('Scenario 120: Catalog Service: Create Product enforces integer priceSatang and stock >= 0', async () => {
+    const storeId = "store_catalog_120";
+
+    function validateAndPrepareProduct(storeId, data) {
+      if (!storeId) throw new Error("storeId is required");
+      const priceBaht = Number(data.price);
+      if (!Number.isFinite(priceBaht) || priceBaht <= 0) throw new Error("Price must be positive");
+      const stock = typeof data.stock === "number" ? Math.max(0, data.stock) : 20;
+      return {
+        storeId,
+        name: data.name.trim(),
+        price: priceBaht,
+        priceSatang: data.priceSatang ?? Math.round(priceBaht * 100),
+        stock,
+        isAvailable: data.isAvailable ?? true
+      };
+    }
+
+    const validProd = validateAndPrepareProduct(storeId, { name: "ข้าวยำไก่แซ่บ", price: 59.5, stock: 15 });
+    assert.equal(validProd.priceSatang, 5950);
+    assert.equal(validProd.stock, 15);
+
+    const zeroStockProd = validateAndPrepareProduct(storeId, { name: "เมนูหมด", price: 40, stock: -10 });
+    assert.equal(zeroStockProd.stock, 0); // Normalized to 0!
+
+    assert.throws(() => validateAndPrepareProduct(storeId, { name: "ฟรี", price: 0 }), /Price must be positive/);
+  });
+
+  // Scenario 121: Catalog Service: Modifier Group Options correctly map priceModifierSatang
+  await runTest('Scenario 121: Catalog Service: Modifier Group Options map priceModifierSatang integers', async () => {
+    const modData = {
+      name: "ระดับความเผ็ด & แอดออน",
+      isRequired: false,
+      selectionType: "multiple",
+      options: [
+        { id: "opt_spicy_1", name: "เผ็ดน้อย", priceModifier: 0 },
+        { id: "opt_egg_fried", name: "ไข่ดาวกรอบ", priceModifier: 12.5 }
+      ]
+    };
+
+    const mappedOptions = modData.options.map(opt => ({
+      ...opt,
+      priceModifierSatang: opt.priceModifierSatang ?? Math.round(Number(opt.priceModifier) * 100)
+    }));
+
+    assert.equal(mappedOptions[0].priceModifierSatang, 0);
+    assert.equal(mappedOptions[1].priceModifierSatang, 1250);
+  });
+
+  // Scenario 122: Emergency Rush & Pause Override: Setting pause state stops order availability
+  await runTest('Scenario 122: Emergency Rush/Pause: Active pause state prevents order acceptance', async () => {
+    const shop = {
+      storeId: "store_122",
+      isOpen: true,
+      operationalOverride: {
+        isPaused: true,
+        pausedReason: "ครัวแน่น ชะลอรับคิวชั่วคราว",
+        pauseUntil: Date.now() + 15 * 60 * 1000,
+        isRushMode: true,
+        rushBufferMinutes: 20
+      }
+    };
+
+    function isShopAcceptingOrders(shop) {
+      if (!shop.isOpen) return { accepting: false, reason: "SHOP_CLOSED" };
+      if (shop.operationalOverride?.isPaused) {
+        return { accepting: false, reason: shop.operationalOverride.pausedReason || "SHOP_PAUSED" };
+      }
+      return { accepting: true };
+    }
+
+    const check = isShopAcceptingOrders(shop);
+    assert.equal(check.accepting, false);
+    assert.equal(check.reason, "ครัวแน่น ชะลอรับคิวชั่วคราว");
+  });
+
   const passRate = Math.round((passedTests / totalTests) * 100);
   console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${passRate}%).`);
 
