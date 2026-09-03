@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Utensils, QrCode, ArrowLeft, Sparkles, AlertCircle, Clock, CheckCircle2 } from 'lucide-react';
 import { CartItem, Order, CustomerProfile } from '../types';
 import { db } from '../firebase/config.js';
@@ -140,8 +140,8 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
             </div>
             
             <div className="bg-gradient-to-r from-[#8B0000] via-[#A50000] to-[#800000] text-white p-6 rounded-3xl shadow-xl max-w-sm mx-auto">
-              <span className="text-xs font-extrabold uppercase tracking-widest text-amber-200">หมายเลขคิวของคุณ</span>
-              <div className="text-5xl font-black my-2 tracking-wider text-amber-300">{createdOrder.queueNumber}</div>
+              <span className="text-xs font-extrabold uppercase tracking-widest text-amber-200">รหัสการจองชั่วคราว (Reservation No.)</span>
+              <div className="text-5xl font-black my-2 tracking-wider text-amber-300">{(createdOrder as any).reservationNumber || createdOrder.queueNumber || 'R001'}</div>
               <div className="inline-block px-3 py-1 bg-amber-400 text-amber-950 rounded-full text-xs font-black">
                 {createdOrder.paymentMethod === 'promptpay' ? 'รอการชำระเงิน (Pending Payment)' : 'รอชำระเงินสดหน้าร้าน'}
               </div>
