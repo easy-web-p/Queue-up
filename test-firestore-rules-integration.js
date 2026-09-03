@@ -111,6 +111,74 @@ function evaluateRules({ collection, action, auth, resource, requestResource }) 
     }
   }
 
+  // --- Collection: /food_categories ---
+  if (collection === 'food_categories') {
+    if (action === 'read') return true;
+    if (!isAuthenticated) return false;
+    if (isAdmin()) return true;
+    const storeId = requestResource?.data?.storeId || resource?.data?.storeId;
+    if (!storeId || !isStoreOwner(storeId)) return false;
+    if (action === 'update' && requestResource?.data?.storeId !== resource?.data?.storeId) return false;
+    return true;
+  }
+
+  // --- Collection: /products ---
+  if (collection === 'products') {
+    if (action === 'read') return true;
+    if (!isAuthenticated) return false;
+    if (isAdmin()) return true;
+    const storeId = requestResource?.data?.storeId || resource?.data?.storeId;
+    if (!storeId || !isStoreOwner(storeId)) return false;
+    if (action === 'create') {
+      const p = requestResource.data;
+      if (typeof p.name !== 'string' || p.name.length < 1 || p.name.length > 250) return false;
+      if (typeof p.price !== 'number' || p.price <= 0) return false;
+      if ('priceSatang' in p && (typeof p.priceSatang !== 'number' || p.priceSatang <= 0)) return false;
+      if ('stock' in p && (typeof p.stock !== 'number' || p.stock < 0)) return false;
+      return true;
+    }
+    if (action === 'update') {
+      if (requestResource.data.storeId !== resource.data.storeId) return false; // 🔒 Lock storeId
+      if ('price' in requestResource.data && (typeof requestResource.data.price !== 'number' || requestResource.data.price <= 0)) return false;
+      if ('priceSatang' in requestResource.data && (typeof requestResource.data.priceSatang !== 'number' || requestResource.data.priceSatang <= 0)) return false;
+      if ('stock' in requestResource.data && (typeof requestResource.data.stock !== 'number' || requestResource.data.stock < 0)) return false;
+      return true;
+    }
+    if (action === 'delete') return isStoreOwner(resource.data.storeId);
+  }
+
+  // --- Collection: /modifier_groups ---
+  if (collection === 'modifier_groups') {
+    if (action === 'read') return true;
+    if (!isAuthenticated) return false;
+    if (isAdmin()) return true;
+    const storeId = requestResource?.data?.storeId || resource?.data?.storeId;
+    if (!storeId || !isStoreOwner(storeId)) return false;
+    if (action === 'update' && requestResource.data.storeId !== resource.data.storeId) return false; // 🔒 Lock storeId
+    return true;
+  }
+
+  // --- Collection: /store_slots ---
+  if (collection === 'store_slots') {
+    if (action === 'read') return true;
+    return false; // 🔒 Universal Backend-Only: allow write: if false;
+  }
+
+  // --- Collection: /shops ---
+  if (collection === 'shops') {
+    if (action === 'read') return true;
+    if (action === 'create') return isAuthenticated && (isAdmin() || requestResource.data?.ownerUid === auth.uid);
+    if (action === 'update') {
+      if (!isAuthenticated) return false;
+      if (isAdmin()) return true;
+      if (isStoreOwner(resource?.id) && requestResource.data?.ownerUid === resource?.data?.ownerUid) {
+        return true;
+      }
+      return false; // Cannot transfer ownerUid
+    }
+    if (action === 'delete') return isAdmin();
+  }
+
   // --- Collection: /users ---
   if (collection === 'users') {
     if (action === 'read') {
@@ -372,6 +440,108 @@ async function main() {
     });
     assert.equal(createAllowed, false);
     assert.equal(updateAllowed, false);
+  });
+
+  // Test 18: Store Owner A creating product in Store A is ALLOWED
+  await runTest('Test 18: Store Owner A creating product in Store A is ALLOWED', async () => {
+    const isAllowed = evaluateRules({
+      collection: 'products',
+      action: 'create',
+      auth: { uid: 'merchant_A_uid', storeId: 'store_A' },
+      requestResource: { data: { storeId: 'store_A', name: 'ข้าวผัดกะเพรา', price: 50, priceSatang: 5000, stock: 20 } }
+    });
+    assert.equal(isAllowed, true);
+  });
+
+  // Test 19: Store Owner A creating product in Store B is DENIED (Store Isolation)
+  await runTest('Test 19: Store Owner A creating product in Store B is DENIED', async () => {
+    const isAllowed = evaluateRules({
+      collection: 'products',
+      action: 'create',
+      auth: { uid: 'merchant_A_uid', storeId: 'store_A' },
+      requestResource: { data: { storeId: 'store_B', name: 'ข้าวผัดกะเพรา', price: 50, priceSatang: 5000, stock: 20 } }
+    });
+    assert.equal(isAllowed, false);
+  });
+
+  // Test 20: Store Owner A modifying product storeId to Store B is strictly DENIED
+  await runTest('Test 20: Store Owner modifying product storeId to another store is strictly DENIED', async () => {
+    const isAllowed = evaluateRules({
+      collection: 'products',
+      action: 'update',
+      auth: { uid: 'merchant_A_uid', storeId: 'store_A' },
+      resource: { data: { storeId: 'store_A', name: 'ต้มยำกุ้ง', price: 80, stock: 10 } },
+      requestResource: { data: { storeId: 'store_B', name: 'ต้มยำกุ้ง', price: 80, stock: 10 } }
+    });
+    assert.equal(isAllowed, false);
+  });
+
+  // Test 21: Product with negative stock is DENIED
+  await runTest('Test 21: Creating or updating product with negative stock is DENIED', async () => {
+    const isAllowed = evaluateRules({
+      collection: 'products',
+      action: 'create',
+      auth: { uid: 'merchant_A_uid', storeId: 'store_A' },
+      requestResource: { data: { storeId: 'store_A', name: 'ข้าวมันไก่', price: 50, stock: -5 } }
+    });
+    assert.equal(isAllowed, false);
+  });
+
+  // Test 22: Store Owner modifying ownerUid of Shop is strictly DENIED
+  await runTest('Test 22: Store Owner attempting to transfer shop ownerUid is strictly DENIED', async () => {
+    const isAllowed = evaluateRules({
+      collection: 'shops',
+      action: 'update',
+      auth: { uid: 'merchant_A_uid', storeId: 'store_A' },
+      resource: { id: 'store_A', data: { ownerUid: 'merchant_A_uid', name: 'ร้าน A' } },
+      requestResource: { data: { ownerUid: 'merchant_imposter_uid', name: 'ร้าน A' } }
+    });
+    assert.equal(isAllowed, false);
+  });
+
+  // Test 23: Store Owner creating Modifier Group in own store is ALLOWED
+  await runTest('Test 23: Store Owner creating Modifier Group in own store is ALLOWED', async () => {
+    const isAllowed = evaluateRules({
+      collection: 'modifier_groups',
+      action: 'create',
+      auth: { uid: 'merchant_A_uid', storeId: 'store_A' },
+      requestResource: { data: { storeId: 'store_A', name: 'ระดับความหวาน' } }
+    });
+    assert.equal(isAllowed, true);
+  });
+
+  // Test 24: Store Owner creating Modifier Group in Store B is DENIED
+  await runTest('Test 24: Store Owner creating Modifier Group in Store B is DENIED', async () => {
+    const isAllowed = evaluateRules({
+      collection: 'modifier_groups',
+      action: 'create',
+      auth: { uid: 'merchant_A_uid', storeId: 'store_A' },
+      requestResource: { data: { storeId: 'store_B', name: 'ระดับความหวาน' } }
+    });
+    assert.equal(isAllowed, false);
+  });
+
+  // Test 25: Client mutating store_slots directly in Firestore is strictly DENIED (Backend Only)
+  await runTest('Test 25: Client mutating store_slots directly in Firestore is strictly DENIED', async () => {
+    const isAllowed = evaluateRules({
+      collection: 'store_slots',
+      action: 'update',
+      auth: { uid: 'customer_01' },
+      resource: { data: { currentOrders: 5, capacity: 10 } },
+      requestResource: { data: { currentOrders: 6, capacity: 10 } }
+    });
+    assert.equal(isAllowed, false);
+  });
+
+  // Test 26: Store Owner creating Food Category in own store is ALLOWED
+  await runTest('Test 26: Store Owner creating Food Category in own store is ALLOWED', async () => {
+    const isAllowed = evaluateRules({
+      collection: 'food_categories',
+      action: 'create',
+      auth: { uid: 'merchant_A_uid', storeId: 'store_A' },
+      requestResource: { data: { storeId: 'store_A', name: 'เครื่องดื่ม' } }
+    });
+    assert.equal(isAllowed, true);
   });
 
   const passRate = Math.round((passedTests / totalTests) * 100);

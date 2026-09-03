@@ -3496,6 +3496,117 @@ async function main() {
     assert.equal(engine.getDoc(`webhook_events/${eventId}`), null);
   });
 
+  // Scenario 115: Atomic Stock Validation: Order requesting quantity > stock is rejected and stock remains untouched
+  await runTest('Scenario 115: Atomic Stock Validation: Insufficient stock throws error and preserves stock level', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const productId = "prod_stock_115";
+    engine.setDoc(`products/${productId}`, {
+      productId,
+      name: "ข้าวกะเพราหมูกรอบ",
+      price: 60,
+      priceSatang: 6000,
+      stock: 3,
+      isAvailable: true,
+      storeId: "store_115"
+    });
+
+    const quantityRequested = 5;
+    let errorThrown = false;
+    try {
+      await engine.runTransaction(async (tx) => {
+        const prodRef = { path: `products/${productId}` };
+        const prodSnap = await tx.get(prodRef);
+        const prod = prodSnap.data();
+        if (prod.stock < quantityRequested) {
+          throw new Error(`INSUFFICIENT_STOCK: Available ${prod.stock}, requested ${quantityRequested}`);
+        }
+        tx.update(prodRef, { stock: prod.stock - quantityRequested });
+      });
+    } catch (err) {
+      errorThrown = true;
+      assert.ok(err.message.includes("INSUFFICIENT_STOCK"));
+    }
+
+    assert.equal(errorThrown, true);
+    assert.equal(engine.getDoc(`products/${productId}`).stock, 3); // 0 dirty decrement!
+  });
+
+  // Scenario 116: Concurrent Slot Booking: 2 concurrent transactions booking last slot capacity serialize with exactly 1 success
+  await runTest('Scenario 116: Concurrent Slot Booking: Only 1 transaction books last remaining capacity without overbooking', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const slotId = "slot_20260903_1200";
+    engine.setDoc(`store_slots/${slotId}`, {
+      slotId,
+      storeId: "store_116",
+      capacity: 10,
+      currentOrders: 9 // Only 1 spot left!
+    });
+
+    async function bookSlot() {
+      return engine.runTransaction(async (tx) => {
+        const slotRef = { path: `store_slots/${slotId}` };
+        const slotSnap = await tx.get(slotRef);
+        const slot = slotSnap.data();
+        if (slot.currentOrders + 1 > slot.capacity) {
+          throw new Error("SLOT_FULL");
+        }
+        tx.update(slotRef, { currentOrders: slot.currentOrders + 1 });
+        return "BOOKED";
+      });
+    }
+
+    const results = await Promise.allSettled([bookSlot(), bookSlot()]);
+    const fulfilled = results.filter(r => r.status === "fulfilled");
+    const rejected = results.filter(r => r.status === "rejected");
+
+    assert.equal(fulfilled.length, 1);
+    assert.equal(rejected.length, 1);
+    assert.equal(engine.getDoc(`store_slots/${slotId}`).currentOrders, 10); // Strictly <= capacity!
+  });
+
+  // Scenario 117: Normalized Modifier Group Selection: Inactive modifier or option is rejected
+  await runTest('Scenario 117: Normalized Modifier Validation: Out of stock modifier option is rejected', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const modGroupId = "mod_toppings_117";
+    engine.setDoc(`modifier_groups/${modGroupId}`, {
+      id: modGroupId,
+      storeId: "store_117",
+      name: "ท็อปปิ้ง",
+      isRequired: false,
+      selectionType: "multiple",
+      options: [
+        { id: "opt_egg", name: "ไข่ดาว", priceModifierSatang: 1000, isOutOfStock: false },
+        { id: "opt_cheese", name: "ชีส", priceModifierSatang: 1500, isOutOfStock: true } // Out of stock!
+      ]
+    });
+
+    function validateSelectedModifier(modGroup, selectedOptId) {
+      const opt = modGroup.options.find(o => o.id === selectedOptId);
+      if (!opt) throw new Error("MODIFIER_NOT_FOUND");
+      if (opt.isOutOfStock) throw new Error("MODIFIER_OUT_OF_STOCK");
+      return opt.priceModifierSatang;
+    }
+
+    const group = engine.getDoc(`modifier_groups/${modGroupId}`);
+    assert.equal(validateSelectedModifier(group, "opt_egg"), 1000);
+    assert.throws(() => validateSelectedModifier(group, "opt_cheese"), /MODIFIER_OUT_OF_STOCK/);
+  });
+
+  // Scenario 118: Price Satang Integrity: Calculation using exact integers avoids floating point precision drift
+  await runTest('Scenario 118: Satang Integrity: Exact integer calculation with priceSatang avoids float drift', async () => {
+    const unitPriceSatang = 6500; // 65.00 THB
+    const toppingPriceSatang = 1000; // 10.00 THB
+    const quantity = 3;
+    const discountSatang = 1500; // 15.00 THB
+
+    const subtotalSatang = (unitPriceSatang + toppingPriceSatang) * quantity;
+    const finalSatang = Math.max(100, subtotalSatang - discountSatang);
+
+    assert.equal(Number.isInteger(subtotalSatang), true);
+    assert.equal(subtotalSatang, 22500); // 225.00 THB
+    assert.equal(finalSatang, 21000); // 210.00 THB
+  });
+
   const passRate = Math.round((passedTests / totalTests) * 100);
   console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${passRate}%).`);
 

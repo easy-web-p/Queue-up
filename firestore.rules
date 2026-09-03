@@ -48,11 +48,29 @@ service cloud.firestore {
     }
 
     // ==========================================
-    // 1. FOOD CATEGORIES (Public Read, Admin Write)
+    // 1. FOOD CATEGORIES (Store Isolated or Admin Default)
     // ==========================================
     match /food_categories/{catId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create: if isAuthenticated() && (
+        isAdmin() || 
+        (request.resource.data.storeId != null && isStoreOwner(request.resource.data.storeId))
+      ) && isValidString(request.resource.data.name, 1, 100);
+      
+      allow update: if isAuthenticated() && (
+        isAdmin() || 
+        (
+          resource.data.storeId != null && 
+          isStoreOwner(resource.data.storeId) &&
+          request.resource.data.storeId == resource.data.storeId &&
+          isValidString(request.resource.data.name, 1, 100)
+        )
+      );
+      
+      allow delete: if isAuthenticated() && (
+        isAdmin() || 
+        (resource.data.storeId != null && isStoreOwner(resource.data.storeId))
+      );
     }
 
     // ==========================================
@@ -65,6 +83,7 @@ service cloud.firestore {
         (request.resource.data.storeId != null && isStoreOwner(request.resource.data.storeId))
       ) && isValidString(request.resource.data.name, 1, 250) && 
         isValidNumber(request.resource.data.price) && request.resource.data.price > 0 &&
+        (!('priceSatang' in request.resource.data) || (isValidNumber(request.resource.data.priceSatang) && request.resource.data.priceSatang > 0)) &&
         (!('stock' in request.resource.data) || (isValidNumber(request.resource.data.stock) && request.resource.data.stock >= 0));
       
       // 🔒 Lock storeId: Store Owner cannot reassign products to other stores, and price must be positive
@@ -75,7 +94,35 @@ service cloud.firestore {
           isStoreOwner(resource.data.storeId) &&
           request.resource.data.storeId == resource.data.storeId &&
           (!('price' in request.resource.data) || (isValidNumber(request.resource.data.price) && request.resource.data.price > 0)) &&
+          (!('priceSatang' in request.resource.data) || (isValidNumber(request.resource.data.priceSatang) && request.resource.data.priceSatang > 0)) &&
           (!('stock' in request.resource.data) || (isValidNumber(request.resource.data.stock) && request.resource.data.stock >= 0))
+        )
+      );
+      
+      allow delete: if isAuthenticated() && (
+        isAdmin() || 
+        (resource.data.storeId != null && isStoreOwner(resource.data.storeId))
+      );
+    }
+
+    // ==========================================
+    // 2.1 MODIFIER GROUPS (Store Isolated Options Engine)
+    // ==========================================
+    match /modifier_groups/{modifierGroupId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && (
+        isAdmin() || 
+        (request.resource.data.storeId != null && isStoreOwner(request.resource.data.storeId))
+      ) && isValidString(request.resource.data.name, 1, 100);
+      
+      // 🔒 Lock storeId: Store Owner cannot reassign modifier groups across stores
+      allow update: if isAuthenticated() && (
+        isAdmin() || 
+        (
+          resource.data.storeId != null && 
+          isStoreOwner(resource.data.storeId) &&
+          request.resource.data.storeId == resource.data.storeId &&
+          isValidString(request.resource.data.name, 1, 100)
         )
       );
       
@@ -113,6 +160,14 @@ service cloud.firestore {
         allow read: if isAuthenticated() && (isStoreOwner(shopId) || request.auth.uid == staffUid || isAdmin());
         allow write: if isStoreOwner(shopId) || isAdmin();
       }
+    }
+
+    // ==========================================
+    // 3.1 STORE CAPACITY SLOTS (Backend Managed Only)
+    // ==========================================
+    match /store_slots/{slotId} {
+      allow read: if true;
+      allow write: if false; // 🔒 Universal Backend-Only: Slot booking and capacity mutations MUST be atomic via Cloud Functions
     }
 
     // ==========================================
