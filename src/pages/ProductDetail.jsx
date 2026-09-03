@@ -217,13 +217,11 @@ function ProductDetail() {
     }
 
     const missing = [];
-    const hasPhone = Boolean(profileData?.phone || profileData?.phoneNumber);
-    const hasName = Boolean(profileData?.name || profileData?.displayName || profileData?.fullName);
-    const hasSchool = Boolean(profileData?.school || profileData?.university || profileData?.canteen);
+    const hasName = Boolean(profileData?.name || profileData?.displayName || profileData?.fullName || user?.name || user?.displayName || user?.email);
+    const hasPhone = Boolean(profileData?.phone || profileData?.phoneNumber || user?.phone);
 
     if (!hasName) missing.push("ชื่อ-นามสกุล");
     if (!hasPhone) missing.push("เบอร์โทรศัพท์สำหรับรับแจ้งเตือนคิว");
-    if (!hasSchool) missing.push("สังกัดโรงเรียน/คณะ/โรงอาหาร");
 
     return {
       isComplete: missing.length === 0,

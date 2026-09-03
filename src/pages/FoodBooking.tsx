@@ -55,7 +55,20 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
       estimatedReadyTime: `${pickupTime} น.`
     };
 
-    await saveOrderToFirestore(newOrder);
+    try {
+      await saveOrderToFirestore(newOrder);
+    } catch (err) {
+      console.warn("Direct firestore order save fallback to local state:", err);
+    }
+
+    // Save to user local order history
+    try {
+      const existing = JSON.parse(localStorage.getItem("queueup_user_orders") || "[]");
+      localStorage.setItem("queueup_user_orders", JSON.stringify([newOrder, ...existing]));
+    } catch {
+      // ignore
+    }
+
     soundManager.playQueueIssuedSound();
     setIsSubmitting(false);
     setCreatedOrder(newOrder);
