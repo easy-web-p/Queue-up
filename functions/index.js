@@ -148,12 +148,18 @@ export const createPromptPayPayment = onCall(
         reservedSlotDocId = `${storeId}_${slotDate}_${slotTime}`;
         const slotRef = db.collection("store_slots").doc(reservedSlotDocId);
         const slotSnap = await transaction.get(slotRef);
-        if (typeof storeConfiguredCapacity !== "number" && !slotSnap.exists) {
-          throw new HttpsError("failed-precondition", "ร้านค้ายังไม่ได้เปิดการตั้งค่าความจุสำหรับรอบเวลานี้");
+
+        // 🔒 Dynamic Store Capacity Precedence:
+        // Live store configuration takes immediate precedence over historical slot snapshots
+        const capacityVal = typeof storeConfiguredCapacity === "number" && storeConfiguredCapacity > 0
+          ? Number(storeConfiguredCapacity)
+          : (slotSnap.exists && typeof slotSnap.data().capacity === "number" ? Number(slotSnap.data().capacity) : 0);
+
+        if (!Number.isFinite(capacityVal) || capacityVal <= 0) {
+          throw new HttpsError("failed-precondition", "ร้านค้ายังไม่ได้กำหนดขีดจำกัดจำนวนออเดอร์สำหรับรอบเวลานี้");
         }
+
         const currentOrders = slotSnap.exists ? Number(slotSnap.data().currentOrders || 0) : 0;
-        const capacityVal = slotSnap.exists && typeof slotSnap.data().capacity === "number" ? Number(slotSnap.data().capacity) : Number(storeConfiguredCapacity);
-        if (!Number.isFinite(capacityVal) || capacityVal <= 0) throw new HttpsError("failed-precondition", "ร้านค้ายังไม่ได้กำหนดขีดจำกัดจำนวนออเดอร์สำหรับรอบเวลานี้");
         if (currentOrders + quantity > capacityVal) {
           throw new HttpsError("failed-precondition", `รอบเวลา ${slotTime} วันที่ ${slotDate} เต็มแล้ว (รองรับได้สูงสุด ${capacityVal} คิว)`);
         }

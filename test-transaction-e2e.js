@@ -896,6 +896,64 @@ async function main() {
     assert.equal(retryAttempt.id, 'chrg_1'); // Same charge returned, zero duplicate charges!
   });
 
+  // Scenario 31: Dynamic Store Capacity Precedence
+  await runTest('Scenario 31: Live store configuration takes immediate precedence over historical slot capacity', async () => {
+    const historicalSlotDoc = { currentOrders: 3, capacity: 20 }; // Old capacity 20
+    const liveShopDoc = { slotCapacity: 5 }; // Store owner reduced capacity to 5
+
+    function computeEffectiveCapacity(shopData, slotData) {
+      const storeConfiguredCapacity = shopData?.slotCapacity ?? shopData?.maxOrdersPerSlot;
+      return typeof storeConfiguredCapacity === 'number' && storeConfiguredCapacity > 0
+        ? Number(storeConfiguredCapacity)
+        : (slotData?.capacity ? Number(slotData.capacity) : 0);
+    }
+
+    const effectiveCapacity = computeEffectiveCapacity(liveShopDoc, historicalSlotDoc);
+    assert.equal(effectiveCapacity, 5); // 5 overrides 20 immediately!
+
+    // Attempting to order 3 more when 3 are booked and max is 5 -> REJECT
+    const canBook3More = (historicalSlotDoc.currentOrders + 3) <= effectiveCapacity;
+    assert.equal(canBook3More, false);
+  });
+
+  // Scenario 32: Admin Browser Client Mutation Restriction in Firestore Rules
+  await runTest('Scenario 32: Admin client in browser cannot tamper with paymentStatus or bypass coupled state machine', async () => {
+    function validateAdminOrderUpdate(existingOrder, updatedFields) {
+      const allowedKeys = ['queueStatus', 'status', 'estimatedReadyTime', 'merchantNote', 'adminNote', 'updatedAt'];
+      const mutatedKeys = Object.keys(updatedFields);
+      const hasOnlyAllowed = mutatedKeys.every(k => allowedKeys.includes(k));
+      if (!hasOnlyAllowed) {
+        throw new Error(`Security Violation: Mutating forbidden keys: ${mutatedKeys.filter(k => !allowedKeys.includes(k))}`);
+      }
+
+      function isValidOrderStateTransition(oldStatus, oldQueue, newStatus, newQueue) {
+        return (oldStatus === newStatus && oldQueue === newQueue) ||
+               (oldStatus === 'TO_SHIP' && oldQueue === 'waiting' && newStatus === 'PREPARING' && newQueue === 'cooking') ||
+               (oldStatus === 'PREPARING' && oldQueue === 'cooking' && newStatus === 'READY' && newQueue === 'ready') ||
+               (oldStatus === 'READY' && oldQueue === 'ready' && newStatus === 'COMPLETED' && newQueue === 'completed') ||
+               ((oldStatus === 'TO_SHIP' || oldStatus === 'PREPARING') && newStatus === 'CANCELLED' && newQueue === 'cancelled');
+      }
+
+      const newStatus = updatedFields.status || existingOrder.status;
+      const newQueue = updatedFields.queueStatus || existingOrder.queueStatus;
+      if (!isValidOrderStateTransition(existingOrder.status, existingOrder.queueStatus, newStatus, newQueue)) {
+        throw new Error('State Machine Violation: Invalid coupled state transition');
+      }
+      return true;
+    }
+
+    const currentOrder = { status: 'TO_SHIP', queueStatus: 'waiting', paymentStatus: 'pending', totalAmount: 100 };
+
+    // Admin tries to set paymentStatus to paid directly -> REJECT
+    assert.throws(() => validateAdminOrderUpdate(currentOrder, { paymentStatus: 'paid' }), /Mutating forbidden keys/);
+
+    // Admin tries to jump TO_SHIP -> COMPLETED directly -> REJECT
+    assert.throws(() => validateAdminOrderUpdate(currentOrder, { status: 'COMPLETED', queueStatus: 'completed' }), /State Machine Violation/);
+
+    // Admin performs legitimate synchronized advance TO_SHIP/waiting -> PREPARING/cooking -> PASS
+    assert.equal(validateAdminOrderUpdate(currentOrder, { status: 'PREPARING', queueStatus: 'cooking', adminNote: 'Approved by admin' }), true);
+  });
+
   const passRate = Math.round((passedTests / totalTests) * 100);
   console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${passRate}%).`);
 

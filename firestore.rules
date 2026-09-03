@@ -195,14 +195,12 @@ service cloud.firestore {
       allow create: if false;
 
       // 🔒 Restricted Update Keys & Synchronized State Transitions:
-      // Merchant can ONLY advance status forward in synchronized pairs (TO_SHIP/waiting -> PREPARING/cooking -> READY/ready -> COMPLETED/completed)
-      // Merchant CANNOT mutate paymentStatus directly (must use resolvePaidAfterExpiredOrder Cloud Function)
+      // Operational KDS status updates are restricted to Store Owner & Admin, and MUST strictly follow synchronized state transitions.
+      // Direct client mutation of paymentStatus / totalAmount is blocked for all client users (Admin must use Backend Cloud Functions).
       allow update: if isAuthenticated() && (
-        isAdmin() ||
         (
-          resource.data.storeId != null && 
-          isStoreOwner(resource.data.storeId) &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['queueStatus', 'status', 'estimatedReadyTime', 'merchantNote', 'updatedAt']) &&
+          (isAdmin() || (resource.data.storeId != null && isStoreOwner(resource.data.storeId))) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['queueStatus', 'status', 'estimatedReadyTime', 'merchantNote', 'adminNote', 'updatedAt']) &&
           isValidOrderStateTransition(
             resource.data.status,
             resource.data.queueStatus,
