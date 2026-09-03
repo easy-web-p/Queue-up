@@ -160,7 +160,15 @@ service cloud.firestore {
     match /merchantProfiles/{merchantId} {
       allow read: if true;
       allow create: if isAuthenticated() && (isAdmin() || request.resource.data.ownerUid == request.auth.uid);
-      allow update, delete: if isStoreOwner(merchantId);
+      // 🔒 Lock ownerUid: Store Owner cannot transfer merchant profile ownership without Admin
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        (
+          isStoreOwner(merchantId) &&
+          request.resource.data.ownerUid == resource.data.ownerUid
+        )
+      );
+      allow delete: if isAdmin();
 
       // Private Financial & PromptPay Config Subcollection
       match /private/finance {
@@ -223,8 +231,10 @@ service cloud.firestore {
     // ==========================================
     match /audit_logs/{logId} {
       allow read: if isAdmin();
-      // 🔒 Prevent spoofing actorUid: Must match authenticated user UID
-      allow create: if isAuthenticated() && (request.resource.data.actorUid == request.auth.uid || isAdmin());
+      // 🔒 Prevent spoofing actorUid: Must match authenticated user UID and require valid action string
+      allow create: if isAuthenticated() && 
+        (request.resource.data.actorUid == request.auth.uid || isAdmin()) &&
+        isValidString(request.resource.data.action, 1, 100);
       allow update, delete: if false; // Immutable audit log
     }
 

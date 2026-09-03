@@ -2,7 +2,7 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // Helper functions
+    // 🔐 HELPER FUNCTIONS FOR RBAC & AUTHORIZATION
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -13,35 +13,61 @@ service firebase.storage {
 
     function isAdmin() {
       return isAuthenticated() && (
-        request.auth.token.email == '58140@lomsak.ac.th' ||
-        request.auth.token.admin == true
+        request.auth.token.admin == true ||
+        request.auth.token.role == 'admin' ||
+        request.auth.token.isSuperAdmin == true ||
+        request.auth.token.email == '58140@lomsak.ac.th'
       );
     }
 
-    function isImageBelowSize(maxSizeMB) {
-      return request.resource.contentType.matches('image/.*') &&
+    function isStoreOwner(shopId) {
+      return isAuthenticated() && (
+        isAdmin() ||
+        (firestore.exists(/databases/(default)/documents/shops/$(shopId)) && 
+         firestore.get(/databases/(default)/documents/shops/$(shopId)).data.ownerUid == request.auth.uid) ||
+        (firestore.exists(/databases/(default)/documents/merchantProfiles/$(shopId)) && 
+         firestore.get(/databases/(default)/documents/merchantProfiles/$(shopId)).data.ownerUid == request.auth.uid) ||
+        request.auth.token.storeId == shopId
+      );
+    }
+
+    // Strict MIME whitelist & File size limiter
+    function isValidImage(maxSizeMB) {
+      return request.resource.contentType in ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] &&
              request.resource.size < maxSizeMB * 1024 * 1024;
     }
 
-    // 1. User Profile Photos & Avatars
+    // 1. User Profile Photos & Avatars (User / Admin only)
     match /users/{userId}/{allPaths=**} {
       allow read: if true;
-      allow write: if (isOwner(userId) || isAdmin()) && isImageBelowSize(5);
+      allow create, update: if (isOwner(userId) || isAdmin()) && isValidImage(5);
+      allow delete: if isOwner(userId) || isAdmin();
     }
 
-    // 2. Product Images & Menus
-    match /products/{productId}/{allPaths=**} {
-      allow read: if true;
-      allow write: if isAuthenticated() && isImageBelowSize(10);
-    }
-
-    // 3. Shop Banners & Logos
+    // 2. Shop Banners, Logos & Media (Store Owner / Admin only)
     match /shops/{shopId}/{allPaths=**} {
       allow read: if true;
-      allow write: if isAuthenticated() && isImageBelowSize(10);
+      allow create, update: if isStoreOwner(shopId) && isValidImage(10);
+      allow delete: if isStoreOwner(shopId);
     }
 
-    // 4. Default Deny for everything else
+    // 3. Product Images (Store Owner / Admin only)
+    match /products/{productId}/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if isAuthenticated() && (
+        isAdmin() ||
+        (firestore.exists(/databases/(default)/documents/products/$(productId)) && 
+         isStoreOwner(firestore.get(/databases/(default)/documents/products/$(productId)).data.storeId)) ||
+        (request.resource.metadata != null && isStoreOwner(request.resource.metadata.storeId))
+      ) && isValidImage(10);
+      allow delete: if isAuthenticated() && (
+        isAdmin() ||
+        (firestore.exists(/databases/(default)/documents/products/$(productId)) && 
+         isStoreOwner(firestore.get(/databases/(default)/documents/products/$(productId)).data.storeId))
+      );
+    }
+
+    // 4. Default Deny for all other routes
     match /{allPaths=**} {
       allow read, write: if false;
     }
