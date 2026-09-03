@@ -1,6 +1,6 @@
 ﻿/**
- * 📦 QueueUp Catalog Service (Wave 4.2.4 Hardened)
- * Atomic Mutations, Canonical Satang Integrity, Referential Integrity & Option Stock Management.
+ * 📦 QueueUp Catalog Service (Wave 4.2.4 Hardened & Verified)
+ * Atomic Mutations, Strict Monetary Consistency, Referential Integrity & Option Stock Management.
  */
 
 import {
@@ -58,7 +58,9 @@ export async function updateStoreOperationalProfile(
   storeId: string,
   updateData: UpdateShopOperationalData
 ) {
-  if (!storeId) throw new Error('storeId is required');
+  if (!storeId || typeof storeId !== 'string' || !storeId.trim()) {
+    throw new Error('storeId is required and must not be empty');
+  }
 
   const cleanData: Record<string, unknown> = {
     updatedAt: serverTimestamp()
@@ -97,6 +99,7 @@ export async function updateStoreOperationalProfile(
  */
 
 export async function fetchStoreCategories(db: Firestore, storeId: string): Promise<MenuCategory[]> {
+  if (!storeId) throw new Error('storeId is required');
   const categoriesRef = collection(db, 'food_categories');
   const q = query(categoriesRef, where('storeId', '==', storeId));
   const snap = await getDocs(q);
@@ -113,7 +116,9 @@ export async function createStoreCategory(
   storeId: string,
   categoryData: { name: string; icon?: string; displayOrder?: number }
 ): Promise<MenuCategory> {
-  if (!storeId) throw new Error('storeId is required');
+  if (!storeId || typeof storeId !== 'string' || !storeId.trim()) {
+    throw new Error('storeId is required and must not be empty');
+  }
   if (!categoryData.name || !categoryData.name.trim()) throw new Error('Category name is required');
 
   const catRef = doc(collection(db, 'food_categories'));
@@ -140,6 +145,7 @@ export async function createStoreCategory(
  */
 
 export async function fetchStoreProducts(db: Firestore, storeId: string): Promise<MenuItem[]> {
+  if (!storeId) throw new Error('storeId is required');
   const productsRef = collection(db, 'products');
   const q = query(productsRef, where('storeId', '==', storeId));
   const snap = await getDocs(q);
@@ -181,8 +187,20 @@ export async function createStoreProduct(
   storeId: string,
   productData: Omit<MenuItem, 'id' | 'storeId'>
 ): Promise<MenuItem> {
-  if (!storeId) throw new Error('storeId is required');
+  if (!storeId || typeof storeId !== 'string' || !storeId.trim()) {
+    throw new Error('storeId is required and must not be empty');
+  }
   if (!productData.name || !productData.name.trim()) throw new Error('Product name is required');
+
+  // 🔒 Strict Monetary Consistency Guard: Detect and reject conflicting price and priceSatang
+  if (productData.priceSatang !== undefined && productData.price !== undefined) {
+    const expectedSatang = Math.round(Number(productData.price) * 100);
+    if (productData.priceSatang !== expectedSatang) {
+      throw new Error(
+        `MONETARY_DRIFT_ERROR: price (${productData.price}) and priceSatang (${productData.priceSatang}) do not match`
+      );
+    }
+  }
 
   // 🔒 priceSatang is Canonical Single Source of Truth
   let priceSatang: number;
@@ -244,6 +262,16 @@ export async function updateStoreProduct(
   updates: Partial<Omit<MenuItem, 'id' | 'storeId'>>
 ) {
   if (!storeId || !productId) throw new Error('storeId and productId are required');
+
+  // 🔒 Strict Monetary Consistency Guard: Detect and reject conflicting price and priceSatang on update
+  if (updates.priceSatang !== undefined && updates.price !== undefined) {
+    const expectedSatang = Math.round(Number(updates.price) * 100);
+    if (updates.priceSatang !== expectedSatang) {
+      throw new Error(
+        `MONETARY_DRIFT_ERROR: price (${updates.price}) and priceSatang (${updates.priceSatang}) do not match`
+      );
+    }
+  }
 
   // Validate modifier referential integrity if modifierGroupIds updated
   if (updates.modifierGroupIds && updates.modifierGroupIds.length > 0) {
@@ -335,6 +363,7 @@ export async function deleteStoreProduct(db: Firestore, storeId: string, product
  */
 
 export async function fetchStoreModifierGroups(db: Firestore, storeId: string): Promise<ModifierGroup[]> {
+  if (!storeId) throw new Error('storeId is required');
   const modRef = collection(db, 'modifier_groups');
   const q = query(modRef, where('storeId', '==', storeId));
   const snap = await getDocs(q);
@@ -351,7 +380,9 @@ export async function createStoreModifierGroup(
   storeId: string,
   modData: Omit<ModifierGroup, 'id' | 'storeId'>
 ): Promise<ModifierGroup> {
-  if (!storeId) throw new Error('storeId is required');
+  if (!storeId || typeof storeId !== 'string' || !storeId.trim()) {
+    throw new Error('storeId is required and must not be empty');
+  }
   if (!modData.name || !modData.name.trim()) throw new Error('Modifier group name is required');
 
   const modRef = doc(collection(db, 'modifier_groups'));
