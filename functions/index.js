@@ -573,13 +573,22 @@ export const opnWebhook = onRequest(
     if (req.method !== "POST") return res.status(405).send("Method not allowed");
     try {
       const event = req.body;
-      if (!event || !String(event.key || "").startsWith("charge.")) return res.status(200).send("Ignored");
+      const ALLOWED_WEBHOOK_EVENTS = ["charge.complete", "charge.create", "charge.update"];
+      if (!event || typeof event.key !== "string" || !ALLOWED_WEBHOOK_EVENTS.includes(event.key)) {
+        return res.status(400).send("Unsupported or missing webhook event key");
+      }
+
       const chargeId = event.data?.id;
-      if (!chargeId) return res.status(400).send("Missing charge id");
-      const charge = await retrieveCharge(chargeId, opnSecretKey.value());
+      if (typeof chargeId !== "string" || !chargeId.trim() || !chargeId.startsWith("chrg_")) {
+        return res.status(400).send("Invalid or missing Opn charge ID format");
+      }
+
+      const charge = await retrieveCharge(chargeId.trim(), opnSecretKey.value());
       const orderId = charge.metadata?.orderId;
       const chargeUid = charge.metadata?.uid;
-      if (!orderId || !chargeUid || charge.currency !== "THB") return res.status(400).send("Invalid payment metadata");
+      if (!orderId || !chargeUid || charge.currency !== "THB") {
+        return res.status(400).send("Invalid payment metadata or unsupported currency");
+      }
 
       const orderRef = db.collection("orders").doc(orderId);
       const orderSnap = await orderRef.get();
@@ -587,15 +596,30 @@ export const opnWebhook = onRequest(
       const order = orderSnap.data();
       if (order.userId !== chargeUid) return res.status(400).send("User ID mismatch");
 
+      // Verify paymentId binding if already recorded on the order
+      if (order.paymentId && order.paymentId !== charge.id) {
+        return res.status(400).send("Charge ID does not match order payment binding");
+      }
+
       // 🔒 Terminal Reconciled State Guard: Never re-open or downgrade orders after merchant resolution
       const TERMINAL_RECONCILED_STATES = ["ACCEPTED", "REFUNDED", "REFUND_REQUESTED", "MANUAL_REFUND_PENDING"];
       if (TERMINAL_RECONCILED_STATES.includes(order.reconciliationStatus) || order.paymentStatus === "refunded") {
         return res.status(200).send("Already resolved in terminal reconciliation state");
       }
 
+      // Prevent downgrade of already PAID orders
+      if (order.paymentStatus === "paid") {
+        if (charge.status === "successful") {
+          return res.status(200).send("Already processed");
+        }
+        return res.status(400).send("Cannot downgrade already paid order to non-successful status");
+      }
+
       // Verify amount before accepting any successful payment state, including the late-payment branch.
       const expectedSatang = Math.round(Number(order.totalAmount || order.totalPrice) * 100);
-      if (!Number.isFinite(expectedSatang) || charge.amount !== expectedSatang) return res.status(400).send("Amount mismatch");
+      if (!Number.isFinite(expectedSatang) || charge.amount !== expectedSatang) {
+        return res.status(400).send("Amount mismatch");
+      }
 
       if (charge.status === "expired" || charge.status === "failed") {
         await releaseOrderResources(orderRef, `Payment provider reported charge ${charge.status}`);

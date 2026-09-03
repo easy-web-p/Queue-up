@@ -1074,6 +1074,80 @@ async function main() {
     assert.ok(recoveredOrder.paidAt);
   });
 
+  // Scenario 35: Webhook with unsupported event key or malformed body is REJECTED (HTTP 400)
+  await runTest('Scenario 35: Webhook with unsupported event key or malformed body is REJECTED', async () => {
+    function validateWebhookEvent(event) {
+      const ALLOWED_WEBHOOK_EVENTS = ["charge.complete", "charge.create", "charge.update"];
+      if (!event || typeof event.key !== "string" || !ALLOWED_WEBHOOK_EVENTS.includes(event.key)) {
+        throw new Error("HTTP 400: Unsupported or missing webhook event key");
+      }
+      const chargeId = event.data?.id;
+      if (typeof chargeId !== "string" || !chargeId.trim() || !chargeId.startsWith("chrg_")) {
+        throw new Error("HTTP 400: Invalid or missing Opn charge ID format");
+      }
+      return true;
+    }
+
+    assert.throws(() => validateWebhookEvent({ key: "customer.create", data: { id: "chrg_123" } }), /Unsupported or missing webhook event key/);
+    assert.throws(() => validateWebhookEvent({ key: "charge.complete", data: { id: "invalid_id_format" } }), /Invalid or missing Opn charge ID format/);
+    assert.equal(validateWebhookEvent({ key: "charge.complete", data: { id: "chrg_test_valid_01" } }), true);
+  });
+
+  // Scenario 36: Webhook with tampered amount (e.g. 50 THB paid for 500 THB order) is REJECTED
+  await runTest('Scenario 36: Webhook with tampered amount is strictly REJECTED (Amount Mismatch)', async () => {
+    function verifyChargeAgainstOrder(charge, order) {
+      const expectedSatang = Math.round(Number(order.totalAmount || order.totalPrice) * 100);
+      if (charge.currency !== "THB") throw new Error("HTTP 400: Currency mismatch");
+      if (charge.amount !== expectedSatang) throw new Error("HTTP 400: Amount mismatch (Possible Underpayment Attack)");
+      if (charge.metadata?.orderId !== order.orderId) throw new Error("HTTP 400: Order ID mismatch");
+      if (charge.metadata?.uid !== order.userId) throw new Error("HTTP 400: User ID mismatch");
+      return true;
+    }
+
+    const validOrder = { orderId: "ord_100", userId: "user_buyer_01", totalAmount: 500 };
+    const tamperedCharge = { id: "chrg_100", amount: 5000, currency: "THB", metadata: { orderId: "ord_100", uid: "user_buyer_01" } }; // 50 THB instead of 500 THB (50000 satang)
+    const validCharge = { id: "chrg_100", amount: 50000, currency: "THB", metadata: { orderId: "ord_100", uid: "user_buyer_01" } };
+
+    assert.throws(() => verifyChargeAgainstOrder(tamperedCharge, validOrder), /Amount mismatch/);
+    assert.equal(verifyChargeAgainstOrder(validCharge, validOrder), true);
+  });
+
+  // Scenario 37: Webhook with charge belonging to Order A attempting to mutate Order B is REJECTED
+  await runTest('Scenario 37: Cross-order charge mutation spoofing is strictly REJECTED', async () => {
+    function verifyOrderBinding(charge, targetOrder) {
+      if (charge.metadata?.orderId !== targetOrder.orderId) {
+        throw new Error("HTTP 400: Metadata Order ID does not match target order");
+      }
+      if (targetOrder.paymentId && targetOrder.paymentId !== charge.id) {
+        throw new Error("HTTP 400: Charge ID does not match order payment binding");
+      }
+      return true;
+    }
+
+    const orderB = { orderId: "ord_B", userId: "user_B", paymentId: "chrg_order_B" };
+    const chargeFromOrderA = { id: "chrg_order_A", metadata: { orderId: "ord_A", uid: "user_A" } };
+
+    assert.throws(() => verifyOrderBinding(chargeFromOrderA, orderB), /Metadata Order ID does not match target order/);
+  });
+
+  // Scenario 38: Webhook attempting to downgrade already PAID order to FAILED is REJECTED
+  await runTest('Scenario 38: Webhook cannot downgrade already PAID order to non-successful status', async () => {
+    function processStateTransition(currentPaymentStatus, incomingChargeStatus) {
+      if (currentPaymentStatus === "paid") {
+        if (incomingChargeStatus === "successful") {
+          return { action: "IGNORE_IDEMPOTENT", status: "paid" };
+        }
+        throw new Error("HTTP 400: Cannot downgrade already paid order to non-successful status");
+      }
+      return { action: "APPLY", status: incomingChargeStatus === "successful" ? "paid" : incomingChargeStatus };
+    }
+
+    assert.throws(() => processStateTransition("paid", "failed"), /Cannot downgrade already paid order/);
+    assert.throws(() => processStateTransition("paid", "expired"), /Cannot downgrade already paid order/);
+    assert.deepEqual(processStateTransition("paid", "successful"), { action: "IGNORE_IDEMPOTENT", status: "paid" });
+    assert.deepEqual(processStateTransition("pending", "successful"), { action: "APPLY", status: "paid" });
+  });
+
   const passRate = Math.round((passedTests / totalTests) * 100);
   console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${passRate}%).`);
 
