@@ -102,14 +102,10 @@ service cloud.firestore {
       );
       allow delete: if isAdmin();
 
-      // Subcollection for store-isolated orders
+      // Subcollection for store-isolated orders (Canonical orders live in root /orders; direct subcollection writes are blocked)
       match /orders/{orderId} {
         allow read: if isAuthenticated() && (isStoreOwner(shopId) || isAdmin() || resource.data.userId == request.auth.uid);
-        allow create: if isAuthenticated() && (
-          isAdmin() ||
-          (request.resource.data.userId == request.auth.uid && request.resource.data.storeId == shopId)
-        );
-        allow update, delete: if isStoreOwner(shopId) || isAdmin();
+        allow write: if false; // Universal Server-Authoritative Backend Order Creation Only
       }
 
       // Subcollection for shop staff management
