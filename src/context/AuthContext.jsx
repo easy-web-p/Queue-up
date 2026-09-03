@@ -26,6 +26,7 @@ export function AuthProvider({ children }) {
 
       try {
         let userDocData = null;
+        let profileFetchError = false;
         try {
           const userSnap = await getDoc(doc(db, "users", firebaseUser.uid));
           // If a subsequent auth event or logout occurred while awaiting Firestore, drop this stale execution
@@ -35,6 +36,7 @@ export function AuthProvider({ children }) {
           }
         } catch (docErr) {
           console.warn("Could not fetch user profile from Firestore:", docErr);
+          profileFetchError = true;
         }
 
         if (thisSeq !== currentSeq) return;
@@ -45,6 +47,8 @@ export function AuthProvider({ children }) {
           isVerifiedAuth: true,
           isTokenVerified: true,
           isFromCache: false,
+          isProfileLoaded: Boolean(userDocData),
+          isProfileError: profileFetchError,
           ...userDocData,
         };
 
@@ -76,6 +80,8 @@ export function AuthProvider({ children }) {
           isVerifiedAuth: true,
           isTokenVerified: true,
           isFromCache: false,
+          isProfileLoaded: Boolean(userDocData),
+          isProfileError: profileFetchError,
           storeId: userDocData?.storeId || (isMerchant ? "store_canteen01" : undefined),
         }));
       } catch (fatalErr) {
@@ -98,6 +104,8 @@ export function AuthProvider({ children }) {
             isVerifiedAuth: true,
             isTokenVerified: true,
             isFromCache: false,
+            isProfileLoaded: false,
+            isProfileError: true,
           }));
         }
       }
