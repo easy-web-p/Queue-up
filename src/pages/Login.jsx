@@ -27,9 +27,20 @@ function Login() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
-  const fromDestination = typeof location.state?.from === "string"
+  // 🔒 Open Redirect Guard: Only allow valid relative internal paths starting with a single '/'
+  const sanitizeInternalRedirect = (destination) => {
+    if (!destination || typeof destination !== "string") return "/home";
+    const trimmed = destination.trim();
+    if (trimmed.startsWith("/") && !trimmed.startsWith("//") && !trimmed.includes("://")) {
+      return trimmed;
+    }
+    return "/home";
+  };
+
+  const rawDestination = typeof location.state?.from === "string"
     ? location.state.from
     : (location.state?.from?.pathname ? `${location.state.from.pathname}${location.state.from.search || ""}` : "/home");
+  const fromDestination = sanitizeInternalRedirect(rawDestination);
   const { user } = useSelector((state) => state.auth);
   const { loginWithGoogle } = useAuth();
 
