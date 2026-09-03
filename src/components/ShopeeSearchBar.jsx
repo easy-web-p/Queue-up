@@ -5,6 +5,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth.js";
 import { clearUser, switchRole } from "../store/authSlice.js";
+import { isUserSuperAdmin } from "../utils/authRoles.js";
 import { usePreferences } from "../context/PreferencesContext.jsx";
 import "./ShopeeSearchBar.css";
 
@@ -182,7 +183,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
           </span>
           <span className="shopee-nav-divider" />
           <span className="shopee-nav-item">{language === "en" ? "Download" : "ดาวน์โหลด"}</span>
-          {(user?.email === "58140@lomsak.ac.th" || user?.activeRole === "admin" || user?.roles?.includes("admin")) && (
+          {isUserSuperAdmin(user) && (
             <>
               <span className="shopee-nav-divider" />
               <span
@@ -541,7 +542,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
                   {language === "en" ? "Merchant Dashboard" : "ศูนย์ผู้ขาย / หน้าจอครัว"}
                 </a>
               </li>
-              {(user?.email === "58140@lomsak.ac.th" || user?.activeRole === "admin" || user?.roles?.includes("admin")) && (
+              {isUserSuperAdmin(user) && (
                 <li>
                   <a
                     className="shopee-dropdown-item text-warning fw-bold"
