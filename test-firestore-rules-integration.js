@@ -130,8 +130,20 @@ function evaluateRules({ collection, action, auth, resource, requestResource }) 
   // --- Collection: /audit_logs ---
   if (collection === 'audit_logs') {
     if (action === 'read') return isAdmin();
-    if (action === 'create') return isAuthenticated && (requestResource.data.actorUid === auth.uid || isAdmin());
-    if (action === 'update' || action === 'delete') return false; // Immutable!
+    if (action === 'create' || action === 'update' || action === 'delete') return false; // 🔒 Universal Backend-Only!
+  }
+
+  // --- Collection: /systemEvaluations ---
+  if (collection === 'systemEvaluations') {
+    if (action === 'read') return isAdmin();
+    if (action === 'create') {
+      return isAuthenticated &&
+        requestResource.id === auth.uid &&
+        requestResource.data?.userId === auth.uid &&
+        typeof requestResource.data?.rating === 'number' &&
+        requestResource.data?.rating >= 1 && requestResource.data?.rating <= 5;
+    }
+    if (action === 'update' || action === 'delete') return false;
   }
 
   return false;
@@ -260,21 +272,50 @@ async function main() {
     assert.equal(isAllowed, false);
   });
 
-  // Test 12: Updating or Deleting immutable /audit_logs is DENIED
-  await runTest('Test 12: Updating or Deleting audit logs is strictly DENIED (Immutable)', async () => {
+  // Test 12: Client creating, updating or deleting /audit_logs is strictly DENIED (Universal Backend-Only)
+  await runTest('Test 12: Client writing /audit_logs is strictly DENIED (Backend-Only)', async () => {
+    const createAllowed = evaluateRules({
+      collection: 'audit_logs',
+      action: 'create',
+      auth: { uid: 'user_customer_01', token: { email: 'customer@test.com' } },
+      requestResource: { data: { actorUid: 'user_customer_01', action: 'LOGIN_SUCCESS' } }
+    });
     const updateAllowed = evaluateRules({
       collection: 'audit_logs',
       action: 'update',
-      auth: { uid: 'admin_01', token: { email: '58140@lomsak.ac.th', admin: true } },
+      auth: { uid: 'admin_01', token: { admin: true } },
       requestResource: { data: { deleted: true } }
     });
     const deleteAllowed = evaluateRules({
       collection: 'audit_logs',
       action: 'delete',
-      auth: { uid: 'admin_01', token: { email: '58140@lomsak.ac.th', admin: true } }
+      auth: { uid: 'admin_01', token: { admin: true } }
     });
+    assert.equal(createAllowed, false);
     assert.equal(updateAllowed, false);
     assert.equal(deleteAllowed, false);
+  });
+
+  // Test 13: Spoofed / duplicate /systemEvaluations from user with mismatched evalId is DENIED (Anti-Spam)
+  await runTest('Test 13: System evaluation with mismatched evalId or spam payload is DENIED', async () => {
+    const isAllowed = evaluateRules({
+      collection: 'systemEvaluations',
+      action: 'create',
+      auth: { uid: 'user_customer_01', token: { email: 'customer@test.com' } },
+      requestResource: { id: 'random_eval_spam_id', data: { userId: 'user_customer_01', rating: 5 } }
+    });
+    assert.equal(isAllowed, false);
+  });
+
+  // Test 14: Valid /systemEvaluations matching authenticated UID with rating 1-5 is ALLOWED
+  await runTest('Test 14: Valid system evaluation matching authenticated UID is ALLOWED', async () => {
+    const isAllowed = evaluateRules({
+      collection: 'systemEvaluations',
+      action: 'create',
+      auth: { uid: 'user_customer_01', token: { email: 'customer@test.com' } },
+      requestResource: { id: 'user_customer_01', data: { userId: 'user_customer_01', rating: 5, comment: 'Great service!' } }
+    });
+    assert.equal(isAllowed, true);
   });
 
   const passRate = Math.round((passedTests / totalTests) * 100);
