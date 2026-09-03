@@ -266,5 +266,12 @@ service cloud.firestore {
       allow write: if false; // Only manageable by Cloud Functions / Admin SDK
     }
 
+    // ==========================================
+    // 11. WEBHOOK EVENTS (Internal Backend Only)
+    // ==========================================
+    match /webhook_events/{eventId} {
+      allow read, write: if false; // 🔒 Universal Backend-Only: Managed exclusively by Cloud Functions Admin SDK
+    }
+
   }
 }

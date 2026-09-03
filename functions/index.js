@@ -567,18 +567,27 @@ export const getPaymentStatus = onCall(
   }
 );
 
-export function isAllowedPaymentTransition(currentStatus, nextStatus) {
+export function isAllowedPaymentTransition(currentStatus, nextStatus, actor = "webhook") {
   if (currentStatus === nextStatus) return true;
   const ALLOWED_TRANSITIONS = {
-    pending: ["paid", "failed", "expired", "charge_created_order_pending", "creation_failed"],
-    charge_created_order_pending: ["paid", "failed", "expired", "creation_failed"],
-    expired: ["paid_after_expired"],
-    cancelled: ["paid_after_expired"],
-    paid: ["refunded", "paid"],
-    paid_after_expired: ["paid", "refunded"],
-    refunded: ["refunded"]
+    webhook: {
+      pending: ["paid", "failed", "expired", "charge_created_order_pending", "creation_failed"],
+      charge_created_order_pending: ["paid", "failed", "expired", "creation_failed"],
+      expired: ["paid_after_expired"],
+      cancelled: ["paid_after_expired"],
+      paid: ["paid"], // Webhook cannot trigger refund
+      paid_after_expired: [],
+      refunded: ["refunded"]
+    },
+    refund_flow: {
+      paid: ["refunded"],
+      paid_after_expired: ["paid", "refunded"]
+    },
+    merchant_reconcile: {
+      paid_after_expired: ["paid", "refunded"]
+    }
   };
-  return (ALLOWED_TRANSITIONS[currentStatus] || []).includes(nextStatus);
+  return (ALLOWED_TRANSITIONS[actor]?.[currentStatus] || []).includes(nextStatus);
 }
 
 export const opnWebhook = onRequest(
@@ -609,7 +618,10 @@ export const opnWebhook = onRequest(
         return res.status(400).send("Invalid payment metadata or unsupported currency");
       }
 
-      const eventId = String(event.id || event.data?.id || "").trim();
+      // Deterministic event identity: If event.id is present use it, otherwise use deterministic composite key
+      const eventId = (typeof event.id === "string" && event.id.trim())
+        ? event.id.trim()
+        : `evnt_${charge.id}_${event.key}_${charge.status}`;
 
       const txResult = await db.runTransaction(async (transaction) => {
         const eventRef = eventId ? db.collection("webhook_events").doc(eventId) : null;

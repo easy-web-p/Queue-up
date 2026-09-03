@@ -146,6 +146,11 @@ function evaluateRules({ collection, action, auth, resource, requestResource }) 
     if (action === 'update' || action === 'delete') return false;
   }
 
+  // --- Collection: /webhook_events ---
+  if (collection === 'webhook_events') {
+    return false; // allow read, write: if false; (Universal Backend-Only)
+  }
+
   return false;
 }
 
@@ -316,6 +321,34 @@ async function main() {
       requestResource: { id: 'user_customer_01', data: { userId: 'user_customer_01', rating: 5, comment: 'Great service!' } }
     });
     assert.equal(isAllowed, true);
+  });
+
+  // Test 15: Client attempting to create /webhook_events is DENIED (Backend-Only)
+  await runTest('Test 15: Client creating /webhook_events is strictly DENIED', async () => {
+    const isAllowed = evaluateRules({
+      collection: 'webhook_events',
+      action: 'create',
+      auth: { uid: 'attacker_uid', token: { email: 'attacker@test.com' } },
+      requestResource: { id: 'evnt_fake_01', data: { processed: true } }
+    });
+    assert.equal(isAllowed, false);
+  });
+
+  // Test 16: Client attempting to update/delete /webhook_events is DENIED (Backend-Only)
+  await runTest('Test 16: Client mutating /webhook_events is strictly DENIED', async () => {
+    const updateAllowed = evaluateRules({
+      collection: 'webhook_events',
+      action: 'update',
+      auth: { uid: 'attacker_uid', token: { email: 'attacker@test.com' } },
+      requestResource: { data: { processed: false } }
+    });
+    const deleteAllowed = evaluateRules({
+      collection: 'webhook_events',
+      action: 'delete',
+      auth: { uid: 'attacker_uid', token: { email: 'attacker@test.com' } }
+    });
+    assert.equal(updateAllowed, false);
+    assert.equal(deleteAllowed, false);
   });
 
   const passRate = Math.round((passedTests / totalTests) * 100);

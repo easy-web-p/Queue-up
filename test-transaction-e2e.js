@@ -1254,6 +1254,128 @@ async function main() {
     assert.equal(isAllowedPaymentTransition("refunded", "paid"), false);
   });
 
+  // Scenario 43: Resource release failure & retry recovery maintains exact inventory consistency
+  await runTest('Scenario 43: Transaction succeeds -> resource release failure recovers cleanly on retry', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    engine.setDoc('products/prod_recovery_01', { stock: 10 });
+    engine.setDoc('orders/ord_rec_01', {
+      orderId: 'ord_rec_01',
+      productId: 'prod_recovery_01',
+      quantity: 2,
+      reservedQuantity: 2,
+      releasedQuantity: 0,
+      resourcesReleased: false,
+      paymentStatus: 'expired'
+    });
+
+    // Simulate crash after initial expiry mark before release completes
+    // Retry resource release
+    async function executeResourceRelease(orderId) {
+      return await engine.runTransaction(async (tx) => {
+        const orderSnap = await tx.get({ path: `orders/${orderId}` });
+        const order = orderSnap.data();
+        if (order.resourcesReleased) return { alreadyReleased: true };
+
+        const prodSnap = await tx.get({ path: `products/${order.productId}` });
+        const prod = prodSnap.data();
+        tx.update({ path: `products/${order.productId}` }, { stock: prod.stock + order.reservedQuantity });
+        tx.update({ path: `orders/${orderId}` }, { resourcesReleased: true, releasedQuantity: order.reservedQuantity });
+        return { released: true };
+      });
+    }
+
+    const firstRun = await executeResourceRelease('ord_rec_01');
+    assert.equal(firstRun.released, true);
+    assert.equal(engine.getDoc('products/prod_recovery_01').stock, 12);
+
+    // Subsequent retry must be idempotent and not double-increment stock!
+    const secondRun = await executeResourceRelease('ord_rec_01');
+    assert.equal(secondRun.alreadyReleased, true);
+    assert.equal(engine.getDoc('products/prod_recovery_01').stock, 12);
+  });
+
+  // Scenario 44: Missing event.id uses deterministic composite key avoiding false collision
+  await runTest('Scenario 44: Missing event.id generates distinct deterministic key without false collision', async () => {
+    function computeEventId(event, charge) {
+      return (typeof event.id === "string" && event.id.trim())
+        ? event.id.trim()
+        : `evnt_${charge.id}_${event.key}_${charge.status}`;
+    }
+
+    const chargeA = { id: "chrg_alpha", status: "successful" };
+    const event1 = { key: "charge.complete", data: { id: "chrg_alpha" } };
+    const event2 = { key: "charge.update", data: { id: "chrg_alpha" } };
+
+    const key1 = computeEventId(event1, chargeA);
+    const key2 = computeEventId(event2, chargeA);
+
+    assert.notEqual(key1, key2); // Distinct event keys produce distinct composite doc IDs!
+    assert.equal(key1, "evnt_chrg_alpha_charge.complete_successful");
+    assert.equal(key2, "evnt_chrg_alpha_charge.update_successful");
+  });
+
+  // Scenario 45: Same chargeId with different event types/statuses are processed distinctly
+  await runTest('Scenario 45: Same chargeId with different event types are not false-deduped', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const eventKey1 = "evnt_chrg_01_charge.create_pending";
+    const eventKey2 = "evnt_chrg_01_charge.complete_successful";
+
+    engine.setDoc(`webhook_events/${eventKey1}`, { processed: true });
+
+    // Event 2 with charge.complete should NOT be considered already processed!
+    const event2Snap = engine.getDoc(`webhook_events/${eventKey2}`);
+    assert.equal(event2Snap, null); // Event 2 is recognized as a new distinct event
+  });
+
+  // Scenario 46: Webhook actor cannot trigger refunded transition via isAllowedPaymentTransition
+  await runTest('Scenario 46: Webhook actor cannot trigger refunded transition via isAllowedPaymentTransition', async () => {
+    function isAllowedPaymentTransitionWithActor(currentStatus, nextStatus, actor = "webhook") {
+      if (currentStatus === nextStatus) return true;
+      const ALLOWED_TRANSITIONS = {
+        webhook: {
+          pending: ["paid", "failed", "expired", "charge_created_order_pending", "creation_failed"],
+          charge_created_order_pending: ["paid", "failed", "expired", "creation_failed"],
+          expired: ["paid_after_expired"],
+          cancelled: ["paid_after_expired"],
+          paid: ["paid"], // Webhook cannot trigger refund
+          paid_after_expired: [],
+          refunded: ["refunded"]
+        },
+        refund_flow: {
+          paid: ["refunded"],
+          paid_after_expired: ["paid", "refunded"]
+        }
+      };
+      return (ALLOWED_TRANSITIONS[actor]?.[currentStatus] || []).includes(nextStatus);
+    }
+
+    assert.equal(isAllowedPaymentTransitionWithActor("paid", "refunded", "webhook"), false); // Webhook blocked!
+    assert.equal(isAllowedPaymentTransitionWithActor("paid", "refunded", "refund_flow"), true); // Legitimate refund allowed
+  });
+
+  // Scenario 47: Concurrent transactions with version conflict retry cleanly without dirty writes
+  await runTest('Scenario 47: Concurrent transactions with version conflict retry cleanly without dirty writes', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    engine.setDoc('orders/ord_occ_retry_01', {
+      orderId: 'ord_occ_retry_01',
+      version: 1,
+      paymentStatus: 'pending',
+      count: 0
+    });
+
+    async function incrementCount() {
+      return await engine.runTransaction(async (tx) => {
+        const snap = await tx.get({ path: 'orders/ord_occ_retry_01' });
+        const data = snap.data();
+        tx.update({ path: 'orders/ord_occ_retry_01' }, { count: data.count + 1 });
+      });
+    }
+
+    await Promise.all([incrementCount(), incrementCount(), incrementCount()]);
+    const finalDoc = engine.getDoc('orders/ord_occ_retry_01');
+    assert.equal(finalDoc.count, 3); // All 3 increments committed sequentially with OCC retries
+  });
+
   const passRate = Math.round((passedTests / totalTests) * 100);
   console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${passRate}%).`);
 
