@@ -195,24 +195,10 @@ service cloud.firestore {
         (resource.data.storeId != null && isStoreOwner(resource.data.storeId))
       );
 
-      // 🔒 Order Creation Integrity:
-      // Online payment orders (PromptPay, QrCode, Opn) MUST be created authoritatively by Cloud Functions.
-      // Offline orders (cash/canteen_counter) created by clients must have strict pending/unpaid state and valid schema.
-      allow create: if isAuthenticated() && (
-        isAdmin() ||
-        (
-          request.resource.data.userId == request.auth.uid &&
-          request.resource.data.paymentMethod in ['cash', 'canteen_counter'] &&
-          (
-            !('paymentStatus' in request.resource.data) ||
-            request.resource.data.paymentStatus == 'pending' ||
-            request.resource.data.paymentStatus == 'unpaid'
-          ) &&
-          isValidString(request.resource.data.storeId, 1, 100) &&
-          isValidNumber(request.resource.data.totalAmount) &&
-          request.resource.data.totalAmount > 0
-        )
-      );
+      // 🔒 Universal Server-Authoritative Order Creation:
+      // ALL Orders (PromptPay, Cash, Canteen Counter) MUST be created authoritatively by Cloud Functions.
+      // Direct client-side creation is blocked to guarantee 100% price integrity and prevent totalAmount tampering.
+      allow create: if isAdmin();
 
       // 🔒 Restricted Update Keys & True State Transitions:
       // Merchant can ONLY advance status forward (TO_SHIP -> PREPARING -> READY -> COMPLETED)

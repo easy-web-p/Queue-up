@@ -72,10 +72,16 @@ const authSlice = createSlice({
     },
     switchRole: (state, action) => {
       if (state.user) {
-        const newRole = action.payload || (state.user.activeRole === "merchant" ? "customer" : "merchant");
+        const requestedRole = action.payload || (state.user.activeRole === "merchant" ? "customer" : "merchant");
+        const effectiveRoles = getEffectiveRoles(state.user);
+        // 🔒 Guard: User can ONLY switch to roles they are officially authorized to assume
+        if (!effectiveRoles.includes(requestedRole)) {
+          console.warn(`[Security] Unauthorized role switch attempt to '${requestedRole}' rejected.`);
+          return;
+        }
         state.user = {
           ...state.user,
-          activeRole: newRole,
+          activeRole: requestedRole,
         };
         if (typeof window !== 'undefined') {
           const safeSession = filterSafeUserSession(state.user);

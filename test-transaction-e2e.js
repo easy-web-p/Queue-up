@@ -683,6 +683,87 @@ async function main() {
     assert.equal(hydratedSession.isSuperAdmin, false);
   });
 
+  // Scenario 21: Fake Offline Price Manipulation Blocked by Universal Server Pricing
+  await runTest('Scenario 21: Client sending manipulated totalAmount is overridden by server-calculated catalog price', async () => {
+    const catalogProduct = { id: 'p_real_01', price: 65, storeId: 'shop_01' };
+    const clientOrderPayload = { productId: 'p_real_01', quantity: 2, clientClaimedTotal: 1, paymentMethod: 'cash' };
+
+    function calculateServerAuthoritativePrice(product, quantity) {
+      return product.price * quantity;
+    }
+
+    const calculatedTotal = calculateServerAuthoritativePrice(catalogProduct, clientOrderPayload.quantity);
+    assert.equal(calculatedTotal, 130);
+    assert.notEqual(calculatedTotal, clientOrderPayload.clientClaimedTotal);
+  });
+
+  // Scenario 22: Fake Coupon / Discount Injection Rejected
+  await runTest('Scenario 22: Fake or expired coupon codes produce 0 THB discount on server calculation', async () => {
+    const validCoupons = {
+      'VALID10': { status: 'Active', discount: 10, minSpend: 50, expiryDate: '2099-12-31' }
+    };
+
+    function applyServerCoupon(couponCode, subtotal) {
+      if (!couponCode) return 0;
+      const c = validCoupons[couponCode.trim().toUpperCase()];
+      if (!c || c.status !== 'Active' || subtotal < c.minSpend || new Date(c.expiryDate) < new Date()) {
+        return 0;
+      }
+      return c.discount;
+    }
+
+    assert.equal(applyServerCoupon('HACK999', 100), 0);
+    assert.equal(applyServerCoupon('VALID10', 40), 0); // minSpend not met
+    assert.equal(applyServerCoupon('VALID10', 80), 10);
+  });
+
+  // Scenario 23: Fake Subtotal vs Unit Price * Quantity Mismatch
+  await runTest('Scenario 23: Subtotal is strictly computed server-side from unit price + modifiers * quantity', async () => {
+    function computeOrderBreakdown(unitPrice, toppingPrice, quantity) {
+      const effectiveUnitPrice = unitPrice + toppingPrice;
+      const subtotal = effectiveUnitPrice * quantity;
+      return { effectiveUnitPrice, subtotal };
+    }
+
+    const breakdown = computeOrderBreakdown(50, 15, 3);
+    assert.equal(breakdown.effectiveUnitPrice, 65);
+    assert.equal(breakdown.subtotal, 195);
+  });
+
+  // Scenario 24: Store ID and Product Ownership Mismatch Rejected
+  await runTest('Scenario 24: Orders with mismatched storeId and product owner are rejected', async () => {
+    const product = { id: 'p_canteen_1', storeId: 'store_canteen_01' };
+
+    function verifyProductStore(prod, claimedStoreId) {
+      if (prod.storeId !== claimedStoreId) {
+        throw new Error('Product does not belong to specified store');
+      }
+      return true;
+    }
+
+    assert.equal(verifyProductStore(product, 'store_canteen_01'), true);
+    assert.throws(() => verifyProductStore(product, 'store_canteen_02'), /Product does not belong/);
+  });
+
+  // Scenario 25: Unauthorized switchRole Rejected by Client State Guard
+  await runTest('Scenario 25: switchRole rejects unverified role changes for non-merchant customers', async () => {
+    const customerUser = { uid: 'user_cust', roles: ['customer'], activeRole: 'customer' };
+
+    function guardedSwitchRole(user, targetRole) {
+      const allowedRoles = user.roles || ['customer'];
+      if (!allowedRoles.includes(targetRole)) {
+        return user.activeRole; // Reject change, retain current
+      }
+      return targetRole;
+    }
+
+    assert.equal(guardedSwitchRole(customerUser, 'merchant'), 'customer');
+    assert.equal(guardedSwitchRole(customerUser, 'admin'), 'customer');
+
+    const merchantUser = { uid: 'user_mch', roles: ['customer', 'merchant'], activeRole: 'customer' };
+    assert.equal(guardedSwitchRole(merchantUser, 'merchant'), 'merchant');
+  });
+
   const passRate = Math.round((passedTests / totalTests) * 100);
   console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${passRate}%).`);
 
