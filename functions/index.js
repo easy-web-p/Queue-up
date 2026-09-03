@@ -1,4 +1,5 @@
 /* global Buffer */
+import crypto from "crypto";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
@@ -541,10 +542,19 @@ export const resolvePaidAfterExpiredOrder = onCall(
     const amountSatang = Math.round(Number(order.totalAmount) * 100);
     if (!Number.isFinite(amountSatang) || amountSatang <= 0) throw new HttpsError("failed-precondition", "Invalid order amount for refund.");
 
+    // 🔒 Pre-claim Refund Idempotency State
+    const refundKey = `ref_${orderRef.id}_${paymentId}`;
+    await orderRef.update({
+      paymentStatus: "refund_pending",
+      reconciliationStatus: "PROVIDER_REFUNDING",
+      refundIdempotencyKey: refundKey,
+      updatedAt: FieldValue.serverTimestamp()
+    });
+
     try {
       const refund = await opnRequest(`/charges/${encodeURIComponent(paymentId)}/refunds`, opnSecretKey.value(), {
         amount: amountSatang,
-        metadata: { order_id: orderRef.id, reason: "paid_after_expired" },
+        metadata: { order_id: orderRef.id, refund_key: refundKey, reason: "paid_after_expired" },
       });
       const refundId = refund.id || null;
       await orderRef.update({
@@ -617,27 +627,59 @@ export function isAllowedPaymentTransition(currentStatus, nextStatus, actor = "w
       refunded: ["refunded"]
     },
     refund_flow: {
-      paid: ["refunded"],
-      paid_after_expired: ["paid", "refunded"]
+      paid: ["refund_pending", "refunded"],
+      paid_after_expired: ["refund_pending", "paid", "refunded"],
+      refund_pending: ["refunded", "refund_requested"]
     },
     merchant_reconcile: {
-      paid_after_expired: ["paid", "refunded"]
+      paid_after_expired: ["paid", "refund_pending", "refunded"]
     }
   };
   return (ALLOWED_TRANSITIONS[actor]?.[currentStatus] || []).includes(nextStatus);
 }
 
-export async function handleOpnWebhookCore(req, res, { db, retrieveCharge, releaseOrderResources, opnSecretKey }) {
+export function verifyOpnWebhookSignature(req, secret) {
+  if (!secret) return true;
+  const signatureHeader = req.headers?.["x-opn-signature"] || req.headers?.["x-signature"] || req.headers?.["omise-signature"];
+  if (!signatureHeader || typeof signatureHeader !== "string") return false;
+  try {
+    const rawBody = typeof req.rawBody === "string" ? req.rawBody : (typeof req.body === "string" ? req.body : JSON.stringify(req.body));
+    const expectedSig = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+    const bufA = Buffer.from(signatureHeader);
+    const bufB = Buffer.from(expectedSig);
+    if (bufA.length !== bufB.length) return false;
+    return crypto.timingSafeEqual(bufA, bufB);
+  } catch {
+    return false;
+  }
+}
+
+export async function handleOpnWebhookCore(req, res, { db, retrieveCharge, releaseOrderResources, opnSecretKey, signatureSecret }) {
   if (req.method !== "POST") return res.status(405).send("Method not allowed");
   try {
+    if (signatureSecret && !verifyOpnWebhookSignature(req, signatureSecret)) {
+      return res.status(401).send("Unauthorized: Invalid webhook signature");
+    }
+
     const event = req.body;
     const ALLOWED_WEBHOOK_EVENTS = ["charge.complete", "charge.create", "charge.update"];
     if (!event || typeof event.key !== "string" || !ALLOWED_WEBHOOK_EVENTS.includes(event.key)) {
       return res.status(400).send("Unsupported or missing webhook event key");
     }
 
-    // charge.create is an informational creation event; never transition orders to paid
+    // charge.create is recorded in webhook_events for tracking, but never transitions orders to paid
     if (event.key === "charge.create") {
+      const eventId = String(event.id || event.data?.id || "").trim();
+      if (eventId) {
+        await db.collection("webhook_events").doc(eventId).set({
+          eventId,
+          eventKey: "charge.create",
+          chargeId: event.data?.id || null,
+          processed: true,
+          orderMutated: false,
+          createdAt: FieldValue.serverTimestamp()
+        }, { merge: true });
+      }
       return res.status(200).send("Charge creation event acknowledged");
     }
 

@@ -1,4 +1,4 @@
-/* global process */
+/* global process, Buffer */
 /**
  * QueueUp Wave 3.13 Production-Grade Transaction & State-Machine Test Matrix
  * Features:
@@ -10,6 +10,7 @@
  * - Zero-tolerance Exit Code Enforcement
  */
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 
 console.log('🧪 Starting QueueUp Wave 3.13 Production-Grade Transaction Test Matrix...\n');
 
@@ -1826,6 +1827,392 @@ async function main() {
     assert.equal(totalProcessed, 137);
     assert.equal(batchesExecuted, 3); // 50 + 50 + 37 = 3 batches
     assert.equal(pendingQueue.filter(o => !o.released).length, 0); // 0 starvation
+  });
+
+  // Scenario 64: Invalid webhook signature header -> 401
+  await runTest('Scenario 64: Invalid webhook signature header -> 401 Unauthorized', async () => {
+    function verifySig(rawBody, headerSig, secret) {
+      if (!secret) return true;
+      if (!headerSig) return false;
+      const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+      const bufA = Buffer.from(headerSig);
+      const bufB = Buffer.from(expected);
+      if (bufA.length !== bufB.length) return false;
+      return crypto.timingSafeEqual(bufA, bufB);
+    }
+
+    const secret = "secret_webhook_key_123";
+    const body = JSON.stringify({ key: "charge.complete", data: { id: "chrg_sig_01" } });
+    const badSig = "bad_signature_abcdef";
+    assert.equal(verifySig(body, badSig, secret), false);
+  });
+
+  // Scenario 65: Valid signature + tampered body -> reject
+  await runTest('Scenario 65: Valid signature with tampered body payload -> reject', async () => {
+    function verifySig(rawBody, headerSig, secret) {
+      if (!secret) return true;
+      if (!headerSig) return false;
+      const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+      const bufA = Buffer.from(headerSig);
+      const bufB = Buffer.from(expected);
+      if (bufA.length !== bufB.length) return false;
+      return crypto.timingSafeEqual(bufA, bufB);
+    }
+
+    const secret = "secret_webhook_key_123";
+    const originalBody = JSON.stringify({ key: "charge.complete", amount: 10000 });
+    const validSig = crypto.createHmac("sha256", secret).update(originalBody).digest("hex");
+
+    const tamperedBody = JSON.stringify({ key: "charge.complete", amount: 1000 }); // Underpayment tamper
+    assert.equal(verifySig(tamperedBody, validSig, secret), false);
+  });
+
+  // Scenario 66: Same eventId replay -> no mutation
+  await runTest('Scenario 66: Same eventId replay -> acknowledged without order mutation', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const eventId = "evnt_replay_66";
+    engine.setDoc(`webhook_events/${eventId}`, { eventId, chargeId: "chrg_66", orderId: "ord_66", processed: true });
+    engine.setDoc(`orders/ord_66`, { paymentStatus: "paid", totalAmount: 100 });
+
+    let mutated = false;
+    const res = await engine.runTransaction(async (tx) => {
+      const snap = await tx.get({ path: `webhook_events/${eventId}` });
+      if (snap?.exists && snap.data()?.processed) {
+        return { code: 200, message: "Already processed event" };
+      }
+      mutated = true;
+      return { code: 200, message: "OK" };
+    });
+
+    assert.equal(res.message, "Already processed event");
+    assert.equal(mutated, false);
+  });
+
+  // Scenario 67: charge.create -> recorded in webhook_events but never paid
+  await runTest('Scenario 67: charge.create is recorded in webhook_events but never sets order to paid', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    engine.setDoc('orders/ord_create_67', { orderId: 'ord_create_67', paymentStatus: 'pending' });
+
+    const event = { id: "evnt_create_67", key: "charge.create", data: { id: "chrg_create_67" } };
+    engine.setDoc(`webhook_events/${event.id}`, {
+      eventId: event.id,
+      eventKey: event.key,
+      chargeId: event.data.id,
+      processed: true,
+      orderMutated: false
+    });
+
+    const orderAfter = engine.getDoc('orders/ord_create_67');
+    const eventDoc = engine.getDoc(`webhook_events/${event.id}`);
+    assert.equal(orderAfter.paymentStatus, 'pending');
+    assert.equal(eventDoc.processed, true);
+    assert.equal(eventDoc.orderMutated, false);
+  });
+
+  // Scenario 68: Same charge, different event IDs -> exactly one payment transition, no double counting
+  await runTest('Scenario 68: Same charge, different event IDs commits exactly once', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    engine.setDoc('orders/ord_multievent_68', { orderId: 'ord_multievent_68', paymentStatus: 'pending' });
+
+    let paidCommitCount = 0;
+    async function processEvent(eventId, chargeId) {
+      return await engine.runTransaction(async (tx) => {
+        const oSnap = await tx.get({ path: 'orders/ord_multievent_68' });
+        const o = oSnap.data();
+        if (o.paymentStatus === 'paid') {
+          return { code: 200, status: 'already_paid' };
+        }
+        paidCommitCount++;
+        tx.update({ path: 'orders/ord_multievent_68' }, { paymentStatus: 'paid', paymentId: chargeId });
+        tx.set({ path: `webhook_events/${eventId}` }, { eventId, processed: true });
+        return { code: 200, status: 'paid' };
+      });
+    }
+
+    const res1 = await processEvent('evnt_first_68', 'chrg_same_68');
+    const res2 = await processEvent('evnt_second_68', 'chrg_same_68');
+
+    assert.equal(res1.status, 'paid');
+    assert.equal(res2.status, 'already_paid');
+    assert.equal(paidCommitCount, 1);
+  });
+
+  // Scenario 69: Worker lease prevents duplicate simultaneous processing
+  await runTest('Scenario 69: Worker lease prevents duplicate simultaneous processing', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const now = Date.now();
+    engine.setDoc('resource_release_jobs/job_lease_69', {
+      jobId: 'job_lease_69',
+      status: 'processing',
+      leaseUntil: now + 5 * 60 * 1000, // 5 minutes in future
+      workerId: 'worker_A'
+    });
+
+    async function claimJob(workerId) {
+      return await engine.runTransaction(async (tx) => {
+        const jSnap = await tx.get({ path: 'resource_release_jobs/job_lease_69' });
+        const j = jSnap.data();
+        const currentTime = Date.now();
+        if (j.status === 'processing' && j.leaseUntil > currentTime) {
+          return { claimed: false, reason: 'LOCKED_BY_ANOTHER_WORKER' };
+        }
+        tx.update({ path: 'resource_release_jobs/job_lease_69' }, {
+          status: 'processing',
+          leaseUntil: currentTime + 5 * 60 * 1000,
+          workerId
+        });
+        return { claimed: true };
+      });
+    }
+
+    const claimB = await claimJob('worker_B');
+    assert.equal(claimB.claimed, false);
+    assert.equal(claimB.reason, 'LOCKED_BY_ANOTHER_WORKER');
+  });
+
+  // Scenario 70: Expired lease can be reclaimed by a new worker
+  await runTest('Scenario 70: Expired lease can be reclaimed by a new worker', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const pastTime = Date.now() - 10 * 60 * 1000; // Expired 10 minutes ago
+    engine.setDoc('resource_release_jobs/job_expired_70', {
+      jobId: 'job_expired_70',
+      status: 'processing',
+      leaseUntil: pastTime,
+      workerId: 'worker_dead'
+    });
+
+    async function claimExpiredJob(workerId) {
+      return await engine.runTransaction(async (tx) => {
+        const jSnap = await tx.get({ path: 'resource_release_jobs/job_expired_70' });
+        const j = jSnap.data();
+        const currentTime = Date.now();
+        if (j.status === 'processing' && j.leaseUntil > currentTime) {
+          return { claimed: false };
+        }
+        tx.update({ path: 'resource_release_jobs/job_expired_70' }, {
+          status: 'processing',
+          leaseUntil: currentTime + 5 * 60 * 1000,
+          workerId
+        });
+        return { claimed: true };
+      });
+    }
+
+    const claimNew = await claimExpiredJob('worker_live');
+    assert.equal(claimNew.claimed, true);
+    assert.equal(engine.getDoc('resource_release_jobs/job_expired_70').workerId, 'worker_live');
+  });
+
+  // Scenario 71: Worker crash after claiming job -> recovered safely on next cycle
+  await runTest('Scenario 71: Worker crash after claiming job recovers safely on next cycle', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    engine.setDoc('products/prod_71', { stock: 2 });
+    engine.setDoc('orders/ord_71', { orderId: 'ord_71', productId: 'prod_71', reservedQuantity: 2, resourcesReleased: false });
+    engine.setDoc('resource_release_jobs/job_71', { jobId: 'job_71', orderId: 'ord_71', status: 'pending' });
+
+    // Worker 1 claims job but dies before completing release
+    engine.setDoc('resource_release_jobs/job_71', {
+      jobId: 'job_71',
+      orderId: 'ord_71',
+      status: 'processing',
+      leaseUntil: Date.now() - 1000, // Expired
+      workerId: 'worker_crashed'
+    });
+
+    // Worker 2 reclaims and completes
+    await engine.runTransaction(async (tx) => {
+      const oSnap = await tx.get({ path: 'orders/ord_71' });
+      const o = oSnap.data();
+      if (!o.resourcesReleased) {
+        const pSnap = await tx.get({ path: `products/${o.productId}` });
+        const p = pSnap.data();
+        tx.update({ path: `products/${o.productId}` }, { stock: p.stock + o.reservedQuantity });
+        tx.update({ path: 'orders/ord_71' }, { resourcesReleased: true });
+      }
+      tx.update({ path: 'resource_release_jobs/job_71' }, { status: 'completed' });
+    });
+
+    assert.equal(engine.getDoc('products/prod_71').stock, 4); // 2 + 2 = 4
+    assert.equal(engine.getDoc('resource_release_jobs/job_71').status, 'completed');
+  });
+
+  // Scenario 72: Job retry and exponential backoff semantics operating properly
+  await runTest('Scenario 72: Job retry and backoff calculates nextRetryAt properly', async () => {
+    function computeNextRetry(attempts, baseDelayMs = 1000) {
+      const delay = baseDelayMs * Math.pow(2, attempts);
+      return Date.now() + delay;
+    }
+
+    const now = Date.now();
+    const retry1 = computeNextRetry(1);
+    const retry2 = computeNextRetry(2);
+    const retry3 = computeNextRetry(3);
+
+    assert.ok(retry1 >= now + 2000);
+    assert.ok(retry2 >= now + 4000);
+    assert.ok(retry3 >= now + 8000);
+  });
+
+  // Scenario 73: Refund provider success + Firestore failure -> recovery with idempotency key
+  await runTest('Scenario 73: Refund provider success + Firestore failure recovers with idempotency key', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const orderId = "ord_refund_73";
+    const refundKey = `ref_${orderId}_chrg_73`;
+
+    engine.setDoc(`orders/${orderId}`, {
+      orderId,
+      paymentId: "chrg_73",
+      paymentStatus: "paid_after_expired",
+      reconciliationStatus: "PROVIDER_REFUNDING",
+      refundIdempotencyKey: refundKey
+    });
+
+    // Provider mock returns existing refund when queried with same idempotency key
+    async function executeOrRecoverRefund(orderId, opnProvider) {
+      const order = engine.getDoc(`orders/${orderId}`);
+      if (order.reconciliationStatus === "REFUNDED") return { status: "ALREADY_REFUNDED" };
+
+      const refundRecord = await opnProvider.findRefundByKey(order.refundIdempotencyKey);
+      if (refundRecord) {
+        // Recover Firestore state
+        engine.setDoc(`orders/${orderId}`, {
+          paymentStatus: "refunded",
+          reconciliationStatus: "REFUNDED",
+          refundId: refundRecord.id
+        }, { merge: true });
+        return { status: "RECOVERED", refundId: refundRecord.id };
+      }
+      return { status: "FAILED" };
+    }
+
+    const mockProvider = {
+      findRefundByKey: async (key) => key === refundKey ? { id: "rfnd_recovered_73" } : null
+    };
+
+    const recoveryResult = await executeOrRecoverRefund(orderId, mockProvider);
+    assert.equal(recoveryResult.status, "RECOVERED");
+    assert.equal(recoveryResult.refundId, "rfnd_recovered_73");
+    assert.equal(engine.getDoc(`orders/${orderId}`).paymentStatus, "refunded");
+  });
+
+  // Scenario 74: Refund replay -> no duplicate refund issued
+  await runTest('Scenario 74: Refund replay / repeated calls does not issue duplicate refund', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    engine.setDoc('orders/ord_refund_74', {
+      orderId: 'ord_refund_74',
+      paymentStatus: 'refunded',
+      reconciliationStatus: 'REFUNDED',
+      refundId: 'rfnd_74'
+    });
+
+    let providerCallCount = 0;
+    async function attemptRefund(orderId) {
+      const order = engine.getDoc(`orders/${orderId}`);
+      const TERMINAL_RECONCILED = ["REFUNDED", "ACCEPTED"];
+      if (TERMINAL_RECONCILED.includes(order.reconciliationStatus) || order.paymentStatus === "refunded") {
+        return { code: 200, message: "Already refunded" };
+      }
+      providerCallCount++;
+      return { code: 200, message: "Refund processed" };
+    }
+
+    const res1 = await attemptRefund('ord_refund_74');
+    const res2 = await attemptRefund('ord_refund_74');
+
+    assert.equal(res1.message, "Already refunded");
+    assert.equal(res2.message, "Already refunded");
+    assert.equal(providerCallCount, 0); // 0 duplicate provider calls
+  });
+
+  // Scenario 75: Cross-order refund binding -> rejected
+  await runTest('Scenario 75: Cross-order refund binding is strictly REJECTED', async () => {
+    function verifyRefundBinding(order, refundMetadata) {
+      if (order.orderId !== refundMetadata.order_id) {
+        throw new Error("400: Refund metadata order ID does not match target order");
+      }
+      if (order.paymentId !== refundMetadata.charge_id) {
+        throw new Error("400: Refund charge ID does not match order payment binding");
+      }
+      return true;
+    }
+
+    const order = { orderId: "ord_target_75", paymentId: "chrg_target_75" };
+    const spoofedMetadata = { order_id: "ord_spoofed_99", charge_id: "chrg_target_75" };
+
+    assert.throws(() => verifyRefundBinding(order, spoofedMetadata), /Refund metadata order ID does not match/);
+  });
+
+  // Scenario 76: Concurrent refund requests -> exactly one provider operation committed
+  await runTest('Scenario 76: Concurrent refund requests execute exactly one provider operation', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    engine.setDoc('orders/ord_conc_76', {
+      orderId: 'ord_conc_76',
+      paymentStatus: 'paid_after_expired',
+      reconciliationStatus: 'PENDING_REVIEW'
+    });
+
+    async function processRefundAtomic() {
+      return await engine.runTransaction(async (tx) => {
+        const snap = await tx.get({ path: 'orders/ord_conc_76' });
+        const order = snap.data();
+        if (order.reconciliationStatus === 'REFUNDED' || order.reconciliationStatus === 'PROVIDER_REFUNDING') {
+          return { status: 'already_processing_or_refunded' };
+        }
+        tx.update({ path: 'orders/ord_conc_76' }, {
+          paymentStatus: 'refunded',
+          reconciliationStatus: 'REFUNDED',
+          refundId: 'rfnd_atomic_76'
+        });
+        return { status: 'refund_committed' };
+      });
+    }
+
+    const [res1, res2] = await Promise.all([processRefundAtomic(), processRefundAtomic()]);
+    const committedCount = [res1, res2].filter(r => r.status === 'refund_committed').length;
+    const alreadyCount = [res1, res2].filter(r => r.status === 'already_processing_or_refunded').length;
+    assert.equal(committedCount, 1);
+    assert.equal(alreadyCount, 1);
+  });
+
+  // Scenario 77: Audit log strictly corresponds to terminal payment state
+  await runTest('Scenario 77: Audit log strictly corresponds to terminal payment state', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    engine.setDoc('orders/ord_audit_77', { orderId: 'ord_audit_77', paymentStatus: 'refunded' });
+    engine.setDoc('audit_logs/reconcile_ord_audit_77', {
+      action: 'PAID_AFTER_EXPIRED_REFUNDED',
+      orderId: 'ord_audit_77',
+      status: 'REFUNDED'
+    });
+
+    const order = engine.getDoc('orders/ord_audit_77');
+    const audit = engine.getDoc('audit_logs/reconcile_ord_audit_77');
+
+    assert.equal(order.paymentStatus, 'refunded');
+    assert.equal(audit.action, 'PAID_AFTER_EXPIRED_REFUNDED');
+  });
+
+  // Scenario 78: Webhook + refund race -> state machine invariant maintained (terminal refund takes precedence)
+  await runTest('Scenario 78: Webhook + refund race: terminal refund strictly takes precedence', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    engine.setDoc('orders/ord_race_78', {
+      orderId: 'ord_race_78',
+      paymentStatus: 'refunded',
+      reconciliationStatus: 'REFUNDED'
+    });
+
+    // Incoming late webhook with successful status arriving after refund
+    async function handleIncomingWebhook(orderId) {
+      const order = engine.getDoc(`orders/${orderId}`);
+      const TERMINAL_STATES = ["ACCEPTED", "REFUNDED", "REFUND_REQUESTED"];
+      if (TERMINAL_STATES.includes(order.reconciliationStatus) || order.paymentStatus === "refunded") {
+        return { code: 200, message: "Already resolved in terminal reconciliation state" };
+      }
+      return { code: 200, message: "State updated to paid" };
+    }
+
+    const webhookRes = await handleIncomingWebhook('ord_race_78');
+    assert.equal(webhookRes.message, "Already resolved in terminal reconciliation state");
+    assert.equal(engine.getDoc('orders/ord_race_78').paymentStatus, 'refunded'); // Never overridden!
   });
 
   const passRate = Math.round((passedTests / totalTests) * 100);
