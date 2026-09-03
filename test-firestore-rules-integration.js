@@ -39,10 +39,11 @@ function evaluateRules({ collection, action, auth, resource, requestResource }) 
   const isOwner = (uid) => isAuthenticated && auth.uid === uid;
   const isAdmin = () => isAuthenticated && (auth.token?.admin === true || auth.token?.role === 'admin');
 
+  // 🔒 Canonical Store Ownership: ONLY shops/{storeId}.ownerUid is canonical authority
   const isStoreOwner = (storeId) => {
     if (!isAuthenticated) return false;
     if (isAdmin()) return true;
-    return storeId === auth.storeId || storeId === auth.merchantId;
+    return storeId === auth.storeId;
   };
 
   function isValidOrderStateTransition(oldStatus, oldQueue, newStatus, newQueue) {
@@ -171,10 +172,20 @@ function evaluateRules({ collection, action, auth, resource, requestResource }) 
     if (action === 'update') {
       if (!isAuthenticated) return false;
       if (isAdmin()) return true;
-      if (isStoreOwner(resource?.id) && requestResource.data?.ownerUid === resource?.data?.ownerUid) {
-        return true;
+      if (isStoreOwner(resource?.id)) {
+        if (requestResource.data?.ownerUid !== resource?.data?.ownerUid) return false; // 🔒 Lock ownerUid
+        if ('status' in requestResource.data && requestResource.data.status !== resource?.data?.status) return false; // 🔒 Lock Admin Status
+        if ('rating' in requestResource.data && requestResource.data.rating !== resource?.data?.rating) return false; // 🔒 Lock Admin Rating
+        if ('reviewsCount' in requestResource.data && requestResource.data.reviewsCount !== resource?.data?.reviewsCount) return false; // 🔒 Lock Admin ReviewsCount
+
+        const mutatedKeys = Object.keys(requestResource.data).filter(k => requestResource.data[k] !== resource?.data?.[k]);
+        const allowedShopKeys = [
+          'name', 'description', 'location', 'hours', 'isOpen', 'contactPhone', 'logoUrl', 'bannerUrl',
+          'operatingHours', 'operationalOverride', 'capacityConfig', 'slotCapacity', 'maxOrdersPerSlot', 'pickupSlots', 'updatedAt'
+        ];
+        return mutatedKeys.every(k => allowedShopKeys.includes(k));
       }
-      return false; // Cannot transfer ownerUid
+      return false;
     }
     if (action === 'delete') return isAdmin();
   }
@@ -542,6 +553,48 @@ async function main() {
       requestResource: { data: { storeId: 'store_A', name: 'เครื่องดื่ม' } }
     });
     assert.equal(isAllowed, true);
+  });
+
+  // Test 27: Store Owner attempting to mutate shop status (e.g. pending_approval -> active) is DENIED (Finding #1)
+  await runTest('Test 27: Store Owner attempting to mutate shop status is strictly DENIED', async () => {
+    const isAllowed = evaluateRules({
+      collection: 'shops',
+      action: 'update',
+      auth: { uid: 'merchant_A_uid', storeId: 'store_A' },
+      resource: { id: 'store_A', data: { ownerUid: 'merchant_A_uid', status: 'pending_approval', name: 'ร้าน A' } },
+      requestResource: { data: { ownerUid: 'merchant_A_uid', status: 'active', name: 'ร้าน A' } }
+    });
+    assert.equal(isAllowed, false);
+  });
+
+  // Test 28: Admin mutating shop status (e.g. pending_approval -> active) is ALLOWED
+  await runTest('Test 28: Admin mutating shop status is ALLOWED', async () => {
+    const isAllowed = evaluateRules({
+      collection: 'shops',
+      action: 'update',
+      auth: { uid: 'admin_uid', token: { admin: true } },
+      resource: { id: 'store_A', data: { ownerUid: 'merchant_A_uid', status: 'pending_approval', name: 'ร้าน A' } },
+      requestResource: { data: { ownerUid: 'merchant_A_uid', status: 'active', name: 'ร้าน A' } }
+    });
+    assert.equal(isAllowed, true);
+  });
+
+  // Test 29: Store Owner updating allowed operational fields (isOpen, hours, operationalOverride) is ALLOWED
+  await runTest('Test 29: Store Owner updating allowed operational fields is ALLOWED', async () => {
+    const isAllowed = evaluateRules({
+      collection: 'shops',
+      action: 'update',
+      auth: { uid: 'merchant_A_uid', storeId: 'store_A' },
+      resource: { id: 'store_A', data: { ownerUid: 'merchant_A_uid', status: 'active', name: 'ร้าน A', isOpen: false } },
+      requestResource: { data: { ownerUid: 'merchant_A_uid', status: 'active', name: 'ร้าน A (สาขา 1)', isOpen: true, hours: '08:00 - 17:00' } }
+    });
+    assert.equal(isAllowed, true);
+  });
+
+  // Test 30: Canonical Ownership Rule AST verification in firestore.rules (Finding #2)
+  await runTest('Test 30: isStoreOwner in firestore.rules uses ONLY canonical shops collection', async () => {
+    assert.ok(rulesContent.includes('get(/databases/$(database)/documents/shops/$(storeId)).data.ownerUid == request.auth.uid'));
+    assert.ok(!rulesContent.includes('documents/merchantProfiles/$(storeId)'));
   });
 
   const passRate = Math.round((passedTests / totalTests) * 100);

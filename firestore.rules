@@ -24,9 +24,7 @@ service cloud.firestore {
       return isAuthenticated() && (
         isAdmin() ||
         (exists(/databases/$(database)/documents/shops/$(storeId)) && 
-         get(/databases/$(database)/documents/shops/$(storeId)).data.ownerUid == request.auth.uid) ||
-        (exists(/databases/$(database)/documents/merchantProfiles/$(storeId)) && 
-         get(/databases/$(database)/documents/merchantProfiles/$(storeId)).data.ownerUid == request.auth.uid)
+         get(/databases/$(database)/documents/shops/$(storeId)).data.ownerUid == request.auth.uid)
       );
     }
 
@@ -139,12 +137,19 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isAuthenticated() && (isAdmin() || request.resource.data.ownerUid == request.auth.uid);
       
-      // 🔒 Lock ownerUid: Store Owner cannot transfer store ownership without Admin
+      // 🔒 Lock Admin Fields & ownerUid: Store Owner cannot change status, rating, reviewsCount, or transfer ownerUid
       allow update: if isAuthenticated() && (
         isAdmin() ||
         (
           isStoreOwner(shopId) &&
-          request.resource.data.ownerUid == resource.data.ownerUid
+          request.resource.data.ownerUid == resource.data.ownerUid &&
+          (!('status' in request.resource.data) || request.resource.data.status == resource.data.status) &&
+          (!('rating' in request.resource.data) || request.resource.data.rating == resource.data.rating) &&
+          (!('reviewsCount' in request.resource.data) || request.resource.data.reviewsCount == resource.data.reviewsCount) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'name', 'description', 'location', 'hours', 'isOpen', 'contactPhone', 'logoUrl', 'bannerUrl',
+            'operatingHours', 'operationalOverride', 'capacityConfig', 'slotCapacity', 'maxOrdersPerSlot', 'pickupSlots', 'updatedAt'
+          ])
         )
       );
       allow delete: if isAdmin();
