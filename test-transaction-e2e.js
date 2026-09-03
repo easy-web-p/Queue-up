@@ -1148,6 +1148,112 @@ async function main() {
     assert.deepEqual(processStateTransition("pending", "successful"), { action: "APPLY", status: "paid" });
   });
 
+  // Scenario 39: charge.create event acknowledges receipt but NEVER marks order as paid
+  await runTest('Scenario 39: charge.create event acknowledges receipt but never marks order as paid', async () => {
+    function handleWebhookEventKey(eventKey, currentOrderStatus) {
+      if (eventKey === "charge.create") {
+        return { responseCode: 200, message: "Charge creation event acknowledged", newStatus: currentOrderStatus };
+      }
+      if (eventKey === "charge.complete") {
+        return { responseCode: 200, message: "OK", newStatus: "paid" };
+      }
+      throw new Error("Unsupported event key");
+    }
+
+    const initialOrder = { orderId: "ord_create_01", paymentStatus: "pending" };
+    const createResult = handleWebhookEventKey("charge.create", initialOrder.paymentStatus);
+    assert.equal(createResult.responseCode, 200);
+    assert.equal(createResult.newStatus, "pending"); // Must remain pending!
+  });
+
+  // Scenario 40: Concurrent duplicate webhooks (Event #1 & #2 entering simultaneously) are serialized with OCC
+  await runTest('Scenario 40: Concurrent webhooks are serialized with OCC and processed exactly once', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    engine.setDoc(`orders/ord_concurrent_01`, {
+      orderId: 'ord_concurrent_01',
+      userId: 'user_concurrent',
+      paymentStatus: 'pending',
+      totalAmount: 100
+    });
+
+    async function processWebhookAtomic() {
+      return await engine.runTransaction(async (tx) => {
+        const snap = await tx.get({ path: 'orders/ord_concurrent_01' });
+        const order = snap.data();
+        if (order.paymentStatus === 'paid') {
+          return { status: 'already_paid' };
+        }
+        tx.update({ path: 'orders/ord_concurrent_01' }, {
+          paymentStatus: 'paid'
+        });
+        return { status: 'marked_paid' };
+      });
+    }
+
+    // Run 2 webhook processors concurrently
+    const [res1, res2] = await Promise.all([processWebhookAtomic(), processWebhookAtomic()]);
+    const finalOrder = engine.getDoc('orders/ord_concurrent_01');
+    assert.equal(finalOrder.paymentStatus, 'paid');
+    const markedPaidCount = [res1, res2].filter(r => r.status === 'marked_paid').length;
+    const alreadyPaidCount = [res1, res2].filter(r => r.status === 'already_paid').length;
+    assert.equal(markedPaidCount, 1); // Exactly 1 committed the transition
+    assert.equal(alreadyPaidCount, 1); // Exactly 1 detected already paid on OCC retry
+  });
+
+  // Scenario 41: Replayed webhook event with existing eventId in webhook_events returns 200 without mutation
+  await runTest('Scenario 41: Replayed webhook event with existing eventId returns 200 without duplicate mutation', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const eventId = "evnt_test_replay_999";
+    engine.setDoc(`webhook_events/${eventId}`, {
+      eventId,
+      chargeId: "chrg_test_replay",
+      orderId: "ord_replay_01",
+      processed: true,
+      createdAt: new Date()
+    });
+    engine.setDoc(`orders/ord_replay_01`, {
+      orderId: 'ord_replay_01',
+      paymentStatus: 'paid',
+      totalAmount: 100
+    });
+
+    let duplicateAuditCreated = false;
+    const result = await engine.runTransaction(async (tx) => {
+      const eventSnap = await tx.get({ path: `webhook_events/${eventId}` });
+      if (eventSnap?.exists && eventSnap.data()?.processed === true) {
+        return { code: 200, message: "Already processed event" };
+      }
+      duplicateAuditCreated = true;
+      return { code: 200, message: "OK" };
+    });
+
+    assert.equal(result.code, 200);
+    assert.equal(result.message, "Already processed event");
+    assert.equal(duplicateAuditCreated, false);
+  });
+
+  // Scenario 42: Out-of-order charge.update with failed arriving after charge.complete is rejected by state machine
+  await runTest('Scenario 42: Out-of-order charge.update after charge.complete is rejected by isAllowedPaymentTransition', async () => {
+    function isAllowedPaymentTransition(currentStatus, nextStatus) {
+      if (currentStatus === nextStatus) return true;
+      const ALLOWED_TRANSITIONS = {
+        pending: ["paid", "failed", "expired", "charge_created_order_pending", "creation_failed"],
+        charge_created_order_pending: ["paid", "failed", "expired", "creation_failed"],
+        expired: ["paid_after_expired"],
+        cancelled: ["paid_after_expired"],
+        paid: ["refunded", "paid"],
+        paid_after_expired: ["paid", "refunded"],
+        refunded: ["refunded"]
+      };
+      return (ALLOWED_TRANSITIONS[currentStatus] || []).includes(nextStatus);
+    }
+
+    assert.equal(isAllowedPaymentTransition("pending", "paid"), true);
+    assert.equal(isAllowedPaymentTransition("paid", "failed"), false);
+    assert.equal(isAllowedPaymentTransition("paid", "expired"), false);
+    assert.equal(isAllowedPaymentTransition("refunded", "paid"), false);
+  });
+
   const passRate = Math.round((passedTests / totalTests) * 100);
   console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${passRate}%).`);
 

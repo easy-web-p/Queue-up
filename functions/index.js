@@ -567,6 +567,20 @@ export const getPaymentStatus = onCall(
   }
 );
 
+export function isAllowedPaymentTransition(currentStatus, nextStatus) {
+  if (currentStatus === nextStatus) return true;
+  const ALLOWED_TRANSITIONS = {
+    pending: ["paid", "failed", "expired", "charge_created_order_pending", "creation_failed"],
+    charge_created_order_pending: ["paid", "failed", "expired", "creation_failed"],
+    expired: ["paid_after_expired"],
+    cancelled: ["paid_after_expired"],
+    paid: ["refunded", "paid"],
+    paid_after_expired: ["paid", "refunded"],
+    refunded: ["refunded"]
+  };
+  return (ALLOWED_TRANSITIONS[currentStatus] || []).includes(nextStatus);
+}
+
 export const opnWebhook = onRequest(
   { region: "asia-southeast1", secrets: [opnSecretKey] },
   async (req, res) => {
@@ -576,6 +590,11 @@ export const opnWebhook = onRequest(
       const ALLOWED_WEBHOOK_EVENTS = ["charge.complete", "charge.create", "charge.update"];
       if (!event || typeof event.key !== "string" || !ALLOWED_WEBHOOK_EVENTS.includes(event.key)) {
         return res.status(400).send("Unsupported or missing webhook event key");
+      }
+
+      // charge.create is an informational creation event; never transition orders to paid
+      if (event.key === "charge.create") {
+        return res.status(200).send("Charge creation event acknowledged");
       }
 
       const chargeId = event.data?.id;
@@ -590,97 +609,117 @@ export const opnWebhook = onRequest(
         return res.status(400).send("Invalid payment metadata or unsupported currency");
       }
 
-      const orderRef = db.collection("orders").doc(orderId);
-      const orderSnap = await orderRef.get();
-      if (!orderSnap.exists) return res.status(400).send("Order mismatch");
-      const order = orderSnap.data();
-      if (order.userId !== chargeUid) return res.status(400).send("User ID mismatch");
+      const eventId = String(event.id || event.data?.id || "").trim();
 
-      // Verify paymentId binding if already recorded on the order
-      if (order.paymentId && order.paymentId !== charge.id) {
-        return res.status(400).send("Charge ID does not match order payment binding");
-      }
-
-      // 🔒 Terminal Reconciled State Guard: Never re-open or downgrade orders after merchant resolution
-      const TERMINAL_RECONCILED_STATES = ["ACCEPTED", "REFUNDED", "REFUND_REQUESTED", "MANUAL_REFUND_PENDING"];
-      if (TERMINAL_RECONCILED_STATES.includes(order.reconciliationStatus) || order.paymentStatus === "refunded") {
-        return res.status(200).send("Already resolved in terminal reconciliation state");
-      }
-
-      // Prevent downgrade of already PAID orders
-      if (order.paymentStatus === "paid") {
-        if (charge.status === "successful") {
-          return res.status(200).send("Already processed");
+      const txResult = await db.runTransaction(async (transaction) => {
+        const eventRef = eventId ? db.collection("webhook_events").doc(eventId) : null;
+        const eventSnap = eventRef ? await transaction.get(eventRef) : null;
+        if (eventSnap?.exists && eventSnap.data()?.processed === true) {
+          return { code: 200, message: "Already processed event" };
         }
-        return res.status(400).send("Cannot downgrade already paid order to non-successful status");
-      }
 
-      // Verify amount before accepting any successful payment state, including the late-payment branch.
-      const expectedSatang = Math.round(Number(order.totalAmount || order.totalPrice) * 100);
-      if (!Number.isFinite(expectedSatang) || charge.amount !== expectedSatang) {
-        return res.status(400).send("Amount mismatch");
-      }
+        const orderRef = db.collection("orders").doc(orderId);
+        const orderSnap = await transaction.get(orderRef);
+        if (!orderSnap.exists) return { code: 400, message: "Order mismatch" };
+        const order = orderSnap.data();
+        if (order.userId !== chargeUid) return { code: 400, message: "User ID mismatch" };
+        if (order.paymentId && order.paymentId !== charge.id) return { code: 400, message: "Charge ID does not match order payment binding" };
 
-      if (charge.status === "expired" || charge.status === "failed") {
+        const TERMINAL_RECONCILED_STATES = ["ACCEPTED", "REFUNDED", "REFUND_REQUESTED", "MANUAL_REFUND_PENDING"];
+        if (TERMINAL_RECONCILED_STATES.includes(order.reconciliationStatus) || order.paymentStatus === "refunded") {
+          return { code: 200, message: "Already resolved in terminal reconciliation state" };
+        }
+
+        const expectedSatang = Math.round(Number(order.totalAmount || order.totalPrice) * 100);
+        if (!Number.isFinite(expectedSatang) || charge.amount !== expectedSatang) {
+          return { code: 400, message: "Amount mismatch" };
+        }
+
+        if (order.paymentStatus === "paid") {
+          if (charge.status === "successful") {
+            return { code: 200, message: "Already processed" };
+          }
+          return { code: 400, message: "Cannot downgrade already paid order to non-successful status" };
+        }
+
+        if (charge.status === "expired" || charge.status === "failed") {
+          return { code: 200, handleRelease: true, orderRef };
+        }
+
+        if (order.paymentStatus === "expired" || order.resourcesReleased) {
+          transaction.update(orderRef, {
+            paymentId: charge.id,
+            paymentStatus: "paid_after_expired",
+            providerStatus: charge.status,
+            flaggedForMerchantReview: true,
+            reconciliationStatus: "PENDING_REVIEW",
+            reconciled: false,
+            paidAt: charge.status === "successful" ? FieldValue.serverTimestamp() : null,
+            updatedAt: FieldValue.serverTimestamp()
+          });
+          const auditRef = db.collection("audit_logs").doc(`pay_late_${orderRef.id}_${charge.id}`);
+          transaction.set(auditRef, {
+            actorUid: "system",
+            actorType: "system_webhook",
+            action: "PAYMENT_PAID_AFTER_EXPIRED",
+            orderId: orderRef.id,
+            userId: order.userId,
+            storeId: order.storeId || null,
+            paymentId: charge.id,
+            amount: Number(order.totalAmount || order.totalPrice),
+            currency: "THB",
+            provider: "opn",
+            createdAt: FieldValue.serverTimestamp()
+          }, { merge: true });
+          if (eventRef) {
+            transaction.set(eventRef, { eventId, chargeId: charge.id, orderId: orderRef.id, eventKey: event.key, processed: true, createdAt: FieldValue.serverTimestamp() });
+          }
+          return { code: 200, message: "Handled as paid_after_expired" };
+        }
+
+        const targetStatus = charge.status === "successful" ? "paid" : charge.status;
+        if (!isAllowedPaymentTransition(order.paymentStatus, targetStatus)) {
+          return { code: 400, message: `Invalid payment transition from ${order.paymentStatus} to ${targetStatus}` };
+        }
+
+        transaction.update(orderRef, {
+          paymentId: charge.id,
+          paymentStatus: targetStatus,
+          providerStatus: charge.status,
+          reconciled: true,
+          paidAt: charge.status === "successful" ? FieldValue.serverTimestamp() : null,
+          updatedAt: FieldValue.serverTimestamp()
+        });
+
+        if (charge.status === "successful") {
+          const auditRef = db.collection("audit_logs").doc(`pay_success_${orderRef.id}_${charge.id}`);
+          transaction.set(auditRef, {
+            actorUid: "system",
+            actorType: "system_webhook",
+            action: "PAYMENT_SUCCESSFUL",
+            orderId: orderRef.id,
+            userId: order.userId,
+            storeId: order.storeId || null,
+            paymentId: charge.id,
+            amount: Number(order.totalAmount || order.totalPrice),
+            currency: "THB",
+            provider: "opn",
+            createdAt: FieldValue.serverTimestamp()
+          }, { merge: true });
+        }
+        if (eventRef) {
+          transaction.set(eventRef, { eventId, chargeId: charge.id, orderId: orderRef.id, eventKey: event.key, processed: true, createdAt: FieldValue.serverTimestamp() });
+        }
+        return { code: 200, message: "OK" };
+      });
+
+      if (txResult.handleRelease) {
+        const orderRef = db.collection("orders").doc(orderId);
         await releaseOrderResources(orderRef, `Payment provider reported charge ${charge.status}`);
         return res.status(200).send("Expired/Failed handled");
       }
 
-      // Late success after resource release: record it for reconciliation, never silently re-reserve stock/slot.
-      if (order.paymentStatus === "expired" || order.resourcesReleased) {
-        await orderRef.update({
-          paymentId: charge.id,
-          paymentStatus: "paid_after_expired",
-          providerStatus: charge.status,
-          flaggedForMerchantReview: true,
-          reconciliationStatus: "PENDING_REVIEW",
-          reconciled: false,
-          paidAt: charge.status === "successful" ? FieldValue.serverTimestamp() : null,
-          updatedAt: FieldValue.serverTimestamp()
-        });
-        await db.collection("audit_logs").doc(`pay_late_${orderRef.id}_${charge.id}`).set({
-          actorUid: "system",
-          actorType: "system_webhook",
-          action: "PAYMENT_PAID_AFTER_EXPIRED",
-          orderId: orderRef.id,
-          userId: order.userId,
-          storeId: order.storeId || null,
-          paymentId: charge.id,
-          amount: Number(order.totalAmount || order.totalPrice),
-          currency: "THB",
-          provider: "opn",
-          createdAt: FieldValue.serverTimestamp()
-        }, { merge: true });
-        return res.status(200).send("Handled as paid_after_expired");
-      }
-
-      if (order.paymentStatus === "paid") return res.status(200).send("Already processed");
-
-      const paymentStatus = charge.status === "successful" ? "paid" : charge.status;
-      await orderRef.update({
-        paymentId: charge.id,
-        paymentStatus,
-        providerStatus: charge.status,
-        reconciled: true,
-        paidAt: charge.status === "successful" ? FieldValue.serverTimestamp() : null,
-        updatedAt: FieldValue.serverTimestamp()
-      });
-      if (charge.status === "successful") {
-        await db.collection("audit_logs").doc(`pay_success_${orderRef.id}_${charge.id}`).set({
-          actorUid: "system",
-          actorType: "system_webhook",
-          action: "PAYMENT_SUCCESSFUL",
-          orderId: orderRef.id,
-          userId: order.userId,
-          storeId: order.storeId || null,
-          paymentId: charge.id,
-          amount: Number(order.totalAmount || order.totalPrice),
-          currency: "THB",
-          provider: "opn",
-          createdAt: FieldValue.serverTimestamp()
-        }, { merge: true });
-      }
-      return res.status(200).send("OK");
+      return res.status(txResult.code).send(txResult.message);
     } catch (error) {
       console.error("Opn webhook error", error);
       return res.status(500).send("Webhook verification failed");
