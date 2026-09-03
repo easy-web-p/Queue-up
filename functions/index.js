@@ -206,7 +206,10 @@ export const createPromptPayPayment = onCall(
         quantity,
         reservedQuantity: quantity,
         releasedQuantity: 0,
-        booking: booking || null,
+        booking: (booking?.date && (booking.timeSlot || booking.time)) ? {
+          date: String(booking.date).trim(),
+          timeSlot: String(booking.timeSlot || booking.time).trim()
+        } : null,
         subtotal,
         discountAmount,
         totalAmount: finalAmount,
@@ -227,7 +230,33 @@ export const createPromptPayPayment = onCall(
     });
 
     if (existingResult) {
-      if (!existingResult.qrUrl && existingResult.paymentId) {
+      if (!existingResult.paymentId && opnSecretKey?.value) {
+        try {
+          const chargeListResponse = await fetch(`https://api.omise.co/charges?limit=10`, {
+            headers: { authorization: `Basic ${Buffer.from(`${opnSecretKey.value()}:`).toString("base64")}` },
+          });
+          if (chargeListResponse.ok) {
+            const chargeList = await chargeListResponse.json();
+            const matchedCharge = chargeList.data?.find(c => c.metadata?.orderId === existingResult.orderId);
+            if (matchedCharge) {
+              const matchedQr = matchedCharge.source?.scannable_code?.image?.download_uri;
+              await db.collection("orders").doc(existingResult.orderId).update({
+                paymentId: matchedCharge.id,
+                qrUrl: matchedQr || null,
+                expiresAt: matchedCharge.expires_at || null,
+                updatedAt: FieldValue.serverTimestamp()
+              });
+              existingResult.paymentId = matchedCharge.id;
+              existingResult.qrUrl = matchedQr;
+              existingResult.expiresAt = matchedCharge.expires_at || null;
+            }
+          }
+        } catch (recoverErr) {
+          console.warn("Charge recovery by metadata warning:", recoverErr);
+        }
+      }
+
+      if (!existingResult.qrUrl && existingResult.paymentId && opnSecretKey?.value) {
         try {
           const recoveredCharge = await retrieveCharge(existingResult.paymentId, opnSecretKey.value());
           const recoveredQr = recoveredCharge.source?.scannable_code?.image?.download_uri;
@@ -382,6 +411,10 @@ export const expirePendingOrders = onCall(
   { region: "asia-southeast1" },
   async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Sign in is required.");
+    const isAdmin = request.auth.token?.admin === true || request.auth.token?.role === "admin";
+    if (!isAdmin) {
+      throw new HttpsError("permission-denied", "Only platform administrators can manually trigger order expiration.");
+    }
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
     const staleSnap = await db.collection("orders")
       .where("paymentStatus", "in", ["pending", "charge_created_order_pending"])
@@ -412,7 +445,7 @@ export const resolvePaidAfterExpiredOrder = onCall(
 
     const shopSnap = order.storeId ? await db.collection("shops").doc(order.storeId).get() : null;
     const profileSnap = order.storeId ? await db.collection("merchantProfiles").doc(order.storeId).get() : null;
-    const isAdmin = request.auth.token?.admin === true || request.auth.token?.email === "58140@lomsak.ac.th";
+    const isAdmin = request.auth.token?.admin === true || request.auth.token?.role === "admin";
     const isOwner = (shopSnap?.exists && (shopSnap.data().ownerUid === request.auth.uid || shopSnap.data().ownerId === request.auth.uid || shopSnap.data().merchantId === request.auth.uid)) || (profileSnap?.exists && profileSnap.data().ownerUid === request.auth.uid);
     if (!isAdmin && !isOwner) throw new HttpsError("permission-denied", "Only the store owner or platform admin can resolve this order.");
 

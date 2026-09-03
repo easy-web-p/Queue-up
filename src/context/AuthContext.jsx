@@ -42,6 +42,7 @@ export function AuthProvider({ children }) {
         if (thisSeq !== currentSeq) return;
 
         const mergedUser = {
+          ...userDocData,
           uid: firebaseUser.uid,
           email: firebaseUser.email || "",
           isVerifiedAuth: true,
@@ -49,7 +50,6 @@ export function AuthProvider({ children }) {
           isFromCache: false,
           isProfileLoaded: Boolean(userDocData),
           isProfileError: profileFetchError,
-          ...userDocData,
         };
 
         const roles = getEffectiveRoles(mergedUser);
@@ -82,7 +82,7 @@ export function AuthProvider({ children }) {
           isFromCache: false,
           isProfileLoaded: Boolean(userDocData),
           isProfileError: profileFetchError,
-          storeId: userDocData?.storeId || (isMerchant ? "store_canteen01" : undefined),
+          storeId: userDocData?.storeId || undefined,
         }));
       } catch (fatalErr) {
         console.error("Fatal error during auth state resolution:", fatalErr);

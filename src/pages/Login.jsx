@@ -20,6 +20,7 @@ import {
   generateSecureAccountId,
   validateEmailSyntaxAndDomain,
 } from "../utils/security.js";
+import { getEffectiveRoles, isUserSuperAdmin } from "../utils/authRoles.js";
 import PdpaPolicyModal from "../components/PdpaPolicyModal.jsx";
 import "./Login.css";
 
@@ -247,9 +248,10 @@ function Login() {
         const accountId = uData.accountId || generateSecureAccountId(58140);
         localStorage.setItem("queueup_secure_account_id", accountId);
 
-        const isAdminAccount = sanitizeInput(email) === "58140@lomsak.ac.th" || (uData.roles && uData.roles.includes("admin")) || uData.role === "admin";
-        const userRoles = isAdminAccount ? ["customer", "merchant", "admin"] : (uData.roles || ["customer"]);
-        const userActiveRole = uData.activeRole || "customer";
+        const mergedForRoles = { ...uData, uid: firebaseUid, email: sanitizeInput(email), isVerifiedAuth: true, isTokenVerified: true, isFromCache: false };
+        const userRoles = getEffectiveRoles(mergedForRoles);
+        const isAdminAccount = isUserSuperAdmin(mergedForRoles);
+        const userActiveRole = uData.activeRole || (isAdminAccount ? "admin" : (userRoles.includes("merchant") ? "merchant" : "customer"));
 
         dispatch(
           setUser({
@@ -303,10 +305,11 @@ function Login() {
       const defaultName = existingData.displayName || existingData.fullName || gUser.displayName || "ผู้ใช้งาน Google";
       const defaultEmail = gUser.email || existingData.email || "";
       const defaultPhoto = existingData.photoURL || existingData.photo || gUser.photoURL || "/yeti_mascot.jpg";
-      const isAdminAccount = defaultEmail.toLowerCase() === "58140@lomsak.ac.th" || existingData.isSuperAdmin === true;
-      const isMerchant = existingData.roles?.includes("merchant") || existingData.isMerchantVerified === true || existingData.isMerchantRegistered === true;
-      const userRoles = isAdminAccount ? ["customer", "merchant", "admin"] : (isMerchant ? ["customer", "merchant"] : (existingData.roles || ["customer"]));
-      const activeRole = isAdminAccount ? (existingData.activeRole || "admin") : (existingData.activeRole || (isMerchant ? "merchant" : "customer"));
+      const mergedForRoles = { ...existingData, uid: gUser.uid, email: defaultEmail, isVerifiedAuth: true, isTokenVerified: true, isFromCache: false };
+      const userRoles = getEffectiveRoles(mergedForRoles);
+      const isAdminAccount = isUserSuperAdmin(mergedForRoles);
+      const isMerchant = userRoles.includes("merchant");
+      const activeRole = existingData.activeRole || (isAdminAccount ? "admin" : (isMerchant ? "merchant" : "customer"));
       
       const studentNum = parseInt(defaultEmail.replace(/\D/g, ""), 10) || Math.floor(10000 + Math.random() * 90000);
       const accountId = existingData.accountId || generateSecureAccountId(studentNum);
@@ -326,7 +329,7 @@ function Login() {
         isMerchantVerified: Boolean(existingData.isMerchantVerified || isAdminAccount),
         isMerchantRegistered: Boolean(existingData.isMerchantRegistered || isAdminAccount),
         isSuperAdmin: isAdminAccount,
-        storeId: existingData.storeId || (isMerchant ? "store_canteen01" : undefined),
+        storeId: existingData.storeId || undefined,
         lastLoginAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
