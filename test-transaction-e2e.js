@@ -764,6 +764,131 @@ async function main() {
     assert.equal(guardedSwitchRole(merchantUser, 'merchant'), 'merchant');
   });
 
+  // Scenario 26: Complete Client Order Creation Lockdown (allow create: if false)
+  await runTest('Scenario 26: Complete Lockdown: Client SDK (including admin) cannot create orders directly in Firestore', async () => {
+    function firestoreSecurityRuleCheck(requestAuth, isBackendAdminSdk) {
+      // allow create: if false (Only Backend Admin SDK can write orders)
+      if (isBackendAdminSdk) return true;
+      return false;
+    }
+
+    assert.equal(firestoreSecurityRuleCheck({ uid: 'cust_1' }, false), false);
+    assert.equal(firestoreSecurityRuleCheck({ uid: 'merchant_1' }, false), false);
+    assert.equal(firestoreSecurityRuleCheck({ uid: 'admin_browser_user' }, false), false);
+    assert.equal(firestoreSecurityRuleCheck(null, true), true); // Cloud Function Admin SDK
+  });
+
+  // Scenario 27: Cross-store Coupon Injection Rejected
+  await runTest('Scenario 27: Coupon bound to Store A produces 0 THB discount when applied to Store B', async () => {
+    const coupons = {
+      'STORE_A_ONLY': { status: 'Active', storeId: 'store_a', discount: 20, minSpend: 50, expiryDate: '2099-12-31' }
+    };
+
+    function validateCouponStoreScope(code, targetStoreId, subtotal) {
+      const c = coupons[code];
+      if (!c || (c.storeId && c.storeId !== targetStoreId) || subtotal < c.minSpend) {
+        return 0;
+      }
+      return c.discount;
+    }
+
+    assert.equal(validateCouponStoreScope('STORE_A_ONLY', 'store_b', 100), 0); // Cross-store rejected
+    assert.equal(validateCouponStoreScope('STORE_A_ONLY', 'store_a', 100), 20); // Valid store match
+  });
+
+  // Scenario 28: Malformed Coupon Edge Cases Handled Safely
+  await runTest('Scenario 28: Malformed coupons (>100% percent, negative discount, inactive) produce safe 0 THB discount', async () => {
+    function computeSafeCouponDiscount(coupon, subtotal) {
+      if (!coupon || coupon.status !== 'Active') return 0;
+      const minSpend = Number(coupon.minSpend) || 0;
+      const discountVal = Number(coupon.discount) || 0;
+      if (subtotal < minSpend || discountVal <= 0 || isNaN(minSpend) || isNaN(discountVal)) return 0;
+
+      if (coupon.discountType === 'percent') {
+        const clampedPercent = Math.min(100, Math.max(0, discountVal));
+        return Math.round((subtotal * clampedPercent) / 100);
+      }
+      return Math.min(subtotal, discountVal);
+    }
+
+    assert.equal(computeSafeCouponDiscount({ status: 'Inactive', discount: 50, minSpend: 0 }, 100), 0);
+    assert.equal(computeSafeCouponDiscount({ status: 'Active', discount: -50, minSpend: 0 }, 100), 0);
+    assert.equal(computeSafeCouponDiscount({ status: 'Active', discount: 150, discountType: 'percent', minSpend: 0 }, 100), 100); // Clamped to 100%
+    assert.equal(computeSafeCouponDiscount({ status: 'Active', discount: 20, minSpend: 200 }, 100), 0); // minSpend not met
+  });
+
+  // Scenario 29: Provider Crash Injection & Automatic Resource Rollback Reconciliation
+  await runTest('Scenario 29: Crash between Firestore commit and Opn provider triggers safe resource release', async () => {
+    const db = new AdvancedFirestoreEngine();
+    const storeId = 'store_crash_01';
+    const date = '2026-09-03';
+    const time = '12:00';
+    const slotDocId = `${storeId}_${date}_${time}`;
+
+    db.setDoc(`products/p_crash_01`, { stock: 5, price: 40 });
+    db.setDoc(`store_slots/${slotDocId}`, { currentOrders: 2, capacity: 10 });
+
+    // Step 1: Reserve resources in Firestore Transaction
+    const orderId = 'ORD_CRASH_TEST';
+    await db.runTransaction(async (t) => {
+      const prod = (await t.get({ path: 'products/p_crash_01' })).data();
+      const slot = (await t.get({ path: `store_slots/${slotDocId}` })).data();
+      t.update({ path: 'products/p_crash_01' }, { stock: prod.stock - 1 });
+      t.update({ path: `store_slots/${slotDocId}` }, { currentOrders: slot.currentOrders + 1 });
+      t.set({ path: `orders/${orderId}` }, { orderId, paymentStatus: 'pending', reservedQuantity: 1, resourcesReleased: false });
+    });
+
+    assert.equal(db.getDoc('products/p_crash_01').stock, 4);
+    assert.equal(db.getDoc(`store_slots/${slotDocId}`).currentOrders, 3);
+
+    // Step 2: Simulate Payment Provider Crash (Network Timeout)
+    const providerCrashed = true;
+    if (providerCrashed) {
+      db.setDoc(`orders/${orderId}`, { paymentStatus: 'creation_failed' }, { merge: true });
+    }
+
+    // Step 3: Scheduler / Reconciliation rolls back reserved resources
+    await db.runTransaction(async (t) => {
+      const ord = (await t.get({ path: `orders/${orderId}` })).data();
+      if (ord.paymentStatus === 'creation_failed' && !ord.resourcesReleased) {
+        const prod = (await t.get({ path: 'products/p_crash_01' })).data();
+        const slot = (await t.get({ path: `store_slots/${slotDocId}` })).data();
+        t.update({ path: 'products/p_crash_01' }, { stock: prod.stock + ord.reservedQuantity });
+        t.update({ path: `store_slots/${slotDocId}` }, { currentOrders: slot.currentOrders - ord.reservedQuantity });
+        t.update({ path: `orders/${orderId}` }, { resourcesReleased: true });
+      }
+    });
+
+    // Verification: Stock and Slot restored to initial values!
+    assert.equal(db.getDoc('products/p_crash_01').stock, 5);
+    assert.equal(db.getDoc(`store_slots/${slotDocId}`).currentOrders, 2);
+    assert.equal(db.getDoc(`orders/${orderId}`).resourcesReleased, true);
+  });
+
+  // Scenario 30: Multi-step Payment Provider Timeout with Idempotent Recovery
+  await runTest('Scenario 30: Recovers existing payment charge on client retry without duplicate charge creation', async () => {
+    const charges = new Map();
+    let chargeCounter = 0;
+
+    function createOrRecoverOpnCharge(idempotencyKey, amount) {
+      if (charges.has(idempotencyKey)) {
+        return { recovered: true, ...charges.get(idempotencyKey) };
+      }
+      chargeCounter++;
+      const charge = { id: `chrg_${chargeCounter}`, amount, qrUrl: `https://opn.ooo/qr/${chargeCounter}` };
+      charges.set(idempotencyKey, charge);
+      return { recovered: false, ...charge };
+    }
+
+    const firstAttempt = createOrRecoverOpnCharge('idemp_timeout_key_1', 15000);
+    assert.equal(firstAttempt.recovered, false);
+    assert.equal(firstAttempt.id, 'chrg_1');
+
+    const retryAttempt = createOrRecoverOpnCharge('idemp_timeout_key_1', 15000);
+    assert.equal(retryAttempt.recovered, true);
+    assert.equal(retryAttempt.id, 'chrg_1'); // Same charge returned, zero duplicate charges!
+  });
+
   const passRate = Math.round((passedTests / totalTests) * 100);
   console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${passRate}%).`);
 

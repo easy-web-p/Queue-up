@@ -197,8 +197,8 @@ service cloud.firestore {
 
       // 🔒 Universal Server-Authoritative Order Creation:
       // ALL Orders (PromptPay, Cash, Canteen Counter) MUST be created authoritatively by Cloud Functions.
-      // Direct client-side creation is blocked to guarantee 100% price integrity and prevent totalAmount tampering.
-      allow create: if isAdmin();
+      // Direct client-side creation is blocked completely (Admin SDK on Cloud Functions bypasses rules).
+      allow create: if false;
 
       // 🔒 Restricted Update Keys & True State Transitions:
       // Merchant can ONLY advance status forward (TO_SHIP -> PREPARING -> READY -> COMPLETED)
