@@ -1,6 +1,6 @@
 ﻿/**
- * 📦 QueueUp Catalog Service (Wave 4.2.2 Hardened)
- * Atomic Mutations, Monetary Single-Source of Truth & Referential Integrity.
+ * 📦 QueueUp Catalog Service (Wave 4.2.4 Hardened)
+ * Atomic Mutations, Canonical Satang Integrity, Referential Integrity & Option Stock Management.
  */
 
 import {
@@ -184,7 +184,7 @@ export async function createStoreProduct(
   if (!storeId) throw new Error('storeId is required');
   if (!productData.name || !productData.name.trim()) throw new Error('Product name is required');
 
-  // 🔒 Finding #2: priceSatang is Canonical Single Source of Truth
+  // 🔒 priceSatang is Canonical Single Source of Truth
   let priceSatang: number;
   if (productData.priceSatang !== undefined) {
     if (!Number.isInteger(productData.priceSatang) || productData.priceSatang <= 0) {
@@ -200,7 +200,7 @@ export async function createStoreProduct(
   }
   const derivedPriceBaht = priceSatang / 100;
 
-  // 🔒 Finding #3: Validate modifierGroupIds referential integrity
+  // 🔒 Validate modifierGroupIds referential integrity
   if (productData.modifierGroupIds && productData.modifierGroupIds.length > 0) {
     await validateModifierReferentialIntegrity(db, storeId, productData.modifierGroupIds);
   }
@@ -235,7 +235,7 @@ export async function createStoreProduct(
 }
 
 /**
- * 🔒 Finding #1 Fix: Atomic Product Update in a Firestore Transaction
+ * 🔒 Atomic Product Update in a Firestore Transaction
  */
 export async function updateStoreProduct(
   db: Firestore,
@@ -307,7 +307,7 @@ export async function updateStoreProduct(
 }
 
 /**
- * 🔒 Finding #1 Fix: Atomic Product Deletion in a Firestore Transaction
+ * 🔒 Atomic Product Deletion in a Firestore Transaction
  */
 export async function deleteStoreProduct(db: Firestore, storeId: string, productId: string) {
   if (!storeId || !productId) throw new Error('storeId and productId are required');
@@ -383,4 +383,50 @@ export async function createStoreModifierGroup(
   });
 
   return newGroup;
+}
+
+/**
+ * 🔒 Atomic Modifier Option Stock Toggle in a Firestore Transaction
+ */
+export async function toggleStoreModifierOptionStock(
+  db: Firestore,
+  storeId: string,
+  groupId: string,
+  optionId: string
+) {
+  if (!storeId || !groupId || !optionId) throw new Error('storeId, groupId and optionId are required');
+
+  return await runTransaction(db, async (tx) => {
+    const modRef = doc(db, 'modifier_groups', groupId);
+    const modSnap = await tx.get(modRef);
+
+    if (!modSnap.exists()) {
+      throw new Error('Modifier group not found');
+    }
+
+    const modData = modSnap.data();
+    if (modData.storeId !== storeId) {
+      throw new Error('Unauthorized: Modifier group does not belong to this store');
+    }
+
+    const existingOptions = modData.options || [];
+    const optionIndex = existingOptions.findIndex((opt: any) => opt.id === optionId);
+    if (optionIndex === -1) {
+      throw new Error(`Option ${optionId} not found in modifier group`);
+    }
+
+    const updatedOptions = existingOptions.map((opt: any) => {
+      if (opt.id === optionId) {
+        return { ...opt, isOutOfStock: !opt.isOutOfStock };
+      }
+      return opt;
+    });
+
+    tx.update(modRef, {
+      options: updatedOptions,
+      updatedAt: serverTimestamp()
+    });
+
+    return { success: true, groupId, optionId, isOutOfStock: updatedOptions[optionIndex].isOutOfStock };
+  });
 }

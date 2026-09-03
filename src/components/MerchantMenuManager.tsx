@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 🍲 MerchantMenuManager.tsx (Wave 4.2.3)
  * Store-Isolated Menu Management with Modifier Group Binding & Exact Satang Integrity.
  */
@@ -49,11 +49,15 @@ export const MerchantMenuManager: React.FC<Props> = ({
   const handleCreateItem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim()) return;
+    if (!storeId) {
+      alert('ข้อผิดพลาด: ไม่พบรหัสร้านค้า (Store ID) กรุณาตรวจสอบสิทธิ์การเข้าใช้งาน');
+      return;
+    }
 
     const satang = Math.round(newPrice * 100);
 
     onAddNewItem({
-      storeId: storeId || 'store_canteen01',
+      storeId,
       name: newName.trim(),
       category: newCategory,
       price: satang / 100,

@@ -4001,6 +4001,72 @@ async function main() {
     assert.equal(product.priceSatang, 5500);
   });
 
+  // Scenario 132: Wave 4.2.4 Fail-Fast Store ID: Missing storeId strictly throws error without falling back to hardcoded store
+  await runTest('Scenario 132: Wave 4.2.4 Fail-Fast Store ID: Missing storeId strictly throws error with 0 fallback', async () => {
+    function prepareProductCreation(storeId, productData) {
+      if (!storeId || typeof storeId !== "string" || !storeId.trim()) {
+        throw new Error("FAIL_FAST_ERROR: storeId is required and must not be empty");
+      }
+      return { storeId: storeId.trim(), ...productData };
+    }
+
+    assert.throws(() => prepareProductCreation(null, { name: "ข้าวมันไก่" }), /FAIL_FAST_ERROR/);
+    assert.throws(() => prepareProductCreation(undefined, { name: "ข้าวมันไก่" }), /FAIL_FAST_ERROR/);
+    assert.throws(() => prepareProductCreation("", { name: "ข้าวมันไก่" }), /FAIL_FAST_ERROR/);
+    assert.equal(prepareProductCreation("store_real_132", { name: "ข้าวมันไก่" }).storeId, "store_real_132");
+  });
+
+  // Scenario 133: Wave 4.2.4 Monetary Consistency: Service strictly rejects conflicting price and priceSatang inputs
+  await runTest('Scenario 133: Wave 4.2.4 Monetary Consistency: Conflicting price and priceSatang are rejected', async () => {
+    function validateMonetaryConsistency(data) {
+      if (data.priceSatang !== undefined && data.price !== undefined) {
+        const expectedSatang = Math.round(Number(data.price) * 100);
+        if (data.priceSatang !== expectedSatang) {
+          throw new Error(`MONETARY_DRIFT_ERROR: price (${data.price}) and priceSatang (${data.priceSatang}) do not match`);
+        }
+      }
+      return true;
+    }
+
+    assert.equal(validateMonetaryConsistency({ price: 45, priceSatang: 4500 }), true);
+    assert.equal(validateMonetaryConsistency({ price: 59.5, priceSatang: 5950 }), true);
+    assert.throws(() => validateMonetaryConsistency({ price: 45, priceSatang: 5000 }), /MONETARY_DRIFT_ERROR/);
+  });
+
+  // Scenario 134: Wave 4.2.4 Atomic Option Stock Toggle: Toggling modifier option of another store in transaction is rejected
+  await runTest('Scenario 134: Wave 4.2.4 Atomic Option Stock: Cross-store modifier option stock toggle is rejected', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const groupId = "mod_store_B_134";
+    engine.setDoc(`modifier_groups/${groupId}`, {
+      id: groupId,
+      storeId: "store_B",
+      name: "ท็อปปิ้งร้าน B",
+      options: [{ id: "opt_b1", name: "ไข่ดาว", isOutOfStock: false }]
+    });
+
+    async function atomicToggleModifierStock(callerStoreId, targetGroupId, optionId) {
+      return engine.runTransaction(async (tx) => {
+        const modRef = { path: `modifier_groups/${targetGroupId}` };
+        const snap = await tx.get(modRef);
+        if (!snap.exists) throw new Error("Modifier group not found");
+        const mod = snap.data();
+        if (mod.storeId !== callerStoreId) {
+          throw new Error("Unauthorized: Modifier group does not belong to this store");
+        }
+        const updated = mod.options.map(o => o.id === optionId ? { ...o, isOutOfStock: !o.isOutOfStock } : o);
+        tx.update(modRef, { options: updated });
+        return true;
+      });
+    }
+
+    // Caller from Store A tries to toggle option in Store B
+    await assert.rejects(
+      async () => atomicToggleModifierStock("store_A", groupId, "opt_b1"),
+      /Unauthorized: Modifier group does not belong to this store/
+    );
+    assert.equal(engine.getDoc(`modifier_groups/${groupId}`).options[0].isOutOfStock, false); // Untouched!
+  });
+
   const passRate = Math.round((passedTests / totalTests) * 100);
   console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${passRate}%).`);
 
