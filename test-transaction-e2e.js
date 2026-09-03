@@ -4067,6 +4067,179 @@ async function main() {
     assert.equal(engine.getDoc(`modifier_groups/${groupId}`).options[0].isOutOfStock, false); // Untouched!
   });
 
+  // Scenario 135: Wave 4.2.5 7-Day Operating Hours: Outside schedule or closed day strictly rejects order
+  await runTest('Scenario 135: Wave 4.2.5 Operating Hours: Outside schedule or closed day rejects order', async () => {
+    const store = {
+      storeId: "store_hours_135",
+      isOpen: true,
+      operatingHours: {
+        monday: { isOpen: true, open: "08:00", close: "16:00" },
+        sunday: { isOpen: false, open: "08:00", close: "16:00" }
+      }
+    };
+
+    function checkAvailability(store, targetDate) {
+      if (!store.isOpen) return { canAccept: false, reason: "STORE_CLOSED_MANUALLY" };
+      const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const currentDay = days[targetDate.getDay()];
+      const sched = store.operatingHours?.[currentDay];
+      if (sched) {
+        if (!sched.isOpen) return { canAccept: false, reason: `STORE_CLOSED_ON_${currentDay.toUpperCase()}` };
+        const timeStr = `${targetDate.getHours().toString().padStart(2, '0')}:${targetDate.getMinutes().toString().padStart(2, '0')}`;
+        if (timeStr < sched.open || timeStr > sched.close) {
+          return { canAccept: false, reason: `OUTSIDE_OPERATING_HOURS (${sched.open} - ${sched.close})` };
+        }
+      }
+      return { canAccept: true };
+    }
+
+    // Monday at 10:30 (Open)
+    const mondayOpen = new Date('2026-09-07T10:30:00');
+    assert.equal(checkAvailability(store, mondayOpen).canAccept, true);
+
+    // Monday at 17:30 (Closed / Outside hours)
+    const mondayClosed = new Date('2026-09-07T17:30:00');
+    assert.equal(checkAvailability(store, mondayClosed).canAccept, false);
+
+    // Sunday (Day closed)
+    const sunday = new Date('2026-09-06T12:00:00');
+    assert.equal(checkAvailability(store, sunday).canAccept, false);
+    assert.equal(checkAvailability(store, sunday).reason, "STORE_CLOSED_ON_SUNDAY");
+  });
+
+  // Scenario 136: Wave 4.2.5 Emergency Pause & Auto-Resume: Pause stops orders until pauseUntil timestamp passes
+  await runTest('Scenario 136: Wave 4.2.5 Pause Engine: Active pause rejects orders, auto-resumes after pauseUntil', async () => {
+    const pauseExpiryTime = new Date('2026-09-03T18:00:00').getTime();
+    const store = {
+      storeId: "store_pause_136",
+      isOpen: true,
+      operationalOverride: {
+        isPaused: true,
+        pausedReason: "วัตถุดิบหมดรอบบ่าย ชะลอรับออเดอร์",
+        pauseUntil: pauseExpiryTime,
+        isRushMode: false,
+        rushBufferMinutes: 0
+      }
+    };
+
+    function evaluatePause(store, testTimestamp) {
+      if (!store.isOpen) return false;
+      const o = store.operationalOverride;
+      if (o?.isPaused) {
+        if (o.pauseUntil && testTimestamp >= o.pauseUntil) {
+          return true; // Auto-resumed!
+        }
+        return false; // Still paused
+      }
+      return true;
+    }
+
+    // Before pause expiration (17:30) -> REJECTED
+    assert.equal(evaluatePause(store, new Date('2026-09-03T17:30:00').getTime()), false);
+
+    // After pause expiration (18:05) -> AUTO-RESUMED
+    assert.equal(evaluatePause(store, new Date('2026-09-03T18:05:00').getTime()), true);
+  });
+
+  // Scenario 137: Wave 4.2.5 Rush Mode Buffer: Rush mode adds positive buffer minutes, rejects negative buffers
+  await runTest('Scenario 137: Wave 4.2.5 Rush Mode: Adds buffer minutes and strictly normalizes/rejects negative values', async () => {
+    function calculatePrepTime(basePrepMinutes, override) {
+      let buffer = 0;
+      if (override?.isRushMode) {
+        if (override.rushBufferMinutes < 0) throw new Error("INVALID_BUFFER: rushBufferMinutes cannot be negative");
+        buffer = override.rushBufferMinutes || 0;
+      }
+      return basePrepMinutes + buffer;
+    }
+
+    const standardMode = { isRushMode: false, rushBufferMinutes: 0 };
+    assert.equal(calculatePrepTime(10, standardMode), 10);
+
+    const rushModeActive = { isRushMode: true, rushBufferMinutes: 15 };
+    assert.equal(calculatePrepTime(10, rushModeActive), 25);
+
+    const negativeBuffer = { isRushMode: true, rushBufferMinutes: -5 };
+    assert.throws(() => calculatePrepTime(10, negativeBuffer), /INVALID_BUFFER/);
+  });
+
+  // Scenario 138: Wave 4.2.5 Atomic Slot Reservation: Capacity check + mutation inside runTransaction prevents race condition
+  await runTest('Scenario 138: Wave 4.2.5 Atomic Capacity Reservation: Race condition test guarantees 0 overbooking', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const slotId = "slot_20260903_1800";
+    const maxCapacity = 5;
+
+    engine.setDoc(`store_slots/${slotId}`, {
+      slotId,
+      storeId: "store_138",
+      capacity: maxCapacity,
+      currentOrders: 4 // Only 1 spot remaining!
+    });
+
+    async function reserveSlotAtomic(callerStoreId) {
+      return engine.runTransaction(async (tx) => {
+        const slotRef = { path: `store_slots/${slotId}` };
+        const slotSnap = await tx.get(slotRef);
+        let current = 0;
+        if (slotSnap.exists) {
+          const d = slotSnap.data();
+          if (d.storeId && d.storeId !== callerStoreId) throw new Error("Unauthorized");
+          current = Number(d.currentOrders) || 0;
+        }
+
+        if (current + 1 > maxCapacity) {
+          throw new Error(`SLOT_CAPACITY_EXCEEDED: ${current}/${maxCapacity}`);
+        }
+
+        tx.update(slotRef, { currentOrders: current + 1 });
+        return current + 1;
+      });
+    }
+
+    // 2 Concurrent users try to book the last 1 slot
+    const [resA, resB] = await Promise.allSettled([
+      reserveSlotAtomic("store_138"),
+      reserveSlotAtomic("store_138")
+    ]);
+
+    const successes = [resA, resB].filter(r => r.status === 'fulfilled');
+    const failures = [resA, resB].filter(r => r.status === 'rejected');
+
+    assert.equal(successes.length, 1);
+    assert.equal(failures.length, 1);
+    assert.equal(engine.getDoc(`store_slots/${slotId}`).currentOrders, 5); // Exactly maxCapacity!
+  });
+
+  // Scenario 139: Wave 4.2.5 Cross-Store Slot Protection: Attempting to reserve slot of another store is rejected
+  await runTest('Scenario 139: Wave 4.2.5 Cross-Store Slot: Reservation for mismatched storeId is strictly rejected', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const slotId = "slot_store_B_139";
+    engine.setDoc(`store_slots/${slotId}`, {
+      slotId,
+      storeId: "store_B",
+      capacity: 10,
+      currentOrders: 2
+    });
+
+    async function reserveSlot(callerStoreId) {
+      return engine.runTransaction(async (tx) => {
+        const slotRef = { path: `store_slots/${slotId}` };
+        const snap = await tx.get(slotRef);
+        const data = snap.data();
+        if (data.storeId !== callerStoreId) {
+          throw new Error("Unauthorized: Slot belongs to another store");
+        }
+        tx.update(slotRef, { currentOrders: data.currentOrders + 1 });
+        return true;
+      });
+    }
+
+    await assert.rejects(
+      async () => reserveSlot("store_A"),
+      /Unauthorized: Slot belongs to another store/
+    );
+    assert.equal(engine.getDoc(`store_slots/${slotId}`).currentOrders, 2); // Preserved!
+  });
+
   const passRate = Math.round((passedTests / totalTests) * 100);
   console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${passRate}%).`);
 
