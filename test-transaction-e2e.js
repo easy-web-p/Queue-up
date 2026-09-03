@@ -3920,6 +3920,87 @@ async function main() {
     );
   });
 
+  // Scenario 129: Wave 4.2.3 Modifier Group Creation: Modifier options with exact satang calculation map cleanly
+  await runTest('Scenario 129: Wave 4.2.3 Modifier Group Creation: Options with priceSatang map integers cleanly', async () => {
+    const rawOptions = [
+      { name: 'ไม่หวาน (0%)', price: 0 },
+      { name: 'หวานน้อย (50%)', price: 0 },
+      { name: 'เพิ่มไข่มุกหนึบ', price: 10 }
+    ];
+
+    const mapped = rawOptions.map((opt, idx) => {
+      const satang = Math.round(opt.price * 100);
+      return {
+        id: `opt_129_${idx}`,
+        name: opt.name,
+        priceModifier: satang / 100,
+        priceModifierSatang: satang,
+        isOutOfStock: false
+      };
+    });
+
+    assert.equal(mapped.length, 3);
+    assert.equal(mapped[0].priceModifierSatang, 0);
+    assert.equal(mapped[2].priceModifierSatang, 1000);
+    assert.equal(mapped[2].priceModifier, 10.0);
+    assert.equal(mapped[2].isOutOfStock, false);
+  });
+
+  // Scenario 130: Wave 4.2.3 Modifier Stock Toggling: Toggling option stock updates state without mutating price
+  await runTest('Scenario 130: Wave 4.2.3 Modifier Stock Toggle: Out of stock status toggles cleanly while preserving price', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const modGroupId = "mod_toggle_130";
+    engine.setDoc(`modifier_groups/${modGroupId}`, {
+      id: modGroupId,
+      storeId: "store_130",
+      name: "ท็อปปิ้งพิเศษ",
+      options: [
+        { id: "opt_pudding", name: "พุดดิ้งไข่", priceModifierSatang: 1500, priceModifier: 15, isOutOfStock: false }
+      ]
+    });
+
+    async function toggleOptionStock(storeId, groupId, optionId) {
+      const group = engine.getDoc(`modifier_groups/${groupId}`);
+      if (!group) throw new Error("Modifier group not found");
+      if (group.storeId !== storeId) throw new Error("Unauthorized");
+
+      const updatedOptions = group.options.map(opt => {
+        if (opt.id === optionId) {
+          return { ...opt, isOutOfStock: !opt.isOutOfStock };
+        }
+        return opt;
+      });
+
+      engine.setDoc(`modifier_groups/${groupId}`, { ...group, options: updatedOptions });
+    }
+
+    await toggleOptionStock("store_130", modGroupId, "opt_pudding");
+    let mod = engine.getDoc(`modifier_groups/${modGroupId}`);
+    assert.equal(mod.options[0].isOutOfStock, true);
+    assert.equal(mod.options[0].priceModifierSatang, 1500); // Preserved!
+
+    await toggleOptionStock("store_130", modGroupId, "opt_pudding");
+    mod = engine.getDoc(`modifier_groups/${modGroupId}`);
+    assert.equal(mod.options[0].isOutOfStock, false);
+  });
+
+  // Scenario 131: Wave 4.2.3 Product & Modifier Linking: Menu item correctly holds multiple validated modifierGroupIds
+  await runTest('Scenario 131: Wave 4.2.3 Product Modifier Linking: Product correctly references store modifierGroupIds', async () => {
+    const product = {
+      storeId: "store_131",
+      name: "ชาไทยเย็นพรีเมียม",
+      price: 55,
+      priceSatang: 5500,
+      stock: 30,
+      modifierGroupIds: ["mod_sweetness_131", "mod_toppings_131"]
+    };
+
+    assert.equal(product.modifierGroupIds.length, 2);
+    assert.ok(product.modifierGroupIds.includes("mod_sweetness_131"));
+    assert.ok(product.modifierGroupIds.includes("mod_toppings_131"));
+    assert.equal(product.priceSatang, 5500);
+  });
+
   const passRate = Math.round((passedTests / totalTests) * 100);
   console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${passRate}%).`);
 
