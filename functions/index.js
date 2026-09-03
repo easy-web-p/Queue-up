@@ -614,6 +614,19 @@ export const opnWebhook = onRequest(
           paidAt: charge.status === "successful" ? FieldValue.serverTimestamp() : null,
           updatedAt: FieldValue.serverTimestamp()
         });
+        await db.collection("audit_logs").doc(`pay_late_${orderRef.id}_${charge.id}`).set({
+          actorUid: "system",
+          actorType: "system_webhook",
+          action: "PAYMENT_PAID_AFTER_EXPIRED",
+          orderId: orderRef.id,
+          userId: order.userId,
+          storeId: order.storeId || null,
+          paymentId: charge.id,
+          amount: Number(order.totalAmount || order.totalPrice),
+          currency: "THB",
+          provider: "opn",
+          createdAt: FieldValue.serverTimestamp()
+        }, { merge: true });
         return res.status(200).send("Handled as paid_after_expired");
       }
 
@@ -628,6 +641,21 @@ export const opnWebhook = onRequest(
         paidAt: charge.status === "successful" ? FieldValue.serverTimestamp() : null,
         updatedAt: FieldValue.serverTimestamp()
       });
+      if (charge.status === "successful") {
+        await db.collection("audit_logs").doc(`pay_success_${orderRef.id}_${charge.id}`).set({
+          actorUid: "system",
+          actorType: "system_webhook",
+          action: "PAYMENT_SUCCESSFUL",
+          orderId: orderRef.id,
+          userId: order.userId,
+          storeId: order.storeId || null,
+          paymentId: charge.id,
+          amount: Number(order.totalAmount || order.totalPrice),
+          currency: "THB",
+          provider: "opn",
+          createdAt: FieldValue.serverTimestamp()
+        }, { merge: true });
+      }
       return res.status(200).send("OK");
     } catch (error) {
       console.error("Opn webhook error", error);
