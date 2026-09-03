@@ -24,6 +24,19 @@ export default function ProtectedRoute({ children, allowedRoles = [] }) {
 
   const currentUser = user;
 
+  // 🔒 Profile Error Guard: If accessing role-restricted route and profile failed to load
+  if (currentUser && currentUser.isProfileError === true && allowedRoles && (allowedRoles.includes("merchant") || allowedRoles.includes("admin"))) {
+    return (
+      <div className="d-flex align-items-center justify-content-center min-vh-100 bg-light p-4">
+        <div className="card shadow-sm p-4 text-center" style={{ maxWidth: 450 }}>
+          <h4 className="text-danger mb-3">⚠️ ไม่สามารถโหลดข้อมูลสิทธิ์ได้</h4>
+          <p className="text-muted">เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูลโปรไฟล์ กรุณารีเฟรชหน้าเว็บหรือลองเข้าสู่ระบบใหม่อีกครั้ง</p>
+          <button className="btn btn-primary" onClick={() => window.location.reload()}>ลองใหม่อีกครั้ง</button>
+        </div>
+      </div>
+    );
+  }
+
   // 1. If not logged in -> Redirect to /login
   if (!currentUser) {
     // If attempting to access admin route while unauthenticated, show 404 to avoid leaking admin existence (Information Hiding)

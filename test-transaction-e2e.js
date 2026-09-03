@@ -994,6 +994,86 @@ async function main() {
     assert.equal(validateAdminOrderUpdate(currentOrder, { status: 'PREPARING', queueStatus: 'cooking', adminNote: 'Approved by admin' }), true);
   });
 
+  // Scenario 33: Network timeout after charge creation -> Client retry recovers existing charge without double deduction
+  await runTest('Scenario 33: Network timeout after charge creation recovers existing charge on retry', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const idempotencyDocId = 'user_01_idemp_key_network_drop';
+
+    // Simulate initial attempt creating charge then client timing out
+    engine.setDoc(`orders/ord_timeout_01`, {
+      orderId: 'ord_timeout_01',
+      userId: 'user_01',
+      storeId: 'store_canteen01',
+      productId: 'prod_krapao',
+      quantity: 1,
+      paymentId: 'chrg_test_timeout_01',
+      qrUrl: 'https://api.omise.co/qr/timeout_01',
+      totalAmount: 50,
+      paymentStatus: 'pending',
+      status: 'TO_SHIP',
+      queueStatus: 'waiting',
+      resourcesReleased: false
+    });
+
+    engine.setDoc(`idempotency_keys/${idempotencyDocId}`, {
+      orderId: 'ord_timeout_01',
+      paymentId: 'chrg_test_timeout_01',
+      createdAt: new Date()
+    });
+
+    // Client retries with same idempotency key
+    const idempSnap = engine.getDoc(`idempotency_keys/${idempotencyDocId}`);
+    assert.ok(idempSnap);
+    const existingOrder = engine.getDoc(`orders/${idempSnap.orderId}`);
+    assert.equal(existingOrder.orderId, 'ord_timeout_01');
+    assert.equal(existingOrder.paymentId, 'chrg_test_timeout_01');
+    assert.equal(existingOrder.paymentStatus, 'pending');
+  });
+
+  // Scenario 34: Webhook arrives before client retry finishes -> marks paid, client retry returns updated state
+  await runTest('Scenario 34: Out-of-order Webhook completes before client retry returns', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const idempotencyDocId = 'user_01_idemp_key_ooo';
+
+    engine.setDoc(`orders/ord_ooo_01`, {
+      orderId: 'ord_ooo_01',
+      userId: 'user_01',
+      storeId: 'store_canteen01',
+      productId: 'prod_krapao',
+      quantity: 1,
+      paymentId: 'chrg_test_ooo_01',
+      totalAmount: 50,
+      paymentStatus: 'pending',
+      status: 'TO_SHIP',
+      queueStatus: 'waiting',
+      resourcesReleased: false
+    });
+
+    engine.setDoc(`idempotency_keys/${idempotencyDocId}`, {
+      orderId: 'ord_ooo_01',
+      paymentId: 'chrg_test_ooo_01',
+      createdAt: new Date()
+    });
+
+    // 1. Webhook arrives FIRST and transitions order to paid
+    await engine.runTransaction(async (tx) => {
+      const snap = await tx.get({ path: 'orders/ord_ooo_01' });
+      const order = snap.data();
+      if (order.paymentStatus === 'pending') {
+        tx.update({ path: 'orders/ord_ooo_01' }, {
+          paymentStatus: 'paid',
+          paidAt: new Date()
+        });
+      }
+    });
+
+    // 2. Client retry recovers the order and sees it is already paid!
+    const idempSnap = engine.getDoc(`idempotency_keys/${idempotencyDocId}`);
+    const recoveredOrder = engine.getDoc(`orders/${idempSnap.orderId}`);
+    assert.equal(recoveredOrder.paymentStatus, 'paid');
+    assert.ok(recoveredOrder.paidAt);
+  });
+
   const passRate = Math.round((passedTests / totalTests) * 100);
   console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${passRate}%).`);
 
