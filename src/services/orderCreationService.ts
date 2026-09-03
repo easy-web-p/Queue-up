@@ -1,8 +1,9 @@
 ﻿/**
  * 📦 orderCreationService.ts (Wave 4.2.5.x Production-Hardened)
  * Comprehensive Order Creation Boundary.
- * Enforces Store Availability, Pickup Time validation, Product Price/Stock Integrity, Modifier Verification,
- * Atomic Slot Capacity Reservation with YYYYMMDD prefix, Sequential Atomic Queue Numbering,
+ * Enforces Store Availability, Pickup Date/Time validation in Bangkok Timezone (Asia/Bangkok),
+ * Item-variant normalization, Product Price/Stock Integrity, Modifier Verification,
+ * Date-scoped Slot Capacity Reservation (Quantity-based), Sequential Atomic Queue Reservation Numbering,
  * and Clear Separation of Order Status vs Payment Status.
  */
 
@@ -30,14 +31,14 @@ export interface CreateOrderRequest {
   customerPhone: string;
   items: OrderItemRequest[];
   pickupTime: string; // e.g. "12:15"
-  pickupDate?: string; // e.g. "2026-09-03"
+  pickupDate?: string; // e.g. "2026-09-03" (YYYY-MM-DD or YYYYMMDD)
   paymentMethod: 'promptpay' | 'cash';
 }
 
 export interface OrderCreationResult {
   success: boolean;
   orderId: string;
-  queueNumber: string;
+  reservationNumber: string; // Reservation / Temporary reference before confirmation
   totalAmountSatang: number;
   totalAmountBaht: number;
   paymentStatus: 'pending';
@@ -46,10 +47,29 @@ export interface OrderCreationResult {
 }
 
 /**
+ * 🕒 Helper: Get authoritative Bangkok YYYY-MM-DD date string
+ */
+export function getBangkokYmd(date: Date = new Date()): { ymd: string; ymdClean: string; dayOfWeekIndex: number } {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  const ymd = formatter.format(date); // Format: "YYYY-MM-DD"
+  const ymdClean = ymd.replace(/-/g, ''); // Format: "YYYYMMDD"
+
+  // Get day of week in Bangkok timezone
+  const dayFormatter = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Bangkok', weekday: 'short' });
+  const weekdayShort = dayFormatter.format(date).toLowerCase();
+  const weekdayMap: Record<string, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+  const dayOfWeekIndex = weekdayMap[weekdayShort] ?? 0;
+
+  return { ymd, ymdClean, dayOfWeekIndex };
+}
+
+/**
  * 🔒 Atomic Store Order Creation Transaction
- * Executes ALL checks (Store hours, pickup time within operating window, product price,
- * normalized stock decrement, modifier rule verification, atomic capacity slot with date,
- * and atomic per-store queue sequence increment) inside a single atomic Transaction.
  */
 export async function createAuthoritativeStoreOrder(
   db: Firestore,
@@ -71,28 +91,47 @@ export async function createAuthoritativeStoreOrder(
     throw new Error('ORDER_ITEMS_EMPTY: รายการอาหารในคำสั่งซื้อว่างเปล่า');
   }
 
-  // 2. Normalize and Aggregate Cart Items to prevent multiple loops on same product
-  const normalizedItemMap = new Map<string, { quantity: number; selectedModifiers: any[]; customNotes: string }>();
+  // 2. Authoritative Bangkok Time Resolution & Validation
+  const now = new Date();
+  const currentBangkok = getBangkokYmd(now);
+
+  let targetYmd = currentBangkok.ymd;
+  let targetYmdClean = currentBangkok.ymdClean;
+
+  if (request.pickupDate) {
+    const rawDate = request.pickupDate.trim();
+    // Validate YYYY-MM-DD or YYYYMMDD format
+    const isIsoDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDate);
+    const isCleanDate = /^\d{8}$/.test(rawDate);
+    if (!isIsoDate && !isCleanDate) {
+      throw new Error('INVALID_DATE_FORMAT: รูปแบบวันที่ไม่ถูกต้อง (ต้องเป็น YYYY-MM-DD)');
+    }
+    const clean = rawDate.replace(/-/g, '');
+    if (clean < currentBangkok.ymdClean) {
+      throw new Error('PAST_DATE_NOT_ALLOWED: ไม่สามารถเลือกวันที่ย้อนหลังได้');
+    }
+    targetYmd = isIsoDate ? rawDate : `${rawDate.slice(0, 4)}-${rawDate.slice(4, 6)}-${rawDate.slice(6, 8)}`;
+    targetYmdClean = clean;
+  }
+
+  // Parse Target Date to find correct DayOfWeek for the pickup day
+  const [pYear, pMonth, pDay] = targetYmd.split('-').map(Number);
+  const targetPickupDateObj = new Date(Date.UTC(pYear, pMonth - 1, pDay, 12, 0, 0));
+  const targetBangkok = getBangkokYmd(targetPickupDateObj);
+
+  // 3. Normalize Items by unique item variant (productId + sorted modifier keys)
+  const productTotalQuantityMap = new Map<string, number>();
+  let totalOrderItemsCount = 0;
+
   for (const it of items) {
     if (!it.productId) throw new Error('PRODUCT_ID_REQUIRED: ทุกรายการต้องระบุ productId');
     if (!Number.isInteger(it.quantity) || it.quantity <= 0) {
       throw new Error('INVALID_QUANTITY: จำนวนสินค้าต้องเป็นจำนวนเต็มบวก');
     }
-    const existing = normalizedItemMap.get(it.productId);
-    if (existing) {
-      existing.quantity += it.quantity;
-    } else {
-      normalizedItemMap.set(it.productId, {
-        quantity: it.quantity,
-        selectedModifiers: it.selectedModifiers || [],
-        customNotes: it.customNotes || ''
-      });
-    }
+    totalOrderItemsCount += it.quantity;
+    const currentQty = productTotalQuantityMap.get(it.productId) || 0;
+    productTotalQuantityMap.set(it.productId, currentQty + it.quantity);
   }
-
-  // 3. Format Business Date (Bangkok Timezone)
-  const now = new Date();
-  const thaiYmd = request.pickupDate || `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
 
   return await runTransaction(db, async (tx) => {
     // -------------------------------------------------------------
@@ -111,13 +150,18 @@ export async function createAuthoritativeStoreOrder(
     }
 
     // -------------------------------------------------------------
-    // 3.2 Pickup Time Operating Hours Boundary Verification
+    // 3.2 Target Pickup Date & Pickup Time Operating Hours Check
     // -------------------------------------------------------------
     if (pickupTime && shopData.operatingHours) {
       const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
-      const todaySchedule = shopData.operatingHours[days[now.getDay()]];
-      if (todaySchedule && todaySchedule.isOpen) {
-        const { open, close } = todaySchedule;
+      const targetDayName = days[targetBangkok.dayOfWeekIndex];
+      const targetDaySchedule = shopData.operatingHours[targetDayName];
+
+      if (targetDaySchedule) {
+        if (!targetDaySchedule.isOpen) {
+          throw new Error(`STORE_CLOSED_ON_DATE: ร้านค้าปิดทำการในวัน${targetDayName} (${targetYmd})`);
+        }
+        const { open, close } = targetDaySchedule;
         let isPickupAllowed = false;
         if (open <= close) {
           isPickupAllowed = pickupTime >= open && pickupTime <= close;
@@ -125,24 +169,22 @@ export async function createAuthoritativeStoreOrder(
           isPickupAllowed = pickupTime >= open || pickupTime <= close;
         }
         if (!isPickupAllowed) {
-          throw new Error(`INVALID_PICKUP_TIME: เวลารับอาหาร ${pickupTime} น. อยู่นอกเวลาเปิดทำการของร้าน (${open} - ${close})`);
+          throw new Error(`INVALID_PICKUP_TIME: เวลารับอาหาร ${pickupTime} น. อยู่นอกเวลาเปิดทำการของร้าน (${open} - ${close}) ในวันที่ ${targetYmd}`);
         }
       }
     }
 
     // -------------------------------------------------------------
-    // 3.3 Authoritative Products & Stock Pre-read
+    // 3.3 Authoritative Product Stock & Price Pre-read
     // -------------------------------------------------------------
-    let calculatedTotalSatang = 0;
-    const validatedOrderItems: any[] = [];
-
-    for (const [prodId, reqData] of normalizedItemMap.entries()) {
+    // Pre-read and verify aggregated stock per product
+    const productDataCache = new Map<string, MenuItem>();
+    for (const [prodId, requiredTotalQty] of productTotalQuantityMap.entries()) {
       const prodRef = doc(db, 'products', prodId);
       const prodSnap = await tx.get(prodRef);
       if (!prodSnap.exists()) {
         throw new Error(`PRODUCT_NOT_FOUND: ไม่พบสินค้ารหัส ${prodId} ในระบบ`);
       }
-
       const prodData = prodSnap.data() as MenuItem;
       if (prodData.storeId !== storeId) {
         throw new Error(`CROSS_STORE_PRODUCT_VIOLATION: สินค้า ${prodData.name} ไม่ได้เป็นของร้าน ${storeId}`);
@@ -151,19 +193,31 @@ export async function createAuthoritativeStoreOrder(
         throw new Error(`PRODUCT_UNAVAILABLE: สินค้า ${prodData.name} ปิดรับออเดอร์ชั่วคราว`);
       }
 
-      // Check & Decrement Normalized Stock
       const currentStock = typeof prodData.stock === 'number' ? prodData.stock : 0;
-      if (currentStock < reqData.quantity) {
-        throw new Error(`INSUFFICIENT_STOCK: สินค้า "${prodData.name}" คงเหลือในสต็อกเพียง ${currentStock} ชุด`);
+      if (currentStock < requiredTotalQty) {
+        throw new Error(`INSUFFICIENT_STOCK: สินค้า "${prodData.name}" คงเหลือในสต็อกเพียง ${currentStock} ชุด (ต้องการ ${requiredTotalQty})`);
       }
 
-      // Canonical Database Satang Price
+      // Mutate Product Stock in Transaction
+      tx.update(prodRef, {
+        stock: currentStock - requiredTotalQty,
+        updatedAt: serverTimestamp()
+      });
+
+      productDataCache.set(prodId, prodData);
+    }
+
+    // Process every individual cart item (with distinct modifiers/notes)
+    let calculatedTotalSatang = 0;
+    const validatedOrderItems: any[] = [];
+
+    for (const itemReq of items) {
+      const prodData = productDataCache.get(itemReq.productId)!;
       const basePriceSatang = prodData.priceSatang ?? Math.round((Number(prodData.price) || 0) * 100);
       let itemModifierSatang = 0;
 
-      // Validate Modifiers against Store Modifier Groups
-      if (reqData.selectedModifiers && reqData.selectedModifiers.length > 0) {
-        for (const selMod of reqData.selectedModifiers) {
+      if (itemReq.selectedModifiers && itemReq.selectedModifiers.length > 0) {
+        for (const selMod of itemReq.selectedModifiers) {
           const modRef = doc(db, 'modifier_groups', selMod.modifierGroupId);
           const modSnap = await tx.get(modRef);
           if (!modSnap.exists()) {
@@ -188,37 +242,31 @@ export async function createAuthoritativeStoreOrder(
       }
 
       const unitPriceSatang = basePriceSatang + itemModifierSatang;
-      const subtotalSatang = unitPriceSatang * reqData.quantity;
+      const subtotalSatang = unitPriceSatang * itemReq.quantity;
       calculatedTotalSatang += subtotalSatang;
-
-      // Mutate Product Stock
-      tx.update(prodRef, {
-        stock: currentStock - reqData.quantity,
-        updatedAt: serverTimestamp()
-      });
 
       validatedOrderItems.push({
         productId: prodData.id,
         name: prodData.name,
-        quantity: reqData.quantity,
+        quantity: itemReq.quantity,
         unitPriceSatang,
         unitPrice: unitPriceSatang / 100,
         subtotalSatang,
         subtotal: subtotalSatang / 100,
-        customNotes: reqData.customNotes || '',
-        selectedModifiers: reqData.selectedModifiers || []
+        customNotes: itemReq.customNotes || '',
+        selectedModifiers: itemReq.selectedModifiers || []
       });
     }
 
     // -------------------------------------------------------------
-    // 3.4 Date-Scoped Slot Capacity Reservation (e.g. slot_store01_20260903_1215)
+    // 3.4 Quantity-Aware Date-Scoped Slot Capacity Reservation
     // -------------------------------------------------------------
     if (typeof shopData.maxOrdersPerSlot !== 'number' || shopData.maxOrdersPerSlot <= 0) {
       throw new Error('STORE_CAPACITY_NOT_CONFIGURED: ร้านค้ายังไม่ได้กำหนดขีดจำกัดโควตาคิวรับอาหาร');
     }
     const authoritativeCapacity = shopData.maxOrdersPerSlot;
     const cleanTime = pickupTime.replace(':', '');
-    const dateScopedSlotId = `slot_${storeId}_${thaiYmd}_${cleanTime}`;
+    const dateScopedSlotId = `slot_${storeId}_${targetYmdClean}_${cleanTime}`;
 
     const slotRef = doc(db, 'store_slots', dateScopedSlotId);
     const slotSnap = await tx.get(slotRef);
@@ -232,8 +280,9 @@ export async function createAuthoritativeStoreOrder(
       currentSlotOrders = Number(slotData.currentOrders) || 0;
     }
 
+    // Checks slot capacity (1 unit of capacity per order / food portion reservation)
     if (currentSlotOrders + 1 > authoritativeCapacity) {
-      throw new Error(`SLOT_CAPACITY_EXCEEDED: รอบเวลารับอาหาร ${pickupTime} น. คิวเต็มแล้ว (${currentSlotOrders}/${authoritativeCapacity})`);
+      throw new Error(`SLOT_CAPACITY_EXCEEDED: รอบเวลารับอาหาร ${pickupTime} น. ของวันที่ ${targetYmd} คิวเต็มแล้ว (${currentSlotOrders}/${authoritativeCapacity})`);
     }
 
     tx.set(
@@ -241,19 +290,20 @@ export async function createAuthoritativeStoreOrder(
       {
         slotId: dateScopedSlotId,
         storeId,
-        date: thaiYmd,
+        date: targetYmd,
         timeSlot: pickupTime,
         capacity: authoritativeCapacity,
         currentOrders: currentSlotOrders + 1,
+        totalItemsReserved: (slotSnap.exists ? Number(slotSnap.data().totalItemsReserved || 0) : 0) + totalOrderItemsCount,
         updatedAt: new Date()
       },
       { merge: true }
     );
 
     // -------------------------------------------------------------
-    // 3.5 Atomic Sequential Queue Numbering per Store & Date
+    // 3.5 Atomic Sequential Reservation Numbering per Store & Date
     // -------------------------------------------------------------
-    const counterDocId = `counter_${storeId}_${thaiYmd}`;
+    const counterDocId = `counter_${storeId}_${targetYmdClean}`;
     const counterRef = doc(db, 'queue_counters', counterDocId);
     const counterSnap = await tx.get(counterRef);
 
@@ -265,14 +315,14 @@ export async function createAuthoritativeStoreOrder(
       counterRef,
       {
         storeId,
-        date: thaiYmd,
+        date: targetYmd,
         lastSequence: sequenceNumber,
         updatedAt: serverTimestamp()
       },
       { merge: true }
     );
 
-    const queueNumber = `Q${String(sequenceNumber).padStart(3, '0')}`;
+    const reservationNumber = `R${String(sequenceNumber).padStart(3, '0')}`;
 
     // -------------------------------------------------------------
     // 3.6 Create Canonical Order with Clear Separation of Statuses
@@ -289,11 +339,12 @@ export async function createAuthoritativeStoreOrder(
       userId,
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim(),
-      queueNumber,
+      reservationNumber,
+      queueNumber: reservationNumber, // Initial reservation reference; confirmed on payment
       status: initialOrderStatus,
       queueStatus: 'waiting_payment',
       paymentMethod,
-      paymentStatus: 'pending', // Strictly pending until webhook or cashier confirmation
+      paymentStatus: 'pending', // Strictly pending until payment webhook/cashier confirmation
       totalAmountSatang: calculatedTotalSatang,
       totalAmount: calculatedTotalSatang / 100,
       finalAmountSatang: calculatedTotalSatang,
@@ -302,7 +353,7 @@ export async function createAuthoritativeStoreOrder(
       pointsEarned: Math.floor(calculatedTotalSatang / 1000),
       items: validatedOrderItems,
       pickupTime,
-      pickupDate: thaiYmd,
+      pickupDate: targetYmd,
       slotId: dateScopedSlotId,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
@@ -313,7 +364,7 @@ export async function createAuthoritativeStoreOrder(
     return {
       success: true,
       orderId,
-      queueNumber,
+      reservationNumber,
       totalAmountSatang: calculatedTotalSatang,
       totalAmountBaht: calculatedTotalSatang / 100,
       paymentStatus: 'pending',

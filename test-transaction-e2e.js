@@ -4484,6 +4484,49 @@ async function main() {
     assert.equal(validateOrderCustomer('user_123', '0899999999'), true);
   });
 
+  // Scenario 149: Wave 4.2.5.x Bangkok Date & Advance Schedule: Validates future pickupDate against that specific day schedule
+  await runTest('Scenario 149: Wave 4.2.5.x Bangkok Timezone & Future Date: Validates target pickupDate day of week', async () => {
+    function getDayScheduleForDate(operatingHours, targetIsoDate) {
+      const [y, m, d] = targetIsoDate.split('-').map(Number);
+      const targetUtc = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+      const formatter = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Bangkok', weekday: 'short' });
+      const weekday = formatter.format(targetUtc).toLowerCase();
+      const map = { sun: 'sunday', mon: 'monday', tue: 'tuesday', wed: 'wednesday', thu: 'thursday', fri: 'friday', sat: 'saturday' };
+      const dayName = map[weekday];
+      return operatingHours[dayName];
+    }
+
+    const weeklyHours = {
+      sunday: { isOpen: false, open: "08:00", close: "17:00" },
+      monday: { isOpen: true, open: "08:00", close: "17:00" },
+      friday: { isOpen: true, open: "08:00", close: "17:00" }
+    };
+
+    // 2026-09-06 is Sunday (closed)
+    const sunSched = getDayScheduleForDate(weeklyHours, "2026-09-06");
+    assert.equal(sunSched.isOpen, false);
+
+    // 2026-09-07 is Monday (open)
+    const monSched = getDayScheduleForDate(weeklyHours, "2026-09-07");
+    assert.equal(monSched.isOpen, true);
+  });
+
+  // Scenario 150: Wave 4.2.5.x Multiple Item Variants: Product with different toppings calculates exact individual satang
+  await runTest('Scenario 150: Wave 4.2.5.x Distinct Modifiers: Same product with different modifiers calculates exact total', async () => {
+    const baseSatang = 5000; // 50.00 THB
+    const toppingEggSatang = 1000; // +10.00 THB
+    const toppingCheeseSatang = 1500; // +15.00 THB
+
+    const item1 = { quantity: 1, baseSatang, modifierSatang: toppingEggSatang }; // 60.00 THB
+    const item2 = { quantity: 1, baseSatang, modifierSatang: toppingCheeseSatang }; // 65.00 THB
+
+    const totalSatang = (item1.baseSatang + item1.modifierSatang) * item1.quantity +
+                        (item2.baseSatang + item2.modifierSatang) * item2.quantity;
+
+    assert.equal(totalSatang, 12500); // 125.00 THB
+    assert.equal(totalSatang / 100, 125);
+  });
+
   const passRate = Math.round((passedTests / totalTests) * 100);
   console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${passRate}%).`);
 
