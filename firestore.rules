@@ -15,8 +15,8 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() && (
-        request.auth.token.email == '58140@lomsak.ac.th' ||
-        request.auth.token.admin == true
+        request.auth.token.admin == true ||
+        request.auth.token.role == 'admin'
       );
     }
 
@@ -135,13 +135,13 @@ service cloud.firestore {
         )
       );
 
-      // 🔒 Lock Privilege Elevation: Users can only edit safe profile keys; roles/storeId/isMerchantVerified are Admin/Backend only
+      // 🔒 Lock Privilege Elevation: Users can only edit safe profile keys; email and roles are Admin/Backend only
       allow update: if isAuthenticated() && (
         isAdmin() ||
         (
           isOwner(userId) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'name', 'displayName', 'phone', 'school', 'photo', 'photoURL', 'avatar', 'email', 'updatedAt'
+            'name', 'displayName', 'phone', 'school', 'photo', 'photoURL', 'avatar', 'updatedAt'
           ])
         )
       );

@@ -59,8 +59,7 @@ function evaluateStorageRules({ path: filePath, action, auth, requestResource, d
   const isAdmin = () => isAuthenticated && (
     auth.token?.admin === true ||
     auth.token?.role === 'admin' ||
-    auth.token?.isSuperAdmin === true ||
-    auth.token?.email === '58140@lomsak.ac.th'
+    auth.token?.isSuperAdmin === true
   );
 
   const isStoreOwner = (shopId) => {
@@ -76,7 +75,7 @@ function evaluateStorageRules({ path: filePath, action, auth, requestResource, d
     if (!requestResource) return false;
     const allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
     const mimeValid = allowedMimes.includes(requestResource.contentType);
-    const sizeValid = typeof requestResource.size === 'number' && requestResource.size < maxSizeMB * 1024 * 1024;
+    const sizeValid = typeof requestResource.size === 'number' && requestResource.size <= maxSizeMB * 1024 * 1024;
     return mimeValid && sizeValid;
   };
 

@@ -97,8 +97,11 @@ export const createPromptPayPayment = onCall(
         for (const mod of modifiers) {
           if (mod && mod.id === "topping" && Array.isArray(mod.value)) {
             for (const topName of mod.value) {
-              const topPrice = TOPPING_PRICES[topName] ?? product.toppingPrices?.[topName];
-              if (typeof topPrice !== "number" || topPrice < 0) throw new HttpsError("invalid-argument", `ไม่พบตัวเลือกท็อปปิ้ง: ${topName}`);
+              const rawTopPrice = TOPPING_PRICES[topName] ?? product.toppingPrices?.[topName];
+              const topPrice = Number(rawTopPrice);
+              if (!Number.isFinite(topPrice) || topPrice < 0 || topPrice > 500) {
+                throw new HttpsError("invalid-argument", `ไม่พบตัวเลือกท็อปปิ้งหรือราคาไม่ถูกต้อง: ${topName}`);
+              }
               modifierUnitPrice += topPrice;
               sanitizedModifiers.push({ id: "topping", name: topName, price: topPrice });
             }

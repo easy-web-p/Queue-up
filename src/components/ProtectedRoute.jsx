@@ -17,8 +17,12 @@ export default function ProtectedRoute({ children, allowedRoles = [] }) {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  // 🔒 Wait for Firebase Auth verification before evaluating route permissions
-  if (isLoading || (user && user.isVerifiedAuth !== true && allowedRoles && allowedRoles.length > 0)) {
+  // 🔒 Wait for Firebase Auth verification and Profile loading before evaluating role-restricted routes
+  if (
+    isLoading || 
+    (user && user.isVerifiedAuth !== true && allowedRoles && allowedRoles.length > 0) ||
+    (user && !user.isProfileLoaded && !user.isProfileError && allowedRoles && allowedRoles.length > 0)
+  ) {
     return <Loading />;
   }
 

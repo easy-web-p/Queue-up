@@ -15,8 +15,7 @@ service firebase.storage {
       return isAuthenticated() && (
         request.auth.token.admin == true ||
         request.auth.token.role == 'admin' ||
-        request.auth.token.isSuperAdmin == true ||
-        request.auth.token.email == '58140@lomsak.ac.th'
+        request.auth.token.isSuperAdmin == true
       );
     }
 
@@ -34,7 +33,7 @@ service firebase.storage {
     // Strict MIME whitelist & File size limiter
     function isValidImage(maxSizeMB) {
       return request.resource.contentType in ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] &&
-             request.resource.size < maxSizeMB * 1024 * 1024;
+             request.resource.size <= maxSizeMB * 1024 * 1024;
     }
 
     // 1. User Profile Photos & Avatars (User / Admin only)

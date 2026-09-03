@@ -37,7 +37,7 @@ async function runTest(name, fn) {
 function evaluateRules({ collection, action, auth, resource, requestResource }) {
   const isAuthenticated = auth !== null;
   const isOwner = (uid) => isAuthenticated && auth.uid === uid;
-  const isAdmin = () => isAuthenticated && (auth.token?.email === '58140@lomsak.ac.th' || auth.token?.admin === true);
+  const isAdmin = () => isAuthenticated && (auth.token?.admin === true || auth.token?.role === 'admin');
 
   const isStoreOwner = (storeId) => {
     if (!isAuthenticated) return false;
@@ -120,7 +120,7 @@ function evaluateRules({ collection, action, auth, resource, requestResource }) 
       if (isAdmin()) return true;
       if (isOwner(resource?.id)) {
         const mutatedKeys = Object.keys(requestResource.data).filter(k => requestResource.data[k] !== resource?.data?.[k]);
-        const allowedKeys = ['name', 'displayName', 'phone', 'school', 'photo', 'photoURL', 'avatar', 'email', 'updatedAt'];
+        const allowedKeys = ['name', 'displayName', 'phone', 'school', 'photo', 'photoURL', 'avatar', 'updatedAt'];
         return mutatedKeys.every(k => allowedKeys.includes(k));
       }
       return false;
