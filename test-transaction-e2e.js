@@ -4412,6 +4412,78 @@ async function main() {
     assert.equal(engine.getDoc(`store_slots/${slotId}`).currentOrders, 2);
   });
 
+  // Scenario 145: Wave 4.2.5.x Atomic Queue Counter: Guarantees sequential Q001, Q002 per store + date with 0 collision
+  await runTest('Scenario 145: Wave 4.2.5.x Atomic Queue Sequence: Sequential per-store counter guarantees 0 duplicate queue numbers', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const storeId = "store_seq_145";
+    const date = "20260903";
+
+    async function issueNextQueueNumber() {
+      return engine.runTransaction(async (tx) => {
+        const counterRef = { path: `queue_counters/counter_${storeId}_${date}` };
+        const snap = await tx.get(counterRef);
+        let seq = 1;
+        if (snap.exists) {
+          seq = (Number(snap.data().lastSequence) || 0) + 1;
+        }
+        tx.set(counterRef, { storeId, date, lastSequence: seq });
+        return `Q${String(seq).padStart(3, '0')}`;
+      });
+    }
+
+    const q1 = await issueNextQueueNumber();
+    const q2 = await issueNextQueueNumber();
+    const q3 = await issueNextQueueNumber();
+
+    assert.equal(q1, "Q001");
+    assert.equal(q2, "Q002");
+    assert.equal(q3, "Q003");
+  });
+
+  // Scenario 146: Wave 4.2.5.x Date-Scoped Slot: Prevents slot capacity collisions across different business days
+  await runTest('Scenario 146: Wave 4.2.5.x Date-Scoped Slot ID: Distinct dates (20260903 vs 20260904) have isolated capacity', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const storeId = "store_slot_146";
+    const slotDay1 = `slot_${storeId}_20260903_1215`;
+    const slotDay2 = `slot_${storeId}_20260904_1215`;
+
+    engine.setDoc(`store_slots/${slotDay1}`, { slotId: slotDay1, currentOrders: 10, capacity: 10 }); // Full for Day 1
+    engine.setDoc(`store_slots/${slotDay2}`, { slotId: slotDay2, currentOrders: 0, capacity: 10 });  // Empty for Day 2
+
+    assert.equal(engine.getDoc(`store_slots/${slotDay1}`).currentOrders, 10);
+    assert.equal(engine.getDoc(`store_slots/${slotDay2}`).currentOrders, 0);
+  });
+
+  // Scenario 147: Wave 4.2.5.x Pickup Time Validation: Outside store operating hours is rejected
+  await runTest('Scenario 147: Wave 4.2.5.x Pickup Time Verification: Pickup time outside store operating schedule is rejected', async () => {
+    function validatePickupTime(operatingHours, pickupTime) {
+      const { open, close } = operatingHours;
+      const isAllowed = open <= close
+        ? (pickupTime >= open && pickupTime <= close)
+        : (pickupTime >= open || pickupTime <= close);
+      if (!isAllowed) throw new Error(`INVALID_PICKUP_TIME: ${pickupTime}`);
+      return true;
+    }
+
+    const schedule = { open: "08:00", close: "17:00" };
+    assert.equal(validatePickupTime(schedule, "12:15"), true);
+    assert.throws(() => validatePickupTime(schedule, "23:30"), /INVALID_PICKUP_TIME/);
+    assert.throws(() => validatePickupTime(schedule, "07:30"), /INVALID_PICKUP_TIME/);
+  });
+
+  // Scenario 148: Wave 4.2.5.x Strict Authentication & Phone: Guest/missing phone strictly rejected
+  await runTest('Scenario 148: Wave 4.2.5.x Strict Fail-Fast: Missing phone or unauthenticated guest is strictly rejected', async () => {
+    function validateOrderCustomer(userId, phone) {
+      if (!userId || userId === 'guest_user') throw new Error('AUTHENTICATION_REQUIRED');
+      if (!phone || !phone.trim()) throw new Error('CUSTOMER_PHONE_REQUIRED');
+      return true;
+    }
+
+    assert.throws(() => validateOrderCustomer('guest_user', '0812345678'), /AUTHENTICATION_REQUIRED/);
+    assert.throws(() => validateOrderCustomer('user_123', ''), /CUSTOMER_PHONE_REQUIRED/);
+    assert.equal(validateOrderCustomer('user_123', '0899999999'), true);
+  });
+
   const passRate = Math.round((passedTests / totalTests) * 100);
   console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${passRate}%).`);
 

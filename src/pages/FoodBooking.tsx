@@ -1,5 +1,5 @@
 ﻿import React, { useState } from 'react';
-import { Utensils, QrCode, CheckCircle2, ArrowLeft, Sparkles, AlertCircle } from 'lucide-react';
+import { Utensils, QrCode, ArrowLeft, Sparkles, AlertCircle, Clock, CheckCircle2 } from 'lucide-react';
 import { CartItem, Order, CustomerProfile } from '../types';
 import { db } from '../firebase/config.js';
 import { createAuthoritativeStoreOrder } from '../services/orderCreationService';
@@ -33,18 +33,29 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
     e.preventDefault();
     if (cartItems.length === 0) return;
 
+    if (!currentUser?.phone) {
+      setOrderError('กรุณากรอกเบอร์โทรศัพท์ในหน้าโปรไฟล์ก่อนทำการจองคิวอาหาร');
+      return;
+    }
+
     setIsSubmitting(true);
     setOrderError(null);
 
     const storeId = cartItems[0]?.menuItem?.storeId || 'store_canteen01';
-    const userId = currentUser?.id || currentUser?.uid || 'guest_user';
+    const userId = currentUser?.id || currentUser?.uid;
+
+    if (!userId) {
+      setOrderError('กรุณาเข้าสู่ระบบก่อนทำการสั่งจองคิวอาหาร');
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
       const result = await createAuthoritativeStoreOrder(db, {
         storeId,
         userId,
-        customerName: currentUser?.name || 'นักเรียน QueueUp',
-        customerPhone: currentUser?.phone || '081-234-5678',
+        customerName: currentUser?.name || currentUser?.displayName || 'ลูกค้า QueueUp',
+        customerPhone: currentUser?.phone,
         pickupTime,
         paymentMethod,
         items: cartItems.map((c) => ({
@@ -95,8 +106,8 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
               </button>
             )}
             <div>
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">ยืนยันการจองคิวอาหาร (Queue Booking)</h1>
-              <p className="text-xs text-slate-500 font-medium">สั่งอาหารล่วงหน้า รับอาหารทันทีเมื่อถึงพักเที่ยง</p>
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">สร้างคำสั่งซื้อ (Create Order)</h1>
+              <p className="text-xs text-slate-500 font-medium">สั่งอาหารล่วงหน้า ตรวจสอบโควตาคิว และชำระเงิน</p>
             </div>
           </div>
           <div className="hidden sm:flex items-center gap-1.5 bg-amber-50 text-amber-800 px-3 py-1.5 rounded-full text-xs font-bold border border-amber-200">
@@ -114,31 +125,44 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
         )}
 
         {createdOrder ? (
-          /* Digital Queue Ticket View */
-          <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border-2 border-emerald-500 text-center space-y-6 animate-fade-in">
-            <div className="inline-flex p-4 rounded-full bg-emerald-100 text-emerald-600 mb-2">
-              <CheckCircle2 className="w-12 h-12" />
+          /* Order Created Summary View (Separating Order Creation from Confirmed Payment) */
+          <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border-2 border-amber-500 text-center space-y-6 animate-fade-in">
+            <div className="inline-flex p-4 rounded-full bg-amber-100 text-amber-600 mb-2">
+              <Clock className="w-12 h-12" />
             </div>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900">ออกตั๋วคิวสำเร็จ!</h2>
+            <div>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900">สร้างคำสั่งซื้อเรียบร้อยแล้ว</h2>
+              <p className="text-xs text-slate-500 mt-1">
+                {createdOrder.paymentMethod === 'promptpay'
+                  ? 'กรุณาชำระเงินผ่าน PromptPay เพื่อยืนยันการรับคิวอาหารอย่างสมบูรณ์'
+                  : 'กรุณาชำระเงินสดที่หน้าร้านค้าเมื่อถึงเวลารับอาหาร'}
+              </p>
+            </div>
             
             <div className="bg-gradient-to-r from-[#8B0000] via-[#A50000] to-[#800000] text-white p-6 rounded-3xl shadow-xl max-w-sm mx-auto">
               <span className="text-xs font-extrabold uppercase tracking-widest text-amber-200">หมายเลขคิวของคุณ</span>
               <div className="text-5xl font-black my-2 tracking-wider text-amber-300">{createdOrder.queueNumber}</div>
-              <p className="text-xs text-amber-100">เวลารับอาหาร: {createdOrder.pickupTime} น.</p>
+              <div className="inline-block px-3 py-1 bg-amber-400 text-amber-950 rounded-full text-xs font-black">
+                {createdOrder.paymentMethod === 'promptpay' ? 'รอการชำระเงิน (Pending Payment)' : 'รอชำระเงินสดหน้าร้าน'}
+              </div>
             </div>
 
             <div className="bg-slate-50 p-4 rounded-2xl max-w-sm mx-auto text-left text-xs font-medium text-slate-600 space-y-2 border border-slate-200">
+              <div className="flex justify-between">
+                <span>เวลารับอาหาร:</span>
+                <span className="font-bold text-slate-800">{createdOrder.pickupTime} น.</span>
+              </div>
               <div className="flex justify-between">
                 <span>ชื่อผู้สั่ง:</span>
                 <span className="font-bold text-slate-800">{createdOrder.customerName}</span>
               </div>
               <div className="flex justify-between">
                 <span>ยอดรวมสุทธิ:</span>
-                <span className="font-bold text-[#8B0000]">{createdOrder.totalAmount} บาท</span>
+                <span className="font-bold text-[#8B0000]">฿{Number(createdOrder.totalAmount).toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
-                <span>แต้มสะสมที่ได้รับ:</span>
-                <span className="font-bold text-emerald-600">+{createdOrder.pointsEarned} แต้ม</span>
+                <span>สถานะการชำระเงิน:</span>
+                <span className="font-bold text-amber-600">รอชำระเงิน (Pending)</span>
               </div>
             </div>
 
@@ -176,12 +200,12 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
                           <p className="text-xs text-amber-700 italic">คำขอ: {item.customNotes}</p>
                         )}
                       </div>
-                      <span className="font-extrabold text-slate-900">{item.menuItem.price * item.quantity} บาท</span>
+                      <span className="font-extrabold text-slate-900">฿{(item.menuItem.price * item.quantity).toFixed(2)}</span>
                     </div>
                   ))}
                   <div className="pt-3 flex justify-between font-black text-base text-[#8B0000]">
                     <span>ยอดรวมทั้งหมด:</span>
-                    <span>{calculateTotal()} บาท</span>
+                    <span>฿{calculateTotal().toFixed(2)}</span>
                   </div>
                 </div>
               )}
@@ -240,7 +264,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
                   }`}
                 >
                   <span className="text-xs font-black text-slate-900 block">PromptPay QR Code</span>
-                  <span className="text-[11px] text-slate-500 font-medium">สแกนชำระทันที ยืนยันคิวอัตโนมัติ</span>
+                  <span className="text-[11px] text-slate-500 font-medium">สร้างรายการชำระเงินและสแกนจ่าย</span>
                 </button>
 
                 <button
@@ -264,7 +288,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
               className="w-full py-4 bg-gradient-to-r from-[#8B0000] via-[#A50000] to-[#800000] hover:from-[#700000] hover:to-[#8B0000] text-white font-black text-base rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
             >
               <QrCode className="w-5 h-5" />
-              <span>{isSubmitting ? 'กำลังตรวจสอบโควตาและสร้างคิว...' : 'ยืนยันจองคิวอาหาร'}</span>
+              <span>{isSubmitting ? 'กำลังตรวจสอบโควตาและสร้างคำสั่งซื้อ...' : 'ยืนยันสร้างคำสั่งซื้อ'}</span>
             </button>
 
           </form>
