@@ -44,9 +44,9 @@ function Login() {
   const { user } = useSelector((state) => state.auth);
   const { loginWithGoogle } = useAuth();
 
-  // 1. Redirect if already logged in
+  // 1. Redirect if already logged in with verified auth
   useEffect(() => {
-    if (user) {
+    if (user && user.isVerifiedAuth === true) {
       navigate(fromDestination, { replace: true });
     }
   }, [user, navigate, fromDestination]);

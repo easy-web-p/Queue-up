@@ -65,7 +65,7 @@ const authSlice = createSlice({
   name: 'auth',
   initialState: {
     user: getInitialUser(),
-    isLoading: false,
+    isLoading: true, // 🔒 Start as true so route guards wait for Firebase Auth verification
   },
   reducers: {
     setUser: (state, action) => {
