@@ -357,4 +357,45 @@ export const saveOrderToFirestore = async (orderPayload) => {
   }
 };
 
+// ฟังก์ชันตรวจสอบและดึงโควตาคิวจริง (Slot Capacity) ตามร้านค้าและวันที่
+export const fetchLiveSlotCapacities = async (storeId, isoDateStr, baseSlots = [], defaultCapacity = 20) => {
+  if (!storeId || !isoDateStr || !Array.isArray(baseSlots)) return baseSlots;
+  const targetYmdClean = isoDateStr.replace(/-/g, "");
+
+  try {
+    const updated = await Promise.all(
+      baseSlots.map(async (slot) => {
+        const cleanTime = (slot.time || "").replace(":", "");
+        const slotDocId = `slot_${storeId}_${targetYmdClean}_${cleanTime}`;
+        const slotRef = doc(db, "store_slots", slotDocId);
+        const snap = await getDoc(slotRef);
+        const capacity = slot.capacity || defaultCapacity;
+        let currentOrders = 0;
+        if (snap.exists()) {
+          currentOrders = Number(snap.data()?.currentOrders) || 0;
+        }
+        const remaining = Math.max(0, capacity - currentOrders);
+        let status = "AVAILABLE";
+        if (remaining === 0) {
+          status = "FULL";
+        } else if (remaining <= 5) {
+          status = "LIMITED";
+        }
+        return {
+          ...slot,
+          capacity,
+          currentOrders,
+          remaining,
+          status,
+        };
+      })
+    );
+    return updated;
+  } catch (error) {
+    console.warn("fetchLiveSlotCapacities warning:", error);
+    return baseSlots;
+  }
+};
+
+
 

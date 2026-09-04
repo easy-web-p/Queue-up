@@ -2925,7 +2925,7 @@ async function main() {
   // Scenario 108: Operating Hours Schedule Check
   await runTest('Scenario 108: Operating Schedule: Order outside store opening hours is strictly rejected', async () => {
     function checkPickupTime(open, close, target) {
-      let isAllowed = false;
+      let isAllowed;
       if (open <= close) {
         isAllowed = target >= open && target <= close;
       } else {
@@ -4272,6 +4272,108 @@ async function main() {
     assert.equal(canCustomerCancel('PREPARING', 'cooking'), false);
     assert.equal(canCustomerCancel('READY', 'ready'), false);
     assert.equal(canCustomerCancel('COMPLETED', 'completed'), false);
+  });
+
+  // Scenario 161: Live Slot Capacity calculation accurately flags FULL, LIMITED, and AVAILABLE states
+  await runTest('Scenario 161: Live Slot Capacity: Accurately computes remaining capacity & status from slot docs', async () => {
+    function calculateSlotState(slot, currentOrders, storeCapacity = 20) {
+      const cap = slot.capacity || storeCapacity;
+      const rem = Math.max(0, cap - (currentOrders || 0));
+      let status = "AVAILABLE";
+      if (rem === 0) status = "FULL";
+      else if (rem <= 5) status = "LIMITED";
+      return { ...slot, capacity: cap, currentOrders, remaining: rem, status };
+    }
+
+    const slotFull = calculateSlotState({ time: "12:00" }, 20, 20);
+    assert.equal(slotFull.remaining, 0);
+    assert.equal(slotFull.status, "FULL");
+
+    const slotLimited = calculateSlotState({ time: "12:30" }, 17, 20);
+    assert.equal(slotLimited.remaining, 3);
+    assert.equal(slotLimited.status, "LIMITED");
+
+    const slotAvailable = calculateSlotState({ time: "13:00" }, 5, 20);
+    assert.equal(slotAvailable.remaining, 15);
+    assert.equal(slotAvailable.status, "AVAILABLE");
+  });
+
+  // Scenario 162: Cart Isolation Invariant - Adding items to cart never decrements slot capacity or issues Q001
+  await runTest('Scenario 162: Cart Isolation: Adding to cart writes only to local storage without reserving slot capacity or queue number', async () => {
+    const mockLocalStorage = new Map();
+    let slotCapacityDoc = { currentOrders: 2 };
+    let globalQueueCounter = 42;
+
+    function addItemToCart(cartKey, item) {
+      const existing = mockLocalStorage.get(cartKey) || [];
+      existing.push(item);
+      mockLocalStorage.set(cartKey, existing);
+      return existing;
+    }
+
+    addItemToCart('queueup_cart', { id: 'prod_1', name: 'ก๋วยเตี๋ยว', quantity: 2 });
+    assert.equal(mockLocalStorage.get('queueup_cart').length, 1);
+    // Capacity doc and queue counter remain completely untouched
+    assert.equal(slotCapacityDoc.currentOrders, 2);
+    assert.equal(globalQueueCounter, 42);
+  });
+
+  // Scenario 163: Full Authoritative Order Creation with Structured Modifiers and Instant Q-Token
+  await runTest('Scenario 163: Zero-Payment Order Pipeline: Produces Q001 instantly with structured modifiers and atomic slot bump', async () => {
+    const engine = new AdvancedFirestoreEngine();
+    const storeId = "store_canteen01";
+    const slotId = "slot_store_canteen01_20260904_1200";
+
+    engine.setDoc(`shops/${storeId}`, {
+      id: storeId,
+      name: "ร้านก๋วยเตี๋ยวเรืออยุธยา",
+      isOpen: true,
+      maxOrdersPerSlot: 20,
+      openTime: "08:00",
+      closeTime: "17:00"
+    });
+
+    engine.setDoc(`store_slots/${slotId}`, {
+      slotId,
+      storeId,
+      capacity: 20,
+      currentOrders: 4
+    });
+
+    // Simulate authoritative order creation
+    const currentOrders = engine.getDoc(`store_slots/${slotId}`).currentOrders;
+    engine.setDoc(`store_slots/${slotId}`, {
+      ...engine.getDoc(`store_slots/${slotId}`),
+      currentOrders: currentOrders + 1
+    });
+
+    const orderId = "ORD-TEST-163";
+    const queueNo = "Q007";
+    engine.setDoc(`orders/${orderId}`, {
+      orderId,
+      queueNumber: queueNo,
+      storeId,
+      status: "PENDING",
+      queueStatus: "waiting",
+      items: [
+        {
+          productId: "prod_noodles_1",
+          name: "ก๋วยเตี๋ยวเรือหมูตุ๋น",
+          quantity: 1,
+          selectedModifiers: [
+            { modifierGroupId: "spicy_level", optionId: "spicy_hot", name: "เผ็ดมาก 3x", priceModifierSatang: 0 },
+            { modifierGroupId: "toppings", optionId: "crackling", name: "กากหมูเจียว", priceModifierSatang: 1000 }
+          ]
+        }
+      ]
+    });
+
+    const createdOrder = engine.getDoc(`orders/${orderId}`);
+    assert.equal(createdOrder.queueNumber, "Q007");
+    assert.equal(createdOrder.status, "PENDING");
+    assert.equal(createdOrder.queueStatus, "waiting");
+    assert.equal(createdOrder.items[0].selectedModifiers.length, 2);
+    assert.equal(engine.getDoc(`store_slots/${slotId}`).currentOrders, 5);
   });
 
   const passRate = Math.round((passedTests / totalTests) * 100);

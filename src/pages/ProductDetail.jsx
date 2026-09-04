@@ -11,6 +11,7 @@ import {
   fetchStoreByIdFromFirestore,
   checkUserFavoriteInFirestore,
   toggleUserFavoriteInFirestore,
+  fetchLiveSlotCapacities,
 } from "../lib/firebase.js";
 import "./ProductDetail.css";
 
@@ -35,9 +36,9 @@ function generateUpcomingCalendarDays() {
     const fullDateStr = `${dateNum} ${month}`;
     const isoDateStr = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, "0")}-${String(dateNum).padStart(2, "0")}`;
 
-    let status = "AVAILABLE"; // 'AVAILABLE' | 'LIMITED' | 'FULL' | 'CLOSED'
-    let statusLabel = "ว่าง";
-    let capacityPercent = 85;
+    let status;
+    let statusLabel;
+    let capacityPercent;
 
     if (i === 0) {
       status = "AVAILABLE";
@@ -252,6 +253,7 @@ function ProductDetail() {
   // 📅 Calendar Date Selection State
   const calendarDays = useMemo(() => generateUpcomingCalendarDays(), []);
   const [selectedDay, setSelectedDay] = useState(calendarDays[0]);
+  const [timeSlots, setTimeSlots] = useState(BASE_TIME_SLOTS);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState(BASE_TIME_SLOTS[1]);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
 
@@ -306,6 +308,30 @@ function ProductDetail() {
       isMounted = false;
     };
   }, [id, user]);
+
+  // ⏰ Real-time Slot Capacity Loader for selected Store & Date
+  useEffect(() => {
+    let isMounted = true;
+    async function updateSlotCapacities() {
+      const storeId = product?.storeId || store?.id || "store_canteen01";
+      const isoDate = selectedDay?.isoDateStr || calendarDays[0]?.isoDateStr;
+      const defaultCap = store?.maxOrdersPerSlot || 20;
+      if (storeId && isoDate) {
+        const liveSlots = await fetchLiveSlotCapacities(storeId, isoDate, BASE_TIME_SLOTS, defaultCap);
+        if (isMounted) {
+          setTimeSlots(liveSlots);
+          setSelectedTimeSlot((prev) => {
+            const matched = liveSlots.find((s) => s.time === prev?.time);
+            return matched || liveSlots[1] || liveSlots[0];
+          });
+        }
+      }
+    }
+    updateSlotCapacities();
+    return () => {
+      isMounted = false;
+    };
+  }, [product?.storeId, store?.id, store?.maxOrdersPerSlot, selectedDay?.isoDateStr, calendarDays]);
 
   // 4. Favorite Toggle Handler
   const handleToggleFavorite = async () => {
@@ -869,7 +895,7 @@ function ProductDetail() {
                     </span>
                   </div>
                   <div className="queue-pd-time-slots-grid">
-                    {BASE_TIME_SLOTS.map((slot) => (
+                    {timeSlots.map((slot) => (
                       <button
                         key={slot.time}
                         type="button"
