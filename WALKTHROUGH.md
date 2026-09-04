@@ -60,6 +60,14 @@
   - ล้างชุดทดสอบเก่าที่เกี่ยวข้องกับ Payment Gateway / Webhook / PromptPay / TO_PAY ทั้งหมด
   - เขียนชุดทดสอบใหม่ 100% Zero-Payment ครอบคลุม: Instant Queue Q001, Sequential Counter, Multi-Store Isolation, Real Calendar Validation, Same-day Past Time, Duplicate Modifiers, Fail-Closed Capacity, High-concurrency Race Condition (0 Overbooking & 0 Negative Stock)
 
+### 8. 🔴 [P1] Frontend Cart Calculation with Modifiers & Fake Default Removal
+- **ไฟล์:** [`src/pages/FoodBooking.tsx`](file:///d:/พัฒนาเว็บแอปพลิเคชัน/my-QueueUp-app/src/pages/FoodBooking.tsx)
+- **การเปลี่ยนแปลง:**
+  - แก้ไข `calculateTotal()` และการแสดงรายการอาหารให้คำนวณ `base price + modifier prices` ถูกต้องตรงตามความเป็นจริง
+  - ลบ Fake Defaults (`store_canteen01`, `ร้านป้าแดง`, `ล็อค 02`) หากไม่มี `storeId` ระบบจะปฏิเสธด้วย `STORE_ID_REQUIRED`
+  - ใช้ `getBangkokYmd().ymd` คำนวณวันที่เริ่มต้นใน Timezone Asia/Bangkok
+  - ปรับปรุงข้อความบนหน้าสรุปผลคิวให้เป็น `รอร้านค้ารับออเดอร์ (PENDING)` สอดคล้องกับ State Machine ที่แท้จริง
+
 ---
 
 ## 🧪 ผลการทดสอบ (Verification Results)

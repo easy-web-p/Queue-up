@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import { Utensils, ArrowLeft, Sparkles, AlertCircle, Clock, CheckCircle2, ShoppingBag, Store, MapPin, Calendar, Compass, ChevronRight } from 'lucide-react';
 import { CartItem, Order, CustomerProfile } from '../types';
 import { db } from '../firebase/config.js';
-import { createAuthoritativeStoreOrder } from '../services/orderCreationService';
+import { createAuthoritativeStoreOrder, getBangkokYmd } from '../services/orderCreationService';
 import { soundManager } from '../utils/audioNotification.js';
 
 interface FoodBookingPageProps {
@@ -13,14 +13,6 @@ interface FoodBookingPageProps {
   onBookingSuccess?: (createdOrder: Order) => void;
   onBack?: () => void;
 }
-
-const getTodayYmdStr = () => {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-};
 
 const formatThaiDate = (ymdStr?: string) => {
   if (!ymdStr) return '';
@@ -78,15 +70,16 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
     if (raw && /^\d{4}-\d{2}-\d{2}$/.test(raw.trim())) {
       return raw.trim();
     }
-    return getTodayYmdStr();
+    return getBangkokYmd().ymd;
   });
   const [customInstructions, setCustomInstructions] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
 
-  const storeName = locationState?.storeName || 'ร้านป้าแดง ตามสั่ง & ไก่ทอด';
-  const storeLocation = locationState?.storeLocation || 'ล็อค 02 โรงอาหารกลาง 1 (ชั้น 1)';
+  const storeId = locationState?.storeId || cartItems[0]?.menuItem?.storeId || '';
+  const storeName = locationState?.storeName || (cartItems[0]?.menuItem as any)?.storeName || (storeId ? `ร้านค้า (${storeId})` : 'ร้านค้า');
+  const storeLocation = locationState?.storeLocation || 'จุดรับอาหารของร้านค้า';
 
   const onBack = propOnBack || (() => {
     if (window.history.length > 1) {
@@ -96,13 +89,29 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
     }
   });
 
+  const calculateItemUnitPrice = (item: CartItem) => {
+    const base = item.menuItem.price || 0;
+    const modTotal = (item.selectedModifiers || []).reduce((sum, m) => {
+      const p = typeof m.priceModifier === 'number'
+        ? m.priceModifier
+        : (m.priceModifierSatang ? m.priceModifierSatang / 100 : 0);
+      return sum + p;
+    }, 0);
+    return base + modTotal;
+  };
+
   const calculateTotal = () => {
-    return cartItems.reduce((sum, item) => sum + item.menuItem.price * item.quantity, 0);
+    return cartItems.reduce((sum, item) => sum + calculateItemUnitPrice(item) * item.quantity, 0);
   };
 
   const handleConfirmOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cartItems.length === 0) return;
+
+    if (!storeId) {
+      setOrderError('ไม่พบรหัสร้านค้า กรุณาเลือกรายการอาหารใหม่อีกครั้ง');
+      return;
+    }
 
     const userPhone = currentUser?.phone || currentUser?.phoneNumber || '';
     if (!userPhone) {
@@ -113,7 +122,6 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
     setIsSubmitting(true);
     setOrderError(null);
 
-    const storeId = locationState?.storeId || cartItems[0]?.menuItem?.storeId || 'store_canteen01';
     const userId = currentUser?.id || currentUser?.uid;
 
     if (!userId) {
@@ -136,7 +144,6 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
           customNotes: c.customNotes || customInstructions || '',
           selectedModifiers: Array.isArray(c.selectedModifiers) ? c.selectedModifiers : []
         }))
-
       });
 
       const orderData = result.order as Order;
@@ -235,8 +242,8 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
             <div className="bg-gradient-to-r from-[#8B0000] via-[#A50000] to-[#800000] text-white p-6 rounded-3xl shadow-xl max-w-sm mx-auto">
               <span className="text-xs font-extrabold uppercase tracking-widest text-amber-200">หมายเลขคิวของคุณ (Queue Number)</span>
               <div className="text-6xl font-black my-2 tracking-wider text-amber-300">{createdOrder.queueNumber || 'Q001'}</div>
-              <div className="inline-block px-3 py-1 bg-emerald-400 text-emerald-950 rounded-full text-xs font-black">
-                คิวรอทำอาหาร (PENDING)
+              <div className="inline-block px-3 py-1 bg-amber-400 text-amber-950 rounded-full text-xs font-black">
+                รอร้านค้ารับออเดอร์ (PENDING)
               </div>
             </div>
 
@@ -265,9 +272,9 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
                 <span>ยอดรวมสุทธิ:</span>
                 <span className="font-bold text-[#8B0000]">฿{Number(createdOrder.totalAmount).toFixed(2)}</span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span>สถานะคิว:</span>
-                <span className="font-bold text-emerald-600">ยืนยันคิวแล้ว (Confirmed)</span>
+                <span className="font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">รอร้านรับออเดอร์ (PENDING)</span>
               </div>
             </div>
 
@@ -277,7 +284,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
               <div>
                 <span className="font-bold text-amber-900 block">เส้นทางเดินรับอาหาร:</span>
                 <p className="text-amber-800 text-[11px] mt-0.5">
-                  เดินเข้าทางเข้าหลักโรงอาหาร ผ่านเสา C3 ตรงไป 40 วินาที รับที่จุด Pick-up หน้าล็อค 02
+                  เดินเข้าทางเข้าหลักโรงอาหาร ผ่านเสา C3 ตรงไป 40 วินาที รับที่จุด Pick-up หน้าร้านค้า
                 </p>
               </div>
             </div>
@@ -319,15 +326,30 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
               ) : (
                 <div className="divide-y divide-slate-100 bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-3">
                   {cartItems.map((item, idx) => (
-                    <div key={idx} className="pt-2 first:pt-0 flex items-center justify-between text-sm">
-                      <div>
-                        <span className="font-bold text-slate-800">{item.menuItem.name}</span>
-                        <span className="text-xs text-slate-500 ml-2">x{item.quantity}</span>
+                    <div key={idx} className="pt-2 first:pt-0 flex items-start justify-between text-sm">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-slate-800">{item.menuItem.name}</span>
+                          <span className="text-xs text-slate-500 font-semibold">x{item.quantity}</span>
+                        </div>
+                        {item.selectedModifiers && item.selectedModifiers.length > 0 && (
+                          <div className="text-[11px] text-slate-500 flex flex-wrap gap-1">
+                            {item.selectedModifiers.map((m, mIdx) => (
+                              <span key={mIdx} className="bg-slate-200/80 px-1.5 py-0.5 rounded text-slate-700">
+                                {m.name || m.optionId}
+                                {((m.priceModifier && m.priceModifier > 0) || (m.priceModifierSatang && m.priceModifierSatang > 0)) &&
+                                  ` (+฿${m.priceModifier || ((m.priceModifierSatang || 0) / 100)})`}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                         {item.customNotes && (
                           <p className="text-xs text-amber-700 italic">คำขอ: {item.customNotes}</p>
                         )}
                       </div>
-                      <span className="font-extrabold text-slate-900">฿{(item.menuItem.price * item.quantity).toFixed(2)}</span>
+                      <span className="font-extrabold text-slate-900 shrink-0">
+                        ฿{(calculateItemUnitPrice(item) * item.quantity).toFixed(2)}
+                      </span>
                     </div>
                   ))}
                   <div className="pt-3 flex justify-between font-black text-base text-[#8B0000]">
