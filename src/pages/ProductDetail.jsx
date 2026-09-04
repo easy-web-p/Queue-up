@@ -87,33 +87,248 @@ const BASE_TIME_SLOTS = [
   { time: "14:30", discount: "-10%", capacity: 20, remaining: 20, status: "AVAILABLE" },
 ];
 
-// 🍜 RICH MODIFIER OPTIONS
-const NOODLE_OPTIONS = [
-  { id: "thin", name: "เส้นเล็ก" },
-  { id: "vermicelli", name: "หมี่ขาว" },
-  { id: "egg_noodle", name: "บะหมี่หยก" },
-  { id: "glass_noodle", name: "วุ้นเส้น" },
-  { id: "no_noodle", name: "เกาเหลา" },
-];
+// 🍜 CATEGORY-AWARE DYNAMIC MODIFIER CONFIGURATIONS
+const CATEGORY_MODIFIER_CONFIGS = {
+  noodle: [
+    {
+      id: "spicy_level",
+      title: "ระดับความเผ็ด",
+      subtitle: "พริกคั่วเตาถ่าน",
+      icon: "bi-fire text-danger",
+      required: true,
+      selectionType: "single",
+      options: [
+        { id: "none", name: "ไม่เผ็ด", desc: "ไม่ใส่พริก", price: 0 },
+        { id: "normal", name: "เผ็ดปกติ", desc: "พริกคั่วเตาถ่าน 1 ช้อน", price: 0 },
+        { id: "hot", name: "เผ็ดมาก 3x", desc: "พริกคั่วเข้มข้นพิเศษ", price: 0 },
+      ],
+      defaultSelected: "normal",
+    },
+    {
+      id: "noodle_type",
+      title: "เลือกเส้น",
+      icon: "bi-egg-fried text-primary",
+      required: true,
+      selectionType: "single",
+      options: [
+        { id: "thin", name: "เส้นเล็ก", price: 0 },
+        { id: "vermicelli", name: "หมี่ขาว", price: 0 },
+        { id: "egg_noodle", name: "บะหมี่หยก", price: 0 },
+        { id: "glass_noodle", name: "วุ้นเส้น", price: 0 },
+        { id: "no_noodle", name: "เกาเหลา", price: 0 },
+      ],
+      defaultSelected: "thin",
+    },
+    {
+      id: "soup_type",
+      title: "เลือกน้ำซุป",
+      icon: "bi-cup-hot text-primary",
+      required: true,
+      selectionType: "single",
+      options: [
+        { id: "namtok", name: "น้ำตกสูตรเข้ม", price: 0 },
+        { id: "clear", name: "น้ำใสพะโล้", price: 0 },
+        { id: "tomyum", name: "ต้มยำน้ำตก", price: 0 },
+      ],
+      defaultSelected: "namtok",
+    },
+    {
+      id: "toppings",
+      title: "เพิ่ม Topping",
+      subtitle: "เลือกได้หลายรายการ",
+      icon: "bi-plus-circle-fill text-success",
+      required: false,
+      selectionType: "multiple",
+      options: [
+        { id: "egg", name: "ไข่ต้มยางมะตูม", price: 10 },
+        { id: "crackling", name: "กากหมูเจียวสด", price: 15 },
+        { id: "meatball", name: "ลูกชิ้นหมู (3 ลูก)", price: 15 },
+        { id: "veggie", name: "ผักบุ้งพิเศษ", price: 5 },
+      ],
+      defaultSelected: ["crackling"],
+    },
+  ],
+  beverage: [
+    {
+      id: "sweet_level",
+      title: "ระดับความหวาน",
+      icon: "bi-droplet-half text-primary",
+      required: true,
+      selectionType: "single",
+      options: [
+        { id: "sweet_0", name: "ไม่หวาน (0%)", price: 0 },
+        { id: "sweet_25", name: "หวานน้อย (25%)", price: 0 },
+        { id: "sweet_50", name: "หวานปกติ (50%)", price: 0 },
+        { id: "sweet_100", name: "หวาน 100%", price: 0 },
+      ],
+      defaultSelected: "sweet_50",
+    },
+    {
+      id: "ice_level",
+      title: "ระดับน้ำแข็ง",
+      icon: "bi-snow text-info",
+      required: true,
+      selectionType: "single",
+      options: [
+        { id: "ice_normal", name: "น้ำแข็งปกติ", price: 0 },
+        { id: "ice_less", name: "น้ำแข็งน้อย", price: 0 },
+        { id: "ice_none", name: "ไม่ใส่น้ำแข็ง", price: 0 },
+      ],
+      defaultSelected: "ice_normal",
+    },
+    {
+      id: "bev_toppings",
+      title: "เพิ่ม Topping เครื่องดื่ม",
+      subtitle: "เลือกได้หลายรายการ",
+      icon: "bi-plus-circle-fill text-success",
+      required: false,
+      selectionType: "multiple",
+      options: [
+        { id: "boba", name: "ไข่มุกบราวน์ชูการ์", price: 10 },
+        { id: "pudding", name: "พุดดิ้งนมสด", price: 10 },
+        { id: "aloe", name: "ว่านหางจระเข้", price: 10 },
+        { id: "jelly", name: "เจลลี่บุกคอลลาเจน", price: 15 },
+      ],
+      defaultSelected: ["boba"],
+    },
+  ],
+  single_dish: [
+    {
+      id: "spicy_level",
+      title: "ระดับความเผ็ด",
+      subtitle: "ความจัดจ้าน",
+      icon: "bi-fire text-danger",
+      required: true,
+      selectionType: "single",
+      options: [
+        { id: "none", name: "ไม่เผ็ด", price: 0 },
+        { id: "normal", name: "เผ็ดปกติ", price: 0 },
+        { id: "hot", name: "เผ็ดจัดจ้าน", price: 0 },
+      ],
+      defaultSelected: "normal",
+    },
+    {
+      id: "egg_option",
+      title: "ตัวเลือกไข่",
+      icon: "bi-egg text-warning",
+      required: false,
+      selectionType: "single",
+      options: [
+        { id: "no_egg", name: "ไม่รับไข่", price: 0 },
+        { id: "fried_egg", name: "ไข่ดาวกรอบ", price: 10 },
+        { id: "omelet", name: "ไข่เจียวฟู", price: 12 },
+        { id: "boiled_egg", name: "ไข่ต้มยางมะตูม", price: 10 },
+      ],
+      defaultSelected: "fried_egg",
+    },
+    {
+      id: "dish_toppings",
+      title: "เพิ่มเครื่องเคียงพิเศษ",
+      subtitle: "เลือกได้หลายรายการ",
+      icon: "bi-plus-circle-fill text-success",
+      required: false,
+      selectionType: "multiple",
+      options: [
+        { id: "extra_meat", name: "เพิ่มเนื้อสัตว์พิเศษ", price: 20 },
+        { id: "crispy_pork", name: "กากหมูเจียว", price: 10 },
+        { id: "chinese_sausage", name: "กุนเชียงทอด", price: 15 },
+      ],
+      defaultSelected: [],
+    },
+  ],
+  western: [
+    {
+      id: "sauce_flavor",
+      title: "รสชาติซอส",
+      subtitle: "สูตรพิเศษประจำร้าน",
+      icon: "bi-palette text-danger",
+      required: true,
+      selectionType: "single",
+      options: [
+        { id: "korean_spicy", name: "ซอสเกาหลีเผ็ดหวาน", price: 0 },
+        { id: "honey_garlic", name: "ซอสฮันนี่การ์ลิค", price: 0 },
+        { id: "cheese_lava", name: "ซอสชีสลาวา", price: 10 },
+        { id: "original", name: "ซอสบาร์บีคิวดั้งเดิม", price: 0 },
+      ],
+      defaultSelected: "korean_spicy",
+    },
+    {
+      id: "side_dish",
+      title: "เพิ่มเครื่องเคียง",
+      subtitle: "เลือกได้หลายรายการ",
+      icon: "bi-plus-circle-fill text-success",
+      required: false,
+      selectionType: "multiple",
+      options: [
+        { id: "french_fries", name: "เฟรนช์ฟรายส์กรอบ", price: 20 },
+        { id: "sticky_rice", name: "ข้าวเหนียวนุ่ม", price: 10 },
+        { id: "coleslaw", name: "สลัดโคลสลอว์สด", price: 15 },
+        { id: "nuggets", name: "นักเก็ตไก่ (4 ชิ้น)", price: 25 },
+      ],
+      defaultSelected: [],
+    },
+  ],
+  curry_soup: [
+    {
+      id: "spicy_level",
+      title: "ระดับความเผ็ด",
+      subtitle: "ความจัดจ้าน",
+      icon: "bi-fire text-danger",
+      required: true,
+      selectionType: "single",
+      options: [
+        { id: "mild", name: "เผ็ดน้อย", price: 0 },
+        { id: "normal", name: "เผ็ดปกติ", price: 0 },
+        { id: "extra", name: "เผ็ดจัดจ้าน 3x", price: 0 },
+      ],
+      defaultSelected: "normal",
+    },
+    {
+      id: "rice_option",
+      title: "ตัวเลือกข้าว",
+      icon: "bi-box-seam text-primary",
+      required: false,
+      selectionType: "single",
+      options: [
+        { id: "with_rice", name: "รับข้าวสวยหอมมะลิ", price: 10 },
+        { id: "no_rice", name: "ไม่รับข้าว (เฉพาะกับข้าว)", price: 0 },
+      ],
+      defaultSelected: "with_rice",
+    },
+    {
+      id: "curry_toppings",
+      title: "เพิ่มเครื่องเคียง",
+      subtitle: "เลือกได้หลายรายการ",
+      icon: "bi-plus-circle-fill text-success",
+      required: false,
+      selectionType: "multiple",
+      options: [
+        { id: "omelet", name: "ไข่เจียวสมุนไพร", price: 15 },
+        { id: "salted_egg", name: "ไข่เค็มไชยา", price: 12 },
+        { id: "shrimp_extra", name: "เพิ่มกุ้งแม่น้ำ (1 ตัว)", price: 35 },
+      ],
+      defaultSelected: [],
+    },
+  ],
+};
 
-const SOUP_OPTIONS = [
-  { id: "namtok", name: "น้ำตกสูตรเข้ม" },
-  { id: "clear", name: "น้ำใสพะโล้" },
-  { id: "tomyum", name: "ต้มยำน้ำตก" },
-];
-
-const SPICY_OPTIONS = [
-  { id: "none", name: "ไม่เผ็ด", desc: "ไม่ใส่พริก" },
-  { id: "normal", name: "เผ็ดปกติ", desc: "พริกคั่วเตาถ่าน 1 ช้อน" },
-  { id: "hot", name: "เผ็ดมาก 3x", desc: "พริกคั่วเข้มข้นพิเศษ" },
-];
-
-const TOPPING_OPTIONS = [
-  { id: "egg", name: "ไข่ต้มยางมะตูม", price: 10 },
-  { id: "crackling", name: "กากหมูเจียวสด", price: 15 },
-  { id: "meatball", name: "ลูกชิ้นหมู (3 ลูก)", price: 15 },
-  { id: "veggie", name: "ผักบุ้งพิเศษ", price: 5 },
-];
+function getCategoryModifiers(category, productTitle = "") {
+  const cat = (category || "").toLowerCase();
+  const title = (productTitle || "").toLowerCase();
+  if (cat.includes("noodle") || title.includes("ก๋วยเตี๋ยว") || title.includes("บะหมี่") || title.includes("วุ้นเส้น")) {
+    return CATEGORY_MODIFIER_CONFIGS.noodle;
+  }
+  if (cat.includes("beverage") || cat.includes("drink") || title.includes("ชา") || title.includes("กาแฟ") || title.includes("นม") || title.includes("น้ำ")) {
+    return CATEGORY_MODIFIER_CONFIGS.beverage;
+  }
+  if (cat.includes("western") || cat.includes("burger") || title.includes("เบอร์เกอร์") || title.includes("ไก่") || title.includes("สเต็ก") || title.includes("ทอด")) {
+    return CATEGORY_MODIFIER_CONFIGS.western;
+  }
+  if (cat.includes("curry") || cat.includes("soup") || title.includes("ต้มยำ") || title.includes("แกง")) {
+    return CATEGORY_MODIFIER_CONFIGS.curry_soup;
+  }
+  return CATEGORY_MODIFIER_CONFIGS.single_dish;
+}
 
 // 🎬 VIDEO REELS MOCK DATA
 const VIDEO_REVIEWS = [
@@ -267,11 +482,14 @@ function ProductDetail() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
 
-  // 🍜 Modifiers State
-  const [spicyLevel, setSpicyLevel] = useState("normal");
-  const [noodleType, setNoodleType] = useState("thin");
-  const [soupType, setSoupType] = useState("namtok");
-  const [selectedToppings, setSelectedToppings] = useState(["crackling"]);
+  // 🍜 Category-Aware Dynamic Modifiers State
+  const productCategory = product?.category || "";
+  const productTitle = product?.name || product?.title || "";
+  const activeModifierGroups = useMemo(() => {
+    return getCategoryModifiers(productCategory, productTitle);
+  }, [productCategory, productTitle]);
+
+  const [selectedModifiersMap, setSelectedModifiersMap] = useState({});
   const [customerNote, setCustomerNote] = useState("");
 
   const [isIncompleteProfileModalOpen, setIsIncompleteProfileModalOpen] = useState(false);
@@ -343,17 +561,37 @@ function ProductDetail() {
     setIsFavorite(newStatus);
   };
 
+  // Helper to get selected value for a group with default fallback
+  const getValForGroup = (grp) => {
+    if (selectedModifiersMap[grp.id] !== undefined) {
+      return selectedModifiersMap[grp.id];
+    }
+    return grp.selectionType === "single" ? (grp.defaultSelected || grp.options[0]?.id) : (grp.defaultSelected || []);
+  };
+
   // 5. Dynamic Price Calculation Formula
-  const toppingTotalPrice = useMemo(() => {
-    return selectedToppings.reduce((sum, topId) => {
-      const optionObj = TOPPING_OPTIONS.find((opt) => opt.id === topId);
-      return sum + (optionObj?.price || 0);
-    }, 0);
-  }, [selectedToppings]);
+  const dynamicModifiersPrice = useMemo(() => {
+    let extra = 0;
+    activeModifierGroups.forEach((grp) => {
+      const val = selectedModifiersMap[grp.id] !== undefined
+        ? selectedModifiersMap[grp.id]
+        : (grp.selectionType === "single" ? (grp.defaultSelected || grp.options[0]?.id) : (grp.defaultSelected || []));
+      if (grp.selectionType === "single" && val) {
+        const opt = grp.options.find((o) => o.id === val);
+        if (opt && opt.price) extra += opt.price;
+      } else if (grp.selectionType === "multiple" && Array.isArray(val)) {
+        val.forEach((optId) => {
+          const opt = grp.options.find((o) => o.id === optId);
+          if (opt && opt.price) extra += opt.price;
+        });
+      }
+    });
+    return extra;
+  }, [activeModifierGroups, selectedModifiersMap]);
 
   const discountPercent = parseInt((selectedTimeSlot?.discount || "0").replace("-", "").replace("%", "")) / 100;
   const basePrice = Number(product?.price) || 30;
-  const discountedUnitPrice = Math.max(0, Math.round((basePrice + toppingTotalPrice) * (1 - discountPercent)));
+  const discountedUnitPrice = Math.max(0, Math.round((basePrice + dynamicModifiersPrice) * (1 - discountPercent)));
   const totalCalculatedPrice = discountedUnitPrice * quantity;
 
   // 15. Store Menu Recommendations
@@ -406,9 +644,14 @@ function ProductDetail() {
   // Helper to validate required modifiers dynamically
   const validateRequiredModifiers = () => {
     const missing = [];
-    if (!spicyLevel) missing.push("ระดับความเผ็ด (Spicy Level)");
-    if (!noodleType) missing.push("ประเภทเส้น (Noodle Type)");
-    if (!soupType) missing.push("ประเภทน้ำซุป (Soup Type)");
+    activeModifierGroups.forEach((grp) => {
+      if (grp.required) {
+        const val = getValForGroup(grp);
+        if (!val || (Array.isArray(val) && val.length === 0)) {
+          missing.push(grp.title);
+        }
+      }
+    });
     return missing;
   };
 
@@ -416,59 +659,41 @@ function ProductDetail() {
     const noteParts = [];
     const structuredModifiers = [];
 
-    const spicyObj = SPICY_OPTIONS.find((s) => s.id === spicyLevel);
-    if (spicyObj) {
-      noteParts.push(`เผ็ด: ${spicyObj.name}`);
-      structuredModifiers.push({
-        modifierGroupId: "spicy_level",
-        optionId: spicyObj.id,
-        name: spicyObj.name,
-        priceModifier: 0,
-        priceModifierSatang: 0,
-      });
-    }
-    
-    const noodleObj = NOODLE_OPTIONS.find((n) => n.id === noodleType);
-    if (noodleObj) {
-      noteParts.push(`เส้น: ${noodleObj.name}`);
-      structuredModifiers.push({
-        modifierGroupId: "noodle_type",
-        optionId: noodleObj.id,
-        name: noodleObj.name,
-        priceModifier: 0,
-        priceModifierSatang: 0,
-      });
-    }
-
-    const soupObj = SOUP_OPTIONS.find((sp) => sp.id === soupType);
-    if (soupObj) {
-      noteParts.push(`ซุป: ${soupObj.name}`);
-      structuredModifiers.push({
-        modifierGroupId: "soup_type",
-        optionId: soupObj.id,
-        name: soupObj.name,
-        priceModifier: 0,
-        priceModifierSatang: 0,
-      });
-    }
-
-    if (selectedToppings && selectedToppings.length > 0) {
-      const toppingNames = [];
-      for (const topId of selectedToppings) {
-        const topOpt = TOPPING_OPTIONS.find((opt) => opt.id === topId);
-        if (topOpt) {
-          toppingNames.push(topOpt.name);
+    activeModifierGroups.forEach((grp) => {
+      const val = getValForGroup(grp);
+      if (grp.selectionType === "single" && val) {
+        const opt = grp.options.find((o) => o.id === val);
+        if (opt) {
+          noteParts.push(`${grp.title}: ${opt.name}`);
           structuredModifiers.push({
-            modifierGroupId: "toppings",
-            optionId: topOpt.id,
-            name: topOpt.name,
-            priceModifier: topOpt.price || 0,
-            priceModifierSatang: (topOpt.price || 0) * 100,
+            modifierGroupId: grp.id,
+            optionId: opt.id,
+            name: opt.name,
+            priceModifier: opt.price || 0,
+            priceModifierSatang: (opt.price || 0) * 100,
           });
         }
+      } else if (grp.selectionType === "multiple" && Array.isArray(val) && val.length > 0) {
+        const chosenNames = [];
+        val.forEach((optId) => {
+          const opt = grp.options.find((o) => o.id === optId);
+          if (opt) {
+            chosenNames.push(opt.name);
+            structuredModifiers.push({
+              modifierGroupId: grp.id,
+              optionId: opt.id,
+              name: opt.name,
+              priceModifier: opt.price || 0,
+              priceModifierSatang: (opt.price || 0) * 100,
+            });
+          }
+        });
+        if (chosenNames.length > 0) {
+          noteParts.push(`${grp.title}: ${chosenNames.join(", ")}`);
+        }
       }
-      noteParts.push(`ท็อปปิ้ง: ${toppingNames.join(", ")}`);
-    }
+    });
+
     if (customerNote && customerNote.trim()) {
       noteParts.push(`โน้ต: ${customerNote.trim()}`);
     }
@@ -705,114 +930,81 @@ function ProductDetail() {
               </div>
             </div>
 
-            {/* 🍜 MODIFIERS SELECTION */}
+            {/* 🍜 DYNAMIC CATEGORY-AWARE MODIFIERS SELECTION */}
             <div className="queue-pd-modifiers-container">
-              {/* Modifier 1: Spicy Level */}
-              <div className="queue-pd-mod-group">
-                <div className="queue-pd-mod-title">
-                  <span><i className="bi bi-fire text-danger me-1" /> ระดับความเผ็ด <span className="text-danger">*</span></span>
-                  <span className="queue-pd-mod-subtitle">พริกคั่วเตาถ่าน</span>
-                </div>
-                <div className="queue-pd-options-grid cols-3">
-                  {SPICY_OPTIONS.map((opt) => (
-                    <label
-                      key={opt.id}
-                      className={`queue-pd-option-chip ${spicyLevel === opt.id ? "active" : ""}`}
-                    >
-                      <span>{opt.name}</span>
-                      <input
-                        type="radio"
-                        name="spicyLevel"
-                        value={opt.id}
-                        checked={spicyLevel === opt.id}
-                        onChange={(e) => setSpicyLevel(e.target.value)}
-                      />
-                    </label>
-                  ))}
-                </div>
-              </div>
+              {activeModifierGroups.map((grp) => {
+                const isSingle = grp.selectionType === "single";
+                const currentVal = getValForGroup(grp);
 
-              {/* Modifier 2: Noodle Type */}
-              <div className="queue-pd-mod-group">
-                <div className="queue-pd-mod-title">
-                  <span><i className="bi bi-egg-fried text-primary me-1" /> เลือกเส้น <span className="text-danger">*</span></span>
-                </div>
-                <div className="queue-pd-options-grid cols-5">
-                  {NOODLE_OPTIONS.map((opt) => (
-                    <label
-                      key={opt.id}
-                      className={`queue-pd-option-chip text-center ${noodleType === opt.id ? "active" : ""}`}
-                    >
-                      <span>{opt.name}</span>
-                      <input
-                        type="radio"
-                        name="noodleType"
-                        value={opt.id}
-                        checked={noodleType === opt.id}
-                        onChange={(e) => setNoodleType(e.target.value)}
-                      />
-                    </label>
-                  ))}
-                </div>
-              </div>
+                return (
+                  <div key={grp.id} className="queue-pd-mod-group">
+                    <div className="queue-pd-mod-title">
+                      <span>
+                        {grp.icon && <i className={`bi ${grp.icon} me-1`} />}
+                        {grp.title} {grp.required && <span className="text-danger">*</span>}
+                      </span>
+                      {grp.subtitle && <span className="queue-pd-mod-subtitle">{grp.subtitle}</span>}
+                    </div>
 
-              {/* Modifier 3: Soup Type */}
-              <div className="queue-pd-mod-group">
-                <div className="queue-pd-mod-title">
-                  <span><i className="bi bi-cup-hot text-primary me-1" /> เลือกน้ำซุป <span className="text-danger">*</span></span>
-                </div>
-                <div className="queue-pd-options-grid cols-3">
-                  {SOUP_OPTIONS.map((opt) => (
-                    <label
-                      key={opt.id}
-                      className={`queue-pd-option-chip ${soupType === opt.id ? "active" : ""}`}
-                    >
-                      <span>{opt.name}</span>
-                      <input
-                        type="radio"
-                        name="soupType"
-                        value={opt.id}
-                        checked={soupType === opt.id}
-                        onChange={(e) => setSoupType(e.target.value)}
-                      />
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Modifier 4: Toppings */}
-              <div className="queue-pd-mod-group">
-                <div className="queue-pd-mod-title">
-                  <span><i className="bi bi-plus-circle-fill text-success me-1" /> เพิ่ม Topping</span>
-                  <span className="queue-pd-mod-subtitle">เลือกได้หลายรายการ</span>
-                </div>
-                <div className="queue-pd-options-grid cols-2">
-                  {TOPPING_OPTIONS.map((opt) => (
-                    <label
-                      key={opt.id}
-                      className={`queue-pd-option-chip justify-content-between ${
-                        selectedToppings.includes(opt.id) ? "active" : ""
-                      }`}
-                    >
-                      <div className="d-flex align-items-center gap-1.5">
-                        <input
-                          type="checkbox"
-                          checked={selectedToppings.includes(opt.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedToppings([...selectedToppings, opt.id]);
-                            } else {
-                              setSelectedToppings(selectedToppings.filter((t) => t !== opt.id));
-                            }
-                          }}
-                        />
-                        <span>{opt.name}</span>
-                      </div>
-                      <span className="text-danger fw-bold">+฿{opt.price}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
+                    <div className={`queue-pd-options-grid cols-${Math.min(grp.options.length, 5)}`}>
+                      {grp.options.map((opt) => {
+                        if (isSingle) {
+                          const isSelected = currentVal === opt.id;
+                          return (
+                            <label
+                              key={opt.id}
+                              className={`queue-pd-option-chip ${isSelected ? "active" : ""}`}
+                            >
+                              <span>{opt.name}</span>
+                              {opt.price ? <span className="text-danger fw-bold ms-1">+฿{opt.price}</span> : null}
+                              <input
+                                type="radio"
+                                name={`grp_${grp.id}`}
+                                value={opt.id}
+                                checked={isSelected}
+                                onChange={() => {
+                                  setSelectedModifiersMap((prev) => ({
+                                    ...prev,
+                                    [grp.id]: opt.id,
+                                  }));
+                                }}
+                              />
+                            </label>
+                          );
+                        } else {
+                          const arr = Array.isArray(currentVal) ? currentVal : [];
+                          const isChecked = arr.includes(opt.id);
+                          return (
+                            <label
+                              key={opt.id}
+                              className={`queue-pd-option-chip justify-content-between ${isChecked ? "active" : ""}`}
+                            >
+                              <div className="d-flex align-items-center gap-1.5">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    const nextChecked = e.target.checked;
+                                    setSelectedModifiersMap((prev) => {
+                                      const existingArr = Array.isArray(prev[grp.id]) ? prev[grp.id] : [];
+                                      const nextArr = nextChecked
+                                        ? [...existingArr, opt.id]
+                                        : existingArr.filter((id) => id !== opt.id);
+                                      return { ...prev, [grp.id]: nextArr };
+                                    });
+                                  }}
+                                />
+                                <span>{opt.name}</span>
+                              </div>
+                              {opt.price ? <span className="text-danger fw-bold">+฿{opt.price}</span> : null}
+                            </label>
+                          );
+                        }
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
 
               {/* Note & Quantity Stepper */}
               <div className="row g-2 align-items-center">
