@@ -16,11 +16,10 @@ export const MerchantKDS: React.FC<Props> = ({
 }) => {
   const [selectedSlipUrl, setSelectedSlipUrl] = useState<string | null>(null);
 
-  const waitingOrders = orders.filter(
-    (o) => o.queueStatus === 'waiting' || o.queueStatus === 'pending_slip'
-  );
+  const waitingOrders = orders.filter((o) => o.queueStatus === 'waiting');
   const cookingOrders = orders.filter((o) => o.queueStatus === 'cooking');
   const readyOrders = orders.filter((o) => o.queueStatus === 'ready');
+
 
   return (
     <div className="space-y-6">

@@ -48,10 +48,11 @@ function evaluateRules({ collection, action, auth, resource, requestResource }) 
 
   function isValidOrderStateTransition(oldStatus, oldQueue, newStatus, newQueue) {
     return (oldStatus === newStatus && oldQueue === newQueue) ||
-           (oldStatus === 'TO_SHIP' && oldQueue === 'waiting' && newStatus === 'PREPARING' && newQueue === 'cooking') ||
+           (oldStatus === 'PENDING' && oldQueue === 'waiting' && newStatus === 'CONFIRMED' && newQueue === 'waiting') ||
+           (oldStatus === 'CONFIRMED' && oldQueue === 'waiting' && newStatus === 'PREPARING' && newQueue === 'cooking') ||
            (oldStatus === 'PREPARING' && oldQueue === 'cooking' && newStatus === 'READY' && newQueue === 'ready') ||
            (oldStatus === 'READY' && oldQueue === 'ready' && newStatus === 'COMPLETED' && newQueue === 'completed') ||
-           ((oldStatus === 'TO_SHIP' || oldStatus === 'PREPARING') && newStatus === 'CANCELLED' && newQueue === 'cancelled');
+           ((oldStatus === 'PENDING' || oldStatus === 'CONFIRMED') && newStatus === 'CANCELLED' && newQueue === 'cancelled');
   }
 
   // --- Collection: /orders ---
@@ -86,7 +87,7 @@ function evaluateRules({ collection, action, auth, resource, requestResource }) 
 
       // Customer Cancellation
       const isCustomer = resource?.data?.userId === auth.uid;
-      const isPreKitchen = resource?.data?.status === 'TO_SHIP' && (resource?.data?.queueStatus === 'waiting' || !resource?.data?.queueStatus);
+      const isPreKitchen = (resource?.data?.status === 'PENDING' || resource?.data?.status === 'CONFIRMED') && (resource?.data?.queueStatus === 'waiting' || !resource?.data?.queueStatus);
       const allowedCustomerKeys = ['cancelReason', 'status', 'queueStatus', 'updatedAt'];
       const hasOnlyCustomerKeys = mutatedKeys.every(k => allowedCustomerKeys.includes(k));
       const isCancelling = requestResource.data.status === 'CANCELLED' && (!requestResource.data.queueStatus || requestResource.data.queueStatus === 'cancelled');
@@ -97,6 +98,7 @@ function evaluateRules({ collection, action, auth, resource, requestResource }) 
 
       return false;
     }
+
     if (action === 'delete') {
       return isAdmin();
     }
@@ -283,19 +285,19 @@ async function main() {
       collection: 'orders',
       action: 'update',
       auth: { uid: 'user_customer_01', token: { email: 'customer@test.com' } },
-      resource: { data: { userId: 'user_customer_01', status: 'TO_SHIP', queueStatus: 'waiting', paymentStatus: 'pending' } },
-      requestResource: { data: { userId: 'user_customer_01', status: 'TO_SHIP', queueStatus: 'waiting', paymentStatus: 'paid' } }
+      resource: { data: { userId: 'user_customer_01', status: 'PENDING', queueStatus: 'waiting', paymentStatus: 'pending' } },
+      requestResource: { data: { userId: 'user_customer_01', status: 'PENDING', queueStatus: 'waiting', paymentStatus: 'paid' } }
     });
     assert.equal(isAllowed, false);
   });
 
-  // Test 6: Customer cancelling legitimate order in TO_SHIP and waiting state is ALLOWED
-  await runTest('Test 6: Customer cancelling order in TO_SHIP & waiting state is ALLOWED', async () => {
+  // Test 6: Customer cancelling legitimate order in PENDING and waiting state is ALLOWED
+  await runTest('Test 6: Customer cancelling order in PENDING & waiting state is ALLOWED', async () => {
     const isAllowed = evaluateRules({
       collection: 'orders',
       action: 'update',
       auth: { uid: 'user_customer_01', token: { email: 'customer@test.com' } },
-      resource: { data: { userId: 'user_customer_01', status: 'TO_SHIP', queueStatus: 'waiting' } },
+      resource: { data: { userId: 'user_customer_01', status: 'PENDING', queueStatus: 'waiting' } },
       requestResource: { data: { userId: 'user_customer_01', status: 'CANCELLED', queueStatus: 'cancelled', cancelReason: 'Changed mind' } }
     });
     assert.equal(isAllowed, true);
@@ -319,19 +321,19 @@ async function main() {
       collection: 'orders',
       action: 'update',
       auth: { uid: 'merchant_A_uid', storeId: 'store_A', token: { email: 'storeA@test.com' } },
-      resource: { data: { storeId: 'store_B', status: 'TO_SHIP', queueStatus: 'waiting' } },
+      resource: { data: { storeId: 'store_B', status: 'CONFIRMED', queueStatus: 'waiting' } },
       requestResource: { data: { storeId: 'store_B', status: 'PREPARING', queueStatus: 'cooking' } }
     });
     assert.equal(isAllowed, false);
   });
 
   // Test 9: Merchant updating store order with synchronized transition is ALLOWED
-  await runTest('Test 9: Store Owner advancing TO_SHIP/waiting to PREPARING/cooking is ALLOWED', async () => {
+  await runTest('Test 9: Store Owner advancing CONFIRMED/waiting to PREPARING/cooking is ALLOWED', async () => {
     const isAllowed = evaluateRules({
       collection: 'orders',
       action: 'update',
       auth: { uid: 'merchant_A_uid', storeId: 'store_A', token: { email: 'storeA@test.com' } },
-      resource: { data: { storeId: 'store_A', status: 'TO_SHIP', queueStatus: 'waiting' } },
+      resource: { data: { storeId: 'store_A', status: 'CONFIRMED', queueStatus: 'waiting' } },
       requestResource: { data: { storeId: 'store_A', status: 'PREPARING', queueStatus: 'cooking' } }
     });
     assert.equal(isAllowed, true);
@@ -343,11 +345,12 @@ async function main() {
       collection: 'orders',
       action: 'update',
       auth: { uid: 'merchant_A_uid', storeId: 'store_A', token: { email: 'storeA@test.com' } },
-      resource: { data: { storeId: 'store_A', status: 'TO_SHIP', queueStatus: 'waiting' } },
+      resource: { data: { storeId: 'store_A', status: 'CONFIRMED', queueStatus: 'waiting' } },
       requestResource: { data: { storeId: 'store_A', status: 'PREPARING', queueStatus: 'waiting' } }
     });
     assert.equal(isAllowed, false);
   });
+
 
   // Test 11: Customer trying to elevate role to admin in /users/{uid} is DENIED
   await runTest('Test 11: Customer elevating role to admin in /users is DENIED', async () => {

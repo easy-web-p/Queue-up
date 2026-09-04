@@ -73,7 +73,13 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
   })();
 
   const [pickupTime, setPickupTime] = useState(locationState?.pickupTime || '12:15');
-  const [pickupDate, setPickupDate] = useState(locationState?.bookingDate || getTodayYmdStr());
+  const [pickupDate, setPickupDate] = useState<string>(() => {
+    const raw = locationState?.bookingDate;
+    if (raw && /^\d{4}-\d{2}-\d{2}$/.test(raw.trim())) {
+      return raw.trim();
+    }
+    return getTodayYmdStr();
+  });
   const [customInstructions, setCustomInstructions] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
@@ -128,8 +134,9 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
           productId: c.menuItem.id,
           quantity: c.quantity,
           customNotes: c.customNotes || customInstructions || '',
-          selectedModifiers: c.selectedModifiers || []
+          selectedModifiers: Array.isArray(c.selectedModifiers) ? c.selectedModifiers : []
         }))
+
       });
 
       const orderData = result.order as Order;

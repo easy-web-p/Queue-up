@@ -33,7 +33,7 @@ export const MerchantMenuManager: React.FC<Props> = ({
 
   // New Item Form State
   const [newName, setNewName] = useState('');
-  const [newCategory, setNewCategory] = useState<MenuCategory>('single_dish');
+  const [newCategory, setNewCategory] = useState<string>('single_dish');
   const [newPrice, setNewPrice] = useState<number>(40);
   const [newStock, setNewStock] = useState<number>(20);
   const [newPrepTime, setNewPrepTime] = useState<number>(5);
@@ -283,9 +283,10 @@ export const MerchantMenuManager: React.FC<Props> = ({
                   <label className="block font-bold text-slate-700 mb-1">หมวดหมู่</label>
                   <select
                     value={newCategory}
-                    onChange={(e) => setNewCategory(e.target.value as MenuCategory)}
+                    onChange={(e) => setNewCategory(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-medium"
                   >
+
                     <option value="single_dish">อาหารจานเดียว</option>
                     <option value="noodles">ก๋วยเตี๋ยว</option>
                     <option value="drinks">เครื่องดื่ม</option>

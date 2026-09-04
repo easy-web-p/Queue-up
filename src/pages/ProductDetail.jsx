@@ -36,28 +36,6 @@ function generateUpcomingCalendarDays() {
     const fullDateStr = `${dateNum} ${month}`;
     const isoDateStr = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, "0")}-${String(dateNum).padStart(2, "0")}`;
 
-    let status;
-    let statusLabel;
-    let capacityPercent;
-
-    if (i === 0) {
-      status = "AVAILABLE";
-      statusLabel = "เปิดจอง";
-      capacityPercent = 60;
-    } else if (i === 1) {
-      status = "LIMITED";
-      statusLabel = "เหลือน้อย";
-      capacityPercent = 25;
-    } else if (i === 3) {
-      status = "FULL";
-      statusLabel = "คิวเต็ม";
-      capacityPercent = 0;
-    } else {
-      status = "AVAILABLE";
-      statusLabel = "ว่าง";
-      capacityPercent = 90;
-    }
-
     days.push({
       id: isoDateStr,
       dayOfWeek,
@@ -67,9 +45,9 @@ function generateUpcomingCalendarDays() {
       isoDateStr,
       isToday: i === 0,
       isTomorrow: i === 1,
-      status,
-      statusLabel,
-      capacityPercent,
+      status: "AVAILABLE",
+      statusLabel: "เปิดจอง",
+      capacityPercent: 100,
     });
   }
   return days;
@@ -87,7 +65,7 @@ const BASE_TIME_SLOTS = [
   { time: "14:30", discount: "-10%", capacity: 20, remaining: 20, status: "AVAILABLE" },
 ];
 
-// 🍜 CATEGORY-AWARE DYNAMIC MODIFIER CONFIGURATIONS
+// 🍜 CATEGORY-AWARE DYNAMIC MODIFIER CONFIGURATIONS (Zero fake bypass defaults for required groups)
 const CATEGORY_MODIFIER_CONFIGS = {
   noodle: [
     {
@@ -102,7 +80,6 @@ const CATEGORY_MODIFIER_CONFIGS = {
         { id: "normal", name: "เผ็ดปกติ", desc: "พริกคั่วเตาถ่าน 1 ช้อน", price: 0 },
         { id: "hot", name: "เผ็ดมาก 3x", desc: "พริกคั่วเข้มข้นพิเศษ", price: 0 },
       ],
-      defaultSelected: "normal",
     },
     {
       id: "noodle_type",
@@ -117,7 +94,6 @@ const CATEGORY_MODIFIER_CONFIGS = {
         { id: "glass_noodle", name: "วุ้นเส้น", price: 0 },
         { id: "no_noodle", name: "เกาเหลา", price: 0 },
       ],
-      defaultSelected: "thin",
     },
     {
       id: "soup_type",
@@ -130,7 +106,6 @@ const CATEGORY_MODIFIER_CONFIGS = {
         { id: "clear", name: "น้ำใสพะโล้", price: 0 },
         { id: "tomyum", name: "ต้มยำน้ำตก", price: 0 },
       ],
-      defaultSelected: "namtok",
     },
     {
       id: "toppings",
@@ -145,7 +120,7 @@ const CATEGORY_MODIFIER_CONFIGS = {
         { id: "meatball", name: "ลูกชิ้นหมู (3 ลูก)", price: 15 },
         { id: "veggie", name: "ผักบุ้งพิเศษ", price: 5 },
       ],
-      defaultSelected: ["crackling"],
+      defaultSelected: [],
     },
   ],
   beverage: [
@@ -161,7 +136,6 @@ const CATEGORY_MODIFIER_CONFIGS = {
         { id: "sweet_50", name: "หวานปกติ (50%)", price: 0 },
         { id: "sweet_100", name: "หวาน 100%", price: 0 },
       ],
-      defaultSelected: "sweet_50",
     },
     {
       id: "ice_level",
@@ -174,7 +148,6 @@ const CATEGORY_MODIFIER_CONFIGS = {
         { id: "ice_less", name: "น้ำแข็งน้อย", price: 0 },
         { id: "ice_none", name: "ไม่ใส่น้ำแข็ง", price: 0 },
       ],
-      defaultSelected: "ice_normal",
     },
     {
       id: "bev_toppings",
@@ -189,7 +162,7 @@ const CATEGORY_MODIFIER_CONFIGS = {
         { id: "aloe", name: "ว่านหางจระเข้", price: 10 },
         { id: "jelly", name: "เจลลี่บุกคอลลาเจน", price: 15 },
       ],
-      defaultSelected: ["boba"],
+      defaultSelected: [],
     },
   ],
   single_dish: [
@@ -205,7 +178,6 @@ const CATEGORY_MODIFIER_CONFIGS = {
         { id: "normal", name: "เผ็ดปกติ", price: 0 },
         { id: "hot", name: "เผ็ดจัดจ้าน", price: 0 },
       ],
-      defaultSelected: "normal",
     },
     {
       id: "egg_option",
@@ -219,7 +191,7 @@ const CATEGORY_MODIFIER_CONFIGS = {
         { id: "omelet", name: "ไข่เจียวฟู", price: 12 },
         { id: "boiled_egg", name: "ไข่ต้มยางมะตูม", price: 10 },
       ],
-      defaultSelected: "fried_egg",
+      defaultSelected: "no_egg",
     },
     {
       id: "dish_toppings",
@@ -250,7 +222,6 @@ const CATEGORY_MODIFIER_CONFIGS = {
         { id: "cheese_lava", name: "ซอสชีสลาวา", price: 10 },
         { id: "original", name: "ซอสบาร์บีคิวดั้งเดิม", price: 0 },
       ],
-      defaultSelected: "korean_spicy",
     },
     {
       id: "side_dish",
@@ -281,7 +252,6 @@ const CATEGORY_MODIFIER_CONFIGS = {
         { id: "normal", name: "เผ็ดปกติ", price: 0 },
         { id: "extra", name: "เผ็ดจัดจ้าน 3x", price: 0 },
       ],
-      defaultSelected: "normal",
     },
     {
       id: "rice_option",
@@ -315,20 +285,21 @@ const CATEGORY_MODIFIER_CONFIGS = {
 function getCategoryModifiers(category, productTitle = "") {
   const cat = (category || "").toLowerCase();
   const title = (productTitle || "").toLowerCase();
-  if (cat.includes("noodle") || title.includes("ก๋วยเตี๋ยว") || title.includes("บะหมี่") || title.includes("วุ้นเส้น")) {
+  if (cat.includes("noodle") || title.includes("ก๋วยเตี๋ยว") || title.includes("บะหมี่") || title.includes("วุ้นเส้น") || title.includes("น้ำตก")) {
     return CATEGORY_MODIFIER_CONFIGS.noodle;
   }
-  if (cat.includes("beverage") || cat.includes("drink") || title.includes("ชา") || title.includes("กาแฟ") || title.includes("นม") || title.includes("น้ำ")) {
-    return CATEGORY_MODIFIER_CONFIGS.beverage;
+  if (cat.includes("curry") || cat.includes("soup") || title.includes("ต้มยำ") || title.includes("แกง") || title.includes("น้ำข้น") || title.includes("ซุป")) {
+    return CATEGORY_MODIFIER_CONFIGS.curry_soup;
   }
   if (cat.includes("western") || cat.includes("burger") || title.includes("เบอร์เกอร์") || title.includes("ไก่") || title.includes("สเต็ก") || title.includes("ทอด")) {
     return CATEGORY_MODIFIER_CONFIGS.western;
   }
-  if (cat.includes("curry") || cat.includes("soup") || title.includes("ต้มยำ") || title.includes("แกง")) {
-    return CATEGORY_MODIFIER_CONFIGS.curry_soup;
+  if (cat.includes("beverage") || cat.includes("drink") || title.includes("ชา") || title.includes("กาแฟ") || title.includes("นม") || title.includes("น้ำสมุนไพร") || title.includes("น้ำผลไม้") || title.includes("โอเลี้ยง") || title.includes("ชานม")) {
+    return CATEGORY_MODIFIER_CONFIGS.beverage;
   }
   return CATEGORY_MODIFIER_CONFIGS.single_dish;
 }
+
 
 // 🎬 VIDEO REELS MOCK DATA
 const VIDEO_REVIEWS = [
@@ -566,7 +537,7 @@ function ProductDetail() {
     if (selectedModifiersMap[grp.id] !== undefined) {
       return selectedModifiersMap[grp.id];
     }
-    return grp.selectionType === "single" ? (grp.defaultSelected || grp.options[0]?.id) : (grp.defaultSelected || []);
+    return grp.selectionType === "single" ? grp.defaultSelected : (grp.defaultSelected || []);
   };
 
   // 5. Dynamic Price Calculation Formula
@@ -575,7 +546,7 @@ function ProductDetail() {
     activeModifierGroups.forEach((grp) => {
       const val = selectedModifiersMap[grp.id] !== undefined
         ? selectedModifiersMap[grp.id]
-        : (grp.selectionType === "single" ? (grp.defaultSelected || grp.options[0]?.id) : (grp.defaultSelected || []));
+        : (grp.selectionType === "single" ? grp.defaultSelected : (grp.defaultSelected || []));
       if (grp.selectionType === "single" && val) {
         const opt = grp.options.find((o) => o.id === val);
         if (opt && opt.price) extra += opt.price;
@@ -766,18 +737,20 @@ function ProductDetail() {
 
     const cartItem = createCurrentCartItem();
 
-    // 6. Seamless Navigation to Authoritative Booking Flow
+    // 6. Seamless Navigation to Authoritative Booking Flow (Strict ISO date format YYYY-MM-DD)
     navigate("/booking", {
       state: {
         cartItems: [cartItem],
         pickupTime: selectedTimeSlot?.time || "12:00",
-        bookingDate: selectedDay.fullDateStr,
+        bookingDate: selectedDay.isoDateStr,
+        bookingDateLabel: selectedDay.fullDateStr,
         storeId: product.storeId || "store_canteen01",
         storeName: store?.name || product.shopName || "ร้านป้าแดง ตามสั่ง & ไก่ทอด",
         storeLocation: store?.location || product.shopLocation || "โรงอาหาร 2 (โรงอาหารกลาง 1) ชั้น 1",
       },
     });
   };
+
 
   return (
     <div className="queue-pd-container">
@@ -1463,69 +1436,144 @@ function ProductDetail() {
         )}
       </div>
 
-      {/* 7. CALENDAR FULL MONTH MODAL */}
-      {isCalendarModalOpen && (
-        <div
-          className="modal fade show d-block"
-          style={{ backgroundColor: "rgba(15, 23, 42, 0.75)", backdropFilter: "blur(6px)", zIndex: 100000 }}
-          tabIndex="-1"
-        >
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content rounded-4 border-0 shadow-lg p-2">
-              <div className="modal-header border-0 pb-0">
-                <h5 className="modal-title fw-bold text-dark">
-                  <i className="bi bi-calendar3 text-primary me-1.5" /> ปฏิทินรอบเวลารับประทานอาหาร
-                </h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setIsCalendarModalOpen(false)}
-                />
-              </div>
-              <div className="modal-body py-3">
-                <p className="small text-muted mb-3">
-                  คุณสามารถเลือกรอบวันที่ต้องการสั่งอาหารล่วงหน้าเพื่อจองคิวก่อนพักเที่ยงได้:
-                </p>
-                <div className="list-group">
-                  {calendarDays.map((d) => (
-                    <button
-                      key={d.id}
-                      type="button"
-                      disabled={d.status === "CLOSED"}
-                      className={`list-group-item list-group-item-action d-flex justify-content-between align-items-center rounded-3 mb-2 border ${
-                        selectedDay.id === d.id ? "border-primary bg-primary-subtle" : ""
-                      }`}
-                      onClick={() => {
-                        setSelectedDay(d);
-                        setIsCalendarModalOpen(false);
-                      }}
-                    >
-                      <div>
-                        <div className="fw-bold">{d.dayOfWeek} ที่ {d.fullDateStr}</div>
-                        <div className="text-xs text-muted">รอบเวลาเปิดรับ: 11:00 - 14:30 น.</div>
-                      </div>
-                      <span className={`badge ${
-                        d.status === "AVAILABLE" ? "bg-success" : d.status === "LIMITED" ? "bg-warning text-dark" : "bg-danger"
-                      }`}>
-                        {d.statusLabel}
-                      </span>
-                    </button>
-                  ))}
+      {/* 7. CALENDAR FULL MONTH MODAL (Full 28-31 Day Monthly Grid) */}
+      {isCalendarModalOpen && (() => {
+        const today = new Date();
+        const curYear = today.getFullYear();
+        const curMonth = today.getMonth();
+        const firstDayOfWeek = new Date(curYear, curMonth, 1).getDay();
+        const daysInMonth = new Date(curYear, curMonth + 1, 0).getDate();
+        const todayDateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+        const cells = [];
+        for (let i = 0; i < firstDayOfWeek; i++) {
+          cells.push({ type: "empty", key: `empty-${i}` });
+        }
+        for (let d = 1; d <= daysInMonth; d++) {
+          const targetDate = new Date(curYear, curMonth, d);
+          const dayOfWeek = DAYS_OF_WEEK_TH[targetDate.getDay()];
+          const monthName = MONTHS_TH[curMonth];
+          const fullDateStr = `${d} ${monthName}`;
+          const isoDateStr = `${curYear}-${String(curMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+          const isPast = targetDate < todayDateOnly;
+          const isToday = targetDate.getTime() === todayDateOnly.getTime();
+          const isSelected = selectedDay?.isoDateStr === isoDateStr;
+
+          cells.push({
+            type: "day",
+            key: isoDateStr,
+            dateNum: d,
+            dayOfWeek,
+            fullDateStr,
+            isoDateStr,
+            isPast,
+            isToday,
+            isSelected,
+            isBookable: !isPast,
+          });
+        }
+
+        return (
+          <div
+            className="modal fade show d-block"
+            style={{ backgroundColor: "rgba(15, 23, 42, 0.75)", backdropFilter: "blur(6px)", zIndex: 100000 }}
+            tabIndex="-1"
+          >
+            <div className="modal-dialog modal-dialog-centered modal-md">
+              <div className="modal-content rounded-4 border-0 shadow-lg p-3">
+                <div className="modal-header border-0 pb-1">
+                  <div>
+                    <h5 className="modal-title fw-bold text-dark mb-0">
+                      <i className="bi bi-calendar-event text-primary me-2" />
+                      ปฏิทินเลือกรอบวันที่สั่งอาหาร
+                    </h5>
+                    <p className="text-xs text-muted mb-0 mt-1">
+                      {MONTHS_TH[curMonth]} {curYear + 543} (สั่งล่วงหน้าได้ตลอดทั้งเดือน)
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    onClick={() => setIsCalendarModalOpen(false)}
+                  />
                 </div>
-              </div>
-              <div className="modal-footer border-0 pt-0">
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm px-4 rounded-pill"
-                  onClick={() => setIsCalendarModalOpen(false)}
-                >
-                  ปิดหน้าต่าง
-                </button>
+                <div className="modal-body py-2">
+                  {/* Weekday Header */}
+                  <div className="d-grid" style={{ gridTemplateColumns: "repeat(7, 1fr)", gap: "4px", textAlign: "center", marginBottom: "8px" }}>
+                    {DAYS_OF_WEEK_TH.map((dw, idx) => (
+                      <div key={idx} className="small fw-bold text-muted py-1" style={{ fontSize: "0.75rem" }}>
+                        {dw}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Day Grid */}
+                  <div className="d-grid" style={{ gridTemplateColumns: "repeat(7, 1fr)", gap: "6px" }}>
+                    {cells.map((cell) => {
+                      if (cell.type === "empty") {
+                        return <div key={cell.key} style={{ minHeight: "44px" }} />;
+                      }
+                      return (
+                        <button
+                          key={cell.key}
+                          type="button"
+                          disabled={!cell.isBookable}
+                          onClick={() => {
+                            setSelectedDay({
+                              id: cell.isoDateStr,
+                              dayOfWeek: cell.dayOfWeek,
+                              dateNum: cell.dateNum,
+                              month: MONTHS_TH[curMonth],
+                              fullDateStr: cell.fullDateStr,
+                              isoDateStr: cell.isoDateStr,
+                              isToday: cell.isToday,
+                              isTomorrow: false,
+                              status: "AVAILABLE",
+                              statusLabel: "เปิดจอง",
+                              capacityPercent: 100,
+                            });
+                            setIsCalendarModalOpen(false);
+                          }}
+                          className={`btn p-1 d-flex flex-column align-items-center justify-content-center rounded-3 position-relative ${
+                            cell.isSelected
+                              ? "btn-primary shadow-sm text-white fw-bold"
+                              : cell.isToday
+                              ? "btn-outline-primary fw-bold"
+                              : cell.isBookable
+                              ? "btn-light border hover-bg-primary-subtle text-dark"
+                              : "btn-light border-0 text-muted opacity-25"
+                          }`}
+                          style={{ minHeight: "44px", fontSize: "0.85rem" }}
+                        >
+                          <span>{cell.dateNum}</span>
+                          {cell.isToday && (
+                            <span style={{ fontSize: "0.6rem", lineHeight: 1 }} className={cell.isSelected ? "text-white" : "text-primary"}>
+                              วันนี้
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="modal-footer border-0 pt-2 pb-0 d-flex justify-content-between">
+                  <div className="small text-muted" style={{ fontSize: "0.75rem" }}>
+                    <span className="badge bg-primary me-1"> </span> วันที่เลือก: {selectedDay.dayOfWeek} {selectedDay.fullDateStr}
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm px-4 rounded-pill"
+                    onClick={() => setIsCalendarModalOpen(false)}
+                  >
+                    ปิด
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
+
 
       {/* 8. WALKING GUIDE MAP MODAL */}
       {isMapModalOpen && (

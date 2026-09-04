@@ -38,12 +38,14 @@ export interface MenuItem {
   imageUrl?: string;
   isAvailable?: boolean;
   stock?: number;
+  maxStock?: number;
   stockMode?: 'unlimited' | 'daily_tracked';
   dailyLimit?: number;
   prepTimeMinutes?: number;
   preparationTime?: number;
   isSpicy?: boolean;
   isBestseller?: boolean;
+  popular?: boolean;
   storeId?: string;
   shopName?: string;
   modifierGroupIds?: string[]; // 🔒 Normalized Modifier References
@@ -70,12 +72,20 @@ export interface CapacitySlot {
   isLocked?: boolean;
 }
 
+export interface SelectedModifierOption {
+  modifierGroupId: string;
+  optionId: string;
+  name?: string;
+  priceModifier?: number;
+  priceModifierSatang?: number;
+}
+
 export interface CartItem {
   menuItem: MenuItem;
   quantity: number;
   customInstructions?: string;
   customNotes?: string;
-  selectedModifiers?: Record<string, string | string[]>;
+  selectedModifiers?: SelectedModifierOption[] | Record<string, string | string[]>;
 }
 
 export interface Order {
@@ -99,6 +109,7 @@ export interface Order {
   pickupTime: string;
   pickupDate?: string;
   slotId?: string;
+  slipUrl?: string;
   createdAt: any;
   updatedAt?: any;
   estimatedReadyTime?: string;
@@ -111,19 +122,27 @@ export interface CustomerProfile {
   id: string;
   name: string;
   phone?: string;
+  phoneNumber?: string;
+  displayName?: string;
+  fullName?: string;
   email?: string;
+  address?: string;
   points: number;
   tier?: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
   totalOrders?: number;
+  ordersCount?: number;
   totalSpent?: number;
   favoriteItems?: string[];
+  favoriteDish?: string;
   lastOrderDate?: string;
 }
 
 export interface MerchantShop {
   id: string;
   name: string;
+  shopName?: string;
   location: string;
+  building?: string;
   hours: string;
   rating: number;
   reviewsCount: number;
@@ -131,7 +150,22 @@ export interface MerchantShop {
   status: 'open' | 'closed';
   contactPhone?: string;
   ownerUid?: string;
+  ownerName?: string;
+  promptpayNumber?: string;
+  logoUrl?: string;
+  bannerUrl?: string;
   slotCapacity?: number;
   maxOrdersPerSlot?: number;
   pickupSlots?: string[];
 }
+
+export interface ChatMessage {
+  id: string;
+  sender: 'user' | 'store' | 'system' | 'client' | 'merchant';
+  senderName?: string;
+  text: string;
+  timestamp: any;
+  isRead?: boolean;
+}
+
+
