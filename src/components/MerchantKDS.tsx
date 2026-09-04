@@ -6,14 +6,14 @@ import { soundManager } from '../utils/audioNotification.js';
 interface Props {
   orders: Order[];
   onUpdateOrderStatus: (orderId: string, newStatus: QueueStatus) => void;
-  onVerifyPayment: (orderId: string) => void;
+  onVerifyPayment?: (orderId: string) => void;
 }
 
 export const MerchantKDS: React.FC<Props> = ({
   orders,
   onUpdateOrderStatus,
-  onVerifyPayment,
 }) => {
+
   const [selectedSlipUrl, setSelectedSlipUrl] = useState<string | null>(null);
 
   const waitingOrders = orders.filter((o) => o.queueStatus === 'waiting');
@@ -93,37 +93,21 @@ export const MerchantKDS: React.FC<Props> = ({
                     ))}
                   </div>
 
-                  {/* Slip Verification Status */}
-                  <div className="p-2 bg-slate-50 rounded-xl border border-slate-200 text-xs flex items-center justify-between">
-                    <span className="text-slate-600 font-medium">สลิปโอนเงิน:</span>
-                    {order.slipUrl ? (
-                      <button
-                        onClick={() => setSelectedSlipUrl(order.slipUrl || null)}
-                        className="text-blue-600 hover:underline font-bold flex items-center gap-1"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>เปิดสลิปตรวจ</span>
-                      </button>
-                    ) : (
-                      <span className="text-amber-600 font-bold">ยังไม่แนบสลิป</span>
-                    )}
-                  </div>
-
                   <div className="pt-2 flex items-center gap-2">
                     <button
                       onClick={() => {
-                        onVerifyPayment(order.id);
                         onUpdateOrderStatus(order.id, 'cooking');
                         soundManager.playNewOrderAlert();
                       }}
                       className="w-full py-2 bg-[#8B0000] hover:bg-[#700000] text-white font-bold text-xs rounded-xl shadow-md shadow-red-950/20 transition-all cursor-pointer"
                     >
-                      อนุมัติสลิป & เริ่มปรุงอาหาร 🔥
+                      รับออเดอร์ & เริ่มปรุงอาหาร 🔥
                     </button>
                   </div>
                 </div>
               ))
             )}
+
           </div>
         </div>
 

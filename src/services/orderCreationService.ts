@@ -14,6 +14,8 @@ import {
   serverTimestamp,
   type Firestore
 } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../firebase/config.js';
 import { evaluateStoreAvailability, type StoreOperationalState } from './storeOperationsService';
 import type { MenuItem, ModifierGroup, Order, OrderStatus, QueueStatus } from '../types';
 
@@ -88,7 +90,7 @@ export function getBangkokYmd(date: Date = new Date()): { ymd: string; ymdClean:
 
 /**
  * 🔒 Atomic Store Order Creation Transaction (Direct to Q001)
- * Enforces strict Read-All -> Validate & Calculate -> Write-All Firestore transaction rules
+ * Enforces strict Server-Authoritative Cloud Function execution with fallback to 3-Phase Transaction
  */
 export async function createAuthoritativeStoreOrder(
   db: Firestore,
@@ -143,7 +145,28 @@ export async function createAuthoritativeStoreOrder(
   const targetPickupDateObj = new Date(Date.UTC(pYear, pMonth - 1, pDay, 12, 0, 0));
   const targetBangkok = getBangkokYmd(targetPickupDateObj);
 
-  // 4. Normalize Items by unique item variant
+  // 4. Try HTTPS Callable Cloud Function (Server-Authoritative) in Browser
+  if (typeof window !== 'undefined' && functions) {
+    try {
+      const createOrderCallable = httpsCallable<CreateOrderRequest, OrderCreationResult>(
+        functions,
+        'createOrderAuthoritative'
+      );
+      const response = await createOrderCallable(request);
+      if (response && response.data && response.data.success) {
+        return response.data;
+      }
+    } catch (callableErr: any) {
+      if (callableErr?.code && callableErr?.message) {
+        if (callableErr.code !== 'functions/unavailable' && callableErr.code !== 'functions/not-found') {
+          throw new Error(callableErr.message);
+        }
+      }
+      console.warn('Falling back to direct Firestore transaction execution:', callableErr);
+    }
+  }
+
+  // 5. Normalize Items by unique item variant
   const productTotalQuantityMap = new Map<string, number>();
   let totalOrderItemsCount = 0;
 
@@ -158,6 +181,7 @@ export async function createAuthoritativeStoreOrder(
   }
 
   return await runTransaction(db, async (tx) => {
+
     // =========================================================================
     // 📖 PHASE 1: READ ALL REQUIRED DOCUMENTS FIRST (Strict Read-Before-Write)
     // =========================================================================
