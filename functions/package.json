@@ -1,5 +1,5 @@
 {
-  "name": "queueup-payments",
+  "name": "queueup-backend",
   "private": true,
   "type": "module",
   "engines": { "node": "20" },

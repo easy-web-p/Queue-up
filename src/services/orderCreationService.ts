@@ -66,6 +66,22 @@ export interface OrderCreationResult {
   order: Partial<Order>;
 }
 
+export function isValidCalendarDate(year: number, month: number, day: number): boolean {
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return false;
+  if (month < 1 || month > 12 || day < 1 || day > 31) return false;
+  const d = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  return d.getUTCFullYear() === year && (d.getUTCMonth() + 1) === month && d.getUTCDate() === day;
+}
+
+export function getBangkokCurrentTime(date: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Bangkok',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(date);
+}
+
 /**
  * 🕒 Helper: Get authoritative Bangkok YYYY-MM-DD date string
  */
@@ -142,8 +158,19 @@ export async function createAuthoritativeStoreOrder(
 
   // Parse Target Date to find correct DayOfWeek for the pickup day
   const [pYear, pMonth, pDay] = targetYmd.split('-').map(Number);
+  if (!isValidCalendarDate(pYear, pMonth, pDay)) {
+    throw new Error('INVALID_CALENDAR_DATE: วันที่ระบุไม่มีอยู่จริงในปฏิทิน');
+  }
   const targetPickupDateObj = new Date(Date.UTC(pYear, pMonth - 1, pDay, 12, 0, 0));
   const targetBangkok = getBangkokYmd(targetPickupDateObj);
+
+  // Strict same-day past pickup time validation
+  if (targetYmdClean === currentBangkok.ymdClean) {
+    const currentBangkokTime = getBangkokCurrentTime(now);
+    if (cleanPickupTime <= currentBangkokTime) {
+      throw new Error(`PAST_PICKUP_TIME_NOT_ALLOWED: เวลารับอาหาร (${cleanPickupTime} น.) ผ่านไปแล้วสำหรับวันนี้ (เวลาปัจจุบัน ${currentBangkokTime} น.)`);
+    }
+  }
 
   // 4. In Browser Runtime: Mandate HTTPS Callable Cloud Function (Server-Authoritative Only, Zero Client Fallback)
   if (typeof window !== 'undefined') {
@@ -225,8 +252,19 @@ export async function executeAuthoritativeOrderTransaction(
 
   // Parse Target Date to find correct DayOfWeek for the pickup day
   const [pYear, pMonth, pDay] = targetYmd.split('-').map(Number);
+  if (!isValidCalendarDate(pYear, pMonth, pDay)) {
+    throw new Error('INVALID_CALENDAR_DATE: วันที่ระบุไม่มีอยู่จริงในปฏิทิน');
+  }
   const targetPickupDateObj = new Date(Date.UTC(pYear, pMonth - 1, pDay, 12, 0, 0));
   const targetBangkok = getBangkokYmd(targetPickupDateObj);
+
+  // Strict same-day past pickup time validation
+  if (targetYmdClean === currentBangkok.ymdClean) {
+    const currentBangkokTime = getBangkokCurrentTime(now);
+    if (cleanPickupTime <= currentBangkokTime) {
+      throw new Error(`PAST_PICKUP_TIME_NOT_ALLOWED: เวลารับอาหาร (${cleanPickupTime} น.) ผ่านไปแล้วสำหรับวันนี้ (เวลาปัจจุบัน ${currentBangkokTime} น.)`);
+    }
+  }
 
   // Normalize Items by unique item variant
   const productTotalQuantityMap = new Map<string, number>();
@@ -377,6 +415,12 @@ export async function executeAuthoritativeOrderTransaction(
           const minSelections = modData.minSelections ?? modData.minSelect ?? (modData.required || modData.isRequired ? 1 : 0);
           const maxSelections = modData.maxSelections ?? modData.maxSelect ?? ((modData.selectionType === 'single' || (modData as any).type === 'single') ? 1 : null);
           const isSingle = modData.selectionType === 'single' || (modData as any).type === 'single';
+
+          // Check duplicate optionIds within group
+          const optionIdsInGroup = groupSelections.map((m) => m.optionId);
+          if (new Set(optionIdsInGroup).size !== optionIdsInGroup.length) {
+            throw new Error(`DUPLICATE_MODIFIER_OPTION: กลุ่มตัวเลือก "${modData.name || mgId}" มีตัวเลือกซ้ำกัน`);
+          }
 
           if (groupSelections.length < minSelections) {
             throw new Error(`REQUIRED_MODIFIER_MISSING: กรุณาเลือก ${modData.name || 'ตัวเลือกที่จำเป็น'} อย่างน้อย ${minSelections} รายการ สำหรับเมนู "${prodData.name}"`);

@@ -2,7 +2,7 @@
   "functions": [
     {
       "source": "functions",
-      "codebase": "payments",
+      "codebase": "queueup-backend",
       "ignore": ["node_modules", ".git", "firebase-debug.log", "firebase-debug.*.log"]
     }
   ],

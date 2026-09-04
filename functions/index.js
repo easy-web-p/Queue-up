@@ -13,6 +13,22 @@ const db = getFirestore();
  * ============================================================================
  */
 
+function isValidCalendarDate(year, month, day) {
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return false;
+  if (month < 1 || month > 12 || day < 1 || day > 31) return false;
+  const d = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  return d.getUTCFullYear() === year && (d.getUTCMonth() + 1) === month && d.getUTCDate() === day;
+}
+
+function getBangkokCurrentTime(date = new Date()) {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Bangkok",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
 function getBangkokYmd(date = new Date()) {
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Bangkok",
@@ -96,8 +112,19 @@ export const createOrderAuthoritative = onCall(
     }
 
     const [pYear, pMonth, pDay] = targetYmd.split("-").map(Number);
+    if (!isValidCalendarDate(pYear, pMonth, pDay)) {
+      throw new HttpsError("invalid-argument", "INVALID_CALENDAR_DATE: วันที่ระบุไม่มีอยู่จริงในปฏิทิน");
+    }
     const targetPickupDateObj = new Date(Date.UTC(pYear, pMonth - 1, pDay, 12, 0, 0));
     const targetBangkok = getBangkokYmd(targetPickupDateObj);
+
+    // Strict same-day past pickup time validation
+    if (targetYmdClean === currentBangkok.ymdClean) {
+      const currentBangkokTime = getBangkokCurrentTime(now);
+      if (cleanPickupTime <= currentBangkokTime) {
+        throw new HttpsError("failed-precondition", `PAST_PICKUP_TIME_NOT_ALLOWED: เวลารับอาหาร (${cleanPickupTime} น.) ผ่านไปแล้วสำหรับวันนี้ (เวลาปัจจุบัน ${currentBangkokTime} น.)`);
+      }
+    }
 
     // Aggregate Product Quantities
     const productTotalQuantityMap = new Map();
@@ -246,12 +273,22 @@ export const createOrderAuthoritative = onCall(
               const groupSelections = selectedModifiers.filter((m) => m.modifierGroupId === mgId);
               const minSelections = modData.minSelections ?? modData.minSelect ?? (modData.required || modData.isRequired ? 1 : 0);
               const maxSelections = modData.maxSelections ?? modData.maxSelect ?? (modData.selectionType === "single" ? 1 : null);
+              const isSingle = modData.selectionType === "single" || modData.type === "single";
+
+              // Check duplicate optionIds within group
+              const optionIdsInGroup = groupSelections.map((m) => m.optionId);
+              if (new Set(optionIdsInGroup).size !== optionIdsInGroup.length) {
+                throw new HttpsError("invalid-argument", `DUPLICATE_MODIFIER_OPTION: กลุ่มตัวเลือก "${modData.name || mgId}" มีตัวเลือกซ้ำกัน`);
+              }
 
               if (groupSelections.length < minSelections) {
                 throw new HttpsError("invalid-argument", `REQUIRED_MODIFIER_MISSING: กรุณาเลือก ${modData.name || "ตัวเลือกที่จำเป็น"} อย่างน้อย ${minSelections} รายการ สำหรับเมนู "${prodData.name}"`);
               }
               if (maxSelections !== null && groupSelections.length > maxSelections) {
                 throw new HttpsError("invalid-argument", `MAX_SELECTIONS_EXCEEDED: กลุ่มตัวเลือก "${modData.name}" เลือกได้สูงสุดไม่เกิน ${maxSelections} รายการ`);
+              }
+              if (isSingle && groupSelections.length > 1) {
+                throw new HttpsError("invalid-argument", `SINGLE_SELECTION_VIOLATED: กลุ่มตัวเลือก "${modData.name}" สามารถเลือกได้เพียง 1 ตัวเลือกเท่านั้น`);
               }
             }
           }

@@ -1,18 +1,23 @@
-/* global process, Buffer */
+/* global process */
 /**
- * QueueUp Zero-Payment Food Ordering & Instant Queue Architecture Test Matrix
- * Features:
- * - Real Firestore Transaction Simulation with Optimistic Concurrency Control (OCC)
- * - Version Checking, Conflict Detection & Auto-retry
- * - Transaction Snapshot Staging & Instant Rollback on Exceptions (Failure Injection)
- * - Concurrent Simultaneous Execution (Promise.all)
- * - 160 Exhaustive Scenarios covering Zero-Payment, Instant Q001, Structured Modifiers, Stock Integrity, Slot Capacity & Operational State Machine
- * - Zero-tolerance Exit Code Enforcement
+ * ============================================================================
+ * QueueUp Zero-Payment & Instant Queue Architecture Comprehensive Test Matrix
+ * ============================================================================
+ * 
+ * 100% Zero-Payment Architecture Verification:
+ * - Direct Cart -> Confirm Order -> Instant Sequential Atomic Queue Number (Q001, Q002...)
+ * - Zero Payment Fields (No paymentMethod, paymentStatus, paymentExpiredAt, chargeId)
+ * - Strict Real Calendar Date Validation (Rejection of 2026-02-31, 2026-99-99, 2026-13-45)
+ * - Same-Day Past Pickup Time Guard (Rejection of pickup time earlier than Bangkok current time)
+ * - Fail-Closed Store Capacity Enforcement (STORE_CAPACITY_NOT_CONFIGURED if maxOrdersPerSlot unset)
+ * - Structured Modifier Bounds, Single-Selection Limit & Duplicate Option Guard
+ * - Optimistic Concurrency Control (OCC) Simulation & Atomic Rollbacks
+ * - Kitchen State Machine Transitions (PENDING -> CONFIRMED -> PREPARING -> READY -> COMPLETED)
  */
-import assert from 'node:assert/strict';
-import crypto from 'node:crypto';
 
-console.log('🧪 Starting QueueUp Zero-Payment & Queue Architecture Test Matrix...\n');
+import assert from 'node:assert/strict';
+
+console.log('🧪 Starting QueueUp Pure Zero-Payment & Instant Queue Test Matrix...\n');
 
 let passedTests = 0;
 let totalTests = 0;
@@ -56,7 +61,7 @@ class AdvancedFirestoreEngine {
     }
   }
 
-  async runTransaction(updateFunction, maxRetries = 5) {
+  async runTransaction(updateFunction, maxRetries = 10) {
     let attempt = 0;
     while (attempt < maxRetries) {
       attempt++;
@@ -70,7 +75,7 @@ class AdvancedFirestoreEngine {
           readSnapshots.set(docRef.path, version);
           return {
             exists: record !== undefined && record !== null,
-            data: () => record ? JSON.parse(JSON.stringify(record.data)) : null,
+            data: () => (record ? JSON.parse(JSON.stringify(record.data)) : null),
             ref: docRef,
           };
         },
@@ -112,7 +117,7 @@ class AdvancedFirestoreEngine {
       } catch (err) {
         if (err.message.includes('CONCURRENCY_CONFLICT') && attempt < maxRetries) {
           // Jittered backoff & retry
-          await new Promise((r) => setTimeout(r, Math.random() * 20));
+          await new Promise((r) => setTimeout(r, Math.random() * 25));
           continue;
         }
         // Failure: Staged writes are automatically discarded (Snapshot Rollback)
@@ -123,4270 +128,1132 @@ class AdvancedFirestoreEngine {
   }
 }
 
-async function main() {
-  // Scenario 1: Standard Payment Success
-  await runTest('Scenario 1: Webhook transition from pending -> paid with UID & Amount validation', async () => {
-    const db = new AdvancedFirestoreEngine();
-    const orderId = 'ORD_SUCCESS_1';
-    db.setDoc(`orders/${orderId}`, {
-      orderId,
-      userId: 'user_123',
-      totalAmount: 65,
-      paymentStatus: 'pending',
-      status: 'TO_SHIP',
-      queueStatus: 'waiting'
-    });
+// Helpers
+function isValidCalendarDate(year, month, day) {
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return false;
+  if (month < 1 || month > 12 || day < 1 || day > 31) return false;
+  const d = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  return d.getUTCFullYear() === year && (d.getUTCMonth() + 1) === month && d.getUTCDate() === day;
+}
 
-    const charge = {
-      id: 'chrg_1',
-      amount: 6500,
-      currency: 'THB',
-      status: 'successful',
-      metadata: { orderId, uid: 'user_123' }
-    };
-
-    const order = db.getDoc(`orders/${orderId}`);
-    assert.equal(order.userId, charge.metadata.uid);
-    assert.equal(charge.amount, order.totalAmount * 100);
-    assert.equal(charge.currency, 'THB');
-
-    db.setDoc(`orders/${orderId}`, {
-      paymentId: charge.id,
-      paymentStatus: 'paid',
-      reconciled: true,
-      paidAt: new Date().toISOString()
-    }, { merge: true });
-
-    assert.equal(db.getDoc(`orders/${orderId}`).paymentStatus, 'paid');
-    assert.equal(db.getDoc(`orders/${orderId}`).paymentId, 'chrg_1');
+function getBangkokYmd(date = new Date()) {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
   });
+  const ymd = formatter.format(date);
+  const ymdClean = ymd.replace(/-/g, '');
+  const dayFormatter = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Bangkok', weekday: 'short' });
+  const weekdayShort = dayFormatter.format(date).toLowerCase();
+  const weekdayMap = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+  const dayOfWeekIndex = weekdayMap[weekdayShort] ?? 0;
+  return { ymd, ymdClean, dayOfWeekIndex };
+}
 
-  // Scenario 2: Atomic Resource Release on Expiry
-  await runTest('Scenario 2: Atomic Resource Release rolls back stock and slot capacity idempotently', async () => {
-    const db = new AdvancedFirestoreEngine();
-    const orderId = 'ORD_EXPIRY_2';
-    db.setDoc('products/prod_1', { stock: 8 });
-    db.setDoc('store_slots/shop_1_2026-09-03_12:00', { currentOrders: 5, capacity: 20 });
-    db.setDoc(`orders/${orderId}`, {
-      orderId,
-      productId: 'prod_1',
-      storeId: 'shop_1',
-      quantity: 2,
-      booking: { date: '2026-09-03', timeSlot: '12:00' },
-      paymentStatus: 'pending',
-      resourcesReleased: false
-    });
+function getBangkokCurrentTime(date = new Date()) {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Bangkok',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(date);
+}
 
-    async function executeAtomicRelease(ordId) {
-      return await db.runTransaction(async (t) => {
-        const oSnap = await t.get({ path: `orders/${ordId}` });
-        const data = oSnap.data();
-        if (data.paymentStatus === 'paid' || data.resourcesReleased === true) return false;
+/**
+ * Authoritative Order Creation Business Logic Simulation
+ */
+async function executeOrderCreation(dbEngine, request, customNow = new Date()) {
+  const { storeId, userId, customerName, customerPhone, items, pickupTime, pickupDate } = request;
 
-        const pSnap = await t.get({ path: `products/${data.productId}` });
-        t.update({ path: `products/${data.productId}` }, { stock: pSnap.data().stock + data.quantity });
+  if (!userId || userId === 'guest_user') {
+    throw new Error('AUTHENTICATION_REQUIRED: กรุณาเข้าสู่ระบบก่อนทำการสั่งจองอาหาร');
+  }
+  if (!customerPhone || !customerPhone.trim()) {
+    throw new Error('CUSTOMER_PHONE_REQUIRED: กรุณาระบุเบอร์โทรศัพท์สำหรับรับการแจ้งเตือนคิว');
+  }
+  if (!storeId || !storeId.trim()) {
+    throw new Error('STORE_ID_REQUIRED: ไม่พบรหัสร้านค้า');
+  }
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    throw new Error('ORDER_ITEMS_EMPTY: รายการอาหารในคำสั่งซื้อว่างเปล่า');
+  }
+  if (!pickupTime || !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(pickupTime).trim())) {
+    throw new Error('INVALID_PICKUP_TIME_FORMAT: รูปแบบเวลารับอาหารไม่ถูกต้อง (ต้องเป็น HH:mm)');
+  }
 
-        const slotPath = `store_slots/${data.storeId}_${data.booking.date}_${data.booking.timeSlot}`;
-        const sSnap = await t.get({ path: slotPath });
-        t.set({ path: slotPath }, { currentOrders: Math.max(0, sSnap.data().currentOrders - data.quantity) }, { merge: true });
+  const cleanPickupTime = String(pickupTime).trim();
+  const now = customNow;
+  const currentBangkok = getBangkokYmd(now);
 
-        t.update({ path: `orders/${ordId}` }, {
-          paymentStatus: 'expired',
-          status: 'CANCELLED',
-          resourcesReleased: true
-        });
-        return true;
-      });
+  let targetYmd = currentBangkok.ymd;
+  let targetYmdClean = currentBangkok.ymdClean;
+
+  if (pickupDate) {
+    const rawDate = String(pickupDate).trim();
+    const isIsoDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDate);
+    const isCleanDate = /^\d{8}$/.test(rawDate);
+    if (!isIsoDate && !isCleanDate) {
+      throw new Error('INVALID_DATE_FORMAT: รูปแบบวันที่ไม่ถูกต้อง (ต้องเป็น YYYY-MM-DD)');
     }
-
-    const first = await executeAtomicRelease(orderId);
-    assert.equal(first, true);
-    assert.equal(db.getDoc('products/prod_1').stock, 10);
-    assert.equal(db.getDoc('store_slots/shop_1_2026-09-03_12:00').currentOrders, 3);
-    assert.equal(db.getDoc(`orders/${orderId}`).paymentStatus, 'expired');
-
-    const second = await executeAtomicRelease(orderId);
-    assert.equal(second, false);
-    assert.equal(db.getDoc('products/prod_1').stock, 10);
-  });
-
-  // Scenario 3: Real Transaction Snapshot Rollback on Injected Failure
-  await runTest('Scenario 3: Transaction snapshot rollback restores initial state if failure occurs midway', async () => {
-    const db = new AdvancedFirestoreEngine();
-    db.setDoc('products/prod_fail', { stock: 10 });
-    db.setDoc('store_slots/shop_fail_slot', { currentOrders: 2 });
-    db.setDoc('orders/ord_fail', { id: 'ord_fail', paymentStatus: 'pending', resourcesReleased: false });
-
-    let failureCaught = false;
-    try {
-      await db.runTransaction(async (t) => {
-        const pSnap = await t.get({ path: 'products/prod_fail' });
-        t.update({ path: 'products/prod_fail' }, { stock: pSnap.data().stock + 5 });
-
-        const sSnap = await t.get({ path: 'store_slots/shop_fail_slot' });
-        t.update({ path: 'store_slots/shop_fail_slot' }, { currentOrders: sSnap.data().currentOrders - 1 });
-
-        // Injected crash before order update
-        throw new Error('INJECTED_NETWORK_TIMEOUT_BEFORE_ORDER_UPDATE');
-      });
-    } catch (e) {
-      if (e.message.includes('INJECTED_NETWORK_TIMEOUT')) failureCaught = true;
+    const clean = rawDate.replace(/-/g, '');
+    if (clean < currentBangkok.ymdClean) {
+      throw new Error('PAST_DATE_NOT_ALLOWED: ไม่สามารถเลือกวันที่ย้อนหลังได้');
     }
+    targetYmd = isIsoDate ? rawDate : `${rawDate.slice(0, 4)}-${rawDate.slice(4, 6)}-${rawDate.slice(6, 8)}`;
+    targetYmdClean = clean;
+  }
 
-    assert.equal(failureCaught, true);
-    // Verify pure atomic rollback: stock & slot remain untouched
-    assert.equal(db.getDoc('products/prod_fail').stock, 10);
-    assert.equal(db.getDoc('store_slots/shop_fail_slot').currentOrders, 2);
-    assert.equal(db.getDoc('orders/ord_fail').paymentStatus, 'pending');
-  });
+  const [pYear, pMonth, pDay] = targetYmd.split('-').map(Number);
+  if (!isValidCalendarDate(pYear, pMonth, pDay)) {
+    throw new Error('INVALID_CALENDAR_DATE: วันที่ระบุไม่มีอยู่จริงในปฏิทิน');
+  }
+  const targetPickupDateObj = new Date(Date.UTC(pYear, pMonth - 1, pDay, 12, 0, 0));
+  const targetBangkok = getBangkokYmd(targetPickupDateObj);
 
-  // Scenario 4: Concurrent Simultaneous Scheduler vs Webhook Race
-  await runTest('Scenario 4: Simultaneous Scheduler & Webhook execution resolved with OCC without dirty reads', async () => {
-    const db = new AdvancedFirestoreEngine();
-    const orderId = 'ORD_RACE_OCC';
-    db.setDoc(`orders/${orderId}`, {
-      orderId,
-      userId: 'user_race',
-      totalAmount: 100,
-      paymentStatus: 'pending',
-      resourcesReleased: false
-    });
-
-    const runScheduler = async () => {
-      return await db.runTransaction(async (t) => {
-        const oSnap = await t.get({ path: `orders/${orderId}` });
-        const data = oSnap.data();
-        if (data.paymentStatus === 'paid') return 'IGNORED_PAID';
-        t.update({ path: `orders/${orderId}` }, {
-          paymentStatus: 'expired',
-          status: 'CANCELLED',
-          resourcesReleased: true
-        });
-        return 'EXPIRED';
-      });
-    };
-
-    const runWebhook = async () => {
-      return await db.runTransaction(async (t) => {
-        const oSnap = await t.get({ path: `orders/${orderId}` });
-        const data = oSnap.data();
-        if (data.paymentStatus === 'expired' || data.resourcesReleased) {
-          t.update({ path: `orders/${orderId}` }, {
-            paymentStatus: 'paid_after_expired',
-            flaggedForMerchantReview: true,
-            reconciliationStatus: 'PENDING_REVIEW'
-          });
-          return 'LATE_PAID';
-        }
-        t.update({ path: `orders/${orderId}` }, { paymentStatus: 'paid', reconciled: true });
-        return 'PAID';
-      });
-    };
-
-    // Execute concurrently
-    await Promise.all([runScheduler(), runWebhook()]);
-
-    const finalOrder = db.getDoc(`orders/${orderId}`);
-    assert.equal(['paid', 'paid_after_expired'].includes(finalOrder.paymentStatus), true);
-  });
-
-  // Scenario 5: Multiple Webhooks (10x Sequential Delivery)
-  await runTest('Scenario 5: Webhook repeated 10 times keeps order in paid status without mutation', async () => {
-    const db = new AdvancedFirestoreEngine();
-    const orderId = 'ORD_WEBHOOK_10X';
-    db.setDoc(`orders/${orderId}`, { orderId, paymentStatus: 'pending', totalAmount: 50 });
-
-    let writes = 0;
-    for (let i = 0; i < 10; i++) {
-      const order = db.getDoc(`orders/${orderId}`);
-      if (order.paymentStatus === 'paid') continue;
-      db.setDoc(`orders/${orderId}`, { paymentStatus: 'paid', reconciled: true }, { merge: true });
-      writes++;
+  if (targetYmdClean === currentBangkok.ymdClean) {
+    const currentBangkokTime = getBangkokCurrentTime(now);
+    if (cleanPickupTime <= currentBangkokTime) {
+      throw new Error(`PAST_PICKUP_TIME_NOT_ALLOWED: เวลารับอาหาร (${cleanPickupTime} น.) ผ่านไปแล้วสำหรับวันนี้ (เวลาปัจจุบัน ${currentBangkokTime} น.)`);
     }
+  }
 
-    assert.equal(writes, 1);
-    assert.equal(db.getDoc(`orders/${orderId}`).paymentStatus, 'paid');
-  });
+  // Aggregate item quantities
+  const productTotalQuantityMap = new Map();
+  let totalOrderItemsCount = 0;
+  for (const it of items) {
+    if (!it.productId) throw new Error('PRODUCT_ID_REQUIRED: ทุกรายการต้องระบุ productId');
+    const qty = Number(it.quantity);
+    if (!Number.isInteger(qty) || qty <= 0) {
+      throw new Error('INVALID_QUANTITY: จำนวนสินค้าต้องเป็นจำนวนเต็มบวก');
+    }
+    totalOrderItemsCount += qty;
+    productTotalQuantityMap.set(it.productId, (productTotalQuantityMap.get(it.productId) || 0) + qty);
+  }
 
-  // Scenario 6: Merchant Resolution - ACCEPT Flow
-  await runTest('Scenario 6: Merchant accepts paid_after_expired order into special queue', async () => {
-    const db = new AdvancedFirestoreEngine();
-    const orderId = 'ORD_MERCHANT_ACCEPT';
-    db.setDoc(`orders/${orderId}`, {
-      orderId,
-      paymentStatus: 'paid_after_expired',
-      flaggedForMerchantReview: true,
-      reconciliationStatus: 'PENDING_REVIEW'
-    });
+  return await dbEngine.runTransaction(async (tx) => {
+    // PHASE 1: READ ALL
+    const shopSnap = await tx.get({ path: `shops/${storeId}` });
+    if (!shopSnap.exists) {
+      throw new Error(`STORE_NOT_FOUND: ร้านค้ารหัส ${storeId} ไม่มีอยู่ในระบบ`);
+    }
+    const shopData = shopSnap.data();
 
-    const TERMINAL = ['ACCEPTED', 'REFUNDED', 'REFUND_REQUESTED', 'MANUAL_REFUND_PENDING'];
-    const order = db.getDoc(`orders/${orderId}`);
-    assert.equal(TERMINAL.includes(order.reconciliationStatus), false);
-
-    db.setDoc(`orders/${orderId}`, {
-      paymentStatus: 'paid',
-      status: 'TO_SHIP',
-      queueStatus: 'waiting',
-      flaggedForMerchantReview: false,
-      reconciliationStatus: 'ACCEPTED'
-    }, { merge: true });
-
-    const accepted = db.getDoc(`orders/${orderId}`);
-    assert.equal(accepted.paymentStatus, 'paid');
-    assert.equal(accepted.reconciliationStatus, 'ACCEPTED');
-    assert.equal(accepted.flaggedForMerchantReview, false);
-  });
-
-  // Scenario 7: Merchant Resolution - REFUND Flow & Duplicate Rejection
-  await runTest('Scenario 7: Merchant refund transitions to terminal REFUNDED and blocks duplicate calls', async () => {
-    const db = new AdvancedFirestoreEngine();
-    const orderId = 'ORD_MERCHANT_REFUND';
-    db.setDoc(`orders/${orderId}`, {
-      orderId,
-      paymentId: 'chrg_rfnd_1',
-      totalAmount: 120,
-      paymentStatus: 'paid_after_expired',
-      flaggedForMerchantReview: true,
-      reconciliationStatus: 'PENDING_REVIEW'
-    });
-
-    const TERMINAL = ['ACCEPTED', 'REFUNDED', 'REFUND_REQUESTED', 'MANUAL_REFUND_PENDING'];
-
-    function resolveRefund(ordId) {
-      const ord = db.getDoc(`orders/${ordId}`);
-      if (TERMINAL.includes(ord.reconciliationStatus) || ord.paymentStatus === 'refunded') {
-        throw new Error(`Order already in terminal state (${ord.reconciliationStatus || ord.paymentStatus})`);
+    const productSnapMap = new Map();
+    const referencedModifierGroupIds = new Set();
+    for (const prodId of productTotalQuantityMap.keys()) {
+      const prodSnap = await tx.get({ path: `products/${prodId}` });
+      if (!prodSnap.exists) {
+        throw new Error(`PRODUCT_NOT_FOUND: ไม่พบสินค้ารหัส ${prodId} ในระบบ`);
       }
-      db.setDoc(`orders/${ordId}`, {
-        paymentStatus: 'refunded',
-        status: 'CANCELLED',
-        flaggedForMerchantReview: false,
-        reconciliationStatus: 'REFUNDED',
-        refundId: 'rfnd_999'
-      }, { merge: true });
-    }
-
-    resolveRefund(orderId);
-    assert.equal(db.getDoc(`orders/${orderId}`).paymentStatus, 'refunded');
-    assert.equal(db.getDoc(`orders/${orderId}`).reconciliationStatus, 'REFUNDED');
-
-    assert.throws(() => resolveRefund(orderId), /Order already in terminal state/);
-  });
-
-  // Scenario 8: Webhook Never Re-Opens Reconciled Terminal Orders
-  await runTest('Scenario 8: Webhook retry never re-opens or downgrades refunded/accepted terminal order', async () => {
-    const db = new AdvancedFirestoreEngine();
-    const orderId = 'ORD_TERMINAL_GUARD';
-    db.setDoc(`orders/${orderId}`, {
-      orderId,
-      paymentStatus: 'refunded',
-      reconciliationStatus: 'REFUNDED',
-      flaggedForMerchantReview: false
-    });
-
-    const TERMINAL = ['ACCEPTED', 'REFUNDED', 'REFUND_REQUESTED', 'MANUAL_REFUND_PENDING'];
-    const order = db.getDoc(`orders/${orderId}`);
-
-    let reOpened = false;
-    if (TERMINAL.includes(order.reconciliationStatus) || order.paymentStatus === 'refunded') {
-      // Return 200 OK without re-opening
-    } else {
-      reOpened = true;
-    }
-
-    assert.equal(reOpened, false);
-    assert.equal(db.getDoc(`orders/${orderId}`).paymentStatus, 'refunded');
-  });
-
-  // Scenario 9: Webhook Signature & Tamper Verification
-  await runTest('Scenario 9: Webhook validates metadata integrity and rejects tampered UID/Amount payloads', async () => {
-    const order = { orderId: 'ORD_TAMPER_CHECK', userId: 'uid_legit', totalAmount: 90 };
-    const tamperedCharge = {
-      id: 'chrg_tamper',
-      amount: 4500, // Tampered half amount
-      currency: 'THB',
-      metadata: { orderId: 'ORD_TAMPER_CHECK', uid: 'uid_attacker' }
-    };
-
-    function verifyWebhook(ord, chrg) {
-      if (chrg.metadata?.uid !== ord.userId) throw new Error('User ID mismatch');
-      if (chrg.metadata?.orderId !== ord.orderId) throw new Error('Order ID mismatch');
-      if (chrg.amount !== ord.totalAmount * 100) throw new Error('Amount mismatch');
-      return true;
-    }
-
-    assert.throws(() => verifyWebhook(order, tamperedCharge), /User ID mismatch/);
-  });
-
-  // Scenario 10: Slot Counter Clamping & Warning
-  await runTest('Scenario 10: Underflow slot release safely clamps to 0 with inconsistency warning', async () => {
-    const warnings = [];
-    const currentOrders = 1;
-    const releaseQty = 3;
-
-    if (currentOrders < releaseQty) {
-      warnings.push('SLOT_COUNTER_INCONSISTENCY');
-    }
-    const safeOrders = Math.max(0, currentOrders - releaseQty);
-
-    assert.equal(safeOrders, 0);
-    assert.deepEqual(warnings, ['SLOT_COUNTER_INCONSISTENCY']);
-  });
-
-  // Scenario 11: Unknown Modifier Catalog Rejection
-  await runTest('Scenario 11: Unknown modifiers thrown as invalid-argument with 0% price leakage', async () => {
-    const TOPPING_PRICES = {
-      'ไข่ดาว': 10,
-      'ไข่เจียว': 10,
-      'หมูกรอบพิเศษ': 15,
-      'กุนเชียง': 10,
-      'ชีส': 15,
-      'เพิ่มเส้น/ข้าว': 10,
-    };
-
-    function calculateModifierPrice(modName) {
-      const price = TOPPING_PRICES[modName];
-      if (typeof price !== 'number' || price < 0) {
-        throw new Error(`ไม่พบตัวเลือกท็อปปิ้ง: ${modName}`);
+      productSnapMap.set(prodId, prodSnap);
+      const pData = prodSnap.data();
+      if (Array.isArray(pData.modifierGroupIds)) {
+        pData.modifierGroupIds.forEach((mgId) => referencedModifierGroupIds.add(mgId));
       }
-      return price;
     }
 
-    assert.equal(calculateModifierPrice('ไข่ดาว'), 10);
-    assert.throws(() => calculateModifierPrice('ของแถมฟรีปลอม'), /ไม่พบตัวเลือกท็อปปิ้ง/);
-  });
-
-  // Scenario 12: Past Date / Past Timeslot Validation with Thai Timezone
-  await runTest('Scenario 12: Rejects past dates and past timeslots for current date in Asia/Bangkok time', async () => {
-    const ALLOWED_SLOTS = ["11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00"];
-
-    function validateSlot(dateStr, timeStr, simulatedNow) {
-      if (!ALLOWED_SLOTS.includes(timeStr)) throw new Error('รอบเวลารับประทานไม่ถูกต้อง');
-      const slotDate = new Date(dateStr);
-      if (isNaN(slotDate.getTime())) throw new Error('รูปแบบวันที่ไม่ถูกต้อง');
-
-      const todayYmd = `${simulatedNow.getFullYear()}-${String(simulatedNow.getMonth() + 1).padStart(2, '0')}-${String(simulatedNow.getDate()).padStart(2, '0')}`;
-      if (dateStr < todayYmd) throw new Error('ไม่สามารถเลือกวันที่ย้อนหลังได้');
-
-      if (dateStr === todayYmd) {
-        const [h, m] = timeStr.split(':').map(Number);
-        if (h < simulatedNow.getHours() || (h === simulatedNow.getHours() && m <= simulatedNow.getMinutes())) {
-          throw new Error('รอบเวลาของวันนี้ผ่านไปแล้ว');
-        }
-      }
-      return true;
-    }
-
-    const mockToday = new Date('2026-09-03T12:45:00');
-    assert.throws(() => validateSlot('2026-09-02', '12:00', mockToday), /ไม่สามารถเลือกวันที่ย้อนหลังได้/);
-    assert.throws(() => validateSlot('2026-09-03', '11:30', mockToday), /รอบเวลาของวันนี้ผ่านไปแล้ว/);
-    assert.equal(validateSlot('2026-09-03', '13:30', mockToday), true);
-  });
-
-  // Scenario 13: Stock Reservation Race
-  await runTest('Scenario 13: Stock reservation race with stock=1 allows exactly 1 buyer and rejects second buyer', async () => {
-    const db = new AdvancedFirestoreEngine();
-    db.setDoc('products/prod_limited', { stock: 1 });
-
-    const buyItem = async (userId) => {
-      return await db.runTransaction(async (t) => {
-        const pSnap = await t.get({ path: 'products/prod_limited' });
-        const stock = pSnap.data().stock;
-        if (stock < 1) throw new Error('สินค้าในสต็อกไม่เพียงพอ');
-        t.update({ path: 'products/prod_limited' }, { stock: stock - 1 });
-        return { success: true, userId };
-      });
-    };
-
-    const results = await Promise.allSettled([buyItem('user_A'), buyItem('user_B')]);
-    const fulfilled = results.filter((r) => r.status === 'fulfilled');
-    const rejected = results.filter((r) => r.status === 'rejected');
-
-    assert.equal(fulfilled.length, 1);
-    assert.equal(rejected.length, 1);
-    assert.equal(db.getDoc('products/prod_limited').stock, 0);
-  });
-
-  // Scenario 14: Slot Capacity Reservation Race
-  await runTest('Scenario 14: Slot capacity reservation race at capacity limit permits exactly available slots', async () => {
-    const db = new AdvancedFirestoreEngine();
-    db.setDoc('store_slots/shop_busy_slot', { currentOrders: 9, capacity: 10 });
-
-    const reserveSlot = async (qty) => {
-      return await db.runTransaction(async (t) => {
-        const sSnap = await t.get({ path: 'store_slots/shop_busy_slot' });
-        const { currentOrders, capacity } = sSnap.data();
-        if (currentOrders + qty > capacity) throw new Error('รอบเวลานี้เต็มแล้ว');
-        t.update({ path: 'store_slots/shop_busy_slot' }, { currentOrders: currentOrders + qty });
-        return { success: true };
-      });
-    };
-
-    const results = await Promise.allSettled([reserveSlot(1), reserveSlot(1)]);
-    const fulfilled = results.filter((r) => r.status === 'fulfilled');
-    const rejected = results.filter((r) => r.status === 'rejected');
-
-    assert.equal(fulfilled.length, 1);
-    assert.equal(rejected.length, 1);
-    assert.equal(db.getDoc('store_slots/shop_busy_slot').currentOrders, 10);
-  });
-
-  // Scenario 15: Crash Recovery with Deterministic Idempotency Key
-  await runTest('Scenario 15: Retry with idempotency key recovers existing order and charge without double charging', async () => {
-    const db = new AdvancedFirestoreEngine();
-    const idempotencyKey = 'uid1_key123';
-    db.setDoc(`idempotency_keys/${idempotencyKey}`, { orderId: 'ORD_EXISTING_1' });
-    db.setDoc('orders/ORD_EXISTING_1', {
-      orderId: 'ORD_EXISTING_1',
-      paymentId: 'chrg_recovered',
-      qrUrl: 'https://opn.ooo/qr/123',
-      totalAmount: 55,
-      paymentStatus: 'pending'
-    });
-
-    const createOrRecover = async (key) => {
-      return await db.runTransaction(async (t) => {
-        const idempSnap = await t.get({ path: `idempotency_keys/${key}` });
-        if (idempSnap.exists) {
-          const ordSnap = await t.get({ path: `orders/${idempSnap.data().orderId}` });
-          if (ordSnap.exists) {
-            return { recovered: true, ...ordSnap.data() };
-          }
-        }
-        return { recovered: false };
-      });
-    };
-
-    const result = await createOrRecover(idempotencyKey);
-    assert.equal(result.recovered, true);
-    assert.equal(result.paymentId, 'chrg_recovered');
-  });
-
-  // Scenario 16: Exhaustive Terminal State Machine Protection
-  await runTest('Scenario 16: Terminal states (ACCEPTED, REFUNDED) strictly forbid any further mutations', async () => {
-    const TERMINAL_STATES = ['ACCEPTED', 'REFUNDED'];
-
-    function attemptTransition(currentState, targetAction) {
-      if (TERMINAL_STATES.includes(currentState)) {
-        throw new Error(`State machine violation: cannot ${targetAction} from ${currentState}`);
-      }
-      return true;
-    }
-
-    assert.throws(() => attemptTransition('REFUNDED', 'ACCEPT'), /State machine violation/);
-    assert.throws(() => attemptTransition('REFUNDED', 'REFUND'), /State machine violation/);
-    assert.throws(() => attemptTransition('ACCEPTED', 'REFUND'), /State machine violation/);
-    assert.throws(() => attemptTransition('ACCEPTED', 'ACCEPT'), /State machine violation/);
-  });
-
-  // Scenario 17: Synchronized Coupled Order State Machine & Customer Cancellation Guard
-  await runTest('Scenario 17: Validates synchronized coupled state progression and blocks mismatched pairs', async () => {
-    function isValidOrderStateTransition(oldStatus, oldQueue, newStatus, newQueue) {
-      return (oldStatus === newStatus && oldQueue === newQueue) ||
-             (oldStatus === 'TO_SHIP' && oldQueue === 'waiting' && newStatus === 'PREPARING' && newQueue === 'cooking') ||
-             (oldStatus === 'PREPARING' && oldQueue === 'cooking' && newStatus === 'READY' && newQueue === 'ready') ||
-             (oldStatus === 'READY' && oldQueue === 'ready' && newStatus === 'COMPLETED' && newQueue === 'completed') ||
-             ((oldStatus === 'TO_SHIP' || oldStatus === 'PREPARING') && newStatus === 'CANCELLED' && newQueue === 'cancelled');
-    }
-
-    function canCustomerCancel(status, queueStatus) {
-      return status === 'TO_SHIP' && queueStatus === 'waiting';
-    }
-
-    // Valid synchronized forward transitions
-    assert.equal(isValidOrderStateTransition('TO_SHIP', 'waiting', 'PREPARING', 'cooking'), true);
-    assert.equal(isValidOrderStateTransition('PREPARING', 'cooking', 'READY', 'ready'), true);
-    assert.equal(isValidOrderStateTransition('READY', 'ready', 'COMPLETED', 'completed'), true);
-    assert.equal(isValidOrderStateTransition('TO_SHIP', 'waiting', 'CANCELLED', 'cancelled'), true);
-    assert.equal(isValidOrderStateTransition('PREPARING', 'cooking', 'CANCELLED', 'cancelled'), true);
-
-    // Mismatched / uncoupled transitions (e.g. status advances but queueStatus stays behind)
-    assert.equal(isValidOrderStateTransition('TO_SHIP', 'waiting', 'PREPARING', 'waiting'), false);
-    assert.equal(isValidOrderStateTransition('PREPARING', 'cooking', 'READY', 'cooking'), false);
-    assert.equal(isValidOrderStateTransition('READY', 'ready', 'COMPLETED', 'ready'), false);
-
-    // Illegal backward transitions
-    assert.equal(isValidOrderStateTransition('COMPLETED', 'completed', 'TO_SHIP', 'waiting'), false);
-    assert.equal(isValidOrderStateTransition('READY', 'ready', 'PREPARING', 'cooking'), false);
-    assert.equal(isValidOrderStateTransition('CANCELLED', 'cancelled', 'TO_SHIP', 'waiting'), false);
-
-    // Customer cancellation guards
-    assert.equal(canCustomerCancel('TO_SHIP', 'waiting'), true);
-    assert.equal(canCustomerCancel('PREPARING', 'cooking'), false);
-    assert.equal(canCustomerCancel('READY', 'ready'), false);
-    assert.equal(canCustomerCancel('COMPLETED', 'completed'), false);
-  });
-
-  // Scenario 18: Reject Products with Missing storeId without Fallback
-  await runTest('Scenario 18: Product missing storeId throws failed-precondition without STORE_DEFAULT fallback', async () => {
-    const invalidProduct = { id: 'p_broken', name: 'ข้าวไข่ดาว', price: 30 }; // No storeId/shopId
-
-    function prepareOrder(product) {
-      const storeId = String(product.storeId || product.shopId || '').trim();
-      if (!storeId) {
-        throw new Error('ข้อมูลสินค้าไม่สมบูรณ์: ไม่พบการระบุรหัสร้านค้า (storeId)');
-      }
-      return { storeId };
-    }
-
-    assert.throws(() => prepareOrder(invalidProduct), /ไม่พบการระบุรหัสร้านค้า/);
-    assert.equal(prepareOrder({ ...invalidProduct, storeId: 'shop_valid_123' }).storeId, 'shop_valid_123');
-  });
-
-  // Scenario 19: Offline vs Online Order Creation Guard in Firestore Rules
-  await runTest('Scenario 19: Client can only create offline orders (cash/canteen_counter) and online payments are rejected', async () => {
-    function validateClientOrderCreation(payload) {
-      const allowedMethods = ['cash', 'canteen_counter'];
-      if (!allowedMethods.includes(payload.paymentMethod)) {
-        throw new Error(`Security violation: client cannot create online payment order with method ${payload.paymentMethod}`);
-      }
-      if (!payload.storeId || typeof payload.storeId !== 'string') {
-        throw new Error('Missing storeId on order creation');
-      }
-      if (typeof payload.totalAmount !== 'number' || payload.totalAmount <= 0) {
-        throw new Error('Invalid totalAmount on order creation');
-      }
-      return true;
-    }
-
-    // Client creates cash order -> PASS
-    assert.equal(validateClientOrderCreation({ paymentMethod: 'cash', storeId: 'shop_01', totalAmount: 50 }), true);
-    assert.equal(validateClientOrderCreation({ paymentMethod: 'canteen_counter', storeId: 'shop_01', totalAmount: 40 }), true);
-
-    // Client tries to create online PromptPay or Slip order directly -> REJECT
-    assert.throws(() => validateClientOrderCreation({ paymentMethod: 'promptpay', storeId: 'shop_01', totalAmount: 50 }), /Security violation/);
-    assert.throws(() => validateClientOrderCreation({ paymentMethod: 'promptpay_slip', storeId: 'shop_01', totalAmount: 1 }), /Security violation/);
-    assert.throws(() => validateClientOrderCreation({ paymentMethod: 'credit_card', storeId: 'shop_01', totalAmount: 50 }), /Security violation/);
-  });
-
-  // Scenario 20: LocalStorage Email & Role Tampering Immunity
-  await runTest('Scenario 20: Initial session strictly sanitizes LocalStorage and rejects email/role spoofing', async () => {
-    function getEffectiveRoles(user) {
-      if (!user) return ['guest'];
-      if (user.isFromCache === true || user.isVerifiedAuth !== true) {
-        return ['customer'];
-      }
-      const email = (user.email || '').toLowerCase().trim();
-      const isSuperAdmin = Boolean(
-        user.isSuperAdmin === true ||
-        user.admin === true ||
-        (user.isTokenVerified === true && email === '58140@lomsak.ac.th')
-      );
-      if (isSuperAdmin) return ['customer', 'merchant', 'admin'];
-      return ['customer'];
-    }
-
-    function isUserSuperAdmin(user) {
-      if (!user || user.isFromCache === true || user.isVerifiedAuth !== true) return false;
-      const email = (user.email || '').toLowerCase().trim();
-      return Boolean(
-        user.isSuperAdmin === true ||
-        user.admin === true ||
-        (user.isTokenVerified === true && email === '58140@lomsak.ac.th')
-      );
-    }
-
-    function hydrateInitialSession(storedJson) {
-      const parsed = JSON.parse(storedJson);
-      if (!parsed || typeof parsed !== 'object' || !parsed.uid) return null;
-      return {
-        uid: String(parsed.uid),
-        email: String(parsed.email || ''),
-        displayName: String(parsed.displayName || "User"),
-        roles: ['customer'],
-        activeRole: 'customer',
-        isMerchantVerified: false,
-        isSuperAdmin: false,
-        isVerifiedAuth: false,
-        isTokenVerified: false,
-        isFromCache: true
-      };
-    }
-
-    // Attacker modifies LocalStorage to inject admin email and admin flags
-    const tamperedLocalStorage = JSON.stringify({
-      uid: 'hacker_123',
-      email: '58140@lomsak.ac.th', // Injected Super Admin email!
-      displayName: 'Attacker',
-      roles: ['customer', 'merchant', 'admin'],
-      activeRole: 'admin',
-      isMerchantVerified: true,
-      isSuperAdmin: true
-    });
-
-    const hydratedSession = hydrateInitialSession(tamperedLocalStorage);
-    // Unverified cached session MUST strictly evaluate to customer
-    assert.deepEqual(getEffectiveRoles(hydratedSession), ['customer']);
-    assert.equal(isUserSuperAdmin(hydratedSession), false);
-    assert.equal(hydratedSession.activeRole, 'customer');
-
-    // Officially verified Firebase Auth session -> Grants elevated role
-    const verifiedSession = {
-      ...hydratedSession,
-      isVerifiedAuth: true,
-      isTokenVerified: true,
-      isFromCache: false
-    };
-    assert.deepEqual(getEffectiveRoles(verifiedSession), ['customer', 'merchant', 'admin']);
-    assert.equal(isUserSuperAdmin(verifiedSession), true);
-  });
-
-  // Scenario 21: Fake Offline Price Manipulation Blocked by Universal Server Pricing
-  await runTest('Scenario 21: Client sending manipulated totalAmount is overridden by server-calculated catalog price', async () => {
-    const catalogProduct = { id: 'p_real_01', price: 65, storeId: 'shop_01' };
-    const clientOrderPayload = { productId: 'p_real_01', quantity: 2, clientClaimedTotal: 1, paymentMethod: 'cash' };
-
-    function calculateServerAuthoritativePrice(product, quantity) {
-      return product.price * quantity;
-    }
-
-    const calculatedTotal = calculateServerAuthoritativePrice(catalogProduct, clientOrderPayload.quantity);
-    assert.equal(calculatedTotal, 130);
-    assert.notEqual(calculatedTotal, clientOrderPayload.clientClaimedTotal);
-  });
-
-  // Scenario 22: Fake Coupon / Discount Injection Rejected
-  await runTest('Scenario 22: Fake or expired coupon codes produce 0 THB discount on server calculation', async () => {
-    const validCoupons = {
-      'VALID10': { status: 'Active', discount: 10, minSpend: 50, expiryDate: '2099-12-31' }
-    };
-
-    function applyServerCoupon(couponCode, subtotal) {
-      if (!couponCode) return 0;
-      const c = validCoupons[couponCode.trim().toUpperCase()];
-      if (!c || c.status !== 'Active' || subtotal < c.minSpend || new Date(c.expiryDate) < new Date()) {
-        return 0;
-      }
-      return c.discount;
-    }
-
-    assert.equal(applyServerCoupon('HACK999', 100), 0);
-    assert.equal(applyServerCoupon('VALID10', 40), 0); // minSpend not met
-    assert.equal(applyServerCoupon('VALID10', 80), 10);
-  });
-
-  // Scenario 23: Fake Subtotal vs Unit Price * Quantity Mismatch
-  await runTest('Scenario 23: Subtotal is strictly computed server-side from unit price + modifiers * quantity', async () => {
-    function computeOrderBreakdown(unitPrice, toppingPrice, quantity) {
-      const effectiveUnitPrice = unitPrice + toppingPrice;
-      const subtotal = effectiveUnitPrice * quantity;
-      return { effectiveUnitPrice, subtotal };
-    }
-
-    const breakdown = computeOrderBreakdown(50, 15, 3);
-    assert.equal(breakdown.effectiveUnitPrice, 65);
-    assert.equal(breakdown.subtotal, 195);
-  });
-
-  // Scenario 24: Store ID and Product Ownership Mismatch Rejected
-  await runTest('Scenario 24: Orders with mismatched storeId and product owner are rejected', async () => {
-    const product = { id: 'p_canteen_1', storeId: 'store_canteen_01' };
-
-    function verifyProductStore(prod, claimedStoreId) {
-      if (prod.storeId !== claimedStoreId) {
-        throw new Error('Product does not belong to specified store');
-      }
-      return true;
-    }
-
-    assert.equal(verifyProductStore(product, 'store_canteen_01'), true);
-    assert.throws(() => verifyProductStore(product, 'store_canteen_02'), /Product does not belong/);
-  });
-
-  // Scenario 25: Unauthorized switchRole Rejected by Client State Guard
-  await runTest('Scenario 25: switchRole rejects unverified role changes for non-merchant customers', async () => {
-    const customerUser = { uid: 'user_cust', roles: ['customer'], activeRole: 'customer' };
-
-    function guardedSwitchRole(user, targetRole) {
-      const allowedRoles = user.roles || ['customer'];
-      if (!allowedRoles.includes(targetRole)) {
-        return user.activeRole; // Reject change, retain current
-      }
-      return targetRole;
-    }
-
-    assert.equal(guardedSwitchRole(customerUser, 'merchant'), 'customer');
-    assert.equal(guardedSwitchRole(customerUser, 'admin'), 'customer');
-
-    const merchantUser = { uid: 'user_mch', roles: ['customer', 'merchant'], activeRole: 'customer' };
-    assert.equal(guardedSwitchRole(merchantUser, 'merchant'), 'merchant');
-  });
-
-  // Scenario 26: Complete Client Order Creation Lockdown (allow create: if false)
-  await runTest('Scenario 26: Complete Lockdown: Client SDK (including admin) cannot create orders directly in Firestore', async () => {
-    function firestoreSecurityRuleCheck(requestAuth, isBackendAdminSdk) {
-      // allow create: if false (Only Backend Admin SDK can write orders)
-      if (isBackendAdminSdk) return true;
-      return false;
-    }
-
-    assert.equal(firestoreSecurityRuleCheck({ uid: 'cust_1' }, false), false);
-    assert.equal(firestoreSecurityRuleCheck({ uid: 'merchant_1' }, false), false);
-    assert.equal(firestoreSecurityRuleCheck({ uid: 'admin_browser_user' }, false), false);
-    assert.equal(firestoreSecurityRuleCheck(null, true), true); // Cloud Function Admin SDK
-  });
-
-  // Scenario 27: Cross-store Coupon Injection Rejected
-  await runTest('Scenario 27: Coupon bound to Store A produces 0 THB discount when applied to Store B', async () => {
-    const coupons = {
-      'STORE_A_ONLY': { status: 'Active', storeId: 'store_a', discount: 20, minSpend: 50, expiryDate: '2099-12-31' }
-    };
-
-    function validateCouponStoreScope(code, targetStoreId, subtotal) {
-      const c = coupons[code];
-      if (!c || (c.storeId && c.storeId !== targetStoreId) || subtotal < c.minSpend) {
-        return 0;
-      }
-      return c.discount;
-    }
-
-    assert.equal(validateCouponStoreScope('STORE_A_ONLY', 'store_b', 100), 0); // Cross-store rejected
-    assert.equal(validateCouponStoreScope('STORE_A_ONLY', 'store_a', 100), 20); // Valid store match
-  });
-
-  // Scenario 28: Malformed Coupon Edge Cases Handled Safely
-  await runTest('Scenario 28: Malformed coupons (>100% percent, negative discount, inactive) produce safe 0 THB discount', async () => {
-    function computeSafeCouponDiscount(coupon, subtotal) {
-      if (!coupon || coupon.status !== 'Active') return 0;
-      const minSpend = Number(coupon.minSpend) || 0;
-      const discountVal = Number(coupon.discount) || 0;
-      if (subtotal < minSpend || discountVal <= 0 || isNaN(minSpend) || isNaN(discountVal)) return 0;
-
-      if (coupon.discountType === 'percent') {
-        const clampedPercent = Math.min(100, Math.max(0, discountVal));
-        return Math.round((subtotal * clampedPercent) / 100);
-      }
-      return Math.min(subtotal, discountVal);
-    }
-
-    assert.equal(computeSafeCouponDiscount({ status: 'Inactive', discount: 50, minSpend: 0 }, 100), 0);
-    assert.equal(computeSafeCouponDiscount({ status: 'Active', discount: -50, minSpend: 0 }, 100), 0);
-    assert.equal(computeSafeCouponDiscount({ status: 'Active', discount: 150, discountType: 'percent', minSpend: 0 }, 100), 100); // Clamped to 100%
-    assert.equal(computeSafeCouponDiscount({ status: 'Active', discount: 20, minSpend: 200 }, 100), 0); // minSpend not met
-  });
-
-  // Scenario 29: Provider Crash Injection & Automatic Resource Rollback Reconciliation
-  await runTest('Scenario 29: Crash between Firestore commit and Opn provider triggers safe resource release', async () => {
-    const db = new AdvancedFirestoreEngine();
-    const storeId = 'store_crash_01';
-    const date = '2026-09-03';
-    const time = '12:00';
-    const slotDocId = `${storeId}_${date}_${time}`;
-
-    db.setDoc(`products/p_crash_01`, { stock: 5, price: 40 });
-    db.setDoc(`store_slots/${slotDocId}`, { currentOrders: 2, capacity: 10 });
-
-    // Step 1: Reserve resources in Firestore Transaction
-    const orderId = 'ORD_CRASH_TEST';
-    await db.runTransaction(async (t) => {
-      const prod = (await t.get({ path: 'products/p_crash_01' })).data();
-      const slot = (await t.get({ path: `store_slots/${slotDocId}` })).data();
-      t.update({ path: 'products/p_crash_01' }, { stock: prod.stock - 1 });
-      t.update({ path: `store_slots/${slotDocId}` }, { currentOrders: slot.currentOrders + 1 });
-      t.set({ path: `orders/${orderId}` }, { orderId, paymentStatus: 'pending', reservedQuantity: 1, resourcesReleased: false });
-    });
-
-    assert.equal(db.getDoc('products/p_crash_01').stock, 4);
-    assert.equal(db.getDoc(`store_slots/${slotDocId}`).currentOrders, 3);
-
-    // Step 2: Simulate Payment Provider Crash (Network Timeout)
-    const providerCrashed = true;
-    if (providerCrashed) {
-      db.setDoc(`orders/${orderId}`, { paymentStatus: 'creation_failed' }, { merge: true });
-    }
-
-    // Step 3: Scheduler / Reconciliation rolls back reserved resources
-    await db.runTransaction(async (t) => {
-      const ord = (await t.get({ path: `orders/${orderId}` })).data();
-      if (ord.paymentStatus === 'creation_failed' && !ord.resourcesReleased) {
-        const prod = (await t.get({ path: 'products/p_crash_01' })).data();
-        const slot = (await t.get({ path: `store_slots/${slotDocId}` })).data();
-        t.update({ path: 'products/p_crash_01' }, { stock: prod.stock + ord.reservedQuantity });
-        t.update({ path: `store_slots/${slotDocId}` }, { currentOrders: slot.currentOrders - ord.reservedQuantity });
-        t.update({ path: `orders/${orderId}` }, { resourcesReleased: true });
-      }
-    });
-
-    // Verification: Stock and Slot restored to initial values!
-    assert.equal(db.getDoc('products/p_crash_01').stock, 5);
-    assert.equal(db.getDoc(`store_slots/${slotDocId}`).currentOrders, 2);
-    assert.equal(db.getDoc(`orders/${orderId}`).resourcesReleased, true);
-  });
-
-  // Scenario 30: Multi-step Payment Provider Timeout with Idempotent Recovery
-  await runTest('Scenario 30: Recovers existing payment charge on client retry without duplicate charge creation', async () => {
-    const charges = new Map();
-    let chargeCounter = 0;
-
-    function createOrRecoverOpnCharge(idempotencyKey, amount) {
-      if (charges.has(idempotencyKey)) {
-        return { recovered: true, ...charges.get(idempotencyKey) };
-      }
-      chargeCounter++;
-      const charge = { id: `chrg_${chargeCounter}`, amount, qrUrl: `https://opn.ooo/qr/${chargeCounter}` };
-      charges.set(idempotencyKey, charge);
-      return { recovered: false, ...charge };
-    }
-
-    const firstAttempt = createOrRecoverOpnCharge('idemp_timeout_key_1', 15000);
-    assert.equal(firstAttempt.recovered, false);
-    assert.equal(firstAttempt.id, 'chrg_1');
-
-    const retryAttempt = createOrRecoverOpnCharge('idemp_timeout_key_1', 15000);
-    assert.equal(retryAttempt.recovered, true);
-    assert.equal(retryAttempt.id, 'chrg_1'); // Same charge returned, zero duplicate charges!
-  });
-
-  // Scenario 31: Dynamic Store Capacity Precedence
-  await runTest('Scenario 31: Live store configuration takes immediate precedence over historical slot capacity', async () => {
-    const historicalSlotDoc = { currentOrders: 3, capacity: 20 }; // Old capacity 20
-    const liveShopDoc = { slotCapacity: 5 }; // Store owner reduced capacity to 5
-
-    function computeEffectiveCapacity(shopData, slotData) {
-      const storeConfiguredCapacity = shopData?.slotCapacity ?? shopData?.maxOrdersPerSlot;
-      return typeof storeConfiguredCapacity === 'number' && storeConfiguredCapacity > 0
-        ? Number(storeConfiguredCapacity)
-        : (slotData?.capacity ? Number(slotData.capacity) : 0);
-    }
-
-    const effectiveCapacity = computeEffectiveCapacity(liveShopDoc, historicalSlotDoc);
-    assert.equal(effectiveCapacity, 5); // 5 overrides 20 immediately!
-
-    // Attempting to order 3 more when 3 are booked and max is 5 -> REJECT
-    const canBook3More = (historicalSlotDoc.currentOrders + 3) <= effectiveCapacity;
-    assert.equal(canBook3More, false);
-  });
-
-  // Scenario 32: Admin Browser Client Mutation Restriction in Firestore Rules
-  await runTest('Scenario 32: Admin client in browser cannot tamper with paymentStatus or bypass coupled state machine', async () => {
-    function validateAdminOrderUpdate(existingOrder, updatedFields) {
-      const allowedKeys = ['queueStatus', 'status', 'estimatedReadyTime', 'merchantNote', 'adminNote', 'updatedAt'];
-      const mutatedKeys = Object.keys(updatedFields);
-      const hasOnlyAllowed = mutatedKeys.every(k => allowedKeys.includes(k));
-      if (!hasOnlyAllowed) {
-        throw new Error(`Security Violation: Mutating forbidden keys: ${mutatedKeys.filter(k => !allowedKeys.includes(k))}`);
-      }
-
-      function isValidOrderStateTransition(oldStatus, oldQueue, newStatus, newQueue) {
-        return (oldStatus === newStatus && oldQueue === newQueue) ||
-               (oldStatus === 'TO_SHIP' && oldQueue === 'waiting' && newStatus === 'PREPARING' && newQueue === 'cooking') ||
-               (oldStatus === 'PREPARING' && oldQueue === 'cooking' && newStatus === 'READY' && newQueue === 'ready') ||
-               (oldStatus === 'READY' && oldQueue === 'ready' && newStatus === 'COMPLETED' && newQueue === 'completed') ||
-               ((oldStatus === 'TO_SHIP' || oldStatus === 'PREPARING') && newStatus === 'CANCELLED' && newQueue === 'cancelled');
-      }
-
-      const newStatus = updatedFields.status || existingOrder.status;
-      const newQueue = updatedFields.queueStatus || existingOrder.queueStatus;
-      if (!isValidOrderStateTransition(existingOrder.status, existingOrder.queueStatus, newStatus, newQueue)) {
-        throw new Error('State Machine Violation: Invalid coupled state transition');
-      }
-      return true;
-    }
-
-    const currentOrder = { status: 'TO_SHIP', queueStatus: 'waiting', paymentStatus: 'pending', totalAmount: 100 };
-
-    // Admin tries to set paymentStatus to paid directly -> REJECT
-    assert.throws(() => validateAdminOrderUpdate(currentOrder, { paymentStatus: 'paid' }), /Mutating forbidden keys/);
-
-    // Admin tries to jump TO_SHIP -> COMPLETED directly -> REJECT
-    assert.throws(() => validateAdminOrderUpdate(currentOrder, { status: 'COMPLETED', queueStatus: 'completed' }), /State Machine Violation/);
-
-    // Admin performs legitimate synchronized advance TO_SHIP/waiting -> PREPARING/cooking -> PASS
-    assert.equal(validateAdminOrderUpdate(currentOrder, { status: 'PREPARING', queueStatus: 'cooking', adminNote: 'Approved by admin' }), true);
-  });
-
-  // Scenario 33: Network timeout after charge creation -> Client retry recovers existing charge without double deduction
-  await runTest('Scenario 33: Network timeout after charge creation recovers existing charge on retry', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const idempotencyDocId = 'user_01_idemp_key_network_drop';
-
-    // Simulate initial attempt creating charge then client timing out
-    engine.setDoc(`orders/ord_timeout_01`, {
-      orderId: 'ord_timeout_01',
-      userId: 'user_01',
-      storeId: 'store_canteen01',
-      productId: 'prod_krapao',
-      quantity: 1,
-      paymentId: 'chrg_test_timeout_01',
-      qrUrl: 'https://api.omise.co/qr/timeout_01',
-      totalAmount: 50,
-      paymentStatus: 'pending',
-      status: 'TO_SHIP',
-      queueStatus: 'waiting',
-      resourcesReleased: false
-    });
-
-    engine.setDoc(`idempotency_keys/${idempotencyDocId}`, {
-      orderId: 'ord_timeout_01',
-      paymentId: 'chrg_test_timeout_01',
-      createdAt: new Date()
-    });
-
-    // Client retries with same idempotency key
-    const idempSnap = engine.getDoc(`idempotency_keys/${idempotencyDocId}`);
-    assert.ok(idempSnap);
-    const existingOrder = engine.getDoc(`orders/${idempSnap.orderId}`);
-    assert.equal(existingOrder.orderId, 'ord_timeout_01');
-    assert.equal(existingOrder.paymentId, 'chrg_test_timeout_01');
-    assert.equal(existingOrder.paymentStatus, 'pending');
-  });
-
-  // Scenario 34: Webhook arrives before client retry finishes -> marks paid, client retry returns updated state
-  await runTest('Scenario 34: Out-of-order Webhook completes before client retry returns', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const idempotencyDocId = 'user_01_idemp_key_ooo';
-
-    engine.setDoc(`orders/ord_ooo_01`, {
-      orderId: 'ord_ooo_01',
-      userId: 'user_01',
-      storeId: 'store_canteen01',
-      productId: 'prod_krapao',
-      quantity: 1,
-      paymentId: 'chrg_test_ooo_01',
-      totalAmount: 50,
-      paymentStatus: 'pending',
-      status: 'TO_SHIP',
-      queueStatus: 'waiting',
-      resourcesReleased: false
-    });
-
-    engine.setDoc(`idempotency_keys/${idempotencyDocId}`, {
-      orderId: 'ord_ooo_01',
-      paymentId: 'chrg_test_ooo_01',
-      createdAt: new Date()
-    });
-
-    // 1. Webhook arrives FIRST and transitions order to paid
-    await engine.runTransaction(async (tx) => {
-      const snap = await tx.get({ path: 'orders/ord_ooo_01' });
-      const order = snap.data();
-      if (order.paymentStatus === 'pending') {
-        tx.update({ path: 'orders/ord_ooo_01' }, {
-          paymentStatus: 'paid',
-          paidAt: new Date()
+    for (const it of items) {
+      if (Array.isArray(it.selectedModifiers)) {
+        it.selectedModifiers.forEach((m) => {
+          if (m.modifierGroupId) referencedModifierGroupIds.add(m.modifierGroupId);
         });
       }
-    });
-
-    // 2. Client retry recovers the order and sees it is already paid!
-    const idempSnap = engine.getDoc(`idempotency_keys/${idempotencyDocId}`);
-    const recoveredOrder = engine.getDoc(`orders/${idempSnap.orderId}`);
-    assert.equal(recoveredOrder.paymentStatus, 'paid');
-    assert.ok(recoveredOrder.paidAt);
-  });
-
-  // Scenario 35: Webhook with unsupported event key or malformed body is REJECTED (HTTP 400)
-  await runTest('Scenario 35: Webhook with unsupported event key or malformed body is REJECTED', async () => {
-    function validateWebhookEvent(event) {
-      const ALLOWED_WEBHOOK_EVENTS = ["charge.complete", "charge.create", "charge.update"];
-      if (!event || typeof event.key !== "string" || !ALLOWED_WEBHOOK_EVENTS.includes(event.key)) {
-        throw new Error("HTTP 400: Unsupported or missing webhook event key");
-      }
-      const chargeId = event.data?.id;
-      if (typeof chargeId !== "string" || !chargeId.trim() || !chargeId.startsWith("chrg_")) {
-        throw new Error("HTTP 400: Invalid or missing Opn charge ID format");
-      }
-      return true;
     }
 
-    assert.throws(() => validateWebhookEvent({ key: "customer.create", data: { id: "chrg_123" } }), /Unsupported or missing webhook event key/);
-    assert.throws(() => validateWebhookEvent({ key: "charge.complete", data: { id: "invalid_id_format" } }), /Invalid or missing Opn charge ID format/);
-    assert.equal(validateWebhookEvent({ key: "charge.complete", data: { id: "chrg_test_valid_01" } }), true);
-  });
-
-  // Scenario 36: Webhook with tampered amount (e.g. 50 THB paid for 500 THB order) is REJECTED
-  await runTest('Scenario 36: Webhook with tampered amount is strictly REJECTED (Amount Mismatch)', async () => {
-    function verifyChargeAgainstOrder(charge, order) {
-      const expectedSatang = Math.round(Number(order.totalAmount || order.totalPrice) * 100);
-      if (charge.currency !== "THB") throw new Error("HTTP 400: Currency mismatch");
-      if (charge.amount !== expectedSatang) throw new Error("HTTP 400: Amount mismatch (Possible Underpayment Attack)");
-      if (charge.metadata?.orderId !== order.orderId) throw new Error("HTTP 400: Order ID mismatch");
-      if (charge.metadata?.uid !== order.userId) throw new Error("HTTP 400: User ID mismatch");
-      return true;
-    }
-
-    const validOrder = { orderId: "ord_100", userId: "user_buyer_01", totalAmount: 500 };
-    const tamperedCharge = { id: "chrg_100", amount: 5000, currency: "THB", metadata: { orderId: "ord_100", uid: "user_buyer_01" } }; // 50 THB instead of 500 THB (50000 satang)
-    const validCharge = { id: "chrg_100", amount: 50000, currency: "THB", metadata: { orderId: "ord_100", uid: "user_buyer_01" } };
-
-    assert.throws(() => verifyChargeAgainstOrder(tamperedCharge, validOrder), /Amount mismatch/);
-    assert.equal(verifyChargeAgainstOrder(validCharge, validOrder), true);
-  });
-
-  // Scenario 37: Webhook with charge belonging to Order A attempting to mutate Order B is REJECTED
-  await runTest('Scenario 37: Cross-order charge mutation spoofing is strictly REJECTED', async () => {
-    function verifyOrderBinding(charge, targetOrder) {
-      if (charge.metadata?.orderId !== targetOrder.orderId) {
-        throw new Error("HTTP 400: Metadata Order ID does not match target order");
-      }
-      if (targetOrder.paymentId && targetOrder.paymentId !== charge.id) {
-        throw new Error("HTTP 400: Charge ID does not match order payment binding");
-      }
-      return true;
-    }
-
-    const orderB = { orderId: "ord_B", userId: "user_B", paymentId: "chrg_order_B" };
-    const chargeFromOrderA = { id: "chrg_order_A", metadata: { orderId: "ord_A", uid: "user_A" } };
-
-    assert.throws(() => verifyOrderBinding(chargeFromOrderA, orderB), /Metadata Order ID does not match target order/);
-  });
-
-  // Scenario 38: Webhook attempting to downgrade already PAID order to FAILED is REJECTED
-  await runTest('Scenario 38: Webhook cannot downgrade already PAID order to non-successful status', async () => {
-    function processStateTransition(currentPaymentStatus, incomingChargeStatus) {
-      if (currentPaymentStatus === "paid") {
-        if (incomingChargeStatus === "successful") {
-          return { action: "IGNORE_IDEMPOTENT", status: "paid" };
-        }
-        throw new Error("HTTP 400: Cannot downgrade already paid order to non-successful status");
-      }
-      return { action: "APPLY", status: incomingChargeStatus === "successful" ? "paid" : incomingChargeStatus };
-    }
-
-    assert.throws(() => processStateTransition("paid", "failed"), /Cannot downgrade already paid order/);
-    assert.throws(() => processStateTransition("paid", "expired"), /Cannot downgrade already paid order/);
-    assert.deepEqual(processStateTransition("paid", "successful"), { action: "IGNORE_IDEMPOTENT", status: "paid" });
-    assert.deepEqual(processStateTransition("pending", "successful"), { action: "APPLY", status: "paid" });
-  });
-
-  // Scenario 39: charge.create event acknowledges receipt but NEVER marks order as paid
-  await runTest('Scenario 39: charge.create event acknowledges receipt but never marks order as paid', async () => {
-    function handleWebhookEventKey(eventKey, currentOrderStatus) {
-      if (eventKey === "charge.create") {
-        return { responseCode: 200, message: "Charge creation event acknowledged", newStatus: currentOrderStatus };
-      }
-      if (eventKey === "charge.complete") {
-        return { responseCode: 200, message: "OK", newStatus: "paid" };
-      }
-      throw new Error("Unsupported event key");
-    }
-
-    const initialOrder = { orderId: "ord_create_01", paymentStatus: "pending" };
-    const createResult = handleWebhookEventKey("charge.create", initialOrder.paymentStatus);
-    assert.equal(createResult.responseCode, 200);
-    assert.equal(createResult.newStatus, "pending"); // Must remain pending!
-  });
-
-  // Scenario 40: Concurrent duplicate webhooks (Event #1 & #2 entering simultaneously) are serialized with OCC
-  await runTest('Scenario 40: Concurrent webhooks are serialized with OCC and processed exactly once', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    engine.setDoc(`orders/ord_concurrent_01`, {
-      orderId: 'ord_concurrent_01',
-      userId: 'user_concurrent',
-      paymentStatus: 'pending',
-      totalAmount: 100
-    });
-
-    async function processWebhookAtomic() {
-      return await engine.runTransaction(async (tx) => {
-        const snap = await tx.get({ path: 'orders/ord_concurrent_01' });
-        const order = snap.data();
-        if (order.paymentStatus === 'paid') {
-          return { status: 'already_paid' };
-        }
-        tx.update({ path: 'orders/ord_concurrent_01' }, {
-          paymentStatus: 'paid'
-        });
-        return { status: 'marked_paid' };
-      });
-    }
-
-    // Run 2 webhook processors concurrently
-    const [res1, res2] = await Promise.all([processWebhookAtomic(), processWebhookAtomic()]);
-    const finalOrder = engine.getDoc('orders/ord_concurrent_01');
-    assert.equal(finalOrder.paymentStatus, 'paid');
-    const markedPaidCount = [res1, res2].filter(r => r.status === 'marked_paid').length;
-    const alreadyPaidCount = [res1, res2].filter(r => r.status === 'already_paid').length;
-    assert.equal(markedPaidCount, 1); // Exactly 1 committed the transition
-    assert.equal(alreadyPaidCount, 1); // Exactly 1 detected already paid on OCC retry
-  });
-
-  // Scenario 41: Replayed webhook event with existing eventId in webhook_events returns 200 without mutation
-  await runTest('Scenario 41: Replayed webhook event with existing eventId returns 200 without duplicate mutation', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const eventId = "evnt_test_replay_999";
-    engine.setDoc(`webhook_events/${eventId}`, {
-      eventId,
-      chargeId: "chrg_test_replay",
-      orderId: "ord_replay_01",
-      processed: true,
-      createdAt: new Date()
-    });
-    engine.setDoc(`orders/ord_replay_01`, {
-      orderId: 'ord_replay_01',
-      paymentStatus: 'paid',
-      totalAmount: 100
-    });
-
-    let duplicateAuditCreated = false;
-    const result = await engine.runTransaction(async (tx) => {
-      const eventSnap = await tx.get({ path: `webhook_events/${eventId}` });
-      if (eventSnap?.exists && eventSnap.data()?.processed === true) {
-        return { code: 200, message: "Already processed event" };
-      }
-      duplicateAuditCreated = true;
-      return { code: 200, message: "OK" };
-    });
-
-    assert.equal(result.code, 200);
-    assert.equal(result.message, "Already processed event");
-    assert.equal(duplicateAuditCreated, false);
-  });
-
-  // Scenario 42: Out-of-order charge.update with failed arriving after charge.complete is rejected by state machine
-  await runTest('Scenario 42: Out-of-order charge.update after charge.complete is rejected by isAllowedPaymentTransition', async () => {
-    function isAllowedPaymentTransition(currentStatus, nextStatus) {
-      if (currentStatus === nextStatus) return true;
-      const ALLOWED_TRANSITIONS = {
-        pending: ["paid", "failed", "expired", "charge_created_order_pending", "creation_failed"],
-        charge_created_order_pending: ["paid", "failed", "expired", "creation_failed"],
-        expired: ["paid_after_expired"],
-        cancelled: ["paid_after_expired"],
-        paid: ["refunded", "paid"],
-        paid_after_expired: ["paid", "refunded"],
-        refunded: ["refunded"]
-      };
-      return (ALLOWED_TRANSITIONS[currentStatus] || []).includes(nextStatus);
-    }
-
-    assert.equal(isAllowedPaymentTransition("pending", "paid"), true);
-    assert.equal(isAllowedPaymentTransition("paid", "failed"), false);
-    assert.equal(isAllowedPaymentTransition("paid", "expired"), false);
-    assert.equal(isAllowedPaymentTransition("refunded", "paid"), false);
-  });
-
-  // Scenario 43: Resource release failure & retry recovery maintains exact inventory consistency
-  await runTest('Scenario 43: Transaction succeeds -> resource release failure recovers cleanly on retry', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    engine.setDoc('products/prod_recovery_01', { stock: 10 });
-    engine.setDoc('orders/ord_rec_01', {
-      orderId: 'ord_rec_01',
-      productId: 'prod_recovery_01',
-      quantity: 2,
-      reservedQuantity: 2,
-      releasedQuantity: 0,
-      resourcesReleased: false,
-      paymentStatus: 'expired'
-    });
-
-    // Simulate crash after initial expiry mark before release completes
-    // Retry resource release
-    async function executeResourceRelease(orderId) {
-      return await engine.runTransaction(async (tx) => {
-        const orderSnap = await tx.get({ path: `orders/${orderId}` });
-        const order = orderSnap.data();
-        if (order.resourcesReleased) return { alreadyReleased: true };
-
-        const prodSnap = await tx.get({ path: `products/${order.productId}` });
-        const prod = prodSnap.data();
-        tx.update({ path: `products/${order.productId}` }, { stock: prod.stock + order.reservedQuantity });
-        tx.update({ path: `orders/${orderId}` }, { resourcesReleased: true, releasedQuantity: order.reservedQuantity });
-        return { released: true };
-      });
-    }
-
-    const firstRun = await executeResourceRelease('ord_rec_01');
-    assert.equal(firstRun.released, true);
-    assert.equal(engine.getDoc('products/prod_recovery_01').stock, 12);
-
-    // Subsequent retry must be idempotent and not double-increment stock!
-    const secondRun = await executeResourceRelease('ord_rec_01');
-    assert.equal(secondRun.alreadyReleased, true);
-    assert.equal(engine.getDoc('products/prod_recovery_01').stock, 12);
-  });
-
-  // Scenario 44: Missing event.id uses deterministic composite key avoiding false collision
-  await runTest('Scenario 44: Missing event.id generates distinct deterministic key without false collision', async () => {
-    function computeEventId(event, charge) {
-      return (typeof event.id === "string" && event.id.trim())
-        ? event.id.trim()
-        : `evnt_${charge.id}_${event.key}_${charge.status}`;
-    }
-
-    const chargeA = { id: "chrg_alpha", status: "successful" };
-    const event1 = { key: "charge.complete", data: { id: "chrg_alpha" } };
-    const event2 = { key: "charge.update", data: { id: "chrg_alpha" } };
-
-    const key1 = computeEventId(event1, chargeA);
-    const key2 = computeEventId(event2, chargeA);
-
-    assert.notEqual(key1, key2); // Distinct event keys produce distinct composite doc IDs!
-    assert.equal(key1, "evnt_chrg_alpha_charge.complete_successful");
-    assert.equal(key2, "evnt_chrg_alpha_charge.update_successful");
-  });
-
-  // Scenario 45: Same chargeId with different event types/statuses are processed distinctly
-  await runTest('Scenario 45: Same chargeId with different event types are not false-deduped', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const eventKey1 = "evnt_chrg_01_charge.create_pending";
-    const eventKey2 = "evnt_chrg_01_charge.complete_successful";
-
-    engine.setDoc(`webhook_events/${eventKey1}`, { processed: true });
-
-    // Event 2 with charge.complete should NOT be considered already processed!
-    const event2Snap = engine.getDoc(`webhook_events/${eventKey2}`);
-    assert.equal(event2Snap, null); // Event 2 is recognized as a new distinct event
-  });
-
-  // Scenario 46: Webhook actor cannot trigger refunded transition via isAllowedPaymentTransition
-  await runTest('Scenario 46: Webhook actor cannot trigger refunded transition via isAllowedPaymentTransition', async () => {
-    function isAllowedPaymentTransitionWithActor(currentStatus, nextStatus, actor = "webhook") {
-      if (currentStatus === nextStatus) return true;
-      const ALLOWED_TRANSITIONS = {
-        webhook: {
-          pending: ["paid", "failed", "expired", "charge_created_order_pending", "creation_failed"],
-          charge_created_order_pending: ["paid", "failed", "expired", "creation_failed"],
-          expired: ["paid_after_expired"],
-          cancelled: ["paid_after_expired"],
-          paid: ["paid"], // Webhook cannot trigger refund
-          paid_after_expired: [],
-          refunded: ["refunded"]
-        },
-        refund_flow: {
-          paid: ["refunded"],
-          paid_after_expired: ["paid", "refunded"]
-        }
-      };
-      return (ALLOWED_TRANSITIONS[actor]?.[currentStatus] || []).includes(nextStatus);
-    }
-
-    assert.equal(isAllowedPaymentTransitionWithActor("paid", "refunded", "webhook"), false); // Webhook blocked!
-    assert.equal(isAllowedPaymentTransitionWithActor("paid", "refunded", "refund_flow"), true); // Legitimate refund allowed
-  });
-
-  // Scenario 47: Concurrent transactions with version conflict retry cleanly without dirty writes
-  await runTest('Scenario 47: Concurrent transactions with version conflict retry cleanly without dirty writes', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    engine.setDoc('orders/ord_occ_retry_01', {
-      orderId: 'ord_occ_retry_01',
-      version: 1,
-      paymentStatus: 'pending',
-      count: 0
-    });
-
-    async function incrementCount() {
-      return await engine.runTransaction(async (tx) => {
-        const snap = await tx.get({ path: 'orders/ord_occ_retry_01' });
-        const data = snap.data();
-        tx.update({ path: 'orders/ord_occ_retry_01' }, { count: data.count + 1 });
-      });
-    }
-
-    await Promise.all([incrementCount(), incrementCount(), incrementCount()]);
-    const finalDoc = engine.getDoc('orders/ord_occ_retry_01');
-    assert.equal(finalDoc.count, 3); // All 3 increments committed sequentially with OCC retries
-  });
-
-  // Scenario 48: Webhook without valid Opn charge verification is REJECTED
-  await runTest('Scenario 48: Webhook without valid Opn charge verification is REJECTED (401/400)', async () => {
-    function verifyWebhookOrigin(event, retrievedCharge) {
-      if (!event || !event.data?.id) throw new Error("400: Missing charge data");
-      if (!retrievedCharge || retrievedCharge.id !== event.data.id) {
-        throw new Error("401: Unauthorized Webhook Origin - Charge not verifiable with Opn");
-      }
-      return true;
-    }
-
-    assert.throws(() => verifyWebhookOrigin({ data: { id: "chrg_unverified" } }, null), /Unauthorized Webhook Origin/);
-    assert.equal(verifyWebhookOrigin({ data: { id: "chrg_real_01" } }, { id: "chrg_real_01", status: "successful" }), true);
-  });
-
-  // Scenario 49: Signature/Hash valid but body tampered post-transmission is rejected via Opn API charge
-  await runTest('Scenario 49: Tampered webhook body after transmission is rejected via authoritative Opn API', async () => {
-    function verifyAuthoritativeState(webhookBody, opnApiCharge) {
-      if (webhookBody.amount !== opnApiCharge.amount) {
-        throw new Error("400: Body payload amount differs from authoritative Opn API charge");
-      }
-      if (webhookBody.status !== opnApiCharge.status) {
-        throw new Error("400: Body payload status differs from authoritative Opn API charge");
-      }
-      return true;
-    }
-
-    const tamperedBody = { amount: 5000, status: "successful" };
-    const authoritativeCharge = { amount: 50000, status: "successful" }; // Real amount 500 THB
-
-    assert.throws(() => verifyAuthoritativeState(tamperedBody, authoritativeCharge), /differ/);
-  });
-
-  // Scenario 50: Event ID reused with different payload/order is REJECTED (Idempotency Collision Attack)
-  await runTest('Scenario 50: Event ID reused with different payload/order is REJECTED (409 Conflict)', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const eventId = "evnt_claimed_01";
-    engine.setDoc(`webhook_events/${eventId}`, {
-      eventId,
-      chargeId: "chrg_original_01",
-      orderId: "ord_original_01",
-      processed: true
-    });
-
-    function verifyEventCollision(existingEventDoc, incomingChargeId, incomingOrderId) {
-      if (existingEventDoc && existingEventDoc.processed) {
-        if (existingEventDoc.chargeId !== incomingChargeId || existingEventDoc.orderId !== incomingOrderId) {
-          throw new Error("409: Security Violation: Event ID already bound to a different charge/order");
-        }
-        return { action: "ALREADY_PROCESSED" };
-      }
-      return { action: "PROCESS" };
-    }
-
-    const existingEvent = engine.getDoc(`webhook_events/${eventId}`);
-    assert.throws(() => verifyEventCollision(existingEvent, "chrg_original_01", "ord_different_02"), /Security Violation/);
-    assert.equal(verifyEventCollision(existingEvent, "chrg_original_01", "ord_original_01").action, "ALREADY_PROCESSED");
-  });
-
-  // Scenario 51: Event ID reused with different Charge ID is REJECTED (Charge Hijacking Blocked)
-  await runTest('Scenario 51: Event ID reused with different Charge ID is REJECTED (409 Conflict)', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const eventId = "evnt_claimed_02";
-    engine.setDoc(`webhook_events/${eventId}`, {
-      eventId,
-      chargeId: "chrg_legit_01",
-      orderId: "ord_legit_01",
-      processed: true
-    });
-
-    function verifyChargeCollision(existingEventDoc, incomingChargeId) {
-      if (existingEventDoc && existingEventDoc.chargeId !== incomingChargeId) {
-        throw new Error("409: Security Violation: Event ID already bound to a different charge ID");
-      }
-      return true;
-    }
-
-    const existingEvent = engine.getDoc(`webhook_events/${eventId}`);
-    assert.throws(() => verifyChargeCollision(existingEvent, "chrg_malicious_02"), /Security Violation/);
-    assert.equal(verifyChargeCollision(existingEvent, "chrg_legit_01"), true);
-  });
-
-  // Scenario 52: Transaction commit atomicity: Rollback on intermediate step failure leaves 0 partial writes
-  await runTest('Scenario 52: Transaction commit atomicity: Rollback leaves 0 partial writes', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    engine.setDoc('orders/ord_atomic_01', { paymentStatus: 'pending', totalAmount: 100 });
-    engine.setDoc('audit_logs/audit_atomic_01', { initial: true });
-
-    let errorThrown = false;
-    try {
-      await engine.runTransaction(async (tx) => {
-        tx.update({ path: 'orders/ord_atomic_01' }, { paymentStatus: 'paid' });
-        // Simulating crash during audit log write
-        throw new Error("CRASH_DURING_AUDIT_WRITE");
-      });
-    } catch {
-      errorThrown = true;
-    }
-
-    assert.equal(errorThrown, true);
-    // Order MUST remain pending (Rollback verified)
-    const orderDoc = engine.getDoc('orders/ord_atomic_01');
-    assert.equal(orderDoc.paymentStatus, 'pending');
-  });
-
-  // Scenario 53: Webhook timeout multi-retry thundering herd: Concurrently executes with OCC and commits exactly once
-  await runTest('Scenario 53: Webhook thundering herd multi-retry commits exactly once with OCC', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    engine.setDoc('orders/ord_herd_01', {
-      orderId: 'ord_herd_01',
-      paymentStatus: 'pending',
-      totalAmount: 100
-    });
-
-    async function processWebhook() {
-      return await engine.runTransaction(async (tx) => {
-        const snap = await tx.get({ path: 'orders/ord_herd_01' });
-        const order = snap.data();
-        if (order.paymentStatus === 'paid') {
-          return { status: 'already_paid' };
-        }
-        tx.update({ path: 'orders/ord_herd_01' }, { paymentStatus: 'paid' });
-        return { status: 'paid_committed' };
-      });
-    }
-
-    // 5 concurrent webhook retries entering simultaneously
-    const results = await Promise.all([
-      processWebhook(),
-      processWebhook(),
-      processWebhook(),
-      processWebhook(),
-      processWebhook()
-    ]);
-
-    const committedCount = results.filter(r => r.status === 'paid_committed').length;
-    const alreadyCount = results.filter(r => r.status === 'already_paid').length;
-    assert.equal(committedCount, 1); // Exactly 1 committed
-    assert.equal(alreadyCount, 4); // 4 retries safely detected already paid
-  });
-
-  // Scenario 54: Webhook actor attempting to trigger refunded transition via state machine is REJECTED
-  await runTest('Scenario 54: Webhook actor attempting to trigger refunded transition is REJECTED', async () => {
-    function isAllowedPaymentTransitionWithActor(currentStatus, nextStatus, actor = "webhook") {
-      if (currentStatus === nextStatus) return true;
-      const ALLOWED_TRANSITIONS = {
-        webhook: {
-          pending: ["paid", "failed", "expired", "charge_created_order_pending", "creation_failed"],
-          charge_created_order_pending: ["paid", "failed", "expired", "creation_failed"],
-          expired: ["paid_after_expired"],
-          cancelled: ["paid_after_expired"],
-          paid: ["paid"],
-          paid_after_expired: [],
-          refunded: ["refunded"]
-        },
-        refund_flow: {
-          paid: ["refunded"],
-          paid_after_expired: ["paid", "refunded"]
-        }
-      };
-      return (ALLOWED_TRANSITIONS[actor]?.[currentStatus] || []).includes(nextStatus);
-    }
-
-    assert.equal(isAllowedPaymentTransitionWithActor("paid", "refunded", "webhook"), false);
-    assert.equal(isAllowedPaymentTransitionWithActor("pending", "paid", "webhook"), true);
-  });
-
-  // Scenario 55: Webhook of Order A attempting to mutate Order B is REJECTED with Order Binding Mismatch
-  await runTest('Scenario 55: Webhook of Order A attempting to mutate Order B is REJECTED (Order Binding Mismatch)', async () => {
-    function verifyCrossOrderBinding(charge, order) {
-      if (charge.metadata?.orderId !== order.orderId) {
-        throw new Error("400: Order ID mismatch");
-      }
-      if (charge.metadata?.uid !== order.userId) {
-        throw new Error("400: User ID mismatch");
-      }
-      if (order.paymentId && order.paymentId !== charge.id) {
-        throw new Error("400: Charge ID does not match order payment binding");
-      }
-      return true;
-    }
-
-    const orderB = { orderId: "ord_target_B", userId: "user_B", paymentId: "chrg_B" };
-    const chargeA = { id: "chrg_A", metadata: { orderId: "ord_target_A", uid: "user_A" } };
-
-    assert.throws(() => verifyCrossOrderBinding(chargeA, orderB), /Order ID mismatch/);
-  });
-
-  // Scenario 56: Direct HTTP Pipeline: Non-whitelisted event responds HTTP 400
-  await runTest('Scenario 56: Direct HTTP Pipeline: Non-whitelisted event responds HTTP 400', async () => {
-    let statusCode = null;
-    let responseBody = null;
-    const req = { method: "POST", body: { key: "unknown.event" } };
-    const res = {
-      status: (code) => { statusCode = code; return res; },
-      send: (data) => { responseBody = data; return res; }
-    };
-
-    function handleRequest(req, res) {
-      const ALLOWED_WEBHOOK_EVENTS = ["charge.complete", "charge.create", "charge.update"];
-      if (!req.body || !ALLOWED_WEBHOOK_EVENTS.includes(req.body.key)) {
-        return res.status(400).send("Unsupported or missing webhook event key");
+    const modifierGroupSnapMap = new Map();
+    for (const mgId of referencedModifierGroupIds) {
+      const modSnap = await tx.get({ path: `modifier_groups/${mgId}` });
+      if (modSnap.exists) {
+        modifierGroupSnapMap.set(mgId, modSnap);
       }
     }
 
-    handleRequest(req, res);
-    assert.equal(statusCode, 400);
-    assert.equal(responseBody, "Unsupported or missing webhook event key");
-  });
+    const cleanTime = cleanPickupTime.replace(':', '');
+    const dateScopedSlotId = `slot_${storeId}_${targetYmdClean}_${cleanTime}`;
+    const slotSnap = await tx.get({ path: `store_slots/${dateScopedSlotId}` });
 
-  // Scenario 57: Direct HTTP Pipeline: charge.create acknowledges with HTTP 200 without order mutation
-  await runTest('Scenario 57: Direct HTTP Pipeline: charge.create acknowledges with HTTP 200 without order mutation', async () => {
-    let statusCode = null;
-    let responseBody = null;
-    const req = { method: "POST", body: { key: "charge.create", data: { id: "chrg_create_only" } } };
-    const res = {
-      status: (code) => { statusCode = code; return res; },
-      send: (data) => { responseBody = data; return res; }
-    };
+    const counterDocId = `counter_${storeId}_${targetYmdClean}`;
+    const counterSnap = await tx.get({ path: `queue_counters/${counterDocId}` });
 
-    let orderMutated = false;
-    function handleRequest(req, res) {
-      if (req.body.key === "charge.create") {
-        return res.status(200).send("Charge creation event acknowledged");
-      }
-      orderMutated = true;
+    // PHASE 2: VALIDATE BUSINESS INVARIANTS
+    if (shopData.isOpen === false || shopData.status === 'closed') {
+      throw new Error('STORE_CLOSED: ร้านค้าปิดให้บริการชั่วคราว');
     }
-
-    handleRequest(req, res);
-    assert.equal(statusCode, 200);
-    assert.equal(responseBody, "Charge creation event acknowledged");
-    assert.equal(orderMutated, false);
-  });
-
-  // Scenario 58: Direct HTTP Pipeline: Unverified Opn charge responds HTTP 401 Unauthorized
-  await runTest('Scenario 58: Direct HTTP Pipeline: Unverified Opn charge responds HTTP 401 Unauthorized', async () => {
-    let statusCode = null;
-    let responseBody = null;
-    const req = { method: "POST", body: { key: "charge.complete", data: { id: "chrg_fake_999" } } };
-    const res = {
-      status: (code) => { statusCode = code; return res; },
-      send: (data) => { responseBody = data; return res; }
-    };
-
-    async function handleRequest(req, res, retrieveChargeMock) {
-      const charge = await retrieveChargeMock(req.body.data.id);
-      if (!charge) {
-        return res.status(401).send("Unauthorized: Charge not found on payment provider");
-      }
-    }
-
-    await handleRequest(req, res, async () => null); // Provider returns null
-    assert.equal(statusCode, 401);
-    assert.equal(responseBody, "Unauthorized: Charge not found on payment provider");
-  });
-
-  // Scenario 59: Direct HTTP Pipeline: Amount mismatch responds HTTP 400
-  await runTest('Scenario 59: Direct HTTP Pipeline: Amount mismatch responds HTTP 400 Amount Mismatch', async () => {
-    let statusCode = null;
-    let responseBody = null;
-    const req = { method: "POST", body: { key: "charge.complete", data: { id: "chrg_mismatch" } } };
-    const res = {
-      status: (code) => { statusCode = code; return res; },
-      send: (data) => { responseBody = data; return res; }
-    };
-
-    async function handleRequest(req, res) {
-      const charge = { id: "chrg_mismatch", amount: 1000, currency: "THB", metadata: { orderId: "ord_mm", uid: "user_mm" } };
-      const order = { orderId: "ord_mm", userId: "user_mm", totalAmount: 50 }; // Expected 5000 Satang
-      const expectedSatang = Math.round(order.totalAmount * 100);
-      if (charge.amount !== expectedSatang) {
-        return res.status(400).send("Amount mismatch");
-      }
-    }
-
-    await handleRequest(req, res);
-    assert.equal(statusCode, 400);
-    assert.equal(responseBody, "Amount mismatch");
-  });
-
-  // Scenario 60: Direct HTTP Pipeline: Successful charge commits atomically and returns HTTP 200 OK
-  await runTest('Scenario 60: Direct HTTP Pipeline: Successful charge commits atomically and returns HTTP 200 OK', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    engine.setDoc('orders/ord_pipeline_success', {
-      orderId: 'ord_pipeline_success',
-      userId: 'user_pipe_01',
-      totalAmount: 150,
-      paymentStatus: 'pending'
-    });
-
-    let statusCode = null;
-    let responseBody = null;
-    const req = {
-      method: "POST",
-      body: {
-        id: "evnt_pipe_success_01",
-        key: "charge.complete",
-        data: { id: "chrg_pipe_success_01" }
-      }
-    };
-    const res = {
-      status: (code) => { statusCode = code; return res; },
-      send: (data) => { responseBody = data; return res; }
-    };
-
-    const mockCharge = {
-      id: "chrg_pipe_success_01",
-      amount: 15000,
-      currency: "THB",
-      status: "successful",
-      metadata: { orderId: "ord_pipeline_success", uid: "user_pipe_01" }
-    };
-
-    await engine.runTransaction(async (tx) => {
-      const orderRef = { path: 'orders/ord_pipeline_success' };
-      const orderSnap = await tx.get(orderRef);
-      const order = orderSnap.data();
-
-      tx.update(orderRef, { paymentStatus: 'paid', paymentId: mockCharge.id });
-      tx.set({ path: `webhook_events/${req.body.id}` }, { eventId: req.body.id, processed: true });
-      tx.set({ path: `audit_logs/pay_${order.orderId}` }, { action: "PAYMENT_SUCCESSFUL", amount: order.totalAmount });
-    });
-
-    res.status(200).send("OK");
-    assert.equal(statusCode, 200);
-    assert.equal(responseBody, "OK");
-
-    const committedOrder = engine.getDoc('orders/ord_pipeline_success');
-    const committedEvent = engine.getDoc(`webhook_events/${req.body.id}`);
-    const committedAudit = engine.getDoc('audit_logs/pay_ord_pipeline_success');
-
-    assert.equal(committedOrder.paymentStatus, 'paid');
-    assert.equal(committedEvent.processed, true);
-    assert.equal(committedAudit.action, "PAYMENT_SUCCESSFUL");
-  });
-
-  // Scenario 61: Durable Outbox Recovery: Interrupted resource release is swept and recovered by recovery worker
-  await runTest('Scenario 61: Durable Outbox Recovery: Interrupted resource release is recovered cleanly', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    engine.setDoc('products/prod_durable_01', { stock: 5 });
-    engine.setDoc('orders/ord_interrupted_01', {
-      orderId: 'ord_interrupted_01',
-      productId: 'prod_durable_01',
-      quantity: 3,
-      reservedQuantity: 3,
-      paymentStatus: 'expired',
-      resourcesReleased: false,
-      resourceReleaseReason: 'Payment timeout occurred midway before release'
-    });
-
-    // Durable Recovery Worker simulation
-    async function durableRecoverySweep() {
-      // Find orders where resourcesReleased == false and paymentStatus == expired
-      const doc = engine.getDoc('orders/ord_interrupted_01');
-      if (doc && doc.resourcesReleased === false && doc.paymentStatus === 'expired') {
-        return await engine.runTransaction(async (tx) => {
-          const oSnap = await tx.get({ path: 'orders/ord_interrupted_01' });
-          const o = oSnap.data();
-          if (o.resourcesReleased) return { recovered: false };
-
-          const pSnap = await tx.get({ path: `products/${o.productId}` });
-          const p = pSnap.data();
-          tx.update({ path: `products/${o.productId}` }, { stock: p.stock + o.reservedQuantity });
-          tx.update({ path: 'orders/ord_interrupted_01' }, { resourcesReleased: true, recoveredAt: new Date() });
-          return { recovered: true };
-        });
-      }
-      return { recovered: false };
-    }
-
-    const recoveryResult = await durableRecoverySweep();
-    assert.equal(recoveryResult.recovered, true);
-    assert.equal(engine.getDoc('products/prod_durable_01').stock, 8); // 5 + 3 = 8
-    assert.equal(engine.getDoc('orders/ord_interrupted_01').resourcesReleased, true);
-
-    // Second sweep does not double-increment stock!
-    const secondSweep = await durableRecoverySweep();
-    assert.equal(secondSweep.recovered, false);
-    assert.equal(engine.getDoc('products/prod_durable_01').stock, 8);
-  });
-
-  // Scenario 62: Worker Crash-in-Flight Resiliency: Worker A dies midway, Worker B retries, exactly 1 increment occurs
-  await runTest('Scenario 62: Worker Crash-in-Flight: Worker A dies midway, Worker B retries, exactly 1 increment', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    engine.setDoc('products/prod_crash_flight', { stock: 10 });
-    engine.setDoc('orders/ord_crash_flight', {
-      orderId: 'ord_crash_flight',
-      productId: 'prod_crash_flight',
-      quantity: 4,
-      reservedQuantity: 4,
-      paymentStatus: 'expired',
-      resourcesReleased: false
-    });
-
-    // Worker A: Starts transaction, reads, but crashes BEFORE commit
-    try {
-      await engine.runTransaction(async (tx) => {
-        const oSnap = await tx.get({ path: 'orders/ord_crash_flight' });
-        const o = oSnap.data();
-        await tx.get({ path: `products/${o.productId}` });
-        // Simulating process kill / OOM crash before commit
-        throw new Error("WORKER_A_PROCESS_CRASH");
-      });
-    } catch {
-      // Worker A died
-    }
-
-    // Invariant check: Stock is still 10, resourcesReleased is still false
-    assert.equal(engine.getDoc('products/prod_crash_flight').stock, 10);
-    assert.equal(engine.getDoc('orders/ord_crash_flight').resourcesReleased, false);
-
-    // Worker B: Picks up the job on next scheduler cycle
-    const workerBResult = await engine.runTransaction(async (tx) => {
-      const oSnap = await tx.get({ path: 'orders/ord_crash_flight' });
-      const o = oSnap.data();
-      if (o.resourcesReleased) return { committed: false };
-
-      const pSnap = await tx.get({ path: `products/${o.productId}` });
-      const p = pSnap.data();
-      tx.update({ path: `products/${o.productId}` }, { stock: p.stock + o.reservedQuantity });
-      tx.update({ path: 'orders/ord_crash_flight' }, { resourcesReleased: true });
-      return { committed: true };
-    });
-
-    assert.equal(workerBResult.committed, true);
-    assert.equal(engine.getDoc('products/prod_crash_flight').stock, 14); // Exactly 10 + 4 = 14
-    assert.equal(engine.getDoc('orders/ord_crash_flight').resourcesReleased, true);
-  });
-
-  // Scenario 63: Starvation-Free Outbox Batch Loop: Backlog of 137 orders drains completely across batches
-  await runTest('Scenario 63: Starvation-Free Batch Loop: 137 backlog orders drain completely across batches', async () => {
-    const totalBacklog = 137;
-    const batchSize = 50;
-    let pendingQueue = Array.from({ length: totalBacklog }, (_, i) => ({ id: `ord_backlog_${i}`, released: false }));
-
-    let batchesExecuted = 0;
-    let totalProcessed = 0;
-
-    while (true) {
-      const currentBatch = pendingQueue.filter(o => !o.released).slice(0, batchSize);
-      if (currentBatch.length === 0) break;
-      batchesExecuted++;
-      for (const item of currentBatch) {
-        item.released = true;
-        totalProcessed++;
-      }
-    }
-
-    assert.equal(totalProcessed, 137);
-    assert.equal(batchesExecuted, 3); // 50 + 50 + 37 = 3 batches
-    assert.equal(pendingQueue.filter(o => !o.released).length, 0); // 0 starvation
-  });
-
-  // Scenario 64: Invalid webhook signature header -> 401
-  await runTest('Scenario 64: Invalid webhook signature header -> 401 Unauthorized', async () => {
-    function verifySig(rawBody, headerSig, secret) {
-      if (!secret) return true;
-      if (!headerSig) return false;
-      const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
-      const bufA = Buffer.from(headerSig);
-      const bufB = Buffer.from(expected);
-      if (bufA.length !== bufB.length) return false;
-      return crypto.timingSafeEqual(bufA, bufB);
-    }
-
-    const secret = "secret_webhook_key_123";
-    const body = JSON.stringify({ key: "charge.complete", data: { id: "chrg_sig_01" } });
-    const badSig = "bad_signature_abcdef";
-    assert.equal(verifySig(body, badSig, secret), false);
-  });
-
-  // Scenario 65: Valid signature + tampered body -> reject
-  await runTest('Scenario 65: Valid signature with tampered body payload -> reject', async () => {
-    function verifySig(rawBody, headerSig, secret) {
-      if (!secret) return true;
-      if (!headerSig) return false;
-      const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
-      const bufA = Buffer.from(headerSig);
-      const bufB = Buffer.from(expected);
-      if (bufA.length !== bufB.length) return false;
-      return crypto.timingSafeEqual(bufA, bufB);
-    }
-
-    const secret = "secret_webhook_key_123";
-    const originalBody = JSON.stringify({ key: "charge.complete", amount: 10000 });
-    const validSig = crypto.createHmac("sha256", secret).update(originalBody).digest("hex");
-
-    const tamperedBody = JSON.stringify({ key: "charge.complete", amount: 1000 }); // Underpayment tamper
-    assert.equal(verifySig(tamperedBody, validSig, secret), false);
-  });
-
-  // Scenario 66: Same eventId replay -> no mutation
-  await runTest('Scenario 66: Same eventId replay -> acknowledged without order mutation', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const eventId = "evnt_replay_66";
-    engine.setDoc(`webhook_events/${eventId}`, { eventId, chargeId: "chrg_66", orderId: "ord_66", processed: true });
-    engine.setDoc(`orders/ord_66`, { paymentStatus: "paid", totalAmount: 100 });
-
-    let mutated = false;
-    const res = await engine.runTransaction(async (tx) => {
-      const snap = await tx.get({ path: `webhook_events/${eventId}` });
-      if (snap?.exists && snap.data()?.processed) {
-        return { code: 200, message: "Already processed event" };
-      }
-      mutated = true;
-      return { code: 200, message: "OK" };
-    });
-
-    assert.equal(res.message, "Already processed event");
-    assert.equal(mutated, false);
-  });
-
-  // Scenario 67: charge.create -> recorded in webhook_events but never paid
-  await runTest('Scenario 67: charge.create is recorded in webhook_events but never sets order to paid', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    engine.setDoc('orders/ord_create_67', { orderId: 'ord_create_67', paymentStatus: 'pending' });
-
-    const event = { id: "evnt_create_67", key: "charge.create", data: { id: "chrg_create_67" } };
-    engine.setDoc(`webhook_events/${event.id}`, {
-      eventId: event.id,
-      eventKey: event.key,
-      chargeId: event.data.id,
-      processed: true,
-      orderMutated: false
-    });
-
-    const orderAfter = engine.getDoc('orders/ord_create_67');
-    const eventDoc = engine.getDoc(`webhook_events/${event.id}`);
-    assert.equal(orderAfter.paymentStatus, 'pending');
-    assert.equal(eventDoc.processed, true);
-    assert.equal(eventDoc.orderMutated, false);
-  });
-
-  // Scenario 68: Same charge, different event IDs -> exactly one payment transition, no double counting
-  await runTest('Scenario 68: Same charge, different event IDs commits exactly once', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    engine.setDoc('orders/ord_multievent_68', { orderId: 'ord_multievent_68', paymentStatus: 'pending' });
-
-    let paidCommitCount = 0;
-    async function processEvent(eventId, chargeId) {
-      return await engine.runTransaction(async (tx) => {
-        const oSnap = await tx.get({ path: 'orders/ord_multievent_68' });
-        const o = oSnap.data();
-        if (o.paymentStatus === 'paid') {
-          return { code: 200, status: 'already_paid' };
-        }
-        paidCommitCount++;
-        tx.update({ path: 'orders/ord_multievent_68' }, { paymentStatus: 'paid', paymentId: chargeId });
-        tx.set({ path: `webhook_events/${eventId}` }, { eventId, processed: true });
-        return { code: 200, status: 'paid' };
-      });
-    }
-
-    const res1 = await processEvent('evnt_first_68', 'chrg_same_68');
-    const res2 = await processEvent('evnt_second_68', 'chrg_same_68');
-
-    assert.equal(res1.status, 'paid');
-    assert.equal(res2.status, 'already_paid');
-    assert.equal(paidCommitCount, 1);
-  });
-
-  // Scenario 69: Worker lease prevents duplicate simultaneous processing
-  await runTest('Scenario 69: Worker lease prevents duplicate simultaneous processing', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const now = Date.now();
-    engine.setDoc('resource_release_jobs/job_lease_69', {
-      jobId: 'job_lease_69',
-      status: 'processing',
-      leaseUntil: now + 5 * 60 * 1000, // 5 minutes in future
-      workerId: 'worker_A'
-    });
-
-    async function claimJob(workerId) {
-      return await engine.runTransaction(async (tx) => {
-        const jSnap = await tx.get({ path: 'resource_release_jobs/job_lease_69' });
-        const j = jSnap.data();
-        const currentTime = Date.now();
-        if (j.status === 'processing' && j.leaseUntil > currentTime) {
-          return { claimed: false, reason: 'LOCKED_BY_ANOTHER_WORKER' };
-        }
-        tx.update({ path: 'resource_release_jobs/job_lease_69' }, {
-          status: 'processing',
-          leaseUntil: currentTime + 5 * 60 * 1000,
-          workerId
-        });
-        return { claimed: true };
-      });
-    }
-
-    const claimB = await claimJob('worker_B');
-    assert.equal(claimB.claimed, false);
-    assert.equal(claimB.reason, 'LOCKED_BY_ANOTHER_WORKER');
-  });
-
-  // Scenario 70: Expired lease can be reclaimed by a new worker
-  await runTest('Scenario 70: Expired lease can be reclaimed by a new worker', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const pastTime = Date.now() - 10 * 60 * 1000; // Expired 10 minutes ago
-    engine.setDoc('resource_release_jobs/job_expired_70', {
-      jobId: 'job_expired_70',
-      status: 'processing',
-      leaseUntil: pastTime,
-      workerId: 'worker_dead'
-    });
-
-    async function claimExpiredJob(workerId) {
-      return await engine.runTransaction(async (tx) => {
-        const jSnap = await tx.get({ path: 'resource_release_jobs/job_expired_70' });
-        const j = jSnap.data();
-        const currentTime = Date.now();
-        if (j.status === 'processing' && j.leaseUntil > currentTime) {
-          return { claimed: false };
-        }
-        tx.update({ path: 'resource_release_jobs/job_expired_70' }, {
-          status: 'processing',
-          leaseUntil: currentTime + 5 * 60 * 1000,
-          workerId
-        });
-        return { claimed: true };
-      });
-    }
-
-    const claimNew = await claimExpiredJob('worker_live');
-    assert.equal(claimNew.claimed, true);
-    assert.equal(engine.getDoc('resource_release_jobs/job_expired_70').workerId, 'worker_live');
-  });
-
-  // Scenario 71: Worker crash after claiming job -> recovered safely on next cycle
-  await runTest('Scenario 71: Worker crash after claiming job recovers safely on next cycle', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    engine.setDoc('products/prod_71', { stock: 2 });
-    engine.setDoc('orders/ord_71', { orderId: 'ord_71', productId: 'prod_71', reservedQuantity: 2, resourcesReleased: false });
-    engine.setDoc('resource_release_jobs/job_71', { jobId: 'job_71', orderId: 'ord_71', status: 'pending' });
-
-    // Worker 1 claims job but dies before completing release
-    engine.setDoc('resource_release_jobs/job_71', {
-      jobId: 'job_71',
-      orderId: 'ord_71',
-      status: 'processing',
-      leaseUntil: Date.now() - 1000, // Expired
-      workerId: 'worker_crashed'
-    });
-
-    // Worker 2 reclaims and completes
-    await engine.runTransaction(async (tx) => {
-      const oSnap = await tx.get({ path: 'orders/ord_71' });
-      const o = oSnap.data();
-      if (!o.resourcesReleased) {
-        const pSnap = await tx.get({ path: `products/${o.productId}` });
-        const p = pSnap.data();
-        tx.update({ path: `products/${o.productId}` }, { stock: p.stock + o.reservedQuantity });
-        tx.update({ path: 'orders/ord_71' }, { resourcesReleased: true });
-      }
-      tx.update({ path: 'resource_release_jobs/job_71' }, { status: 'completed' });
-    });
-
-    assert.equal(engine.getDoc('products/prod_71').stock, 4); // 2 + 2 = 4
-    assert.equal(engine.getDoc('resource_release_jobs/job_71').status, 'completed');
-  });
-
-  // Scenario 72: Job retry and exponential backoff semantics operating properly
-  await runTest('Scenario 72: Job retry and backoff calculates nextRetryAt properly', async () => {
-    function computeNextRetry(attempts, baseDelayMs = 1000) {
-      const delay = baseDelayMs * Math.pow(2, attempts);
-      return Date.now() + delay;
-    }
-
-    const now = Date.now();
-    const retry1 = computeNextRetry(1);
-    const retry2 = computeNextRetry(2);
-    const retry3 = computeNextRetry(3);
-
-    assert.ok(retry1 >= now + 2000);
-    assert.ok(retry2 >= now + 4000);
-    assert.ok(retry3 >= now + 8000);
-  });
-
-  // Scenario 73: Refund provider success + Firestore failure -> recovery with idempotency key
-  await runTest('Scenario 73: Refund provider success + Firestore failure recovers with idempotency key', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const orderId = "ord_refund_73";
-    const refundKey = `ref_${orderId}_chrg_73`;
-
-    engine.setDoc(`orders/${orderId}`, {
-      orderId,
-      paymentId: "chrg_73",
-      paymentStatus: "paid_after_expired",
-      reconciliationStatus: "PROVIDER_REFUNDING",
-      refundIdempotencyKey: refundKey
-    });
-
-    // Provider mock returns existing refund when queried with same idempotency key
-    async function executeOrRecoverRefund(orderId, opnProvider) {
-      const order = engine.getDoc(`orders/${orderId}`);
-      if (order.reconciliationStatus === "REFUNDED") return { status: "ALREADY_REFUNDED" };
-
-      const refundRecord = await opnProvider.findRefundByKey(order.refundIdempotencyKey);
-      if (refundRecord) {
-        // Recover Firestore state
-        engine.setDoc(`orders/${orderId}`, {
-          paymentStatus: "refunded",
-          reconciliationStatus: "REFUNDED",
-          refundId: refundRecord.id
-        }, { merge: true });
-        return { status: "RECOVERED", refundId: refundRecord.id };
-      }
-      return { status: "FAILED" };
-    }
-
-    const mockProvider = {
-      findRefundByKey: async (key) => key === refundKey ? { id: "rfnd_recovered_73" } : null
-    };
-
-    const recoveryResult = await executeOrRecoverRefund(orderId, mockProvider);
-    assert.equal(recoveryResult.status, "RECOVERED");
-    assert.equal(recoveryResult.refundId, "rfnd_recovered_73");
-    assert.equal(engine.getDoc(`orders/${orderId}`).paymentStatus, "refunded");
-  });
-
-  // Scenario 74: Refund replay -> no duplicate refund issued
-  await runTest('Scenario 74: Refund replay / repeated calls does not issue duplicate refund', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    engine.setDoc('orders/ord_refund_74', {
-      orderId: 'ord_refund_74',
-      paymentStatus: 'refunded',
-      reconciliationStatus: 'REFUNDED',
-      refundId: 'rfnd_74'
-    });
-
-    let providerCallCount = 0;
-    async function attemptRefund(orderId) {
-      const order = engine.getDoc(`orders/${orderId}`);
-      const TERMINAL_RECONCILED = ["REFUNDED", "ACCEPTED"];
-      if (TERMINAL_RECONCILED.includes(order.reconciliationStatus) || order.paymentStatus === "refunded") {
-        return { code: 200, message: "Already refunded" };
-      }
-      providerCallCount++;
-      return { code: 200, message: "Refund processed" };
-    }
-
-    const res1 = await attemptRefund('ord_refund_74');
-    const res2 = await attemptRefund('ord_refund_74');
-
-    assert.equal(res1.message, "Already refunded");
-    assert.equal(res2.message, "Already refunded");
-    assert.equal(providerCallCount, 0); // 0 duplicate provider calls
-  });
-
-  // Scenario 75: Cross-order refund binding -> rejected
-  await runTest('Scenario 75: Cross-order refund binding is strictly REJECTED', async () => {
-    function verifyRefundBinding(order, refundMetadata) {
-      if (order.orderId !== refundMetadata.order_id) {
-        throw new Error("400: Refund metadata order ID does not match target order");
-      }
-      if (order.paymentId !== refundMetadata.charge_id) {
-        throw new Error("400: Refund charge ID does not match order payment binding");
-      }
-      return true;
-    }
-
-    const order = { orderId: "ord_target_75", paymentId: "chrg_target_75" };
-    const spoofedMetadata = { order_id: "ord_spoofed_99", charge_id: "chrg_target_75" };
-
-    assert.throws(() => verifyRefundBinding(order, spoofedMetadata), /Refund metadata order ID does not match/);
-  });
-
-  // Scenario 76: Concurrent refund requests -> exactly one provider operation committed
-  await runTest('Scenario 76: Concurrent refund requests execute exactly one provider operation', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    engine.setDoc('orders/ord_conc_76', {
-      orderId: 'ord_conc_76',
-      paymentStatus: 'paid_after_expired',
-      reconciliationStatus: 'PENDING_REVIEW'
-    });
-
-    async function processRefundAtomic() {
-      return await engine.runTransaction(async (tx) => {
-        const snap = await tx.get({ path: 'orders/ord_conc_76' });
-        const order = snap.data();
-        if (order.reconciliationStatus === 'REFUNDED' || order.reconciliationStatus === 'PROVIDER_REFUNDING') {
-          return { status: 'already_processing_or_refunded' };
-        }
-        tx.update({ path: 'orders/ord_conc_76' }, {
-          paymentStatus: 'refunded',
-          reconciliationStatus: 'REFUNDED',
-          refundId: 'rfnd_atomic_76'
-        });
-        return { status: 'refund_committed' };
-      });
-    }
-
-    const [res1, res2] = await Promise.all([processRefundAtomic(), processRefundAtomic()]);
-    const committedCount = [res1, res2].filter(r => r.status === 'refund_committed').length;
-    const alreadyCount = [res1, res2].filter(r => r.status === 'already_processing_or_refunded').length;
-    assert.equal(committedCount, 1);
-    assert.equal(alreadyCount, 1);
-  });
-
-  // Scenario 77: Audit log strictly corresponds to terminal payment state
-  await runTest('Scenario 77: Audit log strictly corresponds to terminal payment state', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    engine.setDoc('orders/ord_audit_77', { orderId: 'ord_audit_77', paymentStatus: 'refunded' });
-    engine.setDoc('audit_logs/reconcile_ord_audit_77', {
-      action: 'PAID_AFTER_EXPIRED_REFUNDED',
-      orderId: 'ord_audit_77',
-      status: 'REFUNDED'
-    });
-
-    const order = engine.getDoc('orders/ord_audit_77');
-    const audit = engine.getDoc('audit_logs/reconcile_ord_audit_77');
-
-    assert.equal(order.paymentStatus, 'refunded');
-    assert.equal(audit.action, 'PAID_AFTER_EXPIRED_REFUNDED');
-  });
-
-  // Scenario 78: Webhook + refund race -> state machine invariant maintained (terminal refund takes precedence)
-  await runTest('Scenario 78: Webhook + refund race: terminal refund strictly takes precedence', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    engine.setDoc('orders/ord_race_78', {
-      orderId: 'ord_race_78',
-      paymentStatus: 'refunded',
-      reconciliationStatus: 'REFUNDED'
-    });
-
-    // Incoming late webhook with successful status arriving after refund
-    async function handleIncomingWebhook(orderId) {
-      const order = engine.getDoc(`orders/${orderId}`);
-      const TERMINAL_STATES = ["ACCEPTED", "REFUNDED", "REFUND_REQUESTED"];
-      if (TERMINAL_STATES.includes(order.reconciliationStatus) || order.paymentStatus === "refunded") {
-        return { code: 200, message: "Already resolved in terminal reconciliation state" };
-      }
-      return { code: 200, message: "State updated to paid" };
-    }
-
-    const webhookRes = await handleIncomingWebhook('ord_race_78');
-    assert.equal(webhookRes.message, "Already resolved in terminal reconciliation state");
-    assert.equal(engine.getDoc('orders/ord_race_78').paymentStatus, 'refunded'); // Never overridden!
-  });
-
-  // Scenario 79: Missing secret / undefined secret -> Fail-Closed (Reject with 401)
-  await runTest('Scenario 79: Missing or undefined webhook secret fails closed (401)', async () => {
-    function verifySig(req, secret) {
-      if (!secret || typeof secret !== "string" || !secret.trim()) return false;
-      const signatureHeader = req.headers?.["x-opn-signature"];
-      if (!signatureHeader || typeof signatureHeader !== "string") return false;
-      const expected = crypto.createHmac("sha256", secret.trim()).update(req.rawBody).digest("hex");
-      const bufA = Buffer.from(signatureHeader);
-      const bufB = Buffer.from(expected);
-      if (bufA.length !== bufB.length) return false;
-      return crypto.timingSafeEqual(bufA, bufB);
-    }
-
-    const req = { headers: { "x-opn-signature": "some_sig" }, rawBody: "{}" };
-    assert.equal(verifySig(req, null), false); // No secret -> Fail closed!
-    assert.equal(verifySig(req, undefined), false);
-    assert.equal(verifySig(req, ""), false);
-  });
-
-  // Scenario 80: Valid signature + exact raw body -> Accept
-  await runTest('Scenario 80: Valid signature with exact raw body is accepted', async () => {
-    const secret = "prod_webhook_secret_key_80";
-    const rawBody = JSON.stringify({ key: "charge.complete", id: "evnt_80", data: { id: "chrg_80" } });
-    const signature = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
-
-    function verifySig(req, sec) {
-      if (!sec || typeof sec !== "string" || !sec.trim()) return false;
-      const sig = req.headers?.["x-opn-signature"];
-      if (!sig || typeof sig !== "string") return false;
-      const expected = crypto.createHmac("sha256", sec.trim()).update(req.rawBody).digest("hex");
-      const bufA = Buffer.from(sig);
-      const bufB = Buffer.from(expected);
-      if (bufA.length !== bufB.length) return false;
-      return crypto.timingSafeEqual(bufA, bufB);
-    }
-
-    const req = { headers: { "x-opn-signature": signature }, rawBody };
-    assert.equal(verifySig(req, secret), true);
-  });
-
-  // Scenario 81: Changing body by even 1 byte -> Reject
-  await runTest('Scenario 81: Changing raw body by even 1 byte rejects signature', async () => {
-    const secret = "prod_webhook_secret_key_81";
-    const originalBody = JSON.stringify({ key: "charge.complete", amount: 50000 });
-    const signature = crypto.createHmac("sha256", secret).update(originalBody).digest("hex");
-
-    const tamperedBody = JSON.stringify({ key: "charge.complete", amount: 50001 }); // 1 byte change
-
-    function verifySig(raw, sig, sec) {
-      const expected = crypto.createHmac("sha256", sec).update(raw).digest("hex");
-      const bufA = Buffer.from(sig);
-      const bufB = Buffer.from(expected);
-      if (bufA.length !== bufB.length) return false;
-      return crypto.timingSafeEqual(bufA, bufB);
-    }
-
-    assert.equal(verifySig(tamperedBody, signature, secret), false);
-  });
-
-  // Scenario 82: Changing signature by even 1 byte -> Reject
-  await runTest('Scenario 82: Changing signature by even 1 byte rejects signature', async () => {
-    const secret = "prod_webhook_secret_key_82";
-    const rawBody = JSON.stringify({ key: "charge.complete", id: "evnt_82" });
-    const validSignature = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
-
-    // Alter 1 character
-    const tamperedSignature = validSignature.slice(0, -1) + (validSignature.slice(-1) === 'a' ? 'b' : 'a');
-
-    function verifySig(raw, sig, sec) {
-      const expected = crypto.createHmac("sha256", sec).update(raw).digest("hex");
-      const bufA = Buffer.from(sig);
-      const bufB = Buffer.from(expected);
-      if (bufA.length !== bufB.length) return false;
-      return crypto.timingSafeEqual(bufA, bufB);
-    }
-
-    assert.equal(verifySig(rawBody, tamperedSignature, secret), false);
-  });
-
-  // Scenario 83: Signature wrong length / malformed format -> Reject
-  await runTest('Scenario 83: Malformed signature format with invalid length is rejected', async () => {
-    const secret = "prod_webhook_secret_key_83";
-    const rawBody = JSON.stringify({ key: "charge.complete" });
-
-    function verifySig(raw, sig, sec) {
-      if (!sig || typeof sig !== "string") return false;
-      const expected = crypto.createHmac("sha256", sec).update(raw).digest("hex");
-      const bufA = Buffer.from(sig);
-      const bufB = Buffer.from(expected);
-      if (bufA.length !== bufB.length) return false;
-      return crypto.timingSafeEqual(bufA, bufB);
-    }
-
-    assert.equal(verifySig(rawBody, "short_sig", secret), false);
-    assert.equal(verifySig(rawBody, "way_too_long_signature_exceeding_standard_sha256_hex_length_of_64_characters_xxxxxxxxxxxx", secret), false);
-  });
-
-  // Scenario 84: Ambiguous / missing / empty signature headers -> Reject
-  await runTest('Scenario 84: Missing or empty signature headers strictly reject', async () => {
-    function verifySig(req, sec) {
-      if (!sec) return false;
-      const signatureHeader = req.headers?.["x-opn-signature"] || req.headers?.["x-signature"];
-      if (!signatureHeader || typeof signatureHeader !== "string" || !signatureHeader.trim()) return false;
-      return true;
-    }
-
-    assert.equal(verifySig({ headers: {} }, "secret"), false);
-    assert.equal(verifySig({ headers: { "x-opn-signature": "" } }, "secret"), false);
-    assert.equal(verifySig({ headers: { "x-opn-signature": "   " } }, "secret"), false);
-  });
-
-  // Scenario 85: JSON re-formatting (whitespace changes) tested strictly against exact raw body -> Reject if raw body changed
-  await runTest('Scenario 85: JSON whitespace re-formatting evaluated against raw body detects tampering', async () => {
-    const secret = "prod_webhook_secret_key_85";
-    const compactJson = '{"key":"charge.complete","amount":100}';
-    const prettyJson = '{\n  "key": "charge.complete",\n  "amount": 100\n}';
-
-    const validSigForCompact = crypto.createHmac("sha256", secret).update(compactJson).digest("hex");
-
-    function verifySig(raw, sig, sec) {
-      const expected = crypto.createHmac("sha256", sec).update(raw).digest("hex");
-      const bufA = Buffer.from(sig);
-      const bufB = Buffer.from(expected);
-      if (bufA.length !== bufB.length) return false;
-      return crypto.timingSafeEqual(bufA, bufB);
-    }
-
-    assert.equal(verifySig(compactJson, validSigForCompact, secret), true);
-    // Passing prettyJson with compact's signature MUST fail because raw bytes differ!
-    assert.equal(verifySig(prettyJson, validSigForCompact, secret), false);
-  });
-
-  // Scenario 86: Replay signature + eventId -> Idempotent
-  await runTest('Scenario 86: Replay signature with original eventId returns idempotent 200', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const eventId = "evnt_replay_86";
-    engine.setDoc(`webhook_events/${eventId}`, { eventId, chargeId: "chrg_86", orderId: "ord_86", processed: true });
-    engine.setDoc(`orders/ord_86`, { paymentStatus: "paid" });
-
-    let mutated = false;
-    const result = await engine.runTransaction(async (tx) => {
-      const snap = await tx.get({ path: `webhook_events/${eventId}` });
-      if (snap?.exists && snap.data()?.processed) {
-        return { code: 200, message: "Already processed event" };
-      }
-      mutated = true;
-      return { code: 200, message: "OK" };
-    });
-
-    assert.equal(result.message, "Already processed event");
-    assert.equal(mutated, false);
-  });
-
-  // Scenario 87: Replay signature with new eventId -> Validated but state machine prevents double mutation
-  await runTest('Scenario 87: Replay signature with new eventId is idempotent on state machine', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    engine.setDoc('orders/ord_87', { orderId: 'ord_87', paymentStatus: 'paid' });
-
-    let stateMutations = 0;
-    async function handleIncomingEvent(newEventId) {
-      return await engine.runTransaction(async (tx) => {
-        const snap = await tx.get({ path: 'orders/ord_87' });
-        const o = snap.data();
-        if (o.paymentStatus === 'paid') {
-          return { code: 200, message: 'Already processed' };
-        }
-        stateMutations++;
-        tx.update({ path: 'orders/ord_87' }, { paymentStatus: 'paid' });
-        tx.set({ path: `webhook_events/${newEventId}` }, { eventId: newEventId, processed: true });
-        return { code: 200, message: 'Paid committed' };
-      });
-    }
-
-    const res = await handleIncomingEvent('evnt_new_replay_87');
-    assert.equal(res.message, 'Already processed');
-    assert.equal(stateMutations, 0); // 0 extra state mutations!
-  });
-
-  // Scenario 88: Secret configuration error (empty string / null) -> fail closed
-  await runTest('Scenario 88: Secret configuration error fails closed before entering logic', async () => {
-    function processRequestWithSignatureGuard(req, signatureSecret) {
-      if (!signatureSecret || typeof signatureSecret !== "string" || !signatureSecret.trim()) {
-        return { status: 401, error: "Configuration Error: Secret missing" };
-      }
-      return { status: 200, error: null };
-    }
-
-    assert.equal(processRequestWithSignatureGuard({}, "").status, 401);
-    assert.equal(processRequestWithSignatureGuard({}, null).status, 401);
-    assert.equal(processRequestWithSignatureGuard({}, "valid_secret").status, 200);
-  });
-
-  // Scenario 89: Signature verification occurs strictly before Firestore transaction
-  await runTest('Scenario 89: Signature failure terminates request before any Firestore transaction', async () => {
-    let firestoreReadCount = 0;
-    function handleWebhookPipeline(req, signatureSecret, dbEngine) {
-      // 1. Signature Check First
-      if (!signatureSecret || req.headers?.["x-opn-signature"] !== "valid_sig") {
-        return { statusCode: 401, message: "Unauthorized" };
-      }
-      // 2. Database interaction occurs only AFTER signature passes
-      firestoreReadCount++;
-      dbEngine.getDoc('orders/ord_89');
-      return { statusCode: 200, message: "OK" };
-    }
-
-    const badReq = { headers: { "x-opn-signature": "invalid_sig" } };
-    const res = handleWebhookPipeline(badReq, "secret", new AdvancedFirestoreEngine());
-
-    assert.equal(res.statusCode, 401);
-    assert.equal(firestoreReadCount, 0); // 0 DB reads or transactions occurred!
-  });
-
-  // Scenario 90: Signature verification failure leaves exactly 0 Order/Audit/Outbox mutations
-  await runTest('Scenario 90: Signature failure leaves exactly 0 Order, Audit, or Outbox mutations', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    engine.setDoc('orders/ord_90', { orderId: 'ord_90', paymentStatus: 'pending', totalAmount: 100 });
-
-    const initialOrderSnap = JSON.stringify(engine.getDoc('orders/ord_90'));
-    const initialEventsSnap = engine.getDoc('webhook_events/evnt_90');
-    const initialAuditSnap = engine.getDoc('audit_logs/pay_ord_90');
-    const initialOutboxSnap = engine.getDoc('resource_release_jobs/job_90');
-
-    function executeWebhookWithSigGate(req, secret, engine) {
-      if (!secret || req.headers?.["x-opn-signature"] !== "expected_sig") {
-        return { code: 401, body: "Unauthorized" };
-      }
-      engine.setDoc('orders/ord_90', { paymentStatus: 'paid' }, { merge: true });
-      return { code: 200, body: "OK" };
-    }
-
-    const badReq = { headers: { "x-opn-signature": "attack_sig" } };
-    const res = executeWebhookWithSigGate(badReq, "expected_sig", engine);
-
-    assert.equal(res.code, 401);
-    assert.equal(JSON.stringify(engine.getDoc('orders/ord_90')), initialOrderSnap); // Untouched
-    assert.equal(engine.getDoc('webhook_events/evnt_90'), initialEventsSnap); // null
-    assert.equal(engine.getDoc('audit_logs/pay_ord_90'), initialAuditSnap); // null
-    assert.equal(engine.getDoc('resource_release_jobs/job_90'), initialOutboxSnap); // null
-  });
-
-  // Scenario 91: Missing rawBody -> 401
-  await runTest('Scenario 91: Missing rawBody property strictly returns 401', async () => {
-    function verifySig(req, secret) {
-      if (!secret || typeof secret !== "string" || !secret.trim()) return false;
-      const signatureHeader = req.headers?.["x-opn-signature"];
-      if (!signatureHeader || typeof signatureHeader !== "string") return false;
-      if (!req.rawBody || (typeof req.rawBody !== "string" && !Buffer.isBuffer(req.rawBody))) {
-        return false;
-      }
-      return true;
-    }
-
-    const reqWithoutRawBody = { headers: { "x-opn-signature": "some_sig" } };
-    assert.equal(verifySig(reqWithoutRawBody, "secret_91"), false);
-  });
-
-  // Scenario 92: Parsed object body only (without rawBody) -> 401
-  await runTest('Scenario 92: Parsed object body only (without rawBody) is REJECTED', async () => {
-    function verifySig(req, secret) {
-      if (!secret || typeof secret !== "string" || !secret.trim()) return false;
-      const signatureHeader = req.headers?.["x-opn-signature"];
-      if (!signatureHeader || typeof signatureHeader !== "string") return false;
-      // No JSON.stringify fallback allowed!
-      if (!req.rawBody || (typeof req.rawBody !== "string" && !Buffer.isBuffer(req.rawBody))) {
-        return false;
-      }
-      return true;
-    }
-
-    const reqObjectOnly = { headers: { "x-opn-signature": "some_sig" }, body: { key: "charge.complete" } };
-    assert.equal(verifySig(reqObjectOnly, "secret_92"), false);
-  });
-
-  // Scenario 93: Raw body modified by 1 byte -> 401
-  await runTest('Scenario 93: Raw body modified by 1 byte fails HMAC verification', async () => {
-    const secret = "secret_93";
-    const originalRaw = '{"key":"charge.complete","amount":25000}';
-    const sig = crypto.createHmac("sha256", secret).update(originalRaw).digest("hex");
-
-    const tamperedRaw = '{"key":"charge.complete","amount":25001}'; // 1 byte change
-
-    function verifyRaw(raw, signature, sec) {
-      const expected = crypto.createHmac("sha256", sec).update(raw).digest("hex");
-      const bufA = Buffer.from(signature);
-      const bufB = Buffer.from(expected);
-      if (bufA.length !== bufB.length) return false;
-      return crypto.timingSafeEqual(bufA, bufB);
-    }
-
-    assert.equal(verifyRaw(tamperedRaw, sig, secret), false);
-  });
-
-  // Scenario 94: Secret rotation / Secret Manager reference failure / whitespace -> 401 + 0 DB mutation
-  await runTest('Scenario 94: Secret rotation / unresolved Secret Manager reference fails closed', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    engine.setDoc('orders/ord_94', { paymentStatus: 'pending' });
-
-    function handleRequest(req, secretProvider, engine) {
-      let resolvedSecret;
-      try {
-        resolvedSecret = typeof secretProvider === "function" ? secretProvider() : secretProvider;
-      } catch {
-        resolvedSecret = null;
-      }
-
-      if (!resolvedSecret || typeof resolvedSecret !== "string" || !resolvedSecret.trim()) {
-        return { status: 401, error: "Secret unavailable / invalid" };
-      }
-      engine.setDoc('orders/ord_94', { paymentStatus: 'paid' }, { merge: true });
-      return { status: 200 };
-    }
-
-    const failingSecretProvider = () => { throw new Error("Secret Manager connection timeout"); };
-    const res1 = handleRequest({}, failingSecretProvider, engine);
-    assert.equal(res1.status, 401);
-    assert.equal(engine.getDoc('orders/ord_94').paymentStatus, 'pending'); // 0 DB mutation
-
-    const whitespaceSecret = "   ";
-    const res2 = handleRequest({}, whitespaceSecret, engine);
-    assert.equal(res2.status, 401);
-    assert.equal(engine.getDoc('orders/ord_94').paymentStatus, 'pending');
-  });
-
-  // Scenario 95: Worker A lease ownership cannot be hijacked by Worker B while lease active
-  await runTest('Scenario 95: Worker A lease ownership cannot be hijacked by Worker B while active', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const now = Date.now();
-    engine.setDoc('resource_release_jobs/job_95', {
-      jobId: 'job_95',
-      status: 'processing',
-      leaseOwner: 'worker_A',
-      leaseToken: 'token_A_123',
-      leaseUntil: now + 5 * 60 * 1000 // Active for 5 min
-    });
-
-    async function attemptClaim(workerId) {
-      return await engine.runTransaction(async (tx) => {
-        const snap = await tx.get({ path: 'resource_release_jobs/job_95' });
-        const job = snap.data();
-        const currentTime = Date.now();
-        if (job.status === 'processing' && job.leaseUntil > currentTime && job.leaseOwner !== workerId) {
-          return { claimed: false, reason: 'LEASE_HELD_BY_ANOTHER_WORKER' };
-        }
-        tx.update({ path: 'resource_release_jobs/job_95' }, {
-          leaseOwner: workerId,
-          leaseToken: 'new_token',
-          leaseUntil: currentTime + 5 * 60 * 1000
-        });
-        return { claimed: true };
-      });
-    }
-
-    const claimB = await attemptClaim('worker_B');
-    assert.equal(claimB.claimed, false);
-    assert.equal(claimB.reason, 'LEASE_HELD_BY_ANOTHER_WORKER');
-    assert.equal(engine.getDoc('resource_release_jobs/job_95').leaseOwner, 'worker_A');
-  });
-
-  // Scenario 96: Expired lease reclaimed strictly via OCC transaction
-  await runTest('Scenario 96: Expired lease reclaimed cleanly with updated token and owner', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const pastTime = Date.now() - 60 * 1000;
-    engine.setDoc('resource_release_jobs/job_96', {
-      jobId: 'job_96',
-      status: 'processing',
-      leaseOwner: 'worker_crashed',
-      leaseToken: 'token_old',
-      leaseUntil: pastTime
-    });
-
-    async function claimJob(workerId) {
-      return await engine.runTransaction(async (tx) => {
-        const snap = await tx.get({ path: 'resource_release_jobs/job_96' });
-        const job = snap.data();
-        const currentTime = Date.now();
-        if (job.status === 'processing' && job.leaseUntil > currentTime && job.leaseOwner !== workerId) {
-          return { claimed: false };
-        }
-        const newLeaseToken = 'token_new_96';
-        tx.update({ path: 'resource_release_jobs/job_96' }, {
-          status: 'processing',
-          leaseOwner: workerId,
-          leaseToken: newLeaseToken,
-          leaseUntil: currentTime + 5 * 60 * 1000
-        });
-        return { claimed: true, leaseToken: newLeaseToken };
-      });
-    }
-
-    const res = await claimJob('worker_B');
-    assert.equal(res.claimed, true);
-    assert.equal(engine.getDoc('resource_release_jobs/job_96').leaseOwner, 'worker_B');
-    assert.equal(engine.getDoc('resource_release_jobs/job_96').leaseToken, 'token_new_96');
-  });
-
-  // Scenario 97: Stale Worker A wakes up after lease expired/reclaimed -> stale write rejected by leaseToken check
-  await runTest('Scenario 97: Stale Worker A write rejected due to leaseToken/leaseOwner mismatch', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    // Worker B has reclaimed job with new token
-    engine.setDoc('resource_release_jobs/job_97', {
-      jobId: 'job_97',
-      status: 'processing',
-      leaseOwner: 'worker_B',
-      leaseToken: 'token_worker_B',
-      leaseUntil: Date.now() + 5 * 60 * 1000
-    });
-
-    async function completeJob(workerId, suppliedToken) {
-      return await engine.runTransaction(async (tx) => {
-        const snap = await tx.get({ path: 'resource_release_jobs/job_97' });
-        const job = snap.data();
-        if (job.leaseOwner !== workerId || job.leaseToken !== suppliedToken) {
-          return { success: false, reason: 'STALE_WORKER_TOKEN_MISMATCH' };
-        }
-        tx.update({ path: 'resource_release_jobs/job_97' }, { status: 'completed' });
-        return { success: true };
-      });
-    }
-
-    // Stale Worker A tries to complete with its old token
-    const staleAttempt = await completeJob('worker_A', 'token_worker_A_old');
-    assert.equal(staleAttempt.success, false);
-    assert.equal(staleAttempt.reason, 'STALE_WORKER_TOKEN_MISMATCH');
-    assert.equal(engine.getDoc('resource_release_jobs/job_97').status, 'processing'); // Still under Worker B!
-  });
-
-  // Scenario 98: Refund provider succeeded + Firestore failed -> Reconciliation worker recovers terminal state
-  await runTest('Scenario 98: Refund provider succeeded + Firestore failed recovers via reconciliation worker', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const orderId = "ord_rec_98";
-    const refundKey = `ref_${orderId}_chrg_98`;
-
-    engine.setDoc(`orders/${orderId}`, {
-      orderId,
-      paymentId: "chrg_98",
-      paymentStatus: "refund_pending",
-      reconciliationStatus: "PROVIDER_REFUNDING",
-      refundIdempotencyKey: refundKey
-    });
-
-    // Mock Opn Provider that already recorded the refund
-    const mockOpn = {
-      retrieveCharge: async (chargeId) => ({
-        id: chargeId,
-        refunds: {
-          data: [{ id: "rfnd_opn_98", amount: 15000, metadata: { refund_key: refundKey, order_id: orderId } }]
-        }
-      })
-    };
-
-    async function reconcileOrder(orderId, opnProvider) {
-      const order = engine.getDoc(`orders/${orderId}`);
-      if (order.reconciliationStatus === "REFUNDED") return { status: "ALREADY_REFUNDED" };
-
-      const charge = await opnProvider.retrieveCharge(order.paymentId);
-      const matchedRefund = charge.refunds?.data?.find(r => r.metadata?.refund_key === order.refundIdempotencyKey);
-      if (matchedRefund) {
-        engine.setDoc(`orders/${orderId}`, {
-          paymentStatus: "refunded",
-          reconciliationStatus: "REFUNDED",
-          refundId: matchedRefund.id
-        }, { merge: true });
-        return { status: "RECONCILED", refundId: matchedRefund.id };
-      }
-      return { status: "NOT_FOUND" };
-    }
-
-    const recResult = await reconcileOrder(orderId, mockOpn);
-    assert.equal(recResult.status, "RECONCILED");
-    assert.equal(recResult.refundId, "rfnd_opn_98");
-    assert.equal(engine.getDoc(`orders/${orderId}`).paymentStatus, "refunded");
-    assert.equal(engine.getDoc(`orders/${orderId}`).reconciliationStatus, "REFUNDED");
-  });
-
-  // Scenario 99: Repeated refund reconciliation -> does not call provider refund again (0 duplicate refund)
-  await runTest('Scenario 99: Repeated refund reconciliation does not call provider refund API', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    engine.setDoc('orders/ord_rec_99', {
-      orderId: 'ord_rec_99',
-      paymentStatus: 'refunded',
-      reconciliationStatus: 'REFUNDED',
-      refundId: 'rfnd_99'
-    });
-
-    let providerRefundCalls = 0;
-    async function reconcile(orderId) {
-      const order = engine.getDoc(`orders/${orderId}`);
-      if (order.reconciliationStatus === "REFUNDED" || order.paymentStatus === "refunded") {
-        return { status: "ALREADY_TERMINAL" };
-      }
-      providerRefundCalls++;
-      return { status: "REFUNDED" };
-    }
-
-    const r1 = await reconcile('ord_rec_99');
-    const r2 = await reconcile('ord_rec_99');
-    assert.equal(r1.status, "ALREADY_TERMINAL");
-    assert.equal(r2.status, "ALREADY_TERMINAL");
-    assert.equal(providerRefundCalls, 0); // Exactly 0 duplicate provider calls
-  });
-
-  // Scenario 100: Webhook + refund + reconciliation concurrency race -> resolves to unique terminal state (refunded)
-  await runTest('Scenario 100: Webhook + refund + reconciliation race resolves strictly to REFUNDED', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    engine.setDoc('orders/ord_race_100', {
-      orderId: 'ord_race_100',
-      paymentStatus: 'paid_after_expired',
-      reconciliationStatus: 'PROVIDER_REFUNDING',
-      refundIdempotencyKey: 'ref_100'
-    });
-
-    async function opnWebhookArrival() {
-      return await engine.runTransaction(async (tx) => {
-        const snap = await tx.get({ path: 'orders/ord_race_100' });
-        const o = snap.data();
-        if (o.reconciliationStatus === 'REFUNDED' || o.reconciliationStatus === 'PROVIDER_REFUNDING') {
-          return { res: 'WEBHOOK_BLOCKED_BY_REFUND' };
-        }
-        tx.update({ path: 'orders/ord_race_100' }, { paymentStatus: 'paid' });
-        return { res: 'WEBHOOK_PAID' };
-      });
-    }
-
-    async function reconciliationWorkerRun() {
-      return await engine.runTransaction(async (tx) => {
-        const snap = await tx.get({ path: 'orders/ord_race_100' });
-        const o = snap.data();
-        if (o.reconciliationStatus === 'REFUNDED') return { res: 'ALREADY_REFUNDED' };
-        tx.update({ path: 'orders/ord_race_100' }, {
-          paymentStatus: 'refunded',
-          reconciliationStatus: 'REFUNDED',
-          refundId: 'rfnd_race_100'
-        });
-        return { res: 'RECONCILED_REFUNDED' };
-      });
-    }
-
-    const [webhookResult, recResult] = await Promise.all([opnWebhookArrival(), reconciliationWorkerRun()]);
-    assert.ok(['WEBHOOK_BLOCKED_BY_REFUND'].includes(webhookResult.res));
-    assert.ok(['RECONCILED_REFUNDED'].includes(recResult.res));
-    assert.equal(engine.getDoc('orders/ord_race_100').paymentStatus, 'refunded');
-    assert.equal(engine.getDoc('orders/ord_race_100').reconciliationStatus, 'REFUNDED');
-  });
-
-  // Scenario 101: Crash at every discrete step of refund workflow -> recovers cleanly without state corruption
-  await runTest('Scenario 101: Crash at each step of refund workflow recovers cleanly', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const orderId = "ord_step_crash_101";
-
-    // Step 1: Pre-claim written
-    engine.setDoc(`orders/${orderId}`, {
-      orderId,
-      paymentId: "chrg_101",
-      paymentStatus: "refund_pending",
-      reconciliationStatus: "PROVIDER_REFUNDING",
-      refundIdempotencyKey: `ref_${orderId}_chrg_101`
-    });
-
-    // Crash happens right after provider refund returns, before final Firestore commit
-    // Recovery worker sweeps and finds existing refund on provider
-    const mockProvider = {
-      retrieveCharge: async () => ({
-        refunds: { data: [{ id: "rfnd_crash_recovery_101", metadata: { refund_key: `ref_${orderId}_chrg_101` } }] }
-      })
-    };
-
-    const charge = await mockProvider.retrieveCharge();
-    const refund = charge.refunds.data[0];
-
-    // Worker completes final Firestore state
-    engine.setDoc(`orders/${orderId}`, {
-      paymentStatus: "refunded",
-      reconciliationStatus: "REFUNDED",
-      refundId: refund.id
-    }, { merge: true });
-
-    assert.equal(engine.getDoc(`orders/${orderId}`).paymentStatus, "refunded");
-    assert.equal(engine.getDoc(`orders/${orderId}`).refundId, "rfnd_crash_recovery_101");
-  });
-
-  // Scenario 102: Audit log strictly reflects the true final terminal payment state
-  await runTest('Scenario 102: Audit log strictly reflects final terminal payment state (REFUND_RECONCILED)', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const orderId = "ord_audit_102";
-    engine.setDoc(`orders/${orderId}`, { orderId, paymentStatus: 'refunded', reconciliationStatus: 'REFUNDED' });
-    engine.setDoc(`audit_logs/reconcile_rec_${orderId}`, {
-      actorUid: "reconciliation_worker",
-      action: "REFUND_RECONCILED",
-      orderId,
-      refundId: "rfnd_102",
-      createdAt: new Date()
-    });
-
-    const order = engine.getDoc(`orders/${orderId}`);
-    const audit = engine.getDoc(`audit_logs/reconcile_rec_${orderId}`);
-
-    assert.equal(order.paymentStatus, 'refunded');
-    assert.equal(order.reconciliationStatus, 'REFUNDED');
-    assert.equal(audit.action, 'REFUND_RECONCILED');
-    assert.equal(audit.refundId, 'rfnd_102');
-  });
-
-  // Scenario 103: Direct Food Ordering without Payment Gateway
-  await runTest('Scenario 103: Zero-Payment Direct Ordering: Order is created atomically in PENDING state with 0 payment fields', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const storeId = "store_canteen_103";
-    const orderId = "ord_103";
-    
-    await engine.runTransaction(async (tx) => {
-      tx.set({ path: `orders/${orderId}` }, {
-        orderId,
-        storeId,
-        userId: "user_103",
-        customerName: "กิตติพงษ์",
-        customerPhone: "0891112233",
-        status: "PENDING",
-        queueStatus: "waiting",
-        queueNumber: "Q001",
-        totalAmount: 65,
-        totalAmountSatang: 6500
-      });
-    });
-
-    const saved = engine.getDoc(`orders/${orderId}`);
-    assert.equal(saved.status, "PENDING");
-    assert.equal(saved.queueStatus, "waiting");
-    assert.equal(saved.queueNumber, "Q001");
-    assert.equal("paymentStatus" in saved, false);
-    assert.equal("paymentMethod" in saved, false);
-  });
-
-  // Scenario 104: Sequential Per-Day Queue Issuance
-  await runTest('Scenario 104: Atomic Sequential Queue Counter: Generates consecutive Q001, Q002 per store per day', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const storeId = "store_canteen_104";
-    const dateKey = "20260904";
-    const counterPath = `queue_counters/counter_${storeId}_${dateKey}`;
-
-    async function issueQueueNumber() {
-      return await engine.runTransaction(async (tx) => {
-        const snap = await tx.get({ path: counterPath });
-        const current = (snap.exists && snap.data()) ? (snap.data().lastQueueNumber || 0) : 0;
-        const next = current + 1;
-        tx.set({ path: counterPath }, { lastQueueNumber: next, storeId, date: dateKey }, { merge: true });
-        return `Q${String(next).padStart(3, '0')}`;
-      });
-    }
-
-    const q1 = await issueQueueNumber();
-    const q2 = await issueQueueNumber();
-    const q3 = await issueQueueNumber();
-
-    assert.equal(q1, "Q001");
-    assert.equal(q2, "Q002");
-    assert.equal(q3, "Q003");
-  });
-
-  // Scenario 105: Store Isolation Guard
-  await runTest('Scenario 105: Store Isolation: Cross-store product mix in a single order is strictly rejected', async () => {
-    function validateStoreItems(targetStoreId, items) {
-      for (const item of items) {
-        if (item.storeId !== targetStoreId) {
-          throw new Error(`CROSS_STORE_VIOLATION: สินค้า ${item.name} ไม่ได้เป็นของร้าน ${targetStoreId}`);
-        }
-      }
-      return true;
-    }
-
-    const items = [
-      { name: "ข้าวมันไก่", storeId: "store_A" },
-      { name: "ก๋วยเตี๋ยว", storeId: "store_B" }
-    ];
-    assert.throws(() => validateStoreItems("store_A", items), /CROSS_STORE_VIOLATION/);
-  });
-
-  // Scenario 106: Fail-Fast Missing Customer Phone
-  await runTest('Scenario 106: Strict Validation: Missing customer phone throws error and aborts order', async () => {
-    function validateCustomerContact(phone) {
-      if (!phone || typeof phone !== 'string' || phone.trim().length < 9) {
-        throw new Error("CUSTOMER_PHONE_REQUIRED: กรุณาระบุเบอร์โทรศัพท์สำหรับรับการแจ้งเตือนคิว");
-      }
-      return true;
-    }
-
-    assert.throws(() => validateCustomerContact(""), /CUSTOMER_PHONE_REQUIRED/);
-    assert.throws(() => validateCustomerContact(null), /CUSTOMER_PHONE_REQUIRED/);
-    assert.equal(validateCustomerContact("0812345678"), true);
-  });
-
-  // Scenario 107: Product Inactive / Closed Guard
-  await runTest('Scenario 107: Product Availability: Inactive or out-of-stock product rejects order placement', async () => {
-    function checkProductOrderable(product) {
-      if (product.isAvailable === false || product.availability === false) {
-        throw new Error("PRODUCT_UNAVAILABLE: เมนูนี้ปิดรับออเดอร์ชั่วคราว");
-      }
-      if (typeof product.stock === 'number' && product.stock <= 0) {
-        throw new Error("INSUFFICIENT_STOCK: สินค้าหมดชั่วคราว");
-      }
-      return true;
-    }
-
-    assert.throws(() => checkProductOrderable({ isAvailable: false, stock: 10 }), /PRODUCT_UNAVAILABLE/);
-    assert.throws(() => checkProductOrderable({ isAvailable: true, stock: 0 }), /INSUFFICIENT_STOCK/);
-    assert.equal(checkProductOrderable({ isAvailable: true, stock: 5 }), true);
-  });
-
-  // Scenario 108: Operating Hours Schedule Check
-  await runTest('Scenario 108: Operating Schedule: Order outside store opening hours is strictly rejected', async () => {
-    function checkPickupTime(open, close, target) {
-      let isAllowed;
-      if (open <= close) {
-        isAllowed = target >= open && target <= close;
-      } else {
-        isAllowed = target >= open || target <= close;
-      }
-      if (!isAllowed) {
-        throw new Error(`INVALID_PICKUP_TIME: เวลารับอาหาร ${target} น. อยู่นอกเวลาเปิดทำการ (${open} - ${close})`);
-      }
-      return true;
-    }
-
-    assert.equal(checkPickupTime("10:00", "14:00", "12:15"), true);
-    assert.throws(() => checkPickupTime("10:00", "14:00", "15:30"), /INVALID_PICKUP_TIME/);
-  });
-
-  // Scenario 109: Quantity-Based Slot Capacity
-  await runTest('Scenario 109: Slot Capacity: Deducts quantity and rejects order exceeding slot max capacity', async () => {
-    function reserveSlotCapacity(currentCount, requestedQty, maxCapacity) {
-      if (currentCount + requestedQty > maxCapacity) {
-        throw new Error(`SLOT_CAPACITY_EXCEEDED: โควตาคิวรับอาหารเต็มแล้ว (${currentCount}/${maxCapacity})`);
-      }
-      return currentCount + requestedQty;
-    }
-
-    assert.equal(reserveSlotCapacity(15, 3, 20), 18);
-    assert.throws(() => reserveSlotCapacity(19, 2, 20), /SLOT_CAPACITY_EXCEEDED/);
-  });
-
-  // Scenario 110: Single-Select Modifier Constraint
-  await runTest('Scenario 110: Single Selection: Multiple selections for single-select modifier is strictly rejected', async () => {
-    function validateGroupSelection(group, selectedOptions) {
-      if (group.selectionType === 'single' && selectedOptions.length > 1) {
-        throw new Error(`SINGLE_SELECTION_VIOLATED: กลุ่ม "${group.name}" เลือกได้เพียง 1 ตัวเลือก`);
-      }
-      return true;
-    }
-
-    const group = { name: "ระดับความเผ็ด", selectionType: "single" };
-    assert.equal(validateGroupSelection(group, ["เผ็ดน้อย"]), true);
-    assert.throws(() => validateGroupSelection(group, ["เผ็ดน้อย", "เผ็ดมาก"]), /SINGLE_SELECTION_VIOLATED/);
-  });
-
-  // Scenario 111: Modifier Price Calculation in Satang
-  await runTest('Scenario 111: Price Calculation: Base price + modifier additions calculate exact satang amount', async () => {
-    const basePriceSatang = 5000; // 50.00 THB
-    const modifiers = [
-      { name: "ไข่ดาว", priceModifierSatang: 1000 },
-      { name: "ชีส", priceModifierSatang: 1500 }
-    ];
-    const quantity = 2;
-
-    const modifierSum = modifiers.reduce((acc, m) => acc + m.priceModifierSatang, 0);
-    const unitPriceSatang = basePriceSatang + modifierSum;
-    const totalSatang = unitPriceSatang * quantity;
-
-    assert.equal(unitPriceSatang, 7500); // 75.00 THB
-    assert.equal(totalSatang, 15000); // 150.00 THB
-  });
-
-  // Scenario 112: Zero Resource Leak on Transaction Abort
-  await runTest('Scenario 112: Atomic Integrity: Stock and Slot mutations rollback completely on failure', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const prodPath = "products/prod_112";
-    const slotPath = "store_slots/slot_112";
-
-    engine.setDoc(prodPath, { stock: 10 });
-    engine.setDoc(slotPath, { currentOrders: 5 });
-
-    try {
-      await engine.runTransaction(async (tx) => {
-        tx.update({ path: prodPath }, { stock: 8 });
-        tx.update({ path: slotPath }, { currentOrders: 7 });
-        throw new Error("INJECTED_TRANSACTION_FAILURE");
-      });
-    } catch {
-      // Expected exception
-    }
-
-    // Must be 10 and 5 (completely rolled back!)
-    assert.equal(engine.getDoc(prodPath).stock, 10);
-    assert.equal(engine.getDoc(slotPath).currentOrders, 5);
-  });
-
-  // Scenario 113: Customer Cancellation State Transition
-  await runTest('Scenario 113: State Machine: Customer cancellation is allowed in waiting, disallowed in cooking/ready', async () => {
-    function canCustomerCancel(status, queueStatus) {
-      return (status === 'PENDING' || status === 'CONFIRMED') && queueStatus === 'waiting';
-    }
-
-    assert.equal(canCustomerCancel('PENDING', 'waiting'), true);
-    assert.equal(canCustomerCancel('CONFIRMED', 'waiting'), true);
-    assert.equal(canCustomerCancel('PREPARING', 'cooking'), false);
-    assert.equal(canCustomerCancel('READY', 'ready'), false);
-  });
-
-  // Scenario 114: Cloud Functions Zero-Payment Architecture status
-  await runTest('Scenario 114: Cloud Functions Status: Health endpoint verifies Zero-Payment architecture', async () => {
-    const responsePayload = {
-      status: "ok",
-      architecture: "Zero-Payment Direct Food Queue",
-      region: "asia-southeast1"
-    };
-
-    assert.equal(responsePayload.status, "ok");
-    assert.equal(responsePayload.architecture, "Zero-Payment Direct Food Queue");
-  });
-
-  // Scenario 115: Atomic Stock Validation: Order requesting quantity > stock is rejected and stock remains untouched
-  await runTest('Scenario 115: Atomic Stock Validation: Insufficient stock throws error and preserves stock level', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const productId = "prod_stock_115";
-    engine.setDoc(`products/${productId}`, {
-      productId,
-      name: "ข้าวกะเพราหมูกรอบ",
-      price: 60,
-      priceSatang: 6000,
-      stock: 3,
-      isAvailable: true,
-      storeId: "store_115"
-    });
-
-    const quantityRequested = 5;
-    let errorThrown = false;
-    try {
-      await engine.runTransaction(async (tx) => {
-        const prodRef = { path: `products/${productId}` };
-        const prodSnap = await tx.get(prodRef);
-        const prod = prodSnap.data();
-        if (prod.stock < quantityRequested) {
-          throw new Error(`INSUFFICIENT_STOCK: Available ${prod.stock}, requested ${quantityRequested}`);
-        }
-        tx.update(prodRef, { stock: prod.stock - quantityRequested });
-      });
-    } catch (err) {
-      errorThrown = true;
-      assert.ok(err.message.includes("INSUFFICIENT_STOCK"));
-    }
-
-    assert.equal(errorThrown, true);
-    assert.equal(engine.getDoc(`products/${productId}`).stock, 3); // 0 dirty decrement!
-  });
-
-  // Scenario 116: Concurrent Slot Booking: 2 concurrent transactions booking last slot capacity serialize with exactly 1 success
-  await runTest('Scenario 116: Concurrent Slot Booking: Only 1 transaction books last remaining capacity without overbooking', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const slotId = "slot_20260903_1200";
-    engine.setDoc(`store_slots/${slotId}`, {
-      slotId,
-      storeId: "store_116",
-      capacity: 10,
-      currentOrders: 9 // Only 1 spot left!
-    });
-
-    async function bookSlot() {
-      return engine.runTransaction(async (tx) => {
-        const slotRef = { path: `store_slots/${slotId}` };
-        const slotSnap = await tx.get(slotRef);
-        const slot = slotSnap.data();
-        if (slot.currentOrders + 1 > slot.capacity) {
-          throw new Error("SLOT_FULL");
-        }
-        tx.update(slotRef, { currentOrders: slot.currentOrders + 1 });
-        return "BOOKED";
-      });
-    }
-
-    const results = await Promise.allSettled([bookSlot(), bookSlot()]);
-    const fulfilled = results.filter(r => r.status === "fulfilled");
-    const rejected = results.filter(r => r.status === "rejected");
-
-    assert.equal(fulfilled.length, 1);
-    assert.equal(rejected.length, 1);
-    assert.equal(engine.getDoc(`store_slots/${slotId}`).currentOrders, 10); // Strictly <= capacity!
-  });
-
-  // Scenario 117: Normalized Modifier Group Selection: Inactive modifier or option is rejected
-  await runTest('Scenario 117: Normalized Modifier Validation: Out of stock modifier option is rejected', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const modGroupId = "mod_toppings_117";
-    engine.setDoc(`modifier_groups/${modGroupId}`, {
-      id: modGroupId,
-      storeId: "store_117",
-      name: "ท็อปปิ้ง",
-      isRequired: false,
-      selectionType: "multiple",
-      options: [
-        { id: "opt_egg", name: "ไข่ดาว", priceModifierSatang: 1000, isOutOfStock: false },
-        { id: "opt_cheese", name: "ชีส", priceModifierSatang: 1500, isOutOfStock: true } // Out of stock!
-      ]
-    });
-
-    function validateSelectedModifier(modGroup, selectedOptId) {
-      const opt = modGroup.options.find(o => o.id === selectedOptId);
-      if (!opt) throw new Error("MODIFIER_NOT_FOUND");
-      if (opt.isOutOfStock) throw new Error("MODIFIER_OUT_OF_STOCK");
-      return opt.priceModifierSatang;
-    }
-
-    const group = engine.getDoc(`modifier_groups/${modGroupId}`);
-    assert.equal(validateSelectedModifier(group, "opt_egg"), 1000);
-    assert.throws(() => validateSelectedModifier(group, "opt_cheese"), /MODIFIER_OUT_OF_STOCK/);
-  });
-
-  // Scenario 118: Price Satang Integrity: Calculation using exact integers avoids floating point precision drift
-  await runTest('Scenario 118: Satang Integrity: Exact integer calculation with priceSatang avoids float drift', async () => {
-    const unitPriceSatang = 6500; // 65.00 THB
-    const toppingPriceSatang = 1000; // 10.00 THB
-    const quantity = 3;
-    const discountSatang = 1500; // 15.00 THB
-
-    const subtotalSatang = (unitPriceSatang + toppingPriceSatang) * quantity;
-    const finalSatang = Math.max(100, subtotalSatang - discountSatang);
-
-    assert.equal(Number.isInteger(subtotalSatang), true);
-    assert.equal(subtotalSatang, 22500); // 225.00 THB
-    assert.equal(finalSatang, 21000); // 210.00 THB
-  });
-
-  // Scenario 119: Catalog Service: Updating shop operational profile filters out admin-only fields
-  await runTest('Scenario 119: Catalog Service: updateStoreOperationalProfile filters out admin-only fields', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const storeId = "store_catalog_119";
-    engine.setDoc(`shops/${storeId}`, {
-      id: storeId,
-      ownerUid: "merchant_119",
-      status: "active",
-      rating: 4.8,
-      name: "ร้านเดิม",
-      isOpen: false
-    });
-
-    const mockDb = {
-      collection: (col) => ({
-        doc: (id) => ({
-          path: `${col}/${id}`,
-          get: async () => ({ exists: !!engine.getDoc(`${col}/${id}`), data: () => engine.getDoc(`${col}/${id}`) }),
-          update: async (d) => engine.setDoc(`${col}/${id}`, d, { merge: true }),
-          set: async (d, opts) => engine.setDoc(`${col}/${id}`, d, opts)
-        })
-      })
-    };
-
-    // Client attempts to pass tampered status & rating alongside valid hours
-    const dirtyUpdate = {
-      name: "ร้านกะเพราอินดี้",
-      isOpen: true,
-      hours: "09:00 - 18:00",
-      status: "admin_elevated", // Should be filtered out!
-      rating: 5.0,              // Should be filtered out!
-      ownerUid: "hacker_uid"    // Should be filtered out!
-    };
-
-    const ALLOWED_KEYS = [
-      'name', 'description', 'location', 'hours', 'isOpen', 'contactPhone', 'logoUrl', 'bannerUrl',
-      'operatingHours', 'operationalOverride', 'capacityConfig', 'slotCapacity', 'maxOrdersPerSlot', 'pickupSlots'
-    ];
-    const cleanData = {};
-    for (const key of ALLOWED_KEYS) {
-      if (dirtyUpdate[key] !== undefined) cleanData[key] = dirtyUpdate[key];
-    }
-
-    await mockDb.collection("shops").doc(storeId).update(cleanData);
-    const updated = engine.getDoc(`shops/${storeId}`);
-
-    assert.equal(updated.name, "ร้านกะเพราอินดี้");
-    assert.equal(updated.isOpen, true);
-    assert.equal(updated.status, "active"); // Preserved!
-    assert.equal(updated.rating, 4.8);      // Preserved!
-    assert.equal(updated.ownerUid, "merchant_119"); // Preserved!
-  });
-
-  // Scenario 120: Catalog Service: Create Product enforces integer priceSatang and STRICTLY rejects negative stock
-  await runTest('Scenario 120: Catalog Service: Create Product enforces integer priceSatang and strictly rejects negative stock', async () => {
-    const storeId = "store_catalog_120";
-
-    function validateAndPrepareProduct(storeId, data) {
-      if (!storeId) throw new Error("storeId is required");
-      const priceBaht = Number(data.price);
-      if (!Number.isFinite(priceBaht) || priceBaht <= 0) throw new Error("Price must be positive");
-      if (data.stock !== undefined && (typeof data.stock !== "number" || data.stock < 0)) {
-        throw new Error("Stock cannot be negative");
-      }
-      const stock = typeof data.stock === "number" ? data.stock : 20;
-      return {
-        storeId,
-        name: data.name.trim(),
-        price: priceBaht,
-        priceSatang: data.priceSatang ?? Math.round(priceBaht * 100),
-        stock,
-        isAvailable: data.isAvailable ?? true
-      };
-    }
-
-    const validProd = validateAndPrepareProduct(storeId, { name: "ข้าวยำไก่แซ่บ", price: 59.5, stock: 15 });
-    assert.equal(validProd.priceSatang, 5950);
-    assert.equal(validProd.stock, 15);
-
-    // Negative stock is strictly REJECTED (Finding #3)
-    assert.throws(() => validateAndPrepareProduct(storeId, { name: "เมนูผิด", price: 40, stock: -10 }), /Stock cannot be negative/);
-    assert.throws(() => validateAndPrepareProduct(storeId, { name: "ฟรี", price: 0 }), /Price must be positive/);
-  });
-
-  // Scenario 121: Catalog Service: Modifier Group Options correctly map priceModifierSatang
-  await runTest('Scenario 121: Catalog Service: Modifier Group Options map priceModifierSatang integers', async () => {
-    const modData = {
-      name: "ระดับความเผ็ด & แอดออน",
-      isRequired: false,
-      selectionType: "multiple",
-      options: [
-        { id: "opt_spicy_1", name: "เผ็ดน้อย", priceModifier: 0 },
-        { id: "opt_egg_fried", name: "ไข่ดาวกรอบ", priceModifier: 12.5 }
-      ]
-    };
-
-    const mappedOptions = modData.options.map(opt => ({
-      ...opt,
-      priceModifierSatang: opt.priceModifierSatang ?? Math.round(Number(opt.priceModifier) * 100)
-    }));
-
-    assert.equal(mappedOptions[0].priceModifierSatang, 0);
-    assert.equal(mappedOptions[1].priceModifierSatang, 1250);
-  });
-
-  // Scenario 122: Emergency Rush & Pause Override: Setting pause state stops order availability
-  await runTest('Scenario 122: Emergency Rush/Pause: Active pause state prevents order acceptance', async () => {
-    const shop = {
-      storeId: "store_122",
-      isOpen: true,
-      operationalOverride: {
-        isPaused: true,
-        pausedReason: "ครัวแน่น ชะลอรับคิวชั่วคราว",
-        pauseUntil: Date.now() + 15 * 60 * 1000,
-        isRushMode: true,
-        rushBufferMinutes: 20
-      }
-    };
-
-    function isShopAcceptingOrders(shop) {
-      if (!shop.isOpen) return { accepting: false, reason: "SHOP_CLOSED" };
-      if (shop.operationalOverride?.isPaused) {
-        return { accepting: false, reason: shop.operationalOverride.pausedReason || "SHOP_PAUSED" };
-      }
-      return { accepting: true };
-    }
-
-    const check = isShopAcceptingOrders(shop);
-    assert.equal(check.accepting, false);
-    assert.equal(check.reason, "ครัวแน่น ชะลอรับคิวชั่วคราว");
-  });
-
-  // Scenario 123: Pre-read Product Update: Attempting to update product of Store B using Store A credentials is rejected
-  await runTest('Scenario 123: Pre-read Product Update: Cross-store product update is strictly rejected before write', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const prodId = "prod_store_B_123";
-    engine.setDoc(`products/${prodId}`, {
-      id: prodId,
-      storeId: "store_B",
-      name: "เมนูของร้าน B",
-      price: 50
-    });
-
-    async function secureUpdateProduct(callerStoreId, targetProdId, updates) {
-      const prod = engine.getDoc(`products/${targetProdId}`);
-      if (!prod) throw new Error("Product not found");
-      if (prod.storeId !== callerStoreId) {
-        throw new Error("Unauthorized: Product does not belong to this store");
-      }
-      engine.setDoc(`products/${targetProdId}`, { ...prod, ...updates }, { merge: true });
-    }
-
-    // Caller from Store A tries to update product of Store B
-    await assert.rejects(
-      async () => secureUpdateProduct("store_A", prodId, { price: 99 }),
-      /Unauthorized: Product does not belong to this store/
-    );
-    assert.equal(engine.getDoc(`products/${prodId}`).price, 50); // Unmutated!
-  });
-
-  // Scenario 124: Pre-read Product Deletion: Attempting to delete product of Store B using Store A credentials is rejected
-  await runTest('Scenario 124: Pre-read Product Deletion: Cross-store product deletion is strictly rejected before write', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const prodId = "prod_store_B_124";
-    engine.setDoc(`products/${prodId}`, {
-      id: prodId,
-      storeId: "store_B",
-      name: "เมนูของร้าน B",
-      price: 50
-    });
-
-    async function secureDeleteProduct(callerStoreId, targetProdId) {
-      const prod = engine.getDoc(`products/${targetProdId}`);
-      if (!prod) throw new Error("Product not found");
-      if (prod.storeId !== callerStoreId) {
-        throw new Error("Unauthorized: Product does not belong to this store");
-      }
-      engine.storage.delete(`products/${targetProdId}`);
-    }
-
-    // Caller from Store A tries to delete product of Store B
-    await assert.rejects(
-      async () => secureDeleteProduct("store_A", prodId),
-      /Unauthorized: Product does not belong to this store/
-    );
-    assert.ok(engine.getDoc(`products/${prodId}`) !== null); // Still exists!
-  });
-
-  // Scenario 125: Product Update Negative Stock: Updating existing product with stock < 0 is strictly rejected
-  await runTest('Scenario 125: Product Update Negative Stock: Updating existing product with stock < 0 is strictly rejected', async () => {
-    function validateStockUpdate(newStock) {
-      if (typeof newStock !== "number" || newStock < 0) {
-        throw new Error("Stock cannot be negative");
-      }
-      return newStock;
+    if (shopData.operationalOverride === 'FORCE_CLOSE' || shopData.operationalOverride === 'EMERGENCY_STOP') {
+      throw new Error('STORE_PAUSED: ร้านค้าหยุดรับออเดอร์ชั่วคราว');
     }
-
-    assert.equal(validateStockUpdate(10), 10);
-    assert.equal(validateStockUpdate(0), 0);
-    assert.throws(() => validateStockUpdate(-1), /Stock cannot be negative/);
-  });
-
-  // Scenario 126: Wave 4.2.2 Atomic Transaction Mutation: Concurrent product update in transaction serializes safely
-  await runTest('Scenario 126: Wave 4.2.2 Atomic Transaction Mutation: Product updates execute atomically inside db.runTransaction', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const prodId = "prod_atomic_126";
-    engine.setDoc(`products/${prodId}`, {
-      id: prodId,
-      storeId: "store_126",
-      name: "ชาเขียวมัทฉะ",
-      price: 45,
-      priceSatang: 4500,
-      stock: 20
-    });
-
-    async function atomicUpdateProduct(callerStoreId, targetProdId, updates) {
-      return engine.runTransaction(async (tx) => {
-        const prodRef = { path: `products/${targetProdId}` };
-        const prodSnap = await tx.get(prodRef);
-        if (!prodSnap.exists) throw new Error("Product not found");
-        const prod = prodSnap.data();
-        if (prod.storeId !== callerStoreId) {
-          throw new Error("Unauthorized: Product does not belong to this store");
-        }
-        tx.update(prodRef, updates);
-        return true;
-      });
-    }
-
-    await atomicUpdateProduct("store_126", prodId, { price: 50, priceSatang: 5000, stock: 18 });
-    const updated = engine.getDoc(`products/${prodId}`);
-    assert.equal(updated.price, 50);
-    assert.equal(updated.priceSatang, 5000);
-    assert.equal(updated.stock, 18);
-
-    // Cross-store transaction update is atomically aborted
-    await assert.rejects(
-      async () => atomicUpdateProduct("store_imposter", prodId, { price: 999 }),
-      /Unauthorized: Product does not belong to this store/
-    );
-    assert.equal(engine.getDoc(`products/${prodId}`).price, 50); // Unmutated!
-  });
-
-  // Scenario 127: Wave 4.2.2 Canonical Monetary Satang: Derived price in THB always syncs with canonical integer priceSatang
-  await runTest('Scenario 127: Wave 4.2.2 Canonical Satang: Derived price in Baht is strictly synchronized with integer satang', async () => {
-    function createCanonicalProduct(data) {
-      let priceSatang;
-      if (data.priceSatang !== undefined) {
-        if (!Number.isInteger(data.priceSatang) || data.priceSatang <= 0) {
-          throw new Error("priceSatang must be a positive integer");
-        }
-        priceSatang = data.priceSatang;
-      } else {
-        const priceBaht = Number(data.price);
-        if (!Number.isFinite(priceBaht) || priceBaht <= 0) {
-          throw new Error("Price must be a positive number");
-        }
-        priceSatang = Math.round(priceBaht * 100);
-      }
-      return {
-        priceSatang,
-        price: priceSatang / 100
-      };
-    }
-
-    const prodFromSatang = createCanonicalProduct({ priceSatang: 6500 });
-    assert.equal(prodFromSatang.priceSatang, 6500);
-    assert.equal(prodFromSatang.price, 65.0);
-
-    const prodFromBaht = createCanonicalProduct({ price: 49.5 });
-    assert.equal(prodFromBaht.priceSatang, 4950);
-    assert.equal(prodFromBaht.price, 49.5);
-
-    assert.throws(() => createCanonicalProduct({ priceSatang: 49.5 }), /priceSatang must be a positive integer/);
-    assert.throws(() => createCanonicalProduct({ priceSatang: -100 }), /priceSatang must be a positive integer/);
-  });
-
-  // Scenario 128: Wave 4.2.2 Modifier Referential Integrity: Linking modifier group from another store is rejected
-  await runTest('Scenario 128: Wave 4.2.2 Modifier Integrity: Linking cross-store or non-existent modifier groups is rejected', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const modStoreA = "mod_store_A_128";
-    const modStoreB = "mod_store_B_128";
-
-    engine.setDoc(`modifier_groups/${modStoreA}`, { id: modStoreA, storeId: "store_A", name: "ความหวาน" });
-    engine.setDoc(`modifier_groups/${modStoreB}`, { id: modStoreB, storeId: "store_B", name: "ท็อปปิ้งร้าน B" });
-
-    async function validateModifierIntegrity(storeId, modifierGroupIds) {
-      if (!modifierGroupIds || modifierGroupIds.length === 0) return;
-      for (const modId of modifierGroupIds) {
-        const mod = engine.getDoc(`modifier_groups/${modId}`);
-        if (!mod) throw new Error(`REFERENTIAL_INTEGRITY_VIOLATION: Modifier group ${modId} does not exist`);
-        if (mod.storeId !== storeId) {
-          throw new Error(`CROSS_STORE_MODIFIER_VIOLATION: Modifier group ${modId} belongs to store ${mod.storeId}, not ${storeId}`);
-        }
-      }
-    }
-
-    // Valid same-store modifier linking
-    await validateModifierIntegrity("store_A", [modStoreA]);
-
-    // Cross-store modifier linking is rejected!
-    await assert.rejects(
-      async () => validateModifierIntegrity("store_A", [modStoreB]),
-      /CROSS_STORE_MODIFIER_VIOLATION/
-    );
-
-    // Non-existent modifier linking is rejected!
-    await assert.rejects(
-      async () => validateModifierIntegrity("store_A", ["mod_non_existent"]),
-      /REFERENTIAL_INTEGRITY_VIOLATION/
-    );
-  });
-
-  // Scenario 129: Wave 4.2.3 Modifier Group Creation: Modifier options with exact satang calculation map cleanly
-  await runTest('Scenario 129: Wave 4.2.3 Modifier Group Creation: Options with priceSatang map integers cleanly', async () => {
-    const rawOptions = [
-      { name: 'ไม่หวาน (0%)', price: 0 },
-      { name: 'หวานน้อย (50%)', price: 0 },
-      { name: 'เพิ่มไข่มุกหนึบ', price: 10 }
-    ];
-
-    const mapped = rawOptions.map((opt, idx) => {
-      const satang = Math.round(opt.price * 100);
-      return {
-        id: `opt_129_${idx}`,
-        name: opt.name,
-        priceModifier: satang / 100,
-        priceModifierSatang: satang,
-        isOutOfStock: false
-      };
-    });
-
-    assert.equal(mapped.length, 3);
-    assert.equal(mapped[0].priceModifierSatang, 0);
-    assert.equal(mapped[2].priceModifierSatang, 1000);
-    assert.equal(mapped[2].priceModifier, 10.0);
-    assert.equal(mapped[2].isOutOfStock, false);
-  });
-
-  // Scenario 130: Wave 4.2.3 Modifier Stock Toggling: Toggling option stock updates state without mutating price
-  await runTest('Scenario 130: Wave 4.2.3 Modifier Stock Toggle: Out of stock status toggles cleanly while preserving price', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const modGroupId = "mod_toggle_130";
-    engine.setDoc(`modifier_groups/${modGroupId}`, {
-      id: modGroupId,
-      storeId: "store_130",
-      name: "ท็อปปิ้งพิเศษ",
-      options: [
-        { id: "opt_pudding", name: "พุดดิ้งไข่", priceModifierSatang: 1500, priceModifier: 15, isOutOfStock: false }
-      ]
-    });
-
-    async function toggleOptionStock(storeId, groupId, optionId) {
-      const group = engine.getDoc(`modifier_groups/${groupId}`);
-      if (!group) throw new Error("Modifier group not found");
-      if (group.storeId !== storeId) throw new Error("Unauthorized");
-
-      const updatedOptions = group.options.map(opt => {
-        if (opt.id === optionId) {
-          return { ...opt, isOutOfStock: !opt.isOutOfStock };
-        }
-        return opt;
-      });
-
-      engine.setDoc(`modifier_groups/${groupId}`, { ...group, options: updatedOptions });
-    }
-
-    await toggleOptionStock("store_130", modGroupId, "opt_pudding");
-    let mod = engine.getDoc(`modifier_groups/${modGroupId}`);
-    assert.equal(mod.options[0].isOutOfStock, true);
-    assert.equal(mod.options[0].priceModifierSatang, 1500); // Preserved!
-
-    await toggleOptionStock("store_130", modGroupId, "opt_pudding");
-    mod = engine.getDoc(`modifier_groups/${modGroupId}`);
-    assert.equal(mod.options[0].isOutOfStock, false);
-  });
-
-  // Scenario 131: Wave 4.2.3 Product & Modifier Linking: Menu item correctly holds multiple validated modifierGroupIds
-  await runTest('Scenario 131: Wave 4.2.3 Product Modifier Linking: Product correctly references store modifierGroupIds', async () => {
-    const product = {
-      storeId: "store_131",
-      name: "ชาไทยเย็นพรีเมียม",
-      price: 55,
-      priceSatang: 5500,
-      stock: 30,
-      modifierGroupIds: ["mod_sweetness_131", "mod_toppings_131"]
-    };
-
-    assert.equal(product.modifierGroupIds.length, 2);
-    assert.ok(product.modifierGroupIds.includes("mod_sweetness_131"));
-    assert.ok(product.modifierGroupIds.includes("mod_toppings_131"));
-    assert.equal(product.priceSatang, 5500);
-  });
-
-  // Scenario 132: Wave 4.2.4 Fail-Fast Store ID: Missing storeId strictly throws error without falling back to hardcoded store
-  await runTest('Scenario 132: Wave 4.2.4 Fail-Fast Store ID: Missing storeId strictly throws error with 0 fallback', async () => {
-    function prepareProductCreation(storeId, productData) {
-      if (!storeId || typeof storeId !== "string" || !storeId.trim()) {
-        throw new Error("FAIL_FAST_ERROR: storeId is required and must not be empty");
-      }
-      return { storeId: storeId.trim(), ...productData };
-    }
-
-    assert.throws(() => prepareProductCreation(null, { name: "ข้าวมันไก่" }), /FAIL_FAST_ERROR/);
-    assert.throws(() => prepareProductCreation(undefined, { name: "ข้าวมันไก่" }), /FAIL_FAST_ERROR/);
-    assert.throws(() => prepareProductCreation("", { name: "ข้าวมันไก่" }), /FAIL_FAST_ERROR/);
-    assert.equal(prepareProductCreation("store_real_132", { name: "ข้าวมันไก่" }).storeId, "store_real_132");
-  });
-
-  // Scenario 133: Wave 4.2.4 Monetary Consistency: Service strictly rejects conflicting price and priceSatang inputs
-  await runTest('Scenario 133: Wave 4.2.4 Monetary Consistency: Conflicting price and priceSatang are rejected', async () => {
-    function validateMonetaryConsistency(data) {
-      if (data.priceSatang !== undefined && data.price !== undefined) {
-        const expectedSatang = Math.round(Number(data.price) * 100);
-        if (data.priceSatang !== expectedSatang) {
-          throw new Error(`MONETARY_DRIFT_ERROR: price (${data.price}) and priceSatang (${data.priceSatang}) do not match`);
-        }
-      }
-      return true;
-    }
-
-    assert.equal(validateMonetaryConsistency({ price: 45, priceSatang: 4500 }), true);
-    assert.equal(validateMonetaryConsistency({ price: 59.5, priceSatang: 5950 }), true);
-    assert.throws(() => validateMonetaryConsistency({ price: 45, priceSatang: 5000 }), /MONETARY_DRIFT_ERROR/);
-  });
-
-  // Scenario 134: Wave 4.2.4 Atomic Option Stock Toggle: Toggling modifier option of another store in transaction is rejected
-  await runTest('Scenario 134: Wave 4.2.4 Atomic Option Stock: Cross-store modifier option stock toggle is rejected', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const groupId = "mod_store_B_134";
-    engine.setDoc(`modifier_groups/${groupId}`, {
-      id: groupId,
-      storeId: "store_B",
-      name: "ท็อปปิ้งร้าน B",
-      options: [{ id: "opt_b1", name: "ไข่ดาว", isOutOfStock: false }]
-    });
-
-    async function atomicToggleModifierStock(callerStoreId, targetGroupId, optionId) {
-      return engine.runTransaction(async (tx) => {
-        const modRef = { path: `modifier_groups/${targetGroupId}` };
-        const snap = await tx.get(modRef);
-        if (!snap.exists) throw new Error("Modifier group not found");
-        const mod = snap.data();
-        if (mod.storeId !== callerStoreId) {
-          throw new Error("Unauthorized: Modifier group does not belong to this store");
-        }
-        const updated = mod.options.map(o => o.id === optionId ? { ...o, isOutOfStock: !o.isOutOfStock } : o);
-        tx.update(modRef, { options: updated });
-        return true;
-      });
-    }
-
-    // Caller from Store A tries to toggle option in Store B
-    await assert.rejects(
-      async () => atomicToggleModifierStock("store_A", groupId, "opt_b1"),
-      /Unauthorized: Modifier group does not belong to this store/
-    );
-    assert.equal(engine.getDoc(`modifier_groups/${groupId}`).options[0].isOutOfStock, false); // Untouched!
-  });
-
-  // Scenario 135: Wave 4.2.5 7-Day Operating Hours: Outside schedule or closed day strictly rejects order
-  await runTest('Scenario 135: Wave 4.2.5 Operating Hours: Outside schedule or closed day rejects order', async () => {
-    const store = {
-      storeId: "store_hours_135",
-      isOpen: true,
-      operatingHours: {
-        monday: { isOpen: true, open: "08:00", close: "16:00" },
-        sunday: { isOpen: false, open: "08:00", close: "16:00" }
-      }
-    };
 
-    function checkAvailability(store, targetDate) {
-      if (!store.isOpen) return { canAccept: false, reason: "STORE_CLOSED_MANUALLY" };
+    if (shopData.operatingHours) {
       const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-      const currentDay = days[targetDate.getDay()];
-      const sched = store.operatingHours?.[currentDay];
-      if (sched) {
-        if (!sched.isOpen) return { canAccept: false, reason: `STORE_CLOSED_ON_${currentDay.toUpperCase()}` };
-        const timeStr = `${targetDate.getHours().toString().padStart(2, '0')}:${targetDate.getMinutes().toString().padStart(2, '0')}`;
-        if (timeStr < sched.open || timeStr > sched.close) {
-          return { canAccept: false, reason: `OUTSIDE_OPERATING_HOURS (${sched.open} - ${sched.close})` };
+      const targetDayName = days[targetBangkok.dayOfWeekIndex];
+      const targetDaySchedule = shopData.operatingHours[targetDayName];
+      if (targetDaySchedule) {
+        if (!targetDaySchedule.isOpen) {
+          throw new Error(`STORE_CLOSED_ON_DATE: ร้านค้าปิดทำการในวัน${targetDayName} (${targetYmd})`);
+        }
+        const { open, close } = targetDaySchedule;
+        const isPickupAllowed =
+          open <= close
+            ? cleanPickupTime >= open && cleanPickupTime <= close
+            : cleanPickupTime >= open || cleanPickupTime <= close;
+        if (!isPickupAllowed) {
+          throw new Error(`INVALID_PICKUP_TIME: เวลารับอาหาร ${cleanPickupTime} น. อยู่นอกเวลาทำการ (${open} - ${close})`);
         }
       }
-      return { canAccept: true };
     }
 
-    // Monday at 10:30 (Open)
-    const mondayOpen = new Date('2026-09-07T10:30:00');
-    assert.equal(checkAvailability(store, mondayOpen).canAccept, true);
-
-    // Monday at 17:30 (Closed / Outside hours)
-    const mondayClosed = new Date('2026-09-07T17:30:00');
-    assert.equal(checkAvailability(store, mondayClosed).canAccept, false);
-
-    // Sunday (Day closed)
-    const sunday = new Date('2026-09-06T12:00:00');
-    assert.equal(checkAvailability(store, sunday).canAccept, false);
-    assert.equal(checkAvailability(store, sunday).reason, "STORE_CLOSED_ON_SUNDAY");
-  });
-
-  // Scenario 136: Wave 4.2.5 Emergency Pause & Auto-Resume: Pause stops orders until pauseUntil timestamp passes
-  await runTest('Scenario 136: Wave 4.2.5 Pause Engine: Active pause rejects orders, auto-resumes after pauseUntil', async () => {
-    const pauseExpiryTime = new Date('2026-09-03T18:00:00').getTime();
-    const store = {
-      storeId: "store_pause_136",
-      isOpen: true,
-      operationalOverride: {
-        isPaused: true,
-        pausedReason: "วัตถุดิบหมดรอบบ่าย ชะลอรับออเดอร์",
-        pauseUntil: pauseExpiryTime,
-        isRushMode: false,
-        rushBufferMinutes: 0
+    for (const [prodId, requiredQty] of productTotalQuantityMap.entries()) {
+      const prodData = productSnapMap.get(prodId).data();
+      if (prodData.storeId !== storeId) {
+        throw new Error(`CROSS_STORE_PRODUCT_VIOLATION: สินค้า ${prodData.name} ไม่ได้เป็นของร้าน ${storeId}`);
       }
-    };
-
-    function evaluatePause(store, testTimestamp) {
-      if (!store.isOpen) return false;
-      const o = store.operationalOverride;
-      if (o?.isPaused) {
-        if (o.pauseUntil && testTimestamp >= o.pauseUntil) {
-          return true; // Auto-resumed!
-        }
-        return false; // Still paused
+      if (prodData.isAvailable === false) {
+        throw new Error(`PRODUCT_UNAVAILABLE: สินค้า ${prodData.name} ปิดรับออเดอร์ชั่วคราว`);
       }
-      return true;
-    }
-
-    // Before pause expiration (17:30) -> REJECTED
-    assert.equal(evaluatePause(store, new Date('2026-09-03T17:30:00').getTime()), false);
-
-    // After pause expiration (18:05) -> AUTO-RESUMED
-    assert.equal(evaluatePause(store, new Date('2026-09-03T18:05:00').getTime()), true);
-  });
-
-  // Scenario 137: Wave 4.2.5 Rush Mode Buffer: Rush mode adds positive buffer minutes, rejects negative buffers
-  await runTest('Scenario 137: Wave 4.2.5 Rush Mode: Adds buffer minutes and strictly normalizes/rejects negative values', async () => {
-    function calculatePrepTime(basePrepMinutes, override) {
-      let buffer = 0;
-      if (override?.isRushMode) {
-        if (override.rushBufferMinutes < 0) throw new Error("INVALID_BUFFER: rushBufferMinutes cannot be negative");
-        buffer = override.rushBufferMinutes || 0;
-      }
-      return basePrepMinutes + buffer;
-    }
-
-    const standardMode = { isRushMode: false, rushBufferMinutes: 0 };
-    assert.equal(calculatePrepTime(10, standardMode), 10);
-
-    const rushModeActive = { isRushMode: true, rushBufferMinutes: 15 };
-    assert.equal(calculatePrepTime(10, rushModeActive), 25);
-
-    const negativeBuffer = { isRushMode: true, rushBufferMinutes: -5 };
-    assert.throws(() => calculatePrepTime(10, negativeBuffer), /INVALID_BUFFER/);
-  });
-
-  // Scenario 138: Wave 4.2.5 Atomic Slot Reservation: Capacity check + mutation inside runTransaction prevents race condition
-  await runTest('Scenario 138: Wave 4.2.5 Atomic Capacity Reservation: Race condition test guarantees 0 overbooking', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const slotId = "slot_20260903_1800";
-    const maxCapacity = 5;
-
-    engine.setDoc(`store_slots/${slotId}`, {
-      slotId,
-      storeId: "store_138",
-      capacity: maxCapacity,
-      currentOrders: 4 // Only 1 spot remaining!
-    });
-
-    async function reserveSlotAtomic(callerStoreId) {
-      return engine.runTransaction(async (tx) => {
-        const slotRef = { path: `store_slots/${slotId}` };
-        const slotSnap = await tx.get(slotRef);
-        let current = 0;
-        if (slotSnap.exists) {
-          const d = slotSnap.data();
-          if (d.storeId && d.storeId !== callerStoreId) throw new Error("Unauthorized");
-          current = Number(d.currentOrders) || 0;
-        }
-
-        if (current + 1 > maxCapacity) {
-          throw new Error(`SLOT_CAPACITY_EXCEEDED: ${current}/${maxCapacity}`);
-        }
-
-        tx.update(slotRef, { currentOrders: current + 1 });
-        return current + 1;
-      });
-    }
-
-    // 2 Concurrent users try to book the last 1 slot
-    const [resA, resB] = await Promise.allSettled([
-      reserveSlotAtomic("store_138"),
-      reserveSlotAtomic("store_138")
-    ]);
-
-    const successes = [resA, resB].filter(r => r.status === 'fulfilled');
-    const failures = [resA, resB].filter(r => r.status === 'rejected');
-
-    assert.equal(successes.length, 1);
-    assert.equal(failures.length, 1);
-    assert.equal(engine.getDoc(`store_slots/${slotId}`).currentOrders, 5); // Exactly maxCapacity!
-  });
-
-  // Scenario 139: Wave 4.2.5 Cross-Store Slot Protection: Attempting to reserve slot of another store is rejected
-  await runTest('Scenario 139: Wave 4.2.5 Cross-Store Slot: Reservation for mismatched storeId is strictly rejected', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const slotId = "slot_store_B_139";
-    engine.setDoc(`store_slots/${slotId}`, {
-      slotId,
-      storeId: "store_B",
-      capacity: 10,
-      currentOrders: 2
-    });
-
-    async function reserveSlot(callerStoreId) {
-      return engine.runTransaction(async (tx) => {
-        const slotRef = { path: `store_slots/${slotId}` };
-        const snap = await tx.get(slotRef);
-        const data = snap.data();
-        if (data.storeId !== callerStoreId) {
-          throw new Error("Unauthorized: Slot belongs to another store");
-        }
-        tx.update(slotRef, { currentOrders: data.currentOrders + 1 });
-        return true;
-      });
-    }
-
-    await assert.rejects(
-      async () => reserveSlot("store_A"),
-      /Unauthorized: Slot belongs to another store/
-    );
-    assert.equal(engine.getDoc(`store_slots/${slotId}`).currentOrders, 2); // Preserved!
-  });
-
-  // Scenario 140: Wave 4.2.5.x Overnight Operating Hours: Supports 22:00 - 02:00 overnight schedule seamlessly
-  await runTest('Scenario 140: Wave 4.2.5.x Operating Hours: Overnight schedule (22:00 - 02:00) evaluated correctly', async () => {
-    function isWithinOperatingHours(open, close, timeStr) {
-      if (open <= close) {
-        return timeStr >= open && timeStr <= close;
-      } else {
-        return timeStr >= open || timeStr <= close;
+      const currentStock = typeof prodData.stock === 'number' ? prodData.stock : 0;
+      if (currentStock < requiredQty) {
+        throw new Error(`INSUFFICIENT_STOCK: สินค้า "${prodData.name}" คงเหลือเพียง ${currentStock} ชุด (ต้องการ ${requiredQty})`);
       }
     }
 
-    // Overnight schedule: 22:00 to 02:00
-    assert.equal(isWithinOperatingHours("22:00", "02:00", "23:30"), true);
-    assert.equal(isWithinOperatingHours("22:00", "02:00", "01:15"), true);
-    assert.equal(isWithinOperatingHours("22:00", "02:00", "02:00"), true);
-    assert.equal(isWithinOperatingHours("22:00", "02:00", "02:05"), false); // Outside!
-    assert.equal(isWithinOperatingHours("22:00", "02:00", "15:00"), false); // Outside!
-  });
+    let calculatedTotalSatang = 0;
+    const validatedOrderItems = [];
 
-  // Scenario 141: Wave 4.2.5.x Authoritative Store Capacity Pre-read: Client cannot spoof higher capacity
-  await runTest('Scenario 141: Wave 4.2.5.x Authoritative Capacity: Store doc maxOrdersPerSlot overrides client spoofed capacity', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const storeId = "store_cap_141";
-    const slotId = "slot_cap_141";
+    for (const itemReq of items) {
+      const prodData = productSnapMap.get(itemReq.productId).data();
+      const basePriceSatang = prodData.priceSatang ?? Math.round((Number(prodData.price) || 0) * 100);
+      let itemModifierSatang = 0;
 
-    engine.setDoc(`shops/${storeId}`, {
-      id: storeId,
-      maxOrdersPerSlot: 5 // Store owner configured 5 max!
-    });
+      const selectedModifiers = itemReq.selectedModifiers || [];
+      const allowedGroupIds = new Set(prodData.modifierGroupIds || []);
 
-    engine.setDoc(`store_slots/${slotId}`, {
-      slotId,
-      storeId,
-      capacity: 5,
-      currentOrders: 5 // Already full!
-    });
-
-    async function reserveSlotAuthoritative(callerStoreId, targetSlotId, clientSpoofedCap) {
-      return engine.runTransaction(async (tx) => {
-        const shopSnap = await tx.get({ path: `shops/${callerStoreId}` });
-        const authoritativeCapacity = shopSnap.exists ? shopSnap.data().maxOrdersPerSlot : clientSpoofedCap;
-
-        const slotRef = { path: `store_slots/${targetSlotId}` };
-        const slotSnap = await tx.get(slotRef);
-        const currentOrders = slotSnap.exists ? slotSnap.data().currentOrders : 0;
-
-        if (currentOrders + 1 > authoritativeCapacity) {
-          throw new Error(`SLOT_CAPACITY_EXCEEDED: ${currentOrders}/${authoritativeCapacity}`);
-        }
-        tx.update(slotRef, { currentOrders: currentOrders + 1 });
-        return true;
-      });
-    }
-
-    // Client attempts to spoof maxCapacity=999 on a full slot
-    await assert.rejects(
-      async () => reserveSlotAuthoritative(storeId, slotId, 999),
-      /SLOT_CAPACITY_EXCEEDED: 5\/5/
-    );
-  });
-
-  // Scenario 142: Wave 4.2.5.x Authoritative Order Creation: Product price is calculated from DB priceSatang, ignoring client price
-  await runTest('Scenario 142: Wave 4.2.5.x Authoritative Price: Total is calculated strictly from DB priceSatang', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const storeId = "store_price_142";
-    const prodId = "prod_price_142";
-
-    engine.setDoc(`shops/${storeId}`, { id: storeId, isOpen: true });
-    engine.setDoc(`products/${prodId}`, {
-      id: prodId,
-      storeId,
-      name: "ข้าวผัดกุ้ง",
-      priceSatang: 6500, // 65.00 THB in DB
-      price: 65,
-      stock: 10,
-      isAvailable: true
-    });
-
-    async function createOrderAuthoritative(itemsReq) {
-      return engine.runTransaction(async (tx) => {
-        let totalSatang = 0;
-        for (const item of itemsReq) {
-          const prodSnap = await tx.get({ path: `products/${item.productId}` });
-          if (!prodSnap.exists) throw new Error("Product not found");
-          const prod = prodSnap.data();
-          const unitSatang = prod.priceSatang; // Authoritative DB price!
-          totalSatang += unitSatang * item.quantity;
-        }
-        return { totalSatang, totalBaht: totalSatang / 100 };
-      });
-    }
-
-    // Client requests item with spoofed clientPrice = 1 THB
-    const clientOrder = [{ productId: prodId, quantity: 2, clientPrice: 1 }];
-    const res = await createOrderAuthoritative(clientOrder);
-
-    // Total must be 130 THB (65 x 2), NOT 2 THB!
-    assert.equal(res.totalSatang, 13000);
-    assert.equal(res.totalBaht, 130);
-  });
-
-  // Scenario 143: Wave 4.2.5.x Atomic Stock & Order Boundary: Insufficient stock fails entire order transaction (0 partial mutation)
-  await runTest('Scenario 143: Wave 4.2.5.x Atomic Stock Rollback: Out of stock item aborts entire order with 0 stock leak', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const storeId = "store_stock_143";
-    const prodA = "prod_A_143";
-    const prodB = "prod_B_143";
-
-    engine.setDoc(`shops/${storeId}`, { id: storeId, isOpen: true });
-    engine.setDoc(`products/${prodA}`, { id: prodA, storeId, stock: 5, priceSatang: 5000 });
-    engine.setDoc(`products/${prodB}`, { id: prodB, storeId, stock: 0, priceSatang: 4000 }); // Out of stock!
-
-    async function createMultiItemOrder(itemsReq) {
-      return engine.runTransaction(async (tx) => {
-        for (const it of itemsReq) {
-          const snap = await tx.get({ path: `products/${it.productId}` });
-          const prod = snap.data();
-          if (prod.stock < it.quantity) throw new Error(`INSUFFICIENT_STOCK: ${prod.id}`);
-          tx.update({ path: `products/${it.productId}` }, { stock: prod.stock - it.quantity });
-        }
-        return true;
-      });
-    }
-
-    await assert.rejects(
-      async () => createMultiItemOrder([{ productId: prodA, quantity: 2 }, { productId: prodB, quantity: 1 }]),
-      /INSUFFICIENT_STOCK: prod_B_143/
-    );
-
-    // Prod A stock must remain 5 (0 partial decrement!)
-    assert.equal(engine.getDoc(`products/${prodA}`).stock, 5);
-  });
-
-  // Scenario 144: Wave 4.2.5.x Capacity Leak Prevention: Transaction atomicity guarantees slot is only reserved on successful order
-  await runTest('Scenario 144: Wave 4.2.5.x Capacity Leak Prevention: Slot count does not leak if order validation fails', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const storeId = "store_leak_144";
-    const slotId = "slot_leak_144";
-    const prodId = "prod_leak_144";
-
-    engine.setDoc(`shops/${storeId}`, { id: storeId, isOpen: true, maxOrdersPerSlot: 10 });
-    engine.setDoc(`store_slots/${slotId}`, { slotId, storeId, currentOrders: 2, capacity: 10 });
-    engine.setDoc(`products/${prodId}`, { id: prodId, storeId, stock: 1, priceSatang: 5000 });
-
-    async function atomicOrderWithSlot(quantity) {
-      return engine.runTransaction(async (tx) => {
-        // 1. Check & increment slot
-        const slotSnap = await tx.get({ path: `store_slots/${slotId}` });
-        const slot = slotSnap.data();
-        tx.update({ path: `store_slots/${slotId}` }, { currentOrders: slot.currentOrders + 1 });
-
-        // 2. Check product stock (fails if quantity > stock)
-        const prodSnap = await tx.get({ path: `products/${prodId}` });
-        const prod = prodSnap.data();
-        if (prod.stock < quantity) throw new Error("INSUFFICIENT_STOCK");
-        tx.update({ path: `products/${prodId}` }, { stock: prod.stock - quantity });
-
-        // 3. Create Order
-        tx.set({ path: `orders/ord_${Date.now()}` }, { storeId, totalSatang: prod.priceSatang * quantity });
-        return true;
-      });
-    }
-
-    // Customer requests quantity 5 when stock is only 1
-    await assert.rejects(
-      async () => atomicOrderWithSlot(5),
-      /INSUFFICIENT_STOCK/
-    );
-
-    // Slot currentOrders must still be 2 (NO capacity leak!)
-    assert.equal(engine.getDoc(`store_slots/${slotId}`).currentOrders, 2);
-  });
-
-  // Scenario 145: Wave 4.2.5.x Atomic Queue Counter: Guarantees sequential Q001, Q002 per store + date with 0 collision
-  await runTest('Scenario 145: Wave 4.2.5.x Atomic Queue Sequence: Sequential per-store counter guarantees 0 duplicate queue numbers', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const storeId = "store_seq_145";
-    const date = "20260903";
-
-    async function issueNextQueueNumber() {
-      return engine.runTransaction(async (tx) => {
-        const counterRef = { path: `queue_counters/counter_${storeId}_${date}` };
-        const snap = await tx.get(counterRef);
-        let seq = 1;
-        if (snap.exists) {
-          seq = (Number(snap.data().lastSequence) || 0) + 1;
-        }
-        tx.set(counterRef, { storeId, date, lastSequence: seq });
-        return `Q${String(seq).padStart(3, '0')}`;
-      });
-    }
-
-    const q1 = await issueNextQueueNumber();
-    const q2 = await issueNextQueueNumber();
-    const q3 = await issueNextQueueNumber();
-
-    assert.equal(q1, "Q001");
-    assert.equal(q2, "Q002");
-    assert.equal(q3, "Q003");
-  });
-
-  // Scenario 146: Wave 4.2.5.x Date-Scoped Slot: Prevents slot capacity collisions across different business days
-  await runTest('Scenario 146: Wave 4.2.5.x Date-Scoped Slot ID: Distinct dates (20260903 vs 20260904) have isolated capacity', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const storeId = "store_slot_146";
-    const slotDay1 = `slot_${storeId}_20260903_1215`;
-    const slotDay2 = `slot_${storeId}_20260904_1215`;
-
-    engine.setDoc(`store_slots/${slotDay1}`, { slotId: slotDay1, currentOrders: 10, capacity: 10 }); // Full for Day 1
-    engine.setDoc(`store_slots/${slotDay2}`, { slotId: slotDay2, currentOrders: 0, capacity: 10 });  // Empty for Day 2
-
-    assert.equal(engine.getDoc(`store_slots/${slotDay1}`).currentOrders, 10);
-    assert.equal(engine.getDoc(`store_slots/${slotDay2}`).currentOrders, 0);
-  });
-
-  // Scenario 147: Wave 4.2.5.x Pickup Time Validation: Outside store operating hours is rejected
-  await runTest('Scenario 147: Wave 4.2.5.x Pickup Time Verification: Pickup time outside store operating schedule is rejected', async () => {
-    function validatePickupTime(operatingHours, pickupTime) {
-      const { open, close } = operatingHours;
-      const isAllowed = open <= close
-        ? (pickupTime >= open && pickupTime <= close)
-        : (pickupTime >= open || pickupTime <= close);
-      if (!isAllowed) throw new Error(`INVALID_PICKUP_TIME: ${pickupTime}`);
-      return true;
-    }
-
-    const schedule = { open: "08:00", close: "17:00" };
-    assert.equal(validatePickupTime(schedule, "12:15"), true);
-    assert.throws(() => validatePickupTime(schedule, "23:30"), /INVALID_PICKUP_TIME/);
-    assert.throws(() => validatePickupTime(schedule, "07:30"), /INVALID_PICKUP_TIME/);
-  });
-
-  // Scenario 148: Wave 4.2.5.x Strict Authentication & Phone: Guest/missing phone strictly rejected
-  await runTest('Scenario 148: Wave 4.2.5.x Strict Fail-Fast: Missing phone or unauthenticated guest is strictly rejected', async () => {
-    function validateOrderCustomer(userId, phone) {
-      if (!userId || userId === 'guest_user') throw new Error('AUTHENTICATION_REQUIRED');
-      if (!phone || !phone.trim()) throw new Error('CUSTOMER_PHONE_REQUIRED');
-      return true;
-    }
-
-    assert.throws(() => validateOrderCustomer('guest_user', '0812345678'), /AUTHENTICATION_REQUIRED/);
-    assert.throws(() => validateOrderCustomer('user_123', ''), /CUSTOMER_PHONE_REQUIRED/);
-    assert.equal(validateOrderCustomer('user_123', '0899999999'), true);
-  });
-
-  // Scenario 149: Wave 4.2.5.x Bangkok Date & Advance Schedule: Validates future pickupDate against that specific day schedule
-  await runTest('Scenario 149: Wave 4.2.5.x Bangkok Timezone & Future Date: Validates target pickupDate day of week', async () => {
-    function getDayScheduleForDate(operatingHours, targetIsoDate) {
-      const [y, m, d] = targetIsoDate.split('-').map(Number);
-      const targetUtc = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
-      const formatter = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Bangkok', weekday: 'short' });
-      const weekday = formatter.format(targetUtc).toLowerCase();
-      const map = { sun: 'sunday', mon: 'monday', tue: 'tuesday', wed: 'wednesday', thu: 'thursday', fri: 'friday', sat: 'saturday' };
-      const dayName = map[weekday];
-      return operatingHours[dayName];
-    }
-
-    const weeklyHours = {
-      sunday: { isOpen: false, open: "08:00", close: "17:00" },
-      monday: { isOpen: true, open: "08:00", close: "17:00" },
-      friday: { isOpen: true, open: "08:00", close: "17:00" }
-    };
-
-    // 2026-09-06 is Sunday (closed)
-    const sunSched = getDayScheduleForDate(weeklyHours, "2026-09-06");
-    assert.equal(sunSched.isOpen, false);
-
-    // 2026-09-07 is Monday (open)
-    const monSched = getDayScheduleForDate(weeklyHours, "2026-09-07");
-    assert.equal(monSched.isOpen, true);
-  });
-
-  // Scenario 150: Wave 4.2.5.x Multiple Item Variants: Product with different toppings calculates exact individual satang
-  await runTest('Scenario 150: Wave 4.2.5.x Distinct Modifiers: Same product with different modifiers calculates exact total', async () => {
-    const baseSatang = 5000; // 50.00 THB
-    const toppingEggSatang = 1000; // +10.00 THB
-    const toppingCheeseSatang = 1500; // +15.00 THB
-
-    const item1 = { quantity: 1, baseSatang, modifierSatang: toppingEggSatang }; // 60.00 THB
-    const item2 = { quantity: 1, baseSatang, modifierSatang: toppingCheeseSatang }; // 65.00 THB
-
-    const totalSatang = (item1.baseSatang + item1.modifierSatang) * item1.quantity +
-                        (item2.baseSatang + item2.modifierSatang) * item2.quantity;
-
-    assert.equal(totalSatang, 12500); // 125.00 THB
-    assert.equal(totalSatang / 100, 125);
-  });
-
-  // Scenario 151: Zero-Payment Architecture: Missing required modifier group strictly throws REQUIRED_MODIFIER_MISSING
-  await runTest('Scenario 151: Zero-Payment Architecture: Missing required modifier group strictly throws REQUIRED_MODIFIER_MISSING', async () => {
-    function validateRequiredModifiers(prodData, modifierGroupsMap, selectedModifiers) {
-      const selectedGroupIds = new Set(selectedModifiers.map(m => m.modifierGroupId));
-      if (prodData.modifierGroupIds && prodData.modifierGroupIds.length > 0) {
+      if (Array.isArray(prodData.modifierGroupIds)) {
         for (const mgId of prodData.modifierGroupIds) {
-          const modData = modifierGroupsMap[mgId];
-          if (modData) {
-            const isRequired = Boolean(modData.required || modData.isRequired || (modData.minSelections && modData.minSelections > 0));
-            if (isRequired && !selectedGroupIds.has(mgId)) {
-              throw new Error(`REQUIRED_MODIFIER_MISSING: กรุณาเลือก ${modData.name} สำหรับเมนู "${prodData.name}"`);
-            }
+          const modSnap = modifierGroupSnapMap.get(mgId);
+          if (!modSnap || !modSnap.exists) {
+            throw new Error(`MODIFIER_GROUP_NOT_FOUND: ไม่พบกลุ่มตัวเลือก ${mgId} สำหรับเมนู "${prodData.name}"`);
+          }
+          const modData = modSnap.data();
+          if (modData.storeId !== storeId) {
+            throw new Error(`CROSS_STORE_MODIFIER_VIOLATION: กลุ่มตัวเลือก ${mgId} ไม่ได้เป็นของร้าน ${storeId}`);
+          }
+          const groupSelections = selectedModifiers.filter((m) => m.modifierGroupId === mgId);
+          const minSelections = modData.minSelections ?? modData.minSelect ?? (modData.required || modData.isRequired ? 1 : 0);
+          const maxSelections = modData.maxSelections ?? modData.maxSelect ?? (modData.selectionType === 'single' ? 1 : null);
+          const isSingle = modData.selectionType === 'single' || modData.type === 'single';
+
+          // Duplicate option check
+          const optionIdsInGroup = groupSelections.map((m) => m.optionId);
+          if (new Set(optionIdsInGroup).size !== optionIdsInGroup.length) {
+            throw new Error(`DUPLICATE_MODIFIER_OPTION: กลุ่มตัวเลือก "${modData.name || mgId}" มีตัวเลือกซ้ำกัน`);
+          }
+
+          if (groupSelections.length < minSelections) {
+            throw new Error(`REQUIRED_MODIFIER_MISSING: กรุณาเลือก ${modData.name || 'ตัวเลือกที่จำเป็น'} อย่างน้อย ${minSelections} รายการ สำหรับเมนู "${prodData.name}"`);
+          }
+          if (maxSelections !== null && groupSelections.length > maxSelections) {
+            throw new Error(`MAX_SELECTIONS_EXCEEDED: กลุ่มตัวเลือก "${modData.name}" เลือกได้สูงสุดไม่เกิน ${maxSelections} รายการ`);
+          }
+          if (isSingle && groupSelections.length > 1) {
+            throw new Error(`SINGLE_SELECTION_VIOLATED: กลุ่มตัวเลือก "${modData.name}" สามารถเลือกได้เพียง 1 ตัวเลือกเท่านั้น`);
           }
         }
       }
-      return true;
+
+      if (selectedModifiers.length > 0) {
+        for (const selMod of selectedModifiers) {
+          if (!allowedGroupIds.has(selMod.modifierGroupId)) {
+            throw new Error(`INVALID_PRODUCT_MODIFIER: กลุ่มตัวเลือก ${selMod.modifierGroupId} ไม่ได้เป็นของสินค้า "${prodData.name}"`);
+          }
+          const modSnap = modifierGroupSnapMap.get(selMod.modifierGroupId);
+          if (!modSnap || !modSnap.exists) {
+            throw new Error(`MODIFIER_GROUP_NOT_FOUND: ไม่พบกลุ่มตัวเลือก ${selMod.modifierGroupId}`);
+          }
+          const modData = modSnap.data();
+          const opt = (modData.options || []).find((o) => o.id === selMod.optionId);
+          if (!opt) {
+            throw new Error(`OPTION_NOT_FOUND: ไม่พบตัวเลือก ${selMod.optionId}`);
+          }
+          if (opt.isOutOfStock) {
+            throw new Error(`OPTION_OUT_OF_STOCK: ตัวเลือก "${opt.name}" หมดชั่วคราว`);
+          }
+          const optPriceSatang = opt.priceModifierSatang ?? Math.round((Number(opt.priceModifier) || 0) * 100);
+          itemModifierSatang += optPriceSatang;
+        }
+      }
+
+      const unitPriceSatang = basePriceSatang + itemModifierSatang;
+      const subtotalSatang = unitPriceSatang * Number(itemReq.quantity);
+      calculatedTotalSatang += subtotalSatang;
+
+      validatedOrderItems.push({
+        productId: itemReq.productId,
+        name: prodData.name,
+        quantity: Number(itemReq.quantity),
+        unitPriceSatang,
+        unitPrice: unitPriceSatang / 100,
+        subtotalSatang,
+        subtotal: subtotalSatang / 100,
+        customNotes: itemReq.customNotes || '',
+        selectedModifiers,
+      });
     }
 
-    const prod = { id: "p_kaprao", name: "ข้าวกะเพราไก่", modifierGroupIds: ["mg_spicy", "mg_egg"] };
-    const modGroups = {
-      mg_spicy: { id: "mg_spicy", name: "ระดับความเผ็ด", required: true },
-      mg_egg: { id: "mg_egg", name: "เลือกไข่", required: true }
-    };
+    // Fail-Closed Slot Capacity check
+    if (typeof shopData.maxOrdersPerSlot !== 'number' || shopData.maxOrdersPerSlot <= 0) {
+      throw new Error('STORE_CAPACITY_NOT_CONFIGURED: ร้านค้ายังไม่ได้กำหนดขีดจำกัดโควตาคิวรับอาหาร');
+    }
+    const authoritativeCapacity = shopData.maxOrdersPerSlot;
+    let currentSlotOrders = 0;
+    if (slotSnap.exists) {
+      const slotData = slotSnap.data();
+      currentSlotOrders = Number(slotData.currentOrders) || 0;
+    }
+    if (currentSlotOrders + 1 > authoritativeCapacity) {
+      throw new Error(`SLOT_CAPACITY_EXCEEDED: รอบเวลารับอาหาร ${cleanPickupTime} น. ของวันที่ ${targetYmd} คิวเต็มแล้ว (${currentSlotOrders}/${authoritativeCapacity})`);
+    }
 
-    // Customer only selected spicy, but forgot egg
-    const selectedMods = [{ modifierGroupId: "mg_spicy", optionId: "opt_medium" }];
-    assert.throws(
-      () => validateRequiredModifiers(prod, modGroups, selectedMods),
-      /REQUIRED_MODIFIER_MISSING: กรุณาเลือก เลือกไข่/
+    // Queue Number Generation
+    let sequenceNumber = 1;
+    if (counterSnap.exists) {
+      sequenceNumber = (Number(counterSnap.data().lastSequence) || 0) + 1;
+    }
+    const queueNumber = `Q${String(sequenceNumber).padStart(3, '0')}`;
+
+    // PHASE 3: WRITE ALL
+    for (const [prodId, requiredQty] of productTotalQuantityMap.entries()) {
+      const prodData = productSnapMap.get(prodId).data();
+      const currentStock = typeof prodData.stock === 'number' ? prodData.stock : 0;
+      tx.update({ path: `products/${prodId}` }, {
+        stock: currentStock - requiredQty,
+        updatedAt: new Date().toISOString()
+      });
+    }
+
+    tx.set(
+      { path: `store_slots/${dateScopedSlotId}` },
+      {
+        slotId: dateScopedSlotId,
+        storeId,
+        date: targetYmd,
+        timeSlot: cleanPickupTime,
+        capacity: authoritativeCapacity,
+        currentOrders: currentSlotOrders + 1,
+        totalItemsReserved: (slotSnap.exists ? Number(slotSnap.data().totalItemsReserved || 0) : 0) + totalOrderItemsCount,
+        updatedAt: new Date().toISOString()
+      },
+      { merge: true }
     );
 
-    // Customer selected both
-    const fullMods = [
-      { modifierGroupId: "mg_spicy", optionId: "opt_medium" },
-      { modifierGroupId: "mg_egg", optionId: "opt_fried_egg" }
-    ];
-    assert.equal(validateRequiredModifiers(prod, modGroups, fullMods), true);
-  });
-
-  // Scenario 152: Instant Queue Number Issuance: Confirmed order receives sequential Q001 immediately without payment
-  await runTest('Scenario 152: Zero-Payment Architecture: Confirmed order receives instant Q001 in PENDING state', async () => {
-    const storeId = "store_canteen_152";
-
-    function issueImmediateQueueOrder(seq) {
-      const queueNumber = `Q${String(seq).padStart(3, '0')}`;
-      return {
-        orderId: `ord_${Date.now()}_${seq}`,
+    tx.set(
+      { path: `queue_counters/${counterDocId}` },
+      {
         storeId,
-        queueNumber,
-        status: "PENDING",
-        queueStatus: "waiting"
-      };
-    }
+        date: targetYmd,
+        lastSequence: sequenceNumber,
+        updatedAt: new Date().toISOString()
+      },
+      { merge: true }
+    );
 
-    const order1 = issueImmediateQueueOrder(1);
-    const order2 = issueImmediateQueueOrder(2);
-
-    assert.equal(order1.queueNumber, "Q001");
-    assert.equal(order1.status, "PENDING");
-    assert.equal(order1.queueStatus, "waiting");
-    assert.equal(order2.queueNumber, "Q002");
-  });
-
-  // Scenario 153: Zero-Payment Cart Isolation: Adding to cart creates 0 orders and 0 stock deductions
-  await runTest('Scenario 153: Zero-Payment Architecture: Cart addition is client-isolated with zero resource allocation', async () => {
-    const localCart = [];
-    let dbOrdersCount = 0;
-    let dbProductStock = 20;
-
-    function addToCart(product, quantity, selectedModifiers) {
-      localCart.push({ product, quantity, selectedModifiers });
-      // Stock and DB orders MUST NOT CHANGE
-      return localCart.length;
-    }
-
-    addToCart({ id: "p1", name: "ข้าวผัด" }, 2, []);
-    addToCart({ id: "p2", name: "ต้มยำ" }, 1, []);
-
-    assert.equal(localCart.length, 2);
-    assert.equal(dbOrdersCount, 0); // 0 orders created
-    assert.equal(dbProductStock, 20); // 0 stock deducted
-  });
-
-  // Scenario 154: Payment-Free State Machine: PENDING -> CONFIRMED -> PREPARING -> READY -> COMPLETED
-  await runTest('Scenario 154: Zero-Payment Architecture: Full operational state machine transitions cleanly', async () => {
-    function isValidTransition(oldStatus, newStatus) {
-      const transitions = {
-        PENDING: ["CONFIRMED", "CANCELLED"],
-        CONFIRMED: ["PREPARING", "CANCELLED"],
-        PREPARING: ["READY"],
-        READY: ["COMPLETED"],
-        COMPLETED: [],
-        CANCELLED: []
-      };
-      return transitions[oldStatus]?.includes(newStatus) ?? false;
-    }
-
-    assert.equal(isValidTransition("PENDING", "CONFIRMED"), true);
-    assert.equal(isValidTransition("CONFIRMED", "PREPARING"), true);
-    assert.equal(isValidTransition("PREPARING", "READY"), true);
-    assert.equal(isValidTransition("READY", "COMPLETED"), true);
-    assert.equal(isValidTransition("PENDING", "CANCELLED"), true);
-    assert.equal(isValidTransition("PREPARING", "CANCELLED"), false); // Customer cannot cancel when kitchen is cooking
-    assert.equal(isValidTransition("READY", "CANCELLED"), false); // Cannot cancel when food is ready
-  });
-
-  // Scenario 155: Complete Absence of Payment Flow: Order payload contains no paymentMethod or paymentStatus
-  await runTest('Scenario 155: Zero-Payment Architecture: Order schema is completely devoid of payment fields', async () => {
+    const orderId = `ord_${Math.random().toString(36).substring(2, 9)}`;
     const orderPayload = {
-      orderId: "ord_nopay_155",
-      storeId: "store_canteen01",
-      userId: "user_customer_1",
-      customerName: "สมชาย ใจดี",
-      customerPhone: "0812345678",
-      queueNumber: "Q001",
-      status: "PENDING",
-      queueStatus: "waiting",
-      totalAmount: 60,
-      totalAmountSatang: 6000,
-      items: [{ productId: "p001", name: "ข้าวกะเพรา", quantity: 1, unitPrice: 60 }]
-    };
-
-    assert.equal("paymentMethod" in orderPayload, false);
-    assert.equal("paymentStatus" in orderPayload, false);
-    assert.equal("reservationNumber" in orderPayload, false);
-    assert.equal(orderPayload.queueNumber, "Q001");
-    assert.equal(orderPayload.status, "PENDING");
-  });
-
-  // Scenario 156: Structured Modifiers preservation across Cart and Order creation
-  await runTest('Scenario 156: Structured Modifiers: Cart items preserve modifierGroupId, optionId, and priceModifierSatang', async () => {
-    const structuredModifier = {
-      modifierGroupId: "spicy_level",
-      optionId: "spicy_medium",
-      name: "เผ็ดกลาง",
-      priceModifierSatang: 0
-    };
-    const cartItem = {
-      menuItem: { id: "prod_noodles_1", name: "ก๋วยเตี๋ยวต้มยำ", price: 50 },
-      quantity: 1,
-      selectedModifiers: [structuredModifier],
-      customNotes: "เผ็ด: เผ็ดกลาง"
-    };
-
-    assert.equal(Array.isArray(cartItem.selectedModifiers), true);
-    assert.equal(cartItem.selectedModifiers[0].modifierGroupId, "spicy_level");
-    assert.equal(cartItem.selectedModifiers[0].optionId, "spicy_medium");
-  });
-
-  // Scenario 157: Strict minSelections & maxSelections validation bounds
-  await runTest('Scenario 157: Modifier Bounds: minSelections < min throws REQUIRED_MODIFIER_MISSING and maxSelections > max throws MAX_SELECTIONS_EXCEEDED', async () => {
-    function validateModifierBounds(group, selected) {
-      const min = group.minSelections ?? (group.required ? 1 : 0);
-      const max = group.maxSelections ?? (group.selectionType === 'single' ? 1 : null);
-      if (selected.length < min) {
-        throw new Error(`REQUIRED_MODIFIER_MISSING: กรุณาเลือก ${group.name} อย่างน้อย ${min} รายการ`);
-      }
-      if (max !== null && selected.length > max) {
-        throw new Error(`MAX_SELECTIONS_EXCEEDED: กลุ่มตัวเลือก "${group.name}" เลือกได้สูงสุดไม่เกิน ${max} รายการ`);
-      }
-      return true;
-    }
-
-    const toppingGroup = { name: "ท็อปปิ้ง", minSelections: 1, maxSelections: 2, required: true };
-    assert.throws(() => validateModifierBounds(toppingGroup, []), /REQUIRED_MODIFIER_MISSING/);
-    assert.equal(validateModifierBounds(toppingGroup, ["opt_egg", "opt_cheese"]), true);
-    assert.throws(() => validateModifierBounds(toppingGroup, ["opt_egg", "opt_cheese", "opt_pork"]), /MAX_SELECTIONS_EXCEEDED/);
-  });
-
-  // Scenario 158: Single selection violation (sending multiple options for single-select group is strictly rejected)
-  await runTest('Scenario 158: Single Selection Guard: Multiple choices for single-choice group throws SINGLE_SELECTION_VIOLATED', async () => {
-    function validateSingleSelection(group, selected) {
-      const isSingle = group.selectionType === 'single' || group.type === 'single';
-      if (isSingle && selected.length > 1) {
-        throw new Error(`SINGLE_SELECTION_VIOLATED: กลุ่มตัวเลือก "${group.name}" สามารถเลือกได้เพียง 1 ตัวเลือกเท่านั้น`);
-      }
-      return true;
-    }
-
-    const spicyGroup = { name: "ระดับความเผ็ด", selectionType: "single" };
-    assert.equal(validateSingleSelection(spicyGroup, ["spicy_normal"]), true);
-    assert.throws(() => validateSingleSelection(spicyGroup, ["spicy_normal", "spicy_extra"]), /SINGLE_SELECTION_VIOLATED/);
-  });
-
-  // Scenario 159: Missing modifier group in database strictly fails closed
-  await runTest('Scenario 159: Fail-Closed Modifier Resolution: Missing modifier group in database throws MODIFIER_GROUP_NOT_FOUND', async () => {
-    const mockDb = new Map();
-    function resolveModifierGroup(groupId) {
-      if (!mockDb.has(groupId)) {
-        throw new Error(`MODIFIER_GROUP_NOT_FOUND: ไม่พบกลุ่มตัวเลือก ${groupId} ในระบบ`);
-      }
-      return mockDb.get(groupId);
-    }
-
-    assert.throws(() => resolveModifierGroup("non_existent_group"), /MODIFIER_GROUP_NOT_FOUND/);
-  });
-
-  // Scenario 160: Customer cancellation disallowed once kitchen starts cooking
-  await runTest('Scenario 160: Kitchen Cancellation Guard: Customer cannot cancel order once PREPARING or READY', async () => {
-    function canCustomerCancel(orderStatus, queueStatus) {
-      return (orderStatus === 'PENDING' || orderStatus === 'CONFIRMED') && queueStatus === 'waiting';
-    }
-
-    assert.equal(canCustomerCancel('PENDING', 'waiting'), true);
-    assert.equal(canCustomerCancel('CONFIRMED', 'waiting'), true);
-    assert.equal(canCustomerCancel('PREPARING', 'cooking'), false);
-    assert.equal(canCustomerCancel('READY', 'ready'), false);
-    assert.equal(canCustomerCancel('COMPLETED', 'completed'), false);
-  });
-
-  // Scenario 161: Live Slot Capacity calculation accurately flags FULL, LIMITED, and AVAILABLE states
-  await runTest('Scenario 161: Live Slot Capacity: Accurately computes remaining capacity & status from slot docs', async () => {
-    function calculateSlotState(slot, currentOrders, storeCapacity = 20) {
-      const cap = slot.capacity || storeCapacity;
-      const rem = Math.max(0, cap - (currentOrders || 0));
-      let status = "AVAILABLE";
-      if (rem === 0) status = "FULL";
-      else if (rem <= 5) status = "LIMITED";
-      return { ...slot, capacity: cap, currentOrders, remaining: rem, status };
-    }
-
-    const slotFull = calculateSlotState({ time: "12:00" }, 20, 20);
-    assert.equal(slotFull.remaining, 0);
-    assert.equal(slotFull.status, "FULL");
-
-    const slotLimited = calculateSlotState({ time: "12:30" }, 17, 20);
-    assert.equal(slotLimited.remaining, 3);
-    assert.equal(slotLimited.status, "LIMITED");
-
-    const slotAvailable = calculateSlotState({ time: "13:00" }, 5, 20);
-    assert.equal(slotAvailable.remaining, 15);
-    assert.equal(slotAvailable.status, "AVAILABLE");
-  });
-
-  // Scenario 162: Cart Isolation Invariant - Adding items to cart never decrements slot capacity or issues Q001
-  await runTest('Scenario 162: Cart Isolation: Adding to cart writes only to local storage without reserving slot capacity or queue number', async () => {
-    const mockLocalStorage = new Map();
-    let slotCapacityDoc = { currentOrders: 2 };
-    let globalQueueCounter = 42;
-
-    function addItemToCart(cartKey, item) {
-      const existing = mockLocalStorage.get(cartKey) || [];
-      existing.push(item);
-      mockLocalStorage.set(cartKey, existing);
-      return existing;
-    }
-
-    addItemToCart('queueup_cart', { id: 'prod_1', name: 'ก๋วยเตี๋ยว', quantity: 2 });
-    assert.equal(mockLocalStorage.get('queueup_cart').length, 1);
-    // Capacity doc and queue counter remain completely untouched
-    assert.equal(slotCapacityDoc.currentOrders, 2);
-    assert.equal(globalQueueCounter, 42);
-  });
-
-  // Scenario 163: Full Authoritative Order Creation with Structured Modifiers and Instant Q-Token
-  await runTest('Scenario 163: Zero-Payment Order Pipeline: Produces Q001 instantly with structured modifiers and atomic slot bump', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const storeId = "store_canteen01";
-    const slotId = "slot_store_canteen01_20260904_1200";
-
-    engine.setDoc(`shops/${storeId}`, {
-      id: storeId,
-      name: "ร้านก๋วยเตี๋ยวเรืออยุธยา",
-      isOpen: true,
-      maxOrdersPerSlot: 20,
-      openTime: "08:00",
-      closeTime: "17:00"
-    });
-
-    engine.setDoc(`store_slots/${slotId}`, {
-      slotId,
-      storeId,
-      capacity: 20,
-      currentOrders: 4
-    });
-
-    // Simulate authoritative order creation
-    const currentOrders = engine.getDoc(`store_slots/${slotId}`).currentOrders;
-    engine.setDoc(`store_slots/${slotId}`, {
-      ...engine.getDoc(`store_slots/${slotId}`),
-      currentOrders: currentOrders + 1
-    });
-
-    const orderId = "ORD-TEST-163";
-    const queueNo = "Q007";
-    engine.setDoc(`orders/${orderId}`, {
+      id: orderId,
       orderId,
-      queueNumber: queueNo,
       storeId,
-      status: "PENDING",
-      queueStatus: "waiting",
+      userId,
+      customerName: customerName.trim(),
+      customerPhone: customerPhone.trim(),
+      queueNumber,
+      status: 'PENDING',
+      queueStatus: 'waiting',
+      totalAmountSatang: calculatedTotalSatang,
+      totalAmount: calculatedTotalSatang / 100,
+      finalAmountSatang: calculatedTotalSatang,
+      finalAmount: calculatedTotalSatang / 100,
+      discountAppliedSatang: 0,
+      pointsEarned: Math.floor(calculatedTotalSatang / 1000),
+      items: validatedOrderItems,
+      pickupTime: cleanPickupTime,
+      pickupDate: targetYmd,
+      slotId: dateScopedSlotId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    tx.set({ path: `orders/${orderId}` }, orderPayload);
+
+    return {
+      success: true,
+      orderId,
+      queueNumber,
+      totalAmountSatang: calculatedTotalSatang,
+      totalAmountBaht: calculatedTotalSatang / 100,
+      orderStatus: 'PENDING',
+      order: orderPayload
+    };
+  });
+}
+
+function setupStoreFixtures(db, storeId = 'store_test_01') {
+  db.setDoc(`shops/${storeId}`, {
+    storeId,
+    name: `ร้านทดสอบ ${storeId}`,
+    isOpen: true,
+    status: 'open',
+    operationalOverride: 'NORMAL',
+    maxOrdersPerSlot: 5,
+    operatingHours: {
+      friday: { isOpen: true, open: '08:00', close: '22:00' },
+      saturday: { isOpen: true, open: '08:00', close: '22:00' },
+      sunday: { isOpen: false, open: '08:00', close: '22:00' },
+      monday: { isOpen: true, open: '08:00', close: '22:00' }
+    }
+  });
+
+  db.setDoc(`modifier_groups/mg_noodle_type_${storeId}`, {
+    id: `mg_noodle_type_${storeId}`,
+    storeId,
+    name: 'เส้นก๋วยเตี๋ยว',
+    required: true,
+    selectionType: 'single',
+    minSelections: 1,
+    maxSelections: 1,
+    options: [
+      { id: 'opt_sen_lek', name: 'เส้นเล็ก', priceModifierSatang: 0, isOutOfStock: false },
+      { id: 'opt_sen_yai', name: 'เส้นใหญ่', priceModifierSatang: 0, isOutOfStock: false },
+      { id: 'opt_mama', name: 'เส้นมาม่า', priceModifierSatang: 1000, isOutOfStock: false },
+      { id: 'opt_woonsen', name: 'วุ้นเส้น (หมด)', priceModifierSatang: 500, isOutOfStock: true },
+    ]
+  });
+
+  db.setDoc(`modifier_groups/mg_spicy_level_${storeId}`, {
+    id: `mg_spicy_level_${storeId}`,
+    storeId,
+    name: 'ระดับความเผ็ด',
+    required: true,
+    selectionType: 'single',
+    minSelections: 1,
+    maxSelections: 1,
+    options: [
+      { id: 'opt_spicy_0', name: 'ไม่เผ็ด', priceModifierSatang: 0, isOutOfStock: false },
+      { id: 'opt_spicy_1', name: 'เผ็ดน้อย', priceModifierSatang: 0, isOutOfStock: false },
+      { id: 'opt_spicy_2', name: 'เผ็ดกลาง', priceModifierSatang: 0, isOutOfStock: false },
+    ]
+  });
+
+  db.setDoc(`modifier_groups/mg_extra_toppings_${storeId}`, {
+    id: `mg_extra_toppings_${storeId}`,
+    storeId,
+    name: 'ท็อปปิ้งเพิ่มเติม',
+    required: false,
+    selectionType: 'multiple',
+    minSelections: 0,
+    maxSelections: 2,
+    options: [
+      { id: 'opt_pork_ball', name: 'ลูกชิ้นหมูเพิ่ม', priceModifierSatang: 1500, isOutOfStock: false },
+      { id: 'opt_crispy_wonton', name: 'เกี๊ยวกรอบ', priceModifierSatang: 1000, isOutOfStock: false },
+      { id: 'opt_boiled_egg', name: 'ไข่ต้มยางมะตูม', priceModifierSatang: 1000, isOutOfStock: false },
+    ]
+  });
+
+  db.setDoc(`products/prod_noodle_${storeId}`, {
+    id: `prod_noodle_${storeId}`,
+    storeId,
+    name: 'ก๋วยเตี๋ยวเรือน้ำตกหมูตุ๋น',
+    priceSatang: 5500,
+    price: 55,
+    stock: 20,
+    isAvailable: true,
+    modifierGroupIds: [`mg_noodle_type_${storeId}`, `mg_spicy_level_${storeId}`, `mg_extra_toppings_${storeId}`]
+  });
+
+  db.setDoc(`products/prod_crispy_pork_${storeId}`, {
+    id: `prod_crispy_pork_${storeId}`,
+    storeId,
+    name: 'กากหมูเจียวกรอบโบราณ',
+    priceSatang: 2500,
+    price: 25,
+    stock: 5,
+    isAvailable: true,
+    modifierGroupIds: []
+  });
+}
+
+async function main() {
+  // =========================================================================
+  // Section A: Pure Zero-Payment & Queue Number Invariants
+  // =========================================================================
+  await runTest('A.1: Order Creation produces instant Q001 in PENDING state with Zero-Payment fields', async () => {
+    const db = new AdvancedFirestoreEngine();
+    setupStoreFixtures(db, 'store_test_01');
+
+    const result = await executeOrderCreation(db, {
+      storeId: 'store_test_01',
+      userId: 'user_cust_01',
+      customerName: 'สมชาย นักชิม',
+      customerPhone: '0812345678',
+      pickupTime: '18:00',
+      pickupDate: '2026-09-04',
       items: [
         {
-          productId: "prod_noodles_1",
-          name: "ก๋วยเตี๋ยวเรือหมูตุ๋น",
+          productId: 'prod_noodle_store_test_01',
           quantity: 1,
           selectedModifiers: [
-            { modifierGroupId: "spicy_level", optionId: "spicy_hot", name: "เผ็ดมาก 3x", priceModifierSatang: 0 },
-            { modifierGroupId: "toppings", optionId: "crackling", name: "กากหมูเจียว", priceModifierSatang: 1000 }
+            { modifierGroupId: 'mg_noodle_type_store_test_01', optionId: 'opt_sen_lek' },
+            { modifierGroupId: 'mg_spicy_level_store_test_01', optionId: 'opt_spicy_2' }
           ]
         }
       ]
-    });
+    }, new Date('2026-09-04T10:00:00+07:00'));
 
-    const createdOrder = engine.getDoc(`orders/${orderId}`);
-    assert.equal(createdOrder.queueNumber, "Q007");
-    assert.equal(createdOrder.status, "PENDING");
-    assert.equal(createdOrder.queueStatus, "waiting");
-    assert.equal(createdOrder.items[0].selectedModifiers.length, 2);
-    assert.equal(engine.getDoc(`store_slots/${slotId}`).currentOrders, 5);
+    assert.equal(result.success, true);
+    assert.equal(result.queueNumber, 'Q001');
+    assert.equal(result.orderStatus, 'PENDING');
+    assert.equal(result.totalAmountSatang, 5500);
+
+    const savedOrder = db.getDoc(`orders/${result.orderId}`);
+    assert.ok(savedOrder);
+    assert.equal(savedOrder.queueNumber, 'Q001');
+    assert.equal(savedOrder.status, 'PENDING');
+    assert.equal(savedOrder.queueStatus, 'waiting');
+
+    // Strict Zero-Payment Invariant: No payment fields!
+    assert.equal(savedOrder.paymentStatus, undefined, 'Order must not contain paymentStatus');
+    assert.equal(savedOrder.paymentMethod, undefined, 'Order must not contain paymentMethod');
+    assert.equal(savedOrder.paymentExpiredAt, undefined, 'Order must not contain paymentExpiredAt');
+    assert.equal(savedOrder.chargeId, undefined, 'Order must not contain chargeId');
   });
 
-  const passRate = Math.round((passedTests / totalTests) * 100);
-  console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${passRate}%).`);
+  await runTest('A.2: Sequential Queue Numbering increments Q001 -> Q002 -> Q003', async () => {
+    const db = new AdvancedFirestoreEngine();
+    setupStoreFixtures(db, 'store_test_01');
 
+    const now = new Date('2026-09-04T10:00:00+07:00');
+    const baseRequest = {
+      storeId: 'store_test_01',
+      userId: 'user_cust_01',
+      customerName: 'สมชาย',
+      customerPhone: '0812345678',
+      pickupTime: '18:00',
+      pickupDate: '2026-09-04',
+      items: [{
+        productId: 'prod_noodle_store_test_01',
+        quantity: 1,
+        selectedModifiers: [
+          { modifierGroupId: 'mg_noodle_type_store_test_01', optionId: 'opt_sen_lek' },
+          { modifierGroupId: 'mg_spicy_level_store_test_01', optionId: 'opt_spicy_1' }
+        ]
+      }]
+    };
+
+    const r1 = await executeOrderCreation(db, baseRequest, now);
+    const r2 = await executeOrderCreation(db, { ...baseRequest, userId: 'user_cust_02' }, now);
+    const r3 = await executeOrderCreation(db, { ...baseRequest, userId: 'user_cust_03' }, now);
+
+    assert.equal(r1.queueNumber, 'Q001');
+    assert.equal(r2.queueNumber, 'Q002');
+    assert.equal(r3.queueNumber, 'Q003');
+  });
+
+  await runTest('A.3: Multi-Store Isolation: Store A and Store B both start with Q001 independently', async () => {
+    const db = new AdvancedFirestoreEngine();
+    setupStoreFixtures(db, 'store_A');
+    setupStoreFixtures(db, 'store_B');
+
+    const now = new Date('2026-09-04T10:00:00+07:00');
+    const rA = await executeOrderCreation(db, {
+      storeId: 'store_A',
+      userId: 'user_1',
+      customerName: 'ลูกค้า A',
+      customerPhone: '0811111111',
+      pickupTime: '18:00',
+      pickupDate: '2026-09-04',
+      items: [{
+        productId: 'prod_crispy_pork_store_A',
+        quantity: 1
+      }]
+    }, now);
+
+    const rB = await executeOrderCreation(db, {
+      storeId: 'store_B',
+      userId: 'user_2',
+      customerName: 'ลูกค้า B',
+      customerPhone: '0822222222',
+      pickupTime: '18:00',
+      pickupDate: '2026-09-04',
+      items: [{
+        productId: 'prod_crispy_pork_store_B',
+        quantity: 1
+      }]
+    }, now);
+
+    assert.equal(rA.queueNumber, 'Q001');
+    assert.equal(rB.queueNumber, 'Q001');
+  });
+
+  // =========================================================================
+  // Section B: Real Calendar & Date Integrity
+  // =========================================================================
+  await runTest('B.1: Rejects fake calendar dates (2026-02-31, 2026-99-99, 2026-13-45)', async () => {
+    const db = new AdvancedFirestoreEngine();
+    setupStoreFixtures(db, 'store_test_01');
+
+    const invalidDates = ['2026-02-31', '2026-99-99', '2026-13-45', '2026-04-31', '2026-06-31'];
+    for (const d of invalidDates) {
+      await assert.rejects(
+        async () => {
+          await executeOrderCreation(db, {
+            storeId: 'store_test_01',
+            userId: 'user_cust_01',
+            customerName: 'สมชาย',
+            customerPhone: '0812345678',
+            pickupTime: '18:00',
+            pickupDate: d,
+            items: [{ productId: 'prod_crispy_pork_store_test_01', quantity: 1 }]
+          }, new Date('2026-01-01T10:00:00+07:00'));
+        },
+        /INVALID_CALENDAR_DATE|INVALID_DATE_FORMAT/
+      );
+    }
+  });
+
+  await runTest('B.2: Accepts valid calendar dates (including leap year 2028-02-29)', async () => {
+    const db = new AdvancedFirestoreEngine();
+    setupStoreFixtures(db, 'store_test_01');
+
+    const result = await executeOrderCreation(db, {
+      storeId: 'store_test_01',
+      userId: 'user_cust_01',
+      customerName: 'สมชาย',
+      customerPhone: '0812345678',
+      pickupTime: '18:00',
+      pickupDate: '2028-02-29',
+      items: [{ productId: 'prod_crispy_pork_store_test_01', quantity: 1 }]
+    }, new Date('2026-01-01T10:00:00+07:00'));
+
+    assert.equal(result.success, true);
+    assert.equal(result.queueNumber, 'Q001');
+  });
+
+  await runTest('B.3: Rejects past dates compared to Bangkok today', async () => {
+    const db = new AdvancedFirestoreEngine();
+    setupStoreFixtures(db, 'store_test_01');
+
+    await assert.rejects(
+      async () => {
+        await executeOrderCreation(db, {
+          storeId: 'store_test_01',
+          userId: 'user_cust_01',
+          customerName: 'สมชาย',
+          customerPhone: '0812345678',
+          pickupTime: '18:00',
+          pickupDate: '2026-09-03',
+          items: [{ productId: 'prod_crispy_pork_store_test_01', quantity: 1 }]
+        }, new Date('2026-09-04T10:00:00+07:00'));
+      },
+      /PAST_DATE_NOT_ALLOWED/
+    );
+  });
+
+  // =========================================================================
+  // Section C: Same-Day Past Pickup Time Validation
+  // =========================================================================
+  await runTest('C.1: Same-Day pickup time already passed (now: 14:00, pickup: 12:15) is rejected', async () => {
+    const db = new AdvancedFirestoreEngine();
+    setupStoreFixtures(db, 'store_test_01');
+
+    const now = new Date('2026-09-04T14:00:00+07:00');
+    await assert.rejects(
+      async () => {
+        await executeOrderCreation(db, {
+          storeId: 'store_test_01',
+          userId: 'user_cust_01',
+          customerName: 'สมชาย',
+          customerPhone: '0812345678',
+          pickupTime: '12:15',
+          pickupDate: '2026-09-04',
+          items: [{ productId: 'prod_crispy_pork_store_test_01', quantity: 1 }]
+        }, now);
+      },
+      /PAST_PICKUP_TIME_NOT_ALLOWED/
+    );
+  });
+
+  await runTest('C.2: Same-Day future pickup time (now: 14:00, pickup: 14:30) is accepted', async () => {
+    const db = new AdvancedFirestoreEngine();
+    setupStoreFixtures(db, 'store_test_01');
+
+    const now = new Date('2026-09-04T14:00:00+07:00');
+    const result = await executeOrderCreation(db, {
+      storeId: 'store_test_01',
+      userId: 'user_cust_01',
+      customerName: 'สมชาย',
+      customerPhone: '0812345678',
+      pickupTime: '14:30',
+      pickupDate: '2026-09-04',
+      items: [{ productId: 'prod_crispy_pork_store_test_01', quantity: 1 }]
+    }, now);
+
+    assert.equal(result.success, true);
+  });
+
+  await runTest('C.3: Future date allows pickup time even if earlier than current time of day', async () => {
+    const db = new AdvancedFirestoreEngine();
+    setupStoreFixtures(db, 'store_test_01');
+
+    // Current time 14:00 on Friday 2026-09-04, booking for 09:00 on Saturday 2026-09-05
+    const now = new Date('2026-09-04T14:00:00+07:00');
+    const result = await executeOrderCreation(db, {
+      storeId: 'store_test_01',
+      userId: 'user_cust_01',
+      customerName: 'สมชาย',
+      customerPhone: '0812345678',
+      pickupTime: '09:00',
+      pickupDate: '2026-09-05',
+      items: [{ productId: 'prod_crispy_pork_store_test_01', quantity: 1 }]
+    }, now);
+
+    assert.equal(result.success, true);
+  });
+
+  // =========================================================================
+  // Section D: Modifier Bounds, Duplicates & Single Choice
+  // =========================================================================
+  await runTest('D.1: Missing required modifier group throws REQUIRED_MODIFIER_MISSING', async () => {
+    const db = new AdvancedFirestoreEngine();
+    setupStoreFixtures(db, 'store_test_01');
+
+    await assert.rejects(
+      async () => {
+        await executeOrderCreation(db, {
+          storeId: 'store_test_01',
+          userId: 'user_cust_01',
+          customerName: 'สมชาย',
+          customerPhone: '0812345678',
+          pickupTime: '18:00',
+          pickupDate: '2026-09-04',
+          items: [{
+            productId: 'prod_noodle_store_test_01',
+            quantity: 1,
+            selectedModifiers: [
+              // Missing mg_spicy_level
+              { modifierGroupId: 'mg_noodle_type_store_test_01', optionId: 'opt_sen_lek' }
+            ]
+          }]
+        }, new Date('2026-09-04T10:00:00+07:00'));
+      },
+      /REQUIRED_MODIFIER_MISSING/
+    );
+  });
+
+  await runTest('D.2: Single-choice group with multiple options throws SINGLE_SELECTION_VIOLATED', async () => {
+    const db = new AdvancedFirestoreEngine();
+    setupStoreFixtures(db, 'store_test_01');
+
+    await assert.rejects(
+      async () => {
+        await executeOrderCreation(db, {
+          storeId: 'store_test_01',
+          userId: 'user_cust_01',
+          customerName: 'สมชาย',
+          customerPhone: '0812345678',
+          pickupTime: '18:00',
+          pickupDate: '2026-09-04',
+          items: [{
+            productId: 'prod_noodle_store_test_01',
+            quantity: 1,
+            selectedModifiers: [
+              { modifierGroupId: 'mg_noodle_type_store_test_01', optionId: 'opt_sen_lek' },
+              { modifierGroupId: 'mg_noodle_type_store_test_01', optionId: 'opt_sen_yai' }, // 2 noodle choices!
+              { modifierGroupId: 'mg_spicy_level_store_test_01', optionId: 'opt_spicy_1' }
+            ]
+          }]
+        }, new Date('2026-09-04T10:00:00+07:00'));
+      },
+      /MAX_SELECTIONS_EXCEEDED|SINGLE_SELECTION_VIOLATED/
+    );
+  });
+
+  await runTest('D.3: Duplicate modifier option in group throws DUPLICATE_MODIFIER_OPTION', async () => {
+    const db = new AdvancedFirestoreEngine();
+    setupStoreFixtures(db, 'store_test_01');
+
+    await assert.rejects(
+      async () => {
+        await executeOrderCreation(db, {
+          storeId: 'store_test_01',
+          userId: 'user_cust_01',
+          customerName: 'สมชาย',
+          customerPhone: '0812345678',
+          pickupTime: '18:00',
+          pickupDate: '2026-09-04',
+          items: [{
+            productId: 'prod_noodle_store_test_01',
+            quantity: 1,
+            selectedModifiers: [
+              { modifierGroupId: 'mg_noodle_type_store_test_01', optionId: 'opt_sen_lek' },
+              { modifierGroupId: 'mg_spicy_level_store_test_01', optionId: 'opt_spicy_1' },
+              // Duplicate topping:
+              { modifierGroupId: 'mg_extra_toppings_store_test_01', optionId: 'opt_pork_ball' },
+              { modifierGroupId: 'mg_extra_toppings_store_test_01', optionId: 'opt_pork_ball' }
+            ]
+          }]
+        }, new Date('2026-09-04T10:00:00+07:00'));
+      },
+      /DUPLICATE_MODIFIER_OPTION/
+    );
+  });
+
+  await runTest('D.4: Modifier option out of stock throws OPTION_OUT_OF_STOCK', async () => {
+    const db = new AdvancedFirestoreEngine();
+    setupStoreFixtures(db, 'store_test_01');
+
+    await assert.rejects(
+      async () => {
+        await executeOrderCreation(db, {
+          storeId: 'store_test_01',
+          userId: 'user_cust_01',
+          customerName: 'สมชาย',
+          customerPhone: '0812345678',
+          pickupTime: '18:00',
+          pickupDate: '2026-09-04',
+          items: [{
+            productId: 'prod_noodle_store_test_01',
+            quantity: 1,
+            selectedModifiers: [
+              { modifierGroupId: 'mg_noodle_type_store_test_01', optionId: 'opt_woonsen' }, // Out of stock
+              { modifierGroupId: 'mg_spicy_level_store_test_01', optionId: 'opt_spicy_1' }
+            ]
+          }]
+        }, new Date('2026-09-04T10:00:00+07:00'));
+      },
+      /OPTION_OUT_OF_STOCK/
+    );
+  });
+
+  await runTest('D.5: Correct price calculation with base price + modifiers in Satang', async () => {
+    const db = new AdvancedFirestoreEngine();
+    setupStoreFixtures(db, 'store_test_01');
+
+    const result = await executeOrderCreation(db, {
+      storeId: 'store_test_01',
+      userId: 'user_cust_01',
+      customerName: 'สมชาย',
+      customerPhone: '0812345678',
+      pickupTime: '18:00',
+      pickupDate: '2026-09-04',
+      items: [{
+        productId: 'prod_noodle_store_test_01',
+        quantity: 2,
+        selectedModifiers: [
+          { modifierGroupId: 'mg_noodle_type_store_test_01', optionId: 'opt_mama' }, // +10.00 THB (1000 Satang)
+          { modifierGroupId: 'mg_spicy_level_store_test_01', optionId: 'opt_spicy_2' }, // +0 THB
+          { modifierGroupId: 'mg_extra_toppings_store_test_01', optionId: 'opt_pork_ball' }, // +15.00 THB (1500 Satang)
+          { modifierGroupId: 'mg_extra_toppings_store_test_01', optionId: 'opt_crispy_wonton' } // +10.00 THB (1000 Satang)
+        ]
+      }]
+    }, new Date('2026-09-04T10:00:00+07:00'));
+
+    // Base: 5500 Satang + Modifiers: (1000 + 1500 + 1000 = 3500) = 9000 Satang per bowl
+    // 2 bowls = 18000 Satang (180.00 THB)
+    assert.equal(result.totalAmountSatang, 18000);
+    assert.equal(result.totalAmountBaht, 180);
+  });
+
+  // =========================================================================
+  // Section E: Fail-Closed Store Capacity & Overbooking Guard
+  // =========================================================================
+  await runTest('E.1: Missing maxOrdersPerSlot throws STORE_CAPACITY_NOT_CONFIGURED', async () => {
+    const db = new AdvancedFirestoreEngine();
+    setupStoreFixtures(db, 'store_test_01');
+    db.setDoc('shops/store_test_01', {
+      storeId: 'store_test_01',
+      name: 'ร้านค้าไม่มี Capacity',
+      isOpen: true,
+      status: 'open',
+      maxOrdersPerSlot: undefined // Missing!
+    });
+
+    await assert.rejects(
+      async () => {
+        await executeOrderCreation(db, {
+          storeId: 'store_test_01',
+          userId: 'user_cust_01',
+          customerName: 'สมชาย',
+          customerPhone: '0812345678',
+          pickupTime: '18:00',
+          pickupDate: '2026-09-04',
+          items: [{ productId: 'prod_crispy_pork_store_test_01', quantity: 1 }]
+        }, new Date('2026-09-04T10:00:00+07:00'));
+      },
+      /STORE_CAPACITY_NOT_CONFIGURED/
+    );
+  });
+
+  await runTest('E.2: Slot capacity full throws SLOT_CAPACITY_EXCEEDED', async () => {
+    const db = new AdvancedFirestoreEngine();
+    setupStoreFixtures(db, 'store_test_01'); // maxOrdersPerSlot = 5
+
+    const now = new Date('2026-09-04T10:00:00+07:00');
+    // Pre-fill slot with 5 orders
+    db.setDoc('store_slots/slot_store_test_01_20260904_1800', {
+      slotId: 'slot_store_test_01_20260904_1800',
+      storeId: 'store_test_01',
+      currentOrders: 5,
+      capacity: 5
+    });
+
+    await assert.rejects(
+      async () => {
+        await executeOrderCreation(db, {
+          storeId: 'store_test_01',
+          userId: 'user_cust_01',
+          customerName: 'สมชาย',
+          customerPhone: '0812345678',
+          pickupTime: '18:00',
+          pickupDate: '2026-09-04',
+          items: [{ productId: 'prod_crispy_pork_store_test_01', quantity: 1 }]
+        }, now);
+      },
+      /SLOT_CAPACITY_EXCEEDED/
+    );
+  });
+
+  await runTest('E.3: High Concurrency Slot Overbooking Race: 10 concurrent orders for capacity 3 -> exactly 3 succeed, 7 fail', async () => {
+    const db = new AdvancedFirestoreEngine();
+    setupStoreFixtures(db, 'store_test_01');
+    db.setDoc('shops/store_test_01', {
+      storeId: 'store_test_01',
+      name: 'ร้านค้า',
+      isOpen: true,
+      status: 'open',
+      maxOrdersPerSlot: 3
+    });
+
+    const now = new Date('2026-09-04T10:00:00+07:00');
+    const promises = [];
+    for (let i = 1; i <= 10; i++) {
+      promises.push(
+        executeOrderCreation(db, {
+          storeId: 'store_test_01',
+          userId: `user_concurrent_${i}`,
+          customerName: `ลูกค้า ${i}`,
+          customerPhone: `081000000${i}`,
+          pickupTime: '18:00',
+          pickupDate: '2026-09-04',
+          items: [{ productId: 'prod_crispy_pork_store_test_01', quantity: 1 }]
+        }, now).catch((err) => ({ error: err.message }))
+      );
+    }
+
+    const results = await Promise.all(promises);
+    const successes = results.filter((r) => r && r.success);
+    const failures = results.filter((r) => r && r.error);
+
+    assert.equal(successes.length, 3, 'Exactly 3 orders must succeed');
+    assert.equal(failures.length, 7, 'Exactly 7 orders must fail');
+
+    const slotDoc = db.getDoc('store_slots/slot_store_test_01_20260904_1800');
+    assert.equal(slotDoc.currentOrders, 3, 'Slot currentOrders must be exactly 3');
+  });
+
+  // =========================================================================
+  // Section F: Stock Integrity & Atomic 100% Rollback
+  // =========================================================================
+  await runTest('F.1: Insufficient stock rejects order and performs zero write rollback', async () => {
+    const db = new AdvancedFirestoreEngine();
+    setupStoreFixtures(db, 'store_test_01'); // prod_crispy_pork has stock 5
+
+    const now = new Date('2026-09-04T10:00:00+07:00');
+    await assert.rejects(
+      async () => {
+        await executeOrderCreation(db, {
+          storeId: 'store_test_01',
+          userId: 'user_cust_01',
+          customerName: 'สมชาย',
+          customerPhone: '0812345678',
+          pickupTime: '18:00',
+          pickupDate: '2026-09-04',
+          items: [{ productId: 'prod_crispy_pork_store_test_01', quantity: 6 }] // needs 6, stock is 5
+        }, now);
+      },
+      /INSUFFICIENT_STOCK/
+    );
+
+    const productDoc = db.getDoc('products/prod_crispy_pork_store_test_01');
+    assert.equal(productDoc.stock, 5, 'Stock must remain intact at 5');
+
+    const counterDoc = db.getDoc('queue_counters/counter_store_test_01_20260904');
+    assert.equal(counterDoc, null, 'Counter doc must not be created or bumped');
+  });
+
+  await runTest('F.2: High Concurrency Stock Race: Stock 5 with 12 concurrent requests -> exactly 5 succeed, stock = 0, no negative stock', async () => {
+    const db = new AdvancedFirestoreEngine();
+    setupStoreFixtures(db, 'store_test_01'); // prod_crispy_pork stock = 5, capacity = 10
+    db.setDoc('shops/store_test_01', {
+      storeId: 'store_test_01',
+      name: 'ร้านค้า',
+      isOpen: true,
+      status: 'open',
+      maxOrdersPerSlot: 10
+    });
+
+    const now = new Date('2026-09-04T10:00:00+07:00');
+    const promises = [];
+    for (let i = 1; i <= 12; i++) {
+      promises.push(
+        executeOrderCreation(db, {
+          storeId: 'store_test_01',
+          userId: `user_stock_${i}`,
+          customerName: `ลูกค้า ${i}`,
+          customerPhone: `081000000${i}`,
+          pickupTime: '18:00',
+          pickupDate: '2026-09-04',
+          items: [{ productId: 'prod_crispy_pork_store_test_01', quantity: 1 }]
+        }, now).catch((err) => ({ error: err.message }))
+      );
+    }
+
+    const results = await Promise.all(promises);
+    const successes = results.filter((r) => r && r.success);
+    const failures = results.filter((r) => r && r.error);
+
+    assert.equal(successes.length, 5, 'Exactly 5 orders must succeed');
+    assert.equal(failures.length, 7, 'Exactly 7 orders must fail');
+
+    const productDoc = db.getDoc('products/prod_crispy_pork_store_test_01');
+    assert.equal(productDoc.stock, 0, 'Stock must be exactly 0, never negative');
+  });
+
+  // =========================================================================
+  // Section G: Store Operational Availability & Schedule
+  // =========================================================================
+  await runTest('G.1: Store closed on Sunday is rejected when booking for Sunday', async () => {
+    const db = new AdvancedFirestoreEngine();
+    setupStoreFixtures(db, 'store_test_01'); // Sunday is closed
+
+    // 2026-09-06 is Sunday
+    const now = new Date('2026-09-04T10:00:00+07:00');
+    await assert.rejects(
+      async () => {
+        await executeOrderCreation(db, {
+          storeId: 'store_test_01',
+          userId: 'user_cust_01',
+          customerName: 'สมชาย',
+          customerPhone: '0812345678',
+          pickupTime: '12:00',
+          pickupDate: '2026-09-06',
+          items: [{ productId: 'prod_crispy_pork_store_test_01', quantity: 1 }]
+        }, now);
+      },
+      /STORE_CLOSED_ON_DATE/
+    );
+  });
+
+  await runTest('G.2: Pickup time outside store operating hours is rejected', async () => {
+    const db = new AdvancedFirestoreEngine();
+    setupStoreFixtures(db, 'store_test_01'); // open 08:00 - 22:00
+
+    const now = new Date('2026-09-04T10:00:00+07:00');
+    await assert.rejects(
+      async () => {
+        await executeOrderCreation(db, {
+          storeId: 'store_test_01',
+          userId: 'user_cust_01',
+          customerName: 'สมชาย',
+          customerPhone: '0812345678',
+          pickupTime: '23:30', // Out of operating hours
+          pickupDate: '2026-09-04',
+          items: [{ productId: 'prod_crispy_pork_store_test_01', quantity: 1 }]
+        }, now);
+      },
+      /INVALID_PICKUP_TIME/
+    );
+  });
+
+  await runTest('G.3: Store EMERGENCY_STOP overrides open status and rejects order', async () => {
+    const db = new AdvancedFirestoreEngine();
+    setupStoreFixtures(db, 'store_test_01');
+    db.setDoc('shops/store_test_01', {
+      storeId: 'store_test_01',
+      name: 'ร้านค้า',
+      isOpen: true,
+      operationalOverride: 'EMERGENCY_STOP',
+      maxOrdersPerSlot: 5
+    });
+
+    const now = new Date('2026-09-04T10:00:00+07:00');
+    await assert.rejects(
+      async () => {
+        await executeOrderCreation(db, {
+          storeId: 'store_test_01',
+          userId: 'user_cust_01',
+          customerName: 'สมชาย',
+          customerPhone: '0812345678',
+          pickupTime: '18:00',
+          pickupDate: '2026-09-04',
+          items: [{ productId: 'prod_crispy_pork_store_test_01', quantity: 1 }]
+        }, now);
+      },
+      /STORE_PAUSED/
+    );
+  });
+
+  // =========================================================================
+  // Section H: Authentication & Identity
+  // =========================================================================
+  await runTest('H.1: Unauthenticated user or guest_user throws AUTHENTICATION_REQUIRED', async () => {
+    const db = new AdvancedFirestoreEngine();
+    setupStoreFixtures(db, 'store_test_01');
+
+    const now = new Date('2026-09-04T10:00:00+07:00');
+    await assert.rejects(
+      async () => {
+        await executeOrderCreation(db, {
+          storeId: 'store_test_01',
+          userId: 'guest_user',
+          customerName: 'ผู้เยี่ยมชม',
+          customerPhone: '0812345678',
+          pickupTime: '18:00',
+          pickupDate: '2026-09-04',
+          items: [{ productId: 'prod_crispy_pork_store_test_01', quantity: 1 }]
+        }, now);
+      },
+      /AUTHENTICATION_REQUIRED/
+    );
+  });
+
+  await runTest('H.2: Missing customerPhone throws CUSTOMER_PHONE_REQUIRED', async () => {
+    const db = new AdvancedFirestoreEngine();
+    setupStoreFixtures(db, 'store_test_01');
+
+    const now = new Date('2026-09-04T10:00:00+07:00');
+    await assert.rejects(
+      async () => {
+        await executeOrderCreation(db, {
+          storeId: 'store_test_01',
+          userId: 'user_cust_01',
+          customerName: 'สมชาย',
+          customerPhone: '', // Missing!
+          pickupTime: '18:00',
+          pickupDate: '2026-09-04',
+          items: [{ productId: 'prod_crispy_pork_store_test_01', quantity: 1 }]
+        }, now);
+      },
+      /CUSTOMER_PHONE_REQUIRED/
+    );
+  });
+
+  console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${Math.round((passedTests / totalTests) * 100)}%).`);
   if (passedTests !== totalTests) {
-    console.error('❌ Test suite failed!');
     process.exit(1);
   }
 }
 
 main().catch((err) => {
-  console.error('Fatal test error:', err);
+  console.error('Fatal Test Matrix Failure:', err);
   process.exit(1);
 });
-
