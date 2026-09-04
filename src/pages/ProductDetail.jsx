@@ -14,40 +14,180 @@ import {
 } from "../lib/firebase.js";
 import "./ProductDetail.css";
 
-// 7. TIME SLOT DATA ARCHITECTURE (Pickup Time Slot Reservation)
-const TIME_SLOTS = [
-  { time: "11:30", discount: "-50%", capacity: 20, currentOrders: 6, status: "AVAILABLE" },
-  { time: "12:00", discount: "-50%", capacity: 20, currentOrders: 18, status: "LIMITED" },
-  { time: "12:30", discount: "-20%", capacity: 20, currentOrders: 20, status: "FULL" },
-  { time: "13:00", discount: "-10%", capacity: 20, currentOrders: 4, status: "AVAILABLE" },
-  { time: "13:30", discount: "-10%", capacity: 20, currentOrders: 2, status: "AVAILABLE" },
-  { time: "14:00", discount: "-10%", capacity: 20, currentOrders: 0, status: "AVAILABLE" },
-  { time: "14:30", discount: "-10%", capacity: 20, currentOrders: 0, status: "AVAILABLE" },
-  { time: "15:00", discount: "-10%", capacity: 20, currentOrders: 0, status: "AVAILABLE" },
+// 📅 CALENDAR DAYS GENERATOR (Generates 7 upcoming days with availability status)
+const DAYS_OF_WEEK_TH = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
+const MONTHS_TH = [
+  "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
+  "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."
 ];
 
-// 5. MODIFIERS DATA SCHEMA ARCHITECTURE
-const DEFAULT_MODIFIERS = [
+function generateUpcomingCalendarDays() {
+  const days = [];
+  const now = new Date();
+  
+  for (let i = 0; i < 7; i++) {
+    const targetDate = new Date(now);
+    targetDate.setDate(now.getDate() + i);
+    
+    const dayOfWeek = DAYS_OF_WEEK_TH[targetDate.getDay()];
+    const dateNum = targetDate.getDate();
+    const month = MONTHS_TH[targetDate.getMonth()];
+    const fullDateStr = `${dateNum} ${month}`;
+    const isoDateStr = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, "0")}-${String(dateNum).padStart(2, "0")}`;
+
+    let status = "AVAILABLE"; // 'AVAILABLE' | 'LIMITED' | 'FULL' | 'CLOSED'
+    let statusLabel = "ว่าง";
+    let capacityPercent = 85;
+
+    if (i === 0) {
+      status = "AVAILABLE";
+      statusLabel = "เปิดจอง";
+      capacityPercent = 60;
+    } else if (i === 1) {
+      status = "LIMITED";
+      statusLabel = "เหลือน้อย";
+      capacityPercent = 25;
+    } else if (i === 3) {
+      status = "FULL";
+      statusLabel = "คิวเต็ม";
+      capacityPercent = 0;
+    } else {
+      status = "AVAILABLE";
+      statusLabel = "ว่าง";
+      capacityPercent = 90;
+    }
+
+    days.push({
+      id: isoDateStr,
+      dayOfWeek,
+      dateNum,
+      month,
+      fullDateStr,
+      isoDateStr,
+      isToday: i === 0,
+      isTomorrow: i === 1,
+      status,
+      statusLabel,
+      capacityPercent,
+    });
+  }
+  return days;
+}
+
+// ⏰ TIME SLOTS DATA FOR CALENDAR SELECTION
+const BASE_TIME_SLOTS = [
+  { time: "11:00", discount: "-50%", capacity: 20, remaining: 12, status: "AVAILABLE" },
+  { time: "11:30", discount: "-50%", capacity: 20, remaining: 8, status: "AVAILABLE" },
+  { time: "12:00", discount: "-50%", capacity: 20, remaining: 4, status: "LIMITED" },
+  { time: "12:30", discount: "-20%", capacity: 20, remaining: 0, status: "FULL" },
+  { time: "13:00", discount: "-10%", capacity: 20, remaining: 15, status: "AVAILABLE" },
+  { time: "13:30", discount: "-10%", capacity: 20, remaining: 18, status: "AVAILABLE" },
+  { time: "14:00", discount: "-10%", capacity: 20, remaining: 20, status: "AVAILABLE" },
+  { time: "14:30", discount: "-10%", capacity: 20, remaining: 20, status: "AVAILABLE" },
+];
+
+// 🍜 RICH MODIFIER OPTIONS
+const NOODLE_OPTIONS = [
+  { id: "thin", name: "เส้นเล็ก" },
+  { id: "vermicelli", name: "หมี่ขาว" },
+  { id: "egg_noodle", name: "บะหมี่หยก" },
+  { id: "glass_noodle", name: "วุ้นเส้น" },
+  { id: "no_noodle", name: "เกาเหลา" },
+];
+
+const SOUP_OPTIONS = [
+  { id: "namtok", name: "น้ำตกสูตรเข้ม" },
+  { id: "clear", name: "น้ำใสพะโล้" },
+  { id: "tomyum", name: "ต้มยำน้ำตก" },
+];
+
+const SPICY_OPTIONS = [
+  { id: "none", name: "ไม่เผ็ด", desc: "ไม่ใส่พริก" },
+  { id: "normal", name: "เผ็ดปกติ", desc: "พริกคั่วเตาถ่าน 1 ช้อน" },
+  { id: "hot", name: "เผ็ดมาก 3x", desc: "พริกคั่วเข้มข้นพิเศษ" },
+];
+
+const TOPPING_OPTIONS = [
+  { id: "egg", name: "ไข่ต้มยางมะตูม", price: 10 },
+  { id: "crackling", name: "กากหมูเจียวสด", price: 15 },
+  { id: "meatball", name: "ลูกชิ้นหมู (3 ลูก)", price: 15 },
+  { id: "veggie", name: "ผักบุ้งพิเศษ", price: 5 },
+];
+
+// 🎬 VIDEO REELS MOCK DATA
+const VIDEO_REVIEWS = [
   {
-    id: "spicy",
-    name: "ระดับความเผ็ด",
-    type: "single",
-    required: true,
-    options: [
-      { id: "none", name: "ไม่เผ็ด", price: 0 },
-      { id: "medium", name: "เผ็ดปกติ", price: 0 },
-      { id: "hot", name: "เผ็ดมาก", price: 0 },
-    ],
+    id: "v1",
+    author: "@FoodieCampus",
+    title: "ชิมน้ำตกเข้มข้นป้าแดง กระดูกหมูตุ๋นเปื่อยละลายในปาก!",
+    views: "48.2k",
+    duration: "0:45",
+    tags: "#ก๋วยเตี๋ยวเรือหมูน้ำตก #โรงอาหาร2",
+    thumbnail: "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=500&auto=format&fit=crop&q=80",
   },
   {
-    id: "topping",
-    name: "เพิ่ม Topping พิเศษ",
-    type: "multiple",
-    required: false,
-    options: [
-      { id: "fried-egg", name: "ไข่ดาว (+10฿)", price: 10 },
-      { id: "extra-rice", name: "เพิ่มข้าว (+5฿)", price: 5 },
-    ],
+    id: "v2",
+    author: "@เด็กหอพาชิม",
+    title: "ASMR กากหมูเจียวสดใหม่ กรอบสนั่น ชามละ 30 บาทคุ้มเว่อร์",
+    views: "32.5k",
+    duration: "0:38",
+    tags: "#กากหมูเจียว #อร่อยบอกต่อ",
+    thumbnail: "https://images.unsplash.com/photo-1555126634-323283e090fa?w=500&auto=format&fit=crop&q=80",
+  },
+  {
+    id: "v3",
+    author: "@KinRaiDeeTU",
+    title: "วิธีกดจองคิว QueueUp ไม่ต้องต่อแถวพักเที่ยง ได้กินตรงเวลาเป๊ะ!",
+    views: "29.1k",
+    duration: "0:52",
+    tags: "#QueueUpLife #กินไรดี",
+    thumbnail: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80",
+  },
+  {
+    id: "v4",
+    author: "@AuntyDaengFan",
+    title: "บุกหลังครัวป้าแดง ชมหม้อน้ำซุปสมุนไพรเคี่ยว 4 ชั่วโมงของจริง",
+    views: "19.8k",
+    duration: "1:12",
+    tags: "#สูตรลับป้าแดง #ก๋วยเตี๋ยวเรือ",
+    thumbnail: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=500&auto=format&fit=crop&q=80",
+  },
+];
+
+// ⭐ CUSTOMER REVIEWS MOCK DATA
+const CUSTOMER_REVIEWS = [
+  {
+    id: "r1",
+    author: "ธนภัทร น. (คณะวิศวกรรมศาสตร์)",
+    avatarLetter: "TN",
+    avatarBg: "#065f46",
+    role: "ผู้สั่งจริงผ่านแอป",
+    date: "16 ส.ค. 2026",
+    dishInfo: "สั่ง: เส้นเล็กน้ำตกเนื้อหมู + กากหมูกรอบ",
+    rating: 5,
+    comment: "ชอบระบบสั่งล่วงหน้าแบบนี้มากกก ปกติพักเที่ยงคิวยาวจนหมดเวลาพัก วันนี้กดรอบ 12:00 น. เดินมาถึงป้าแดงตักใส่ชามให้ทันที น้ำตกหอมพะโล้จัดจ้านไม่ต้องปรุงเพิ่มเลย กากหมูก็กรอบสนั่น 10/10 ครับ",
+  },
+  {
+    id: "r2",
+    author: "พรรณวษา (เจ้าหน้าที่คณะพาณิชย์ฯ)",
+    avatarLetter: "PW",
+    avatarBg: "#fd5837",
+    role: "ผู้สั่งจริงผ่านแอป",
+    date: "15 ส.ค. 2026",
+    dishInfo: "สั่ง: เกาเหลาน้ำตก + ไข่ต้มยางมะตูม",
+    rating: 5,
+    comment: "หมูนุ่มมาก ตับลวกมาไม่สุกเกินไป ไข่ต้มยางมะตูมเยิ้มกำลังดี ที่สำคัญร้านสะอาดถูกสุขอนามัยและคุณป้าคนขายน่ารักมากค่ะ ลด 50% แล้วคุ้มจนสั่งทานซ้ำแทบทุกวัน",
+  },
+  {
+    id: "r3",
+    author: "กิตติศักดิ์ ส. (นักศึกษาปี 3)",
+    avatarLetter: "KS",
+    avatarBg: "#3b82f6",
+    role: "ผู้สั่งจริงผ่านแอป",
+    date: "14 ส.ค. 2026",
+    dishInfo: "สั่ง: บะหมี่หยกน้ำตก + ลูกชิ้นหมู",
+    rating: 5,
+    comment: "ระบบบอกสล็อตคิวแม่นยำมากครับ ไม่ต้องมายืนรอท่ามกลางคนเยอะๆ เหมาะกับช่วงพักสั้นๆ มาก แนะนำเลยครับ",
   },
 ];
 
@@ -84,11 +224,11 @@ function resolveStoreByStoreId(storeId) {
   return (
     found || {
       id: storeId,
-      name: "ร้านครัวโรงเรียน QueueUp Canteen",
-      location: "โรงอาหาร 1 (อาคารเรียน 2)",
-      hours: "07:30 - 16:00 น.",
-      rating: 4.9,
-      reviewsCount: 320,
+      name: "ร้านป้าแดง ตามสั่ง & ไก่ทอด",
+      location: "โรงอาหาร 2 (โรงอาหารกลาง 1) ชั้น 1 • ช่อง 04",
+      hours: "07:00 - 14:30 น.",
+      rating: 4.8,
+      reviewsCount: 1840,
       isOpen: true,
       status: "open",
     }
@@ -107,15 +247,29 @@ function ProductDetail() {
   const [store, setStore] = useState(initialStore);
 
   const [selectedImg, setSelectedImg] = useState(initialProduct.mainImg || initialProduct.image);
-  const [guestCount, setGuestCount] = useState("1 จาน");
-  const [bookingDate, setBookingDate] = useState("17 ส.ค.");
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState(TIME_SLOTS[1]);
+  const [quantity, setQuantity] = useState(1);
+  
+  // 📅 Calendar Date Selection State
+  const calendarDays = useMemo(() => generateUpcomingCalendarDays(), []);
+  const [selectedDay, setSelectedDay] = useState(calendarDays[0]);
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState(BASE_TIME_SLOTS[1]);
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
+
+  // 🗺️ Canteen Walking Guide Modal State
+  const [isMapModalOpen, setIsMapModalOpen] = useState(false);
+
+  // 🎬 Video Player Modal State
+  const [activeVideo, setActiveVideo] = useState(null);
+
+  // 💬 Chat & Favorite States
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
 
-  // 5. Modifier Choices State
-  const [spicyLevel, setSpicyLevel] = useState("medium");
-  const [selectedToppings, setSelectedToppings] = useState(["fried-egg"]);
+  // 🍜 Modifiers State
+  const [spicyLevel, setSpicyLevel] = useState("normal");
+  const [noodleType, setNoodleType] = useState("thin");
+  const [soupType, setSoupType] = useState("namtok");
+  const [selectedToppings, setSelectedToppings] = useState(["crackling"]);
   const [customerNote, setCustomerNote] = useState("");
 
   const [isIncompleteProfileModalOpen, setIsIncompleteProfileModalOpen] = useState(false);
@@ -163,21 +317,18 @@ function ProductDetail() {
     setIsFavorite(newStatus);
   };
 
-  // 5. Toppings & Dynamic Price Calculation Formula: unitPrice = (basePrice + toppingPrice) * (1 - discountPercent)
+  // 5. Dynamic Price Calculation Formula
   const toppingTotalPrice = useMemo(() => {
     return selectedToppings.reduce((sum, topId) => {
-      const optionObj = DEFAULT_MODIFIERS[1].options.find((opt) => opt.id === topId);
+      const optionObj = TOPPING_OPTIONS.find((opt) => opt.id === topId);
       return sum + (optionObj?.price || 0);
     }, 0);
   }, [selectedToppings]);
 
   const discountPercent = parseInt((selectedTimeSlot?.discount || "0").replace("-", "").replace("%", "")) / 100;
-  const basePrice = Number(product?.price) || 0;
+  const basePrice = Number(product?.price) || 30;
   const discountedUnitPrice = Math.max(0, Math.round((basePrice + toppingTotalPrice) * (1 - discountPercent)));
-  
-  // 6. Quantity (จำนวนจาน) & Subtotal Calculation
-  const quantityNumber = parseInt(guestCount) || 1;
-  const totalCalculatedPrice = discountedUnitPrice * quantityNumber;
+  const totalCalculatedPrice = discountedUnitPrice * quantity;
 
   // 15. Store Menu Recommendations
   const recommendedProducts = useMemo(() => {
@@ -229,18 +380,26 @@ function ProductDetail() {
   // Helper to validate required modifiers
   const validateRequiredModifiers = () => {
     const missing = [];
-    if (!spicyLevel) {
-      missing.push("ระดับความเผ็ด");
-    }
+    if (!spicyLevel) missing.push("ระดับความเผ็ด");
+    if (!noodleType) missing.push("ประเภทเส้น");
+    if (!soupType) missing.push("ประเภทน้ำซุป");
     return missing;
   };
 
   const createCurrentCartItem = () => {
     const noteParts = [];
-    if (spicyLevel) noteParts.push(`เผ็ด: ${spicyLevel}`);
+    const spicyObj = SPICY_OPTIONS.find((s) => s.id === spicyLevel);
+    if (spicyObj) noteParts.push(`เผ็ด: ${spicyObj.name}`);
+    
+    const noodleObj = NOODLE_OPTIONS.find((n) => n.id === noodleType);
+    if (noodleObj) noteParts.push(`เส้น: ${noodleObj.name}`);
+
+    const soupObj = SOUP_OPTIONS.find((sp) => sp.id === soupType);
+    if (soupObj) noteParts.push(`ซุป: ${soupObj.name}`);
+
     if (selectedToppings && selectedToppings.length > 0) {
       const toppingNames = selectedToppings.map(
-        (topId) => DEFAULT_MODIFIERS[1]?.options?.find((opt) => opt.id === topId)?.name || topId
+        (topId) => TOPPING_OPTIONS.find((opt) => opt.id === topId)?.name || topId
       );
       noteParts.push(`ท็อปปิ้ง: ${toppingNames.join(", ")}`);
     }
@@ -256,7 +415,7 @@ function ProductDetail() {
         storeId: product.storeId || "store_canteen01",
         image: selectedImg || product.mainImg || product.image || "/crispy_fried_chicken.jpg",
       },
-      quantity: quantityNumber,
+      quantity: quantity,
       customNotes: noteParts.join(" | "),
     };
   };
@@ -272,7 +431,7 @@ function ProductDetail() {
     try {
       const existing = JSON.parse(localStorage.getItem("queueup_cart") || "[]");
       localStorage.setItem("queueup_cart", JSON.stringify([...existing, newItem]));
-      alert(`🛒 เพิ่ม "${newItem.menuItem.name}" (จำนวน ${newItem.quantity} จาน) ลงในตะกร้าเรียบร้อยแล้ว!`);
+      alert(`🛒 เพิ่ม "${newItem.menuItem.name}" (จำนวน ${newItem.quantity} ชาม) ลงในตะกร้าเรียบร้อยแล้ว!`);
     } catch {
       // ignore
     }
@@ -319,11 +478,11 @@ function ProductDetail() {
     navigate("/booking", {
       state: {
         cartItems: [cartItem],
-        pickupTime: selectedTimeSlot?.time || "12:15",
-        bookingDate: bookingDate,
+        pickupTime: selectedTimeSlot?.time || "12:00",
+        bookingDate: selectedDay.fullDateStr,
         storeId: product.storeId || "store_canteen01",
-        storeName: store?.name || product.shopName || "ร้านครัวโรงเรียน QueueUp Canteen",
-        storeLocation: store?.location || product.shopLocation || "โรงอาหาร 1 (อาคารเรียน 2)",
+        storeName: store?.name || product.shopName || "ร้านป้าแดง ตามสั่ง & ไก่ทอด",
+        storeLocation: store?.location || product.shopLocation || "โรงอาหาร 2 (โรงอาหารกลาง 1) ชั้น 1",
       },
     });
   };
@@ -333,20 +492,24 @@ function ProductDetail() {
       <ShopeeSearchBar />
 
       <div className="queue-pd-wrapper">
-        <div className="queue-pd-breadcrumb mb-3">
-          <span className="text-muted" style={{ cursor: "pointer" }} onClick={() => navigate("/home")}>
-            <i className="bi bi-house-door-fill me-1" /> หน้าหลัก
+        {/* 1. BREADCRUMB NAVIGATION */}
+        <div className="queue-pd-breadcrumb">
+          <span className="text-muted cursor-pointer" onClick={() => navigate("/home")}>
+            <i className="bi bi-house-door-fill me-1 text-primary" /> หน้าหลัก
           </span>
-          <span className="mx-2 text-muted">/</span>
-          <span className="text-muted" style={{ cursor: "pointer" }} onClick={() => navigate("/search?keyword=ทั้งหมด")}>
-            โรงอาหารกลาง
+          <span className="text-muted">/</span>
+          <span className="text-muted cursor-pointer" onClick={() => navigate("/search?keyword=ทั้งหมด")}>
+            โรงอาหารกลาง (โรงอาหาร 2)
           </span>
-          <span className="mx-2 text-muted">/</span>
+          <span className="text-muted">/</span>
+          <span className="text-muted">{store.name || product.shopName}</span>
+          <span className="text-muted">/</span>
           <span className="fw-bold text-dark">{product.name}</span>
         </div>
 
+        {/* 2. MAIN TWO-COLUMN SHOWCASE & FORM */}
         <div className="queue-pd-main-grid">
-          {/* 3. IMAGE GALLERY & RECOMMENDATION COLUMN */}
+          {/* LEFT COLUMN: Gallery & Terms */}
           <div className="queue-pd-left-col">
             <div className="queue-pd-main-img-box">
               <img
@@ -358,8 +521,21 @@ function ProductDetail() {
                   e.currentTarget.src = "/crispy_fried_chicken.jpg";
                 }}
               />
+              {/* Badges Overlay */}
+              <div className="queue-pd-img-badges">
+                <span className="queue-pd-badge-hot">
+                  <i className="bi bi-fire me-1" /> ยอดสั่งสูงสุดอันดับ 1
+                </span>
+                <span className="queue-pd-badge-halal">
+                  ฮาลาล / ครัวแยก
+                </span>
+              </div>
+              <div className="queue-pd-photo-count">
+                <i className="bi bi-camera-fill me-1" /> 4 รูปภาพ
+              </div>
             </div>
 
+            {/* Thumbnail Grid */}
             <div className="queue-pd-thumb-grid">
               {[product.mainImg || product.image, ...(product.gallery || product.images || [])].slice(0, 4).map((img, idx) => (
                 <div
@@ -380,23 +556,28 @@ function ProductDetail() {
               ))}
             </div>
 
+            {/* Special Terms & Discount Notice */}
             <div className="queue-pd-recommend-box">
               <div className="queue-pd-recommend-header">
                 <h3 className="queue-pd-recommend-title">
                   <i className="bi bi-info-circle-fill me-1 text-primary" />
                   เงื่อนไขการสั่งจองและรับส่วนลด
                 </h3>
-                <span className="queue-pd-discount-badge-pink">{selectedTimeSlot.discount}</span>
+                <span className="queue-pd-discount-badge-pink">-50% QueueUp Early Bird</span>
               </div>
               <p className="queue-pd-recommend-desc">
-                ส่วนลดพิเศษระบบ QueueUp CRM สามารถใช้ได้กับเมนูอาหารที่เป็นราคาปกติทั้งหมด
-                สั่งจองคิวล่วงหน้ารับแต้มสะสมฟรีทันที และสามารถระบุสล็อตเวลารับอาหารที่สะดวกได้
+                ส่วนลดพิเศษระบบ QueueUp Food CRM สั่งจองคิวล่วงหน้ารับแต้มสะสมฟรี 2 เท่า และสามารถระบุสล็อตเวลารับอาหารที่สะดวก โดยระบบจะแจ้งเตือนเมื่อเตาเริ่มปรุงเสร็จ
               </p>
+              <div className="queue-pd-terms-footer">
+                <span><i className="bi bi-shield-check text-success me-1" /> ไม่ต้องตัดบัตรเครดิต</span>
+                <span><i className="bi bi-clock-history text-primary me-1" /> รับอาหารตามรอบคิว 100%</span>
+              </div>
             </div>
           </div>
 
-          {/* 2. STORE DATA & PRODUCT DETAILS COLUMN */}
+          {/* RIGHT COLUMN: Store Header, Modifiers, & Calendar Slots */}
           <div className="queue-pd-right-card">
+            {/* Store Banner & Mini Header */}
             <div className="queue-pd-shop-banner-box">
               <img
                 src={product.shopBanner || store.banner}
@@ -407,76 +588,71 @@ function ProductDetail() {
                   e.currentTarget.src = "/crispy_fried_chicken.jpg";
                 }}
               />
-            </div>
-
-            <div>
-              <div className="d-flex align-items-center justify-content-between">
-                <div className="d-flex align-items-center gap-2">
-                  <h1 className="queue-pd-shop-title mb-0">{store.name || product.shopName}</h1>
-                  {/* 4. FAVORITE BUTTON INTEGRATION */}
-                  <button
-                    type="button"
-                    className="btn btn-link p-0 text-decoration-none ms-1"
-                    onClick={handleToggleFavorite}
-                    title="บันทึกเป็นเมนูโปรด"
-                  >
-                    <i className={`bi ${isFavorite ? "bi-heart-fill text-danger" : "bi-heart text-muted"} fs-5`} />
-                  </button>
-                </div>
-                <button
-                  className="btn btn-sm btn-outline-danger font-weight-bold"
-                  onClick={() => setIsChatOpen(true)}
-                >
-                  <i className="bi bi-chat-dots-fill me-1" /> แชทสอบถามร้านค้า
-                </button>
-              </div>
-
-              <div className="fw-bold text-primary mb-1 mt-1">{product.name}</div>
-              <div className="queue-pd-shop-address">
-                {product.shopAddress || store.location || "2089 อาคารเรียน 2 (โรงอาหาร 1) แขวงพญาไท เขตราชเทวี กรุงเทพฯ 10400"}
-              </div>
-
-              <div className="queue-pd-shop-tags-row">
-                <span>{product.shopLocation || store.location}</span>
-                <span>·</span>
-                <span>฿฿</span>
-                <span>·</span>
-                <span>&lt; 500m</span>
-                <span>·</span>
-                {/* 2. Store Status Badge */}
-                <span className={`badge ${store?.isOpen !== false && store?.status !== "closed" ? "bg-success" : "bg-danger"}`}>
-                  {store?.isOpen !== false && store?.status !== "closed" ? "เปิดบริการปกติ" : "ปิดบริการชั่วคราว"}
-                </span>
-              </div>
-
-              <div className="queue-pd-shop-meta-row">
-                <div className="queue-pd-shop-hours">
-                  เวลาทำการ: <strong>{product.shopHours || store.hours || "07:30 - 16:00 น."}</strong>
-                </div>
-                <div className="queue-pd-shop-rating">
-                  <i className="bi bi-star-fill text-warning me-1" /> {product.rating || store.rating || 4.9} | จองแล้ว {product.sales || "1.2k ครั้ง"}
+              <div className="queue-pd-shop-banner-overlay">
+                <div className="d-flex justify-content-between align-items-center w-100">
+                  <div className="text-white small">
+                    <span className="badge bg-success me-2">เปิดบริการ</span>
+                    <span>โรงอาหาร 2 • ช่อง 04</span>
+                  </div>
+                  <div className="d-flex gap-2">
+                    <button
+                      className="btn btn-sm btn-light fw-bold text-danger py-0 px-2"
+                      onClick={() => setIsChatOpen(true)}
+                    >
+                      <i className="bi bi-chat-dots-fill me-1" /> แชทร้านค้า
+                    </button>
+                    <button
+                      className="btn btn-sm btn-light py-0 px-2 text-dark"
+                      onClick={handleToggleFavorite}
+                    >
+                      <i className={`bi ${isFavorite ? "bi-heart-fill text-danger" : "bi-heart"}`} />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Price Row */}
-            <div className="d-flex align-items-baseline gap-2 bg-light p-2 rounded">
-              <span className="text-muted small text-decoration-line-through">
-                ฿{product.originalPrice || basePrice + 30}
-              </span>
-              <span className="text-danger fw-bold fs-4">฿{discountedUnitPrice}</span>
-              <span className="badge bg-danger ms-1">ส่วนลด {selectedTimeSlot.discount}</span>
+            {/* Store Meta */}
+            <div className="d-flex justify-content-between align-items-center">
+              <div>
+                <h1 className="queue-pd-shop-title mb-0">{store.name || product.shopName}</h1>
+                <div className="queue-pd-shop-hours small text-muted">
+                  <i className="bi bi-clock me-1 text-primary" /> เวลาทำการ: {store.hours || "07:00 - 14:30 น."}
+                </div>
+              </div>
+              <div className="queue-pd-shop-rating">
+                <i className="bi bi-star-fill text-warning me-1" /> {store.rating || 4.8}
+                <span className="text-muted small fw-normal ms-1">({store.reviewsCount || "1.8k"})</span>
+              </div>
             </div>
 
-            {/* 5. MODIFIERS & OPTIONS FORM */}
-            <div className="d-flex flex-column gap-3">
-              <div className="bg-light p-2 rounded-3 border">
-                <div className="text-dark small fw-bold mb-1">
-                  <i className="bi bi-fire me-1 text-danger" /> ระดับความเผ็ด:
+            {/* Product Title & Price */}
+            <div className="d-flex justify-content-between align-items-center bg-light p-2.5 rounded-3">
+              <div>
+                <span className="badge bg-danger-subtle text-danger text-xs fw-bold mb-1">เมนูแนะนำ</span>
+                <h2 className="fs-5 fw-bold text-dark mb-0">{product.name}</h2>
+              </div>
+              <div className="text-end">
+                <div className="text-muted small text-decoration-line-through">฿{basePrice + 40}</div>
+                <div className="text-danger fw-black fs-4">฿{discountedUnitPrice}</div>
+              </div>
+            </div>
+
+            {/* 🍜 MODIFIERS SELECTION */}
+            <div className="queue-pd-modifiers-container">
+              {/* Modifier 1: Spicy Level */}
+              <div className="queue-pd-mod-group">
+                <div className="queue-pd-mod-title">
+                  <span><i className="bi bi-fire text-danger me-1" /> ระดับความเผ็ด <span className="text-danger">*</span></span>
+                  <span className="queue-pd-mod-subtitle">พริกคั่วเตาถ่าน</span>
                 </div>
-                <div className="d-flex gap-2 mb-2">
-                  {DEFAULT_MODIFIERS[0].options.map((opt) => (
-                    <label key={opt.id} className="small text-muted cursor-pointer d-flex align-items-center gap-1">
+                <div className="queue-pd-options-grid cols-3">
+                  {SPICY_OPTIONS.map((opt) => (
+                    <label
+                      key={opt.id}
+                      className={`queue-pd-option-chip ${spicyLevel === opt.id ? "active" : ""}`}
+                    >
+                      <span>{opt.name}</span>
                       <input
                         type="radio"
                         name="spicyLevel"
@@ -484,98 +660,201 @@ function ProductDetail() {
                         checked={spicyLevel === opt.id}
                         onChange={(e) => setSpicyLevel(e.target.value)}
                       />
-                      {opt.name}
                     </label>
                   ))}
                 </div>
-
-                <div className="text-dark small fw-bold mb-1 border-top pt-1">
-                  <i className="bi bi-plus-circle me-1 text-success" /> เพิ่ม Topping พิเศษ:
-                </div>
-                <div className="d-flex gap-3 mb-2">
-                  {DEFAULT_MODIFIERS[1].options.map((opt) => (
-                    <label key={opt.id} className="small text-muted cursor-pointer d-flex align-items-center gap-1">
-                      <input
-                        type="checkbox"
-                        checked={selectedToppings.includes(opt.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedToppings([...selectedToppings, opt.id]);
-                          } else {
-                            setSelectedToppings(selectedToppings.filter((t) => t !== opt.id));
-                          }
-                        }}
-                      />
-                      {opt.name}
-                    </label>
-                  ))}
-                </div>
-
-                <input
-                  type="text"
-                  className="form-control form-control-sm text-xs mt-1"
-                  placeholder="หมายเหตุเพิ่มเติมถึงร้านค้า (เช่น ไม่ใส่ผัก, เผ็ดน้อย)"
-                  value={customerNote}
-                  onChange={(e) => setCustomerNote(e.target.value)}
-                />
               </div>
 
-              {/* 6. QUANTITY & BOOKING DATE SELECTORS */}
-              <div className="queue-pd-booking-inputs-row">
-                <select
-                  className="queue-pd-input-select"
-                  value={guestCount}
-                  onChange={(e) => setGuestCount(e.target.value)}
-                >
-                  <option value="1 จาน">1 จาน</option>
-                  <option value="2 จาน">2 จาน</option>
-                  <option value="3 จาน">3 จาน</option>
-                  <option value="4 จานขึ้นไป">4 จานขึ้นไป</option>
-                </select>
-
-                <select
-                  className="queue-pd-input-select"
-                  value={bookingDate}
-                  onChange={(e) => setBookingDate(e.target.value)}
-                >
-                  <option value="17 ส.ค.">วันนี้ (17 ส.ค.)</option>
-                  <option value="18 ส.ค.">พรุ่งนี้ (18 ส.ค.)</option>
-                  <option value="19 ส.ค.">19 ส.ค.</option>
-                </select>
-              </div>
-
-              {/* 7. TIME SLOTS GRID (Capacity & Slot Reservation) */}
-              <div>
-                <div className="text-muted small fw-bold mb-2 d-flex align-items-center justify-content-between">
-                  <span>
-                    <i className="bi bi-clock-history me-1 text-primary" />
-                    เลือกช่วงเวลาจองคิวรับอาหาร:
-                  </span>
-                  <span className="badge bg-info-subtle text-info text-xs">{selectedTimeSlot.status}</span>
+              {/* Modifier 2: Noodle Type */}
+              <div className="queue-pd-mod-group">
+                <div className="queue-pd-mod-title">
+                  <span><i className="bi bi-egg-fried text-primary me-1" /> เลือกเส้น <span className="text-danger">*</span></span>
                 </div>
-                <div className="queue-pd-time-slots-grid">
-                  {TIME_SLOTS.map((slot) => (
-                    <button
-                      key={slot.time}
-                      disabled={slot.status === "FULL" || slot.status === "CLOSED"}
-                      className={`queue-pd-time-slot-btn ${
-                        selectedTimeSlot.time === slot.time ? "active" : ""
-                      } ${slot.status === "FULL" ? "opacity-50 cursor-not-allowed" : ""}`}
-                      onClick={() => setSelectedTimeSlot(slot)}
+                <div className="queue-pd-options-grid cols-5">
+                  {NOODLE_OPTIONS.map((opt) => (
+                    <label
+                      key={opt.id}
+                      className={`queue-pd-option-chip text-center ${noodleType === opt.id ? "active" : ""}`}
                     >
-                      <span>{slot.time} น.</span>
-                      <span>{slot.status === "FULL" ? "คิวเต็ม" : slot.discount}</span>
+                      <span>{opt.name}</span>
+                      <input
+                        type="radio"
+                        name="noodleType"
+                        value={opt.id}
+                        checked={noodleType === opt.id}
+                        onChange={(e) => setNoodleType(e.target.value)}
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Modifier 3: Soup Type */}
+              <div className="queue-pd-mod-group">
+                <div className="queue-pd-mod-title">
+                  <span><i className="bi bi-cup-hot text-primary me-1" /> เลือกน้ำซุป <span className="text-danger">*</span></span>
+                </div>
+                <div className="queue-pd-options-grid cols-3">
+                  {SOUP_OPTIONS.map((opt) => (
+                    <label
+                      key={opt.id}
+                      className={`queue-pd-option-chip ${soupType === opt.id ? "active" : ""}`}
+                    >
+                      <span>{opt.name}</span>
+                      <input
+                        type="radio"
+                        name="soupType"
+                        value={opt.id}
+                        checked={soupType === opt.id}
+                        onChange={(e) => setSoupType(e.target.value)}
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Modifier 4: Toppings */}
+              <div className="queue-pd-mod-group">
+                <div className="queue-pd-mod-title">
+                  <span><i className="bi bi-plus-circle-fill text-success me-1" /> เพิ่ม Topping</span>
+                  <span className="queue-pd-mod-subtitle">เลือกได้หลายรายการ</span>
+                </div>
+                <div className="queue-pd-options-grid cols-2">
+                  {TOPPING_OPTIONS.map((opt) => (
+                    <label
+                      key={opt.id}
+                      className={`queue-pd-option-chip justify-content-between ${
+                        selectedToppings.includes(opt.id) ? "active" : ""
+                      }`}
+                    >
+                      <div className="d-flex align-items-center gap-1.5">
+                        <input
+                          type="checkbox"
+                          checked={selectedToppings.includes(opt.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedToppings([...selectedToppings, opt.id]);
+                            } else {
+                              setSelectedToppings(selectedToppings.filter((t) => t !== opt.id));
+                            }
+                          }}
+                        />
+                        <span>{opt.name}</span>
+                      </div>
+                      <span className="text-danger fw-bold">+฿{opt.price}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Note & Quantity Stepper */}
+              <div className="row g-2 align-items-center">
+                <div className="col-12 col-sm-7">
+                  <input
+                    type="text"
+                    className="form-control form-control-sm text-xs"
+                    placeholder="หมายเหตุ: เช่น แยกพริก, ไม่ใส่ผักบุ้ง"
+                    value={customerNote}
+                    onChange={(e) => setCustomerNote(e.target.value)}
+                  />
+                </div>
+                <div className="col-12 col-sm-5">
+                  <div className="queue-pd-qty-stepper">
+                    <span className="text-muted small px-2">จำนวน:</span>
+                    <button
+                      type="button"
+                      className="queue-pd-qty-btn"
+                      onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                    >
+                      <i className="bi bi-dash" />
+                    </button>
+                    <span className="fw-bold px-2">{quantity} ชาม</span>
+                    <button
+                      type="button"
+                      className="queue-pd-qty-btn"
+                      onClick={() => setQuantity((q) => Math.min(10, q + 1))}
+                    >
+                      <i className="bi bi-plus" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* 📅 CALENDAR PICKUP SLOT SELECTION (STATUS VIEW) */}
+              <div className="queue-pd-calendar-box">
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <div className="d-flex align-items-center gap-1.5">
+                    <i className="bi bi-calendar3 text-primary" />
+                    <span className="fw-bold text-dark small">ปฏิทินรอบเวลารับ (Pickup Schedule)</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-link btn-sm p-0 text-primary text-decoration-none fw-bold small"
+                    onClick={() => setIsCalendarModalOpen(true)}
+                  >
+                    <i className="bi bi-calendar-range me-1" /> ดูปฏิทินเต็มเดือน
+                  </button>
+                </div>
+
+                {/* Date Ribbon */}
+                <div className="queue-pd-date-ribbon">
+                  {calendarDays.map((day) => (
+                    <button
+                      key={day.id}
+                      type="button"
+                      disabled={day.status === "CLOSED"}
+                      className={`queue-pd-date-card ${selectedDay.id === day.id ? "active" : ""} ${
+                        day.status === "FULL" ? "full" : ""
+                      }`}
+                      onClick={() => setSelectedDay(day)}
+                    >
+                      <span className="queue-pd-date-day">{day.dayOfWeek}</span>
+                      <span className="queue-pd-date-num">{day.dateNum}</span>
+                      <span className={`queue-pd-date-badge ${day.status.toLowerCase()}`}>
+                        {day.statusLabel}
+                      </span>
                     </button>
                   ))}
+                </div>
+
+                {/* Time Slot Grid for Selected Date */}
+                <div className="mt-2.5">
+                  <div className="d-flex justify-content-between align-items-center small text-muted mb-1.5">
+                    <span>
+                      เลือกรอบเวลารับ ({selectedDay.fullDateStr}):
+                    </span>
+                    <span className="badge bg-success-subtle text-success">
+                      รอบละ 20 คิว
+                    </span>
+                  </div>
+                  <div className="queue-pd-time-slots-grid">
+                    {BASE_TIME_SLOTS.map((slot) => (
+                      <button
+                        key={slot.time}
+                        type="button"
+                        disabled={slot.status === "FULL" || slot.remaining === 0}
+                        className={`queue-pd-slot-pill ${
+                          selectedTimeSlot.time === slot.time ? "active" : ""
+                        } ${slot.status === "FULL" ? "full" : ""}`}
+                        onClick={() => setSelectedTimeSlot(slot)}
+                      >
+                        <span className="fw-bold">{slot.time}</span>
+                        <span className="small text-danger fw-bold">{slot.discount}</span>
+                        <span className="queue-pd-slot-cap">
+                          {slot.status === "FULL" ? "เต็ม" : `ว่าง ${slot.remaining}`}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* BOOKING FOOTER & ACTIONS */}
-            <div className="queue-pd-booking-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
+            {/* ACTION FOOTER */}
+            <div className="queue-pd-booking-footer">
               <div>
                 <div className="queue-pd-booking-summary-text">
-                  {guestCount} · {bookingDate}, {selectedTimeSlot.time} น. / {selectedTimeSlot.discount}
+                  {quantity} ชาม · {selectedDay.fullDateStr}, {selectedTimeSlot.time} น. ({selectedTimeSlot.discount})
                 </div>
                 <div className="text-danger fw-bold fs-5">
                   ยอดรวม: ฿{totalCalculatedPrice.toFixed(2)}
@@ -604,39 +883,485 @@ function ProductDetail() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
 
-            {/* 15. RECOMMENDED MENU FROM SAME STORE */}
-            {recommendedProducts.length > 0 && (
-              <div className="mt-3 pt-3 border-top">
-                <div className="text-dark fw-bold small mb-2">
-                  <i className="bi bi-shop me-1 text-primary" /> เมนูอื่นจากร้านนี้ ({store.name || product.shopName})
+        {/* 3. 🗺️ SECTION: CANTEEN INDOOR MAP & WAYFINDING */}
+        <section className="queue-pd-canteen-map-section mt-4">
+          <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div>
+              <h2 className="fs-5 fw-bold text-dark d-flex align-items-center gap-2 mb-1">
+                <i className="bi bi-geo-alt-fill text-primary" /> แผนที่เดินทางไปร้าน &amp; ผังจุดรับอาหาร
+              </h2>
+              <p className="text-muted small mb-0">
+                โรงอาหาร 2 (โรงอาหารกลาง 1) ชั้น 1 • ช่องจำหน่าย 04 ใกล้ประตูทางเข้าทิศเหนือ
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn btn-outline-primary btn-sm rounded-pill fw-bold"
+              onClick={() => setIsMapModalOpen(true)}
+            >
+              <i className="bi bi-compass me-1" /> เปิดแผนที่นำทาง (Walking Guide)
+            </button>
+          </div>
+
+          <div className="row g-3 items-center">
+            {/* Left: Interactive Simulated Canteen Blueprint Floor Plan */}
+            <div className="col-12 col-lg-8">
+              <div className="queue-pd-blueprint-card">
+                <div className="queue-pd-blueprint-header">
+                  <span><i className="bi bi-door-open text-primary me-1" /> ทางเข้าทิศเหนือ (North Gate)</span>
+                  <span className="badge bg-secondary-subtle text-secondary">โรงอาหาร 2 ชั้น 1 (Zone A)</span>
+                  <span><i className="bi bi-layers me-1" /> บันไดขึ้นชั้น 2</span>
                 </div>
-                <div className="row g-2">
-                  {recommendedProducts.map((rec) => (
-                    <div key={rec.id} className="col-6 col-md-3">
-                      <div
-                        className="bg-light p-2 rounded-3 border text-center cursor-pointer h-100"
-                        onClick={() => navigate(`/product/${rec.id}`)}
-                      >
-                        <img
-                          src={rec.image || rec.mainImg}
-                          alt={rec.name}
-                          className="w-100 rounded-2 mb-1"
-                          style={{ height: "60px", objectFit: "cover" }}
-                        />
-                        <div className="small fw-bold text-dark text-truncate">{rec.name}</div>
-                        <div className="text-danger small fw-bold">฿{rec.price}</div>
+
+                {/* Stalls Grid */}
+                <div className="queue-pd-stalls-grid">
+                  <div className="queue-pd-stall-box">
+                    <span className="stall-num">ล็อค 01</span>
+                    <span className="stall-name">ข้าวมันไก่</span>
+                  </div>
+                  <div className="queue-pd-stall-box">
+                    <span className="stall-num">ล็อค 02</span>
+                    <span className="stall-name">ข้าวแกงใต้</span>
+                  </div>
+                  <div className="queue-pd-stall-box">
+                    <span className="stall-num">ล็อค 03</span>
+                    <span className="stall-name">เครื่องดื่ม/ผลไม้</span>
+                  </div>
+                  <div className="queue-pd-stall-box target">
+                    <span className="target-badge">ปลายทาง</span>
+                    <i className="bi bi-shop fs-4 text-warning" />
+                    <span className="stall-name fw-bold">ล็อค 04: ป้าแดง</span>
+                  </div>
+                </div>
+
+                {/* Walking Path */}
+                <div className="queue-pd-walking-path">
+                  <div className="d-flex align-items-center gap-2">
+                    <div className="queue-pd-pin-icon">
+                      <i className="bi bi-person-walking" />
+                    </div>
+                    <div>
+                      <div className="fw-bold small text-dark">จุดเริ่มต้น: ทางเข้าลานกิจกรรมหน้าโรงอาหาร</div>
+                      <div className="text-muted text-xs">เดินตรงผ่านเสา C3 เข้ามาประมาณ 25 เมตร • ร้านอยู่ทางขวามือ</div>
+                    </div>
+                  </div>
+                  <span className="badge bg-success-subtle text-success fw-bold">เดิน 40 วินาที</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Landmarks & Spotting Helpers */}
+            <div className="col-12 col-lg-4">
+              <div className="queue-pd-landmarks-box">
+                <div className="fw-bold text-dark small mb-2">
+                  <i className="bi bi-flag-fill text-primary me-1" /> จุดสังเกตสำคัญในบริเวณร้าน
+                </div>
+                <div className="queue-pd-landmark-item">
+                  <i className="bi bi-geo-fill text-danger fs-5" />
+                  <div>
+                    <div className="fw-bold small">เสาอาคาร C3 (ป้ายไฟเขียว QueueUp)</div>
+                    <div className="text-muted text-xs">ตรงข้ามตู้กดน้ำดื่มสะอาด และจุดเติมเงินบัตรโรงอาหาร</div>
+                  </div>
+                </div>
+                <div className="queue-pd-landmark-item">
+                  <i className="bi bi-box-seam-fill text-primary fs-5" />
+                  <div>
+                    <div className="fw-bold small">ตู้สแกนรับคิวด่วน (QueueUp Locker)</div>
+                    <div className="text-muted text-xs">หยิบกล่องออเดอร์พร้อมทานได้ทันที ไม่ต้องเบียดคิวหน้าร้าน</div>
+                  </div>
+                </div>
+                <div className="queue-pd-landmark-item">
+                  <i className="bi bi-arrow-return-left text-success fs-5" />
+                  <div>
+                    <div className="fw-bold small">ใกล้จุดส่งคืนภาชนะ Zone A</div>
+                    <div className="text-muted text-xs">ทานเสร็จสามารถเดินนำชามไปคืนได้สะดวก ห่างเพียง 10 ก้าว</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 4. 🎬 SECTION: FOOD VIBE & VIDEO REVIEWS (SHORTS/REELS STYLE) */}
+        <section className="queue-pd-video-section mt-4">
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <h2 className="fs-5 fw-bold text-dark d-flex align-items-center gap-2 mb-1">
+                <i className="bi bi-camera-reels-fill text-danger" /> วิดีโอรีวิวความอร่อย (Food Vibe &amp; Video Reviews)
+              </h2>
+              <p className="text-muted small mb-0">ชมความเข้มข้นของน้ำตกและเสียงกรุบกรอบของกากหมูเจียวสด</p>
+            </div>
+            <span className="badge bg-danger-subtle text-danger fw-bold d-none d-sm-inline-block">
+              <i className="bi bi-fire me-1" /> ไวรัลสัปดาห์นี้
+            </span>
+          </div>
+
+          <div className="row g-3">
+            {VIDEO_REVIEWS.map((vid) => (
+              <div key={vid.id} className="col-6 col-md-3">
+                <div
+                  className="queue-pd-video-card"
+                  onClick={() => setActiveVideo(vid)}
+                >
+                  <img src={vid.thumbnail} alt={vid.title} className="queue-pd-video-thumb" />
+                  <div className="queue-pd-video-overlay" />
+                  <div className="queue-pd-video-top">
+                    <span className="badge bg-dark bg-opacity-75 text-white">
+                      <i className="bi bi-play-fill" /> {vid.duration}
+                    </span>
+                    <span className="badge bg-dark bg-opacity-75 text-white">
+                      <i className="bi bi-eye" /> {vid.views}
+                    </span>
+                  </div>
+                  <div className="queue-pd-video-play-btn">
+                    <i className="bi bi-play-fill fs-3" />
+                  </div>
+                  <div className="queue-pd-video-bottom">
+                    <div className="queue-pd-video-author">{vid.author}</div>
+                    <div className="queue-pd-video-title">{vid.title}</div>
+                    <div className="queue-pd-video-tags">{vid.tags}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* 5. ⭐ SECTION: RATINGS & REVIEWS ANALYTICS */}
+        <section className="queue-pd-reviews-section mt-4">
+          <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 pb-3 border-bottom mb-3">
+            <div>
+              <h2 className="fs-5 fw-bold text-dark d-flex align-items-center gap-2 mb-1">
+                <i className="bi bi-chat-square-quote-fill text-warning" /> รีวิวและคะแนนความพึงพอใจ
+              </h2>
+              <p className="text-muted small mb-0">จากนักศึกษาและบุคลากรกว่า 1,840 ออเดอร์จริง</p>
+            </div>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm rounded-pill fw-bold"
+              onClick={() => alert("ระบบจะเปิดให้เขียนรีวิวหลังท่านรับอาหารเสร็จสิ้นเรียบร้อยแล้ว")}
+            >
+              <i className="bi bi-pencil-square me-1" /> เขียนรีวิวอาหาร / ให้คะแนน
+            </button>
+          </div>
+
+          {/* Rating Breakdown Bars */}
+          <div className="queue-pd-rating-analytics-card">
+            <div className="row g-3 align-items-center">
+              <div className="col-12 col-md-4 text-center border-end-md">
+                <div className="display-4 fw-black text-danger mb-0">4.8</div>
+                <div className="text-warning mb-1">
+                  <i className="bi bi-star-fill me-1" />
+                  <i className="bi bi-star-fill me-1" />
+                  <i className="bi bi-star-fill me-1" />
+                  <i className="bi bi-star-fill me-1" />
+                  <i className="bi bi-star-half" />
+                </div>
+                <div className="small text-muted">คะแนนรวม 4.8 จากเต็ม 5.0 ดาว</div>
+                <div className="badge bg-success-subtle text-success mt-1">98% ของผู้ทานแนะนำร้านนี้</div>
+              </div>
+
+              <div className="col-12 col-md-8">
+                <div className="d-flex flex-column gap-2">
+                  <div className="d-flex align-items-center gap-2 small">
+                    <span style={{ width: "90px" }}>รสชาติอาหาร</span>
+                    <div className="progress flex-grow-1" style={{ height: "8px" }}>
+                      <div className="progress-bar bg-danger" style={{ width: "98%" }} />
+                    </div>
+                    <span className="fw-bold">4.9</span>
+                  </div>
+                  <div className="d-flex align-items-center gap-2 small">
+                    <span style={{ width: "90px" }}>ความสะอาด</span>
+                    <div className="progress flex-grow-1" style={{ height: "8px" }}>
+                      <div className="progress-bar bg-success" style={{ width: "98%" }} />
+                    </div>
+                    <span className="fw-bold">4.9</span>
+                  </div>
+                  <div className="d-flex align-items-center gap-2 small">
+                    <span style={{ width: "90px" }}>ความรวดเร็ว</span>
+                    <div className="progress flex-grow-1" style={{ height: "8px" }}>
+                      <div className="progress-bar bg-primary" style={{ width: "94%" }} />
+                    </div>
+                    <span className="fw-bold">4.7</span>
+                  </div>
+                  <div className="d-flex align-items-center gap-2 small">
+                    <span style={{ width: "90px" }}>ความคุ้มค่า</span>
+                    <div className="progress flex-grow-1" style={{ height: "8px" }}>
+                      <div className="progress-bar bg-warning" style={{ width: "96%" }} />
+                    </div>
+                    <span className="fw-bold">4.8</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Highlight Filter Chips */}
+          <div className="d-flex align-items-center flex-wrap gap-2 my-3">
+            <span className="text-muted small fw-bold">ประเด็นที่พูดถึงบ่อย:</span>
+            <span className="badge bg-light text-dark border p-2 cursor-pointer">
+              <i className="bi bi-hand-thumbs-up text-primary me-1" /> น้ำซุปเข้มข้นสะใจ (512)
+            </span>
+            <span className="badge bg-light text-dark border p-2 cursor-pointer">
+              <i className="bi bi-hand-thumbs-up text-primary me-1" /> กากหมูกรอบใหม่ไม่อมน้ำมัน (384)
+            </span>
+            <span className="badge bg-light text-dark border p-2 cursor-pointer">
+              <i className="bi bi-hand-thumbs-up text-primary me-1" /> ได้คิวไว ไม่ต้องรอนาน (295)
+            </span>
+            <span className="badge bg-light text-dark border p-2 cursor-pointer">
+              <i className="bi bi-hand-thumbs-up text-primary me-1" /> ปริมาณคุ้มราคา 30 บ. (260)
+            </span>
+          </div>
+
+          {/* Diner Reviews List */}
+          <div className="d-flex flex-column gap-3 mt-2">
+            {CUSTOMER_REVIEWS.map((rev) => (
+              <div key={rev.id} className="queue-pd-review-card">
+                <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                  <div className="d-flex align-items-center gap-2">
+                    <div
+                      className="queue-pd-reviewer-avatar"
+                      style={{ backgroundColor: rev.avatarBg }}
+                    >
+                      {rev.avatarLetter}
+                    </div>
+                    <div>
+                      <div className="fw-bold text-dark small d-flex align-items-center gap-1.5">
+                        {rev.author}
+                        <span className="badge bg-success-subtle text-success text-xs">
+                          <i className="bi bi-patch-check-fill" /> {rev.role}
+                        </span>
+                      </div>
+                      <div className="text-muted text-xs">{rev.dishInfo} • {rev.date}</div>
+                    </div>
+                  </div>
+                  <div className="text-warning small">
+                    {[...Array(rev.rating)].map((_, i) => (
+                      <i key={i} className="bi bi-star-fill me-0.5" />
+                    ))}
+                  </div>
+                </div>
+                <p className="text-muted small mb-0">{rev.comment}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* 6. 🍲 SECTION: MORE MENUS FROM THIS STORE */}
+        {recommendedProducts.length > 0 && (
+          <section className="mt-4 pt-3 border-top">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h2 className="fs-5 fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                <i className="bi bi-shop text-primary" /> เมนูอื่นจากร้านนี้ ({store.name || product.shopName})
+              </h2>
+              <span className="text-primary small fw-bold cursor-pointer" onClick={() => navigate("/search?keyword=ทั้งหมด")}>
+                ดูเมนูทั้งหมด ({store.name}) <i className="bi bi-arrow-right" />
+              </span>
+            </div>
+
+            <div className="row g-3">
+              {recommendedProducts.map((rec) => (
+                <div key={rec.id} className="col-6 col-md-3">
+                  <div
+                    className="queue-pd-rec-menu-card"
+                    onClick={() => {
+                      navigate(`/product/${rec.id}`);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                  >
+                    <div className="queue-pd-rec-img-box">
+                      <img
+                        src={rec.image || rec.mainImg}
+                        alt={rec.name}
+                        className="queue-pd-rec-img"
+                      />
+                      <span className="queue-pd-rec-badge">ขายดี</span>
+                    </div>
+                    <div className="p-2.5 d-flex flex-column justify-content-between flex-grow-1">
+                      <div>
+                        <div className="fw-bold text-dark small text-truncate">{rec.name}</div>
+                        <div className="text-muted text-xs text-truncate mt-0.5">รสชาติอร่อยกลมกล่อม</div>
+                      </div>
+                      <div className="d-flex justify-content-between align-items-center pt-2">
+                        <span className="text-danger fw-bold">฿{rec.price}</span>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-primary rounded-circle d-flex align-items-center justify-content-center"
+                          style={{ width: "28px", height: "28px" }}
+                        >
+                          <i className="bi bi-plus" />
+                        </button>
                       </div>
                     </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+
+      {/* 7. CALENDAR FULL MONTH MODAL */}
+      {isCalendarModalOpen && (
+        <div
+          className="modal fade show d-block"
+          style={{ backgroundColor: "rgba(15, 23, 42, 0.75)", backdropFilter: "blur(6px)", zIndex: 100000 }}
+          tabIndex="-1"
+        >
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content rounded-4 border-0 shadow-lg p-2">
+              <div className="modal-header border-0 pb-0">
+                <h5 className="modal-title fw-bold text-dark">
+                  <i className="bi bi-calendar3 text-primary me-1.5" /> ปฏิทินรอบเวลารับประทานอาหาร
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setIsCalendarModalOpen(false)}
+                />
+              </div>
+              <div className="modal-body py-3">
+                <p className="small text-muted mb-3">
+                  คุณสามารถเลือกรอบวันที่ต้องการสั่งอาหารล่วงหน้าเพื่อจองคิวก่อนพักเที่ยงได้:
+                </p>
+                <div className="list-group">
+                  {calendarDays.map((d) => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      disabled={d.status === "CLOSED"}
+                      className={`list-group-item list-group-item-action d-flex justify-content-between align-items-center rounded-3 mb-2 border ${
+                        selectedDay.id === d.id ? "border-primary bg-primary-subtle" : ""
+                      }`}
+                      onClick={() => {
+                        setSelectedDay(d);
+                        setIsCalendarModalOpen(false);
+                      }}
+                    >
+                      <div>
+                        <div className="fw-bold">{d.dayOfWeek} ที่ {d.fullDateStr}</div>
+                        <div className="text-xs text-muted">รอบเวลาเปิดรับ: 11:00 - 14:30 น.</div>
+                      </div>
+                      <span className={`badge ${
+                        d.status === "AVAILABLE" ? "bg-success" : d.status === "LIMITED" ? "bg-warning text-dark" : "bg-danger"
+                      }`}>
+                        {d.statusLabel}
+                      </span>
+                    </button>
                   ))}
                 </div>
               </div>
-            )}
+              <div className="modal-footer border-0 pt-0">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm px-4 rounded-pill"
+                  onClick={() => setIsCalendarModalOpen(false)}
+                >
+                  ปิดหน้าต่าง
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* 17. CHAT ASSISTANT FLOATING BUTTON */}
+      {/* 8. WALKING GUIDE MAP MODAL */}
+      {isMapModalOpen && (
+        <div
+          className="modal fade show d-block"
+          style={{ backgroundColor: "rgba(15, 23, 42, 0.75)", backdropFilter: "blur(6px)", zIndex: 100000 }}
+          tabIndex="-1"
+        >
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content rounded-4 border-0 shadow-lg p-2">
+              <div className="modal-header border-0 pb-0">
+                <h5 className="modal-title fw-bold text-dark">
+                  <i className="bi bi-compass text-primary me-1.5" /> แผนที่นำทางไปยัง {store.name}
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setIsMapModalOpen(false)}
+                />
+              </div>
+              <div className="modal-body py-3">
+                <div className="p-3 bg-light rounded-3 border mb-3">
+                  <div className="fw-bold text-primary small mb-1">📍 ตำแหน่งที่ตั้ง:</div>
+                  <div className="small text-dark">{store.location || "โรงอาหาร 2 (โรงอาหารกลาง 1) ชั้น 1 • ช่อง 04"}</div>
+                </div>
+                <div className="d-flex flex-column gap-2 small">
+                  <div className="d-flex gap-2">
+                    <span className="badge bg-primary rounded-circle" style={{ width: "22px", height: "22px" }}>1</span>
+                    <span>เข้าประตูโรงอาหารทิศเหนือ (ลานกิจกรรม)</span>
+                  </div>
+                  <div className="d-flex gap-2">
+                    <span className="badge bg-primary rounded-circle" style={{ width: "22px", height: "22px" }}>2</span>
+                    <span>เดินตรงผ่านเสา C3 และจุดเติมเงินบัตร</span>
+                  </div>
+                  <div className="d-flex gap-2">
+                    <span className="badge bg-primary rounded-circle" style={{ width: "22px", height: "22px" }}>3</span>
+                    <span>ร้านป้าแดง (ล็อค 04) อยู่ทางขวามือ ติดกับตู้ QueueUp Locker</span>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer border-0 pt-0">
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm px-4 rounded-pill fw-bold"
+                  onClick={() => setIsMapModalOpen(false)}
+                >
+                  เข้าใจแล้ว
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 9. VIDEO MODAL PLAYER */}
+      {activeVideo && (
+        <div
+          className="modal fade show d-block"
+          style={{ backgroundColor: "rgba(15, 23, 42, 0.85)", backdropFilter: "blur(10px)", zIndex: 100002 }}
+          tabIndex="-1"
+        >
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content rounded-4 border-0 shadow-lg p-0 overflow-hidden bg-dark text-white">
+              <div className="position-relative" style={{ height: "360px" }}>
+                <img
+                  src={activeVideo.thumbnail}
+                  alt={activeVideo.title}
+                  className="w-100 h-100 object-fit-cover opacity-75"
+                />
+                <div className="position-absolute top-0 end-0 p-3">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-dark rounded-circle"
+                    onClick={() => setActiveVideo(null)}
+                  >
+                    <i className="bi bi-x-lg" />
+                  </button>
+                </div>
+                <div className="position-absolute top-50 start-50 translate-middle">
+                  <div className="btn btn-light btn-lg rounded-circle shadow-lg p-3">
+                    <i className="bi bi-play-fill fs-2 text-danger" />
+                  </div>
+                </div>
+                <div className="position-absolute bottom-0 start-0 end-0 p-3" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.85), transparent)" }}>
+                  <div className="fw-bold small text-warning">{activeVideo.author}</div>
+                  <div className="fw-bold">{activeVideo.title}</div>
+                  <div className="text-xs text-slate-300">{activeVideo.tags}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 10. CHAT MODAL */}
       <button
         className="queue-floating-chat-btn"
         onClick={() => setIsChatOpen(true)}
@@ -654,7 +1379,7 @@ function ProductDetail() {
         productId={product.id}
       />
 
-      {/* 11. PROFILE COMPLETENESS MODAL */}
+      {/* 11. INCOMPLETE PROFILE MODAL */}
       {isIncompleteProfileModalOpen && (
         <div
           className="modal fade show d-block"
