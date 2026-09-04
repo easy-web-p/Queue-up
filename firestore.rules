@@ -20,6 +20,14 @@ service cloud.firestore {
       );
     }
 
+    function isStaffSupervisor() {
+      return isAuthenticated() && (
+        isAdmin() ||
+        request.auth.token.role == 'staff_supervisor' ||
+        request.auth.token.staffSupervisor == true
+      );
+    }
+
     function isStoreOwner(storeId) {
       return isAuthenticated() && (
         isAdmin() ||
@@ -339,6 +347,84 @@ service cloud.firestore {
     // ==========================================
     match /resource_release_jobs/{jobId} {
       allow read, write: if false; // 🔒 Universal Backend-Only: Managed exclusively by Cloud Functions Admin SDK
+    }
+
+    // ==========================================
+    // 13. CAMPUS STUDENTS (Role-Protected Profiles)
+    // ==========================================
+    match /students/{studentId} {
+      allow read: if isAuthenticated() && (
+        isOwner(studentId) ||
+        (resource.data.guardianIds != null && request.auth.uid in resource.data.guardianIds) ||
+        isStaffSupervisor() ||
+        isAdmin()
+      );
+      allow create, update, delete: if isStaffSupervisor() || isAdmin();
+    }
+
+    // ==========================================
+    // 14. PARENT-CHILD LINKS (Guardian Linking)
+    // ==========================================
+    match /parent_child_links/{linkId} {
+      allow read: if isAuthenticated() && (
+        isOwner(resource.data.guardianId) ||
+        isOwner(resource.data.studentId) ||
+        isStaffSupervisor() ||
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && 
+        request.resource.data.guardianId == request.auth.uid &&
+        request.resource.data.status == 'PENDING';
+      allow update: if isStaffSupervisor() || isAdmin();
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.guardianId == request.auth.uid);
+    }
+
+    // ==========================================
+    // 15. STUDENT WALLETS (Cloud Functions Backend-Only Write)
+    // ==========================================
+    match /wallets/{studentId} {
+      allow read: if isAuthenticated() && (
+        isOwner(studentId) ||
+        (resource.data.guardianIds != null && request.auth.uid in resource.data.guardianIds) ||
+        isAdmin()
+      );
+      allow write: if false; // 🔒 Universal Backend-Only: Wallets writable strictly by Cloud Functions
+    }
+
+    // ==========================================
+    // 16. WALLET TRANSACTIONS (Cloud Functions Backend-Only Write)
+    // ==========================================
+    match /wallet_transactions/{txId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.studentId ||
+        request.auth.uid == resource.data.actorUid ||
+        isAdmin()
+      );
+      allow write: if false; // 🔒 Universal Backend-Only: Immutable transaction ledger
+    }
+
+    // ==========================================
+    // 17. VENDOR APPROVALS (Student Submissions, Staff Reviews)
+    // ==========================================
+    match /vendor_approvals/{requestId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.studentVendorId ||
+        isStaffSupervisor() ||
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && 
+        request.resource.data.studentVendorId == request.auth.uid &&
+        request.resource.data.status == 'PENDING';
+      allow update: if isStaffSupervisor() || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ==========================================
+    // 18. STAFF SUPERVISORS (Role-Restricted Directory)
+    // ==========================================
+    match /staff_supervisors/{staffId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
 
   }
