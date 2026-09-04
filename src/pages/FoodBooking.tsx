@@ -149,10 +149,8 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
 
       const orderData = result.order as Order;
 
-      // Update local history cache for instant UI rendering and clear cart
+      // Clear cart
       try {
-        const existing = JSON.parse(localStorage.getItem('queueup_user_orders') || '[]');
-        localStorage.setItem('queueup_user_orders', JSON.stringify([orderData, ...existing]));
         localStorage.removeItem('queueup_cart');
       } catch {
         // ignore

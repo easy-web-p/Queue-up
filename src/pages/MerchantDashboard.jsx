@@ -5,6 +5,7 @@ import { switchRole, clearUser } from "../store/authSlice.js";
 import { db, doc, getDoc, setDoc } from "../firebase/config.js";
 import { collection, query, where, onSnapshot, updateDoc, serverTimestamp } from "firebase/firestore";
 import { SHARED_PRODUCTS } from "../data/mockProducts.js";
+import { MerchantKDS } from "../components/MerchantKDS.tsx";
 import ChatModal from "../components/ChatModal.jsx";
 import BookingCalendar from "../components/BookingCalendar.jsx";
 import SellerAssistantModal from "../components/SellerAssistantModal.jsx";
@@ -18,45 +19,6 @@ import { getSecurityHealthReport } from "../services/aiSecurityShield.js";
 import { recordAuditLog } from "../services/storeIsolationEngine.js";
 import Footer from "../components/Footer.jsx";
 import "./MerchantDashboard.css";
-
-const MOCK_MERCHANT_ORDERS = [
-  {
-    id: "240809QUEUE01",
-    customerName: "เด็กชายพิสิษฐ์ แก้วกุลพิสิษฐ์ (ม.1/6)",
-    phone: "081-234-5678",
-    status: "TO_RECEIVE",
-    statusText: "พร้อมรับที่เคาน์เตอร์ 1 (คิว A05)",
-    time: "11:40 น.",
-    items: [
-      { name: "ชุดข้าวผัดกุ้งกะทะร้อน + ไข่ดาวสด", variant: "เผ็ดน้อย, ไม่ใส่ผักหอม", qty: 1, price: 65 },
-    ],
-    totalPrice: 65,
-  },
-  {
-    id: "240809QUEUE02",
-    customerName: "สมชาย สายกิน (ม.3/2)",
-    phone: "089-876-5432",
-    status: "PREPARING",
-    statusText: "กำลังปรุงคิวอาหาร",
-    time: "11:45 น.",
-    items: [
-      { name: "สเต็กหมูพริกไทยดำ + เฟรนช์ฟรายส์กรอบ", variant: "ซอสพริกไทยดำเข้มข้น", qty: 1, price: 120 },
-    ],
-    totalPrice: 120,
-  },
-  {
-    id: "240809QUEUE03",
-    customerName: "วรรณวิสา สดใส (ม.5/1)",
-    phone: "086-555-4321",
-    status: "PENDING",
-    statusText: "รอร้านรับออเดอร์เข้าครัว",
-    time: "11:50 น.",
-    items: [
-      { name: "ไก่ทอดซอสเกาหลี ชุบแป้งกรอบ", variant: "เผ็ดมาก", qty: 2, price: 138 },
-    ],
-    totalPrice: 138,
-  },
-];
 
 function MerchantDashboard() {
   const dispatch = useDispatch();
@@ -120,20 +82,7 @@ function MerchantDashboard() {
   const initialStore = getInitialStoreData();
   const [currentStoreId] = useState(initialStore.storeId);
 
-  const [merchantOrders, setMerchantOrders] = useState(() => {
-    // Read store-specific merchant orders from cache if present
-    if (initialStore.storeId) {
-      const storeSpecific = localStorage.getItem(`queueup_merchant_orders_${initialStore.storeId}`);
-      if (storeSpecific) {
-        try {
-          return JSON.parse(storeSpecific);
-        } catch {
-          // ignore
-        }
-      }
-    }
-    return [];
-  });
+  const [merchantOrders, setMerchantOrders] = useState([]);
 
   const [menuItems, setMenuItems] = useState(() => {
     if (initialStore.storeId) {
@@ -276,16 +225,75 @@ function MerchantDashboard() {
     }
   }, [user, navigate]);
 
-  const handleUpdateOrderStatus = (orderId, newStatus, newText) => {
-    setMerchantOrders((prev) => {
-      const updated = prev.map((o) => (o.id === orderId ? { ...o, status: newStatus, statusText: newText } : o));
-      try {
-        localStorage.setItem(`queueup_merchant_orders_${currentStoreId}`, JSON.stringify(updated));
-      } catch {
-        // ignore
-      }
-      return updated;
-    });
+  // 🔔 Real-time Firestore Listener for Store Orders
+  useEffect(() => {
+    if (!currentStoreId) return;
+
+    try {
+      const q = query(
+        collection(db, "orders"),
+        where("storeId", "==", currentStoreId)
+      );
+
+      const unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          const liveOrders = [];
+          snapshot.forEach((docSnap) => {
+            liveOrders.push({ id: docSnap.id, ...docSnap.data() });
+          });
+
+          // Sort by createdAt descending
+          liveOrders.sort((a, b) => {
+            const timeA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+            const timeB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+            return timeB - timeA;
+          });
+
+          setMerchantOrders(liveOrders);
+        },
+        (err) => {
+          console.warn("MerchantDashboard onSnapshot orders warning:", err);
+        }
+      );
+
+      return () => unsubscribe();
+    } catch (err) {
+      console.warn("MerchantDashboard setup onSnapshot error:", err);
+    }
+  }, [currentStoreId]);
+
+  const handleUpdateOrderStatus = async (orderId, newStatus, newText) => {
+    let status = 'PENDING';
+    let queueStatus = 'waiting';
+
+    if (newStatus === 'confirmed' || newStatus === 'CONFIRMED') {
+      status = 'CONFIRMED';
+      queueStatus = 'confirmed';
+    } else if (newStatus === 'cooking' || newStatus === 'PREPARING') {
+      status = 'PREPARING';
+      queueStatus = 'cooking';
+    } else if (newStatus === 'ready' || newStatus === 'READY' || newStatus === 'TO_RECEIVE') {
+      status = 'READY';
+      queueStatus = 'ready';
+    } else if (newStatus === 'completed' || newStatus === 'COMPLETED') {
+      status = 'COMPLETED';
+      queueStatus = 'completed';
+    } else if (newStatus === 'cancelled' || newStatus === 'CANCELLED') {
+      status = 'CANCELLED';
+      queueStatus = 'cancelled';
+    }
+
+    try {
+      await updateDoc(doc(db, "orders", orderId), {
+        status,
+        queueStatus,
+        statusText: newText || status,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error("Failed to update order status in Firestore:", err);
+    }
   };
 
   const handleToggleProductStatus = (productId) => {
@@ -531,163 +539,13 @@ function MerchantDashboard() {
           </button>
         </div>
 
-        {/* TAB 1: LIVE ORDER QUEUE BOARD */}
+        {/* TAB 1: LIVE ORDER QUEUE BOARD (KDS) */}
         {activeTab === "queue" && (
           <div className="merchant-panel-box">
-            <div className="d-flex align-items-center justify-content-between mb-3">
-              <h3 className="merchant-panel-title mb-0">
-                <i className="bi bi-receipt-cutoff text-danger me-2" />
-                บอร์ดจัดการคิวอาหารและออเดอร์เรียลไทม์
-              </h3>
-              <button
-                className="btn btn-sm btn-outline-danger font-weight-bold"
-                onClick={() => setMerchantOrders(MOCK_MERCHANT_ORDERS)}
-              >
-                <i className="bi bi-arrow-clockwise me-1" /> รีเฟรชรายการคิว
-              </button>
-            </div>
-
-            <div className="merchant-queue-subtabs">
-              {[
-                { id: "ALL", label: "ทั้งหมด" },
-                { id: "PENDING", label: "ออเดอร์ใหม่ / รอยืนยัน" },
-                { id: "PREPARING", label: "กำลังปรุงคิวอาหาร" },
-                { id: "READY", label: "พร้อมรับที่เคาน์เตอร์" },
-                { id: "COMPLETED", label: "เสร็จสิ้นแล้ว" },
-              ].map((sub) => (
-                <button
-                  key={sub.id}
-                  className={`merchant-subtab-chip ${queueFilter === sub.id ? "active" : ""}`}
-                  onClick={() => setQueueFilter(sub.id)}
-                >
-                  {sub.label}
-                </button>
-              ))}
-            </div>
-
-            {filteredQueueOrders.length > 0 ? (
-              filteredQueueOrders.map((order) => (
-                <div key={order.id} className="merchant-order-card">
-                  <div className="merchant-order-card-header">
-                    <div>
-                      <span className="merchant-order-id me-3">ID: {order.id}</span>
-                      <span className="text-muted small">
-                        <i className="bi bi-clock me-1" /> {order.time}
-                      </span>
-                    </div>
-                    <span className={`merchant-order-badge-status ${order.status.toLowerCase()}`}>
-                      {order.statusText}
-                    </span>
-                  </div>
-
-                  <div className="mb-2 d-flex align-items-center justify-content-between">
-                    <div>
-                      <div className="fw-bold text-dark fs-6">
-                        <i className="bi bi-person-fill text-primary me-1" /> {order.customerName}
-                      </div>
-                      <div className="small text-muted">โทร: {order.phone}</div>
-                    </div>
-                    <button
-                      className="btn btn-sm btn-outline-primary"
-                      onClick={() => {
-                        setChatCustomerName(order.customerName);
-                        setChatOrderContext({
-                          orderId: order.id,
-                          itemTitle: order.items[0]?.name,
-                          queueNo: order.statusText,
-                          price: order.totalPrice,
-                        });
-                        setIsChatOpen(true);
-                      }}
-                    >
-                      <i className="bi bi-chat-dots-fill me-1" /> แชทคุยกับลูกค้า
-                    </button>
-                  </div>
-
-                  <div className="merchant-order-items-list">
-                    {order.items.map((item, idx) => (
-                      <div key={idx} className="merchant-order-item-row">
-                        <img src="/logo.png" alt={item.name} className="merchant-order-item-img" />
-                        <div>
-                          <div className="merchant-order-item-title">
-                            {item.name} <span className="text-danger fw-bold">x{item.qty}</span>
-                          </div>
-                          <div className="merchant-order-item-opt">ตัวเลือก: {item.variant}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="merchant-order-card-footer">
-                    <div>
-                      <span className="small text-muted me-2">ราคารวมคำสั่งซื้อ:</span>
-                      <span className="merchant-order-total-price">฿{(Number(order.totalPrice) || 0).toFixed(2)}</span>
-                    </div>
-
-                    <div className="merchant-order-actions-row">
-                      {order.status === "PENDING" && (
-                        <button
-                          className="merchant-btn-next-step"
-                          onClick={() =>
-                            handleUpdateOrderStatus(
-                              order.id,
-                              "PREPARING",
-                              "กำลังปรุงคิวอาหาร (ประมาณ 10 นาที)"
-                            )
-                          }
-                        >
-                          <i className="bi bi-check-circle-fill me-1" /> ยืนยันรับออเดอร์เข้าครัว
-                        </button>
-                      )}
-
-                      {order.status === "PREPARING" && (
-                        <button
-                          className="merchant-btn-next-step"
-                          style={{ background: "#2563eb" }}
-                          onClick={() =>
-                            handleUpdateOrderStatus(
-                              order.id,
-                              "READY",
-                              "พร้อมรับที่เคาน์เตอร์ 1 (คิว A05)"
-                            )
-                          }
-                        >
-                          <i className="bi bi-bell-fill me-1" /> แจ้งคิวพร้อมรับอาหาร (คิว A05)
-                        </button>
-                      )}
-
-                      {order.status === "READY" && (
-                        <button
-                          className="merchant-btn-next-step"
-                          style={{ background: "#16a34a" }}
-                          onClick={() =>
-                            handleUpdateOrderStatus(order.id, "COMPLETED", "ส่งมอบเรียบร้อยแล้ว")
-                          }
-                        >
-                          <i className="bi bi-bag-check-fill me-1" /> ส่งมอบอาหารเรียบร้อยแล้ว
-                        </button>
-                      )}
-
-                      {order.status !== "COMPLETED" && (
-                        <button
-                          className="merchant-btn-cancel-step"
-                          onClick={() =>
-                            handleUpdateOrderStatus(order.id, "CANCELLED", "ยกเลิกคำสั่งซื้อ")
-                          }
-                        >
-                          ยกเลิกคำสั่งซื้อ
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-5 text-muted">
-                <i className="bi bi-inbox fs-1 d-block mb-2 text-slate-300" />
-                ยังไม่มีรายการคิวอาหารในสถานะนี้
-              </div>
-            )}
+            <MerchantKDS
+              orders={merchantOrders}
+              onUpdateOrderStatus={handleUpdateOrderStatus}
+            />
           </div>
         )}
 

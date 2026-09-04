@@ -50,10 +50,7 @@ function UserProfile() {
   const [chatOrderContext, setChatOrderContext] = useState(null);
 
   // 🔔 Real-time Booking & Purchase History State (Connected to Firestore /orders)
-  const [orders, setOrders] = useState(() => {
-    const saved = localStorage.getItem("queueup_user_orders");
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [orders, setOrders] = useState([]);
   const [orderStatusTab, setOrderStatusTab] = useState("ALL");
   const [orderSearchQuery, setOrderSearchQuery] = useState("");
 
@@ -209,14 +206,7 @@ function UserProfile() {
             return timeB - timeA;
           });
 
-          if (liveOrders.length > 0) {
-            setOrders(liveOrders);
-            try {
-              localStorage.setItem("queueup_user_orders", JSON.stringify(liveOrders));
-            } catch {
-              // ignore
-            }
-          }
+          setOrders(liveOrders);
         },
         (err) => {
           console.warn("UserProfile onSnapshot orders warning:", err);

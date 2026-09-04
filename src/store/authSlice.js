@@ -56,7 +56,7 @@ const filterSafeUserSession = (rawUser) => {
     isVerifiedAuth: false, // 🔒 Stored cache is marked unverified
     isTokenVerified: false,
     isFromCache: true,
-    storeId: storeId || (isMerchant ? "store_canteen01" : undefined),
+    storeId: storeId || undefined,
     school: school || "โรงเรียน",
   };
 };

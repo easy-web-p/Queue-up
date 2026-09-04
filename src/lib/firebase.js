@@ -329,7 +329,7 @@ export const fetchRelatedProductsFromFirestore = async (storeId, currentProductI
 export const saveOrderToFirestore = async (orderPayload) => {
   if (!orderPayload) return null;
   const orderId = orderPayload.orderId || orderPayload.id || `ORD-${Date.now()}`;
-  const storeId = orderPayload.storeId || "store_canteen01";
+  const storeId = orderPayload.storeId || "";
   const fullOrder = {
     ...orderPayload,
     id: orderId,

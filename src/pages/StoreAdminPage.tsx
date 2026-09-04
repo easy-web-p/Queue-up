@@ -143,9 +143,14 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
       status: 'Active'
     };
     try {
+      const targetStoreId = shopInfo?.id || user?.storeId;
+      if (!targetStoreId) {
+        setToastMsg("ไม่พบรหัสร้านค้า (Store ID Required)");
+        return;
+      }
       const batch = writeBatch(db);
-      batch.set(doc(db, "shops", "store_canteen01", "staff", newStaff.id), newStaff, { merge: true });
-      batch.set(doc(db, "merchantProfiles", "store_canteen01", "staff", newStaff.id), newStaff, { merge: true });
+      batch.set(doc(db, "shops", targetStoreId, "staff", newStaff.id), newStaff, { merge: true });
+      batch.set(doc(db, "merchantProfiles", targetStoreId, "staff", newStaff.id), newStaff, { merge: true });
       await batch.commit();
 
       setStaffList(prev => [...prev, newStaff]);
@@ -418,7 +423,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
             { id: 'overview', label: 'ภาพรวมระบบ', icon: BarChart3 },
             { id: 'menu_admin', label: 'จัดการรายการอาหาร & สต็อก', icon: Utensils },
             { id: 'orders', label: 'ออเดอร์ & KDS หน้าครัว', icon: ChefHat },
-            { id: 'payments', label: 'ตั้งค่าการชำระเงิน PromptPay', icon: QrCode },
+            { id: 'payments', label: 'ตั้งค่าความจุคิว & Zero-Payment', icon: Settings },
             { id: 'staff', label: 'พนักงาน & สิทธิ์เข้าถึง', icon: Users },
             { id: 'crm', label: 'ระบบ CRM & แต้มสะสม', icon: Sparkles },
             { id: 'logs', label: 'บันทึกกิจกรรมระบบ', icon: FileText },
@@ -838,32 +843,43 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
           </div>
         )}
 
-        {/* TAB 4: PAYMENTS */}
+        {/* TAB 4: ZERO-PAYMENT & CAPACITY SETTINGS */}
         {activeTab === 'payments' && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-6">
             <div>
-              <h3 className="text-base font-extrabold text-slate-900">ตั้งค่าบัญชีรับเงิน PromptPay & ระบบตรวจสลิป</h3>
-              <p className="text-xs text-slate-500">กำหนดเบอร์พร้อมเพย์ ชื่อบัญชี และระบบตรวจสอบสลิปอัตโนมัติ</p>
+              <h3 className="text-base font-extrabold text-slate-900">ตั้งค่าระบบ Zero-Payment & กำลังการผลิตคิว</h3>
+              <p className="text-xs text-slate-500">กำหนดขีดจำกัดออเดอร์ต่อสล็อตเวลาและสถานะเปิดปิดร้านค้า</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4 border-r border-slate-200 pr-0 md:pr-6">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">หมายเลขพร้อมเพย์ (PromptPay ID)</label>
+                  <label className="text-xs font-bold text-slate-700">ขีดจำกัดออเดอร์ต่อสล็อตเวลา (Max Orders Per Slot)</label>
                   <input
-                    type="text"
-                    value={shopInfo?.promptpayNumber || '081-234-5678'}
-                    onChange={(e) => setShopInfo((prev) => prev ? { ...prev, promptpayNumber: e.target.value } : { id: 's1', shopName: 'ร้านค้าสถานศึกษา', promptpayNumber: e.target.value } as any)}
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={shopInfo?.maxOrdersPerSlot || 10}
+                    onChange={async (e) => {
+                      const val = parseInt(e.target.value) || 10;
+                      setShopInfo((prev) => prev ? { ...prev, maxOrdersPerSlot: val } : null);
+                      const targetStoreId = shopInfo?.id || user?.storeId;
+                      if (targetStoreId) {
+                        await setDoc(doc(db, "shops", targetStoreId), { maxOrdersPerSlot: val }, { merge: true });
+                        setToastMsg(`อัปเดตกำลังการผลิตเป็น ${val} ออเดอร์/สล็อต สำเร็จ`);
+                      }
+                    }}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#f6402e]"
                   />
+                  <p className="text-[11px] text-slate-400">ระบบจะป้องกัน Overbooking อัตโนมัติเมื่อจำนวนออเดอร์ในรอบเวลาถึงขีดจำกัด</p>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">ชื่อบัญชีผู้รับเงิน</label>
+                  <label className="text-xs font-bold text-slate-700">ชื่อผู้ดูแลร้านค้า</label>
                   <input
                     type="text"
-                    value={shopInfo?.ownerName || 'ป้าแดง ใจดี'}
-                    onChange={(e) => setShopInfo((prev) => prev ? { ...prev, ownerName: e.target.value } : { id: 's1', shopName: 'ร้านค้าสถานศึกษา', ownerName: e.target.value } as any)}
+                    value={shopInfo?.ownerName || 'เจ้าของร้าน'}
+                    onChange={(e) => setShopInfo((prev) => prev ? { ...prev, ownerName: e.target.value } : null)}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#f6402e]"
                   />
                 </div>
@@ -871,25 +887,25 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                 <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-3">
                   <ShieldCheck className="w-8 h-8 text-emerald-600 shrink-0" />
                   <div className="text-xs">
-                    <div className="font-bold text-emerald-900">ระบบตรวจสลิป AI Slip Verification</div>
+                    <div className="font-bold text-emerald-900">Zero-Payment Mode Active (สแกนรับอาหารทันที)</div>
                     <div className="text-emerald-700 text-[11px]">
-                      ตรวจสอบสลิปโอนเงิน ยอดเงินตรง ยอดไม่ซ้ำซ้อน ป้องกันสลิปปลอมอัตโนมัติ 100%
+                      ระบบไม่ต้องตรวจสลิป ลูกค้าสั่งอาหารและรับคิวได้ทันที ร้านค้ารับออเดอร์และปรุงอาหารได้ทันที
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* QR Preview Box */}
+              {/* Status & Policy Box */}
               <div className="flex flex-col items-center justify-center p-6 bg-slate-50 border border-slate-200 rounded-2xl text-center space-y-3">
-                <div className="w-40 h-40 bg-white p-3 rounded-2xl border-2 border-orange-300 shadow-md flex items-center justify-center">
-                  <QrCode className="w-32 h-32 text-[#f6402e]" />
+                <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 shadow-sm">
+                  <Sparkles className="w-10 h-10" />
                 </div>
                 <div>
-                  <div className="font-extrabold text-sm text-slate-900">{shopInfo?.ownerName || 'ป้าแดง ใจดี'}</div>
-                  <div className="text-xs text-slate-500 font-mono">PromptPay: {shopInfo?.promptpayNumber || '081-234-5678'}</div>
+                  <div className="font-extrabold text-sm text-slate-900">{shopInfo?.shopName || 'ร้านค้าสถานศึกษา'}</div>
+                  <div className="text-xs text-slate-500 font-mono">กำลังการผลิต: {shopInfo?.maxOrdersPerSlot || 10} รายการ / สล็อต 15 นาที</div>
                 </div>
-                <span className="text-[10px] bg-orange-100 text-[#f6402e] font-bold px-3 py-1 rounded-full">
-                  QR Code พร้อมใช้งานสำหรับแสดงในหน้ารับชำระเงิน
+                <span className="text-[11px] bg-emerald-100 text-emerald-800 font-bold px-3 py-1.5 rounded-full">
+                  ⚡ ระบบจัดการคิวฉับไว Zero-Wait Queue
                 </span>
               </div>
             </div>
