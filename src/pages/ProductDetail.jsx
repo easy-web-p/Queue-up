@@ -254,9 +254,45 @@ function ProductDetail() {
     if (!isComplete) {
       setMissingProfileFields(missing);
       setIsIncompleteProfileModalOpen(true);
-    } else {
-      setIsPaymentModalOpen(true);
+      return;
     }
+
+    // 5. Build custom instruction notes from modifiers
+    const noteParts = [];
+    if (spicyLevel) noteParts.push(`เผ็ด: ${spicyLevel}`);
+    if (selectedToppings && selectedToppings.length > 0) {
+      const toppingNames = selectedToppings.map(
+        (topId) => DEFAULT_MODIFIERS[1]?.options?.find((opt) => opt.id === topId)?.name || topId
+      );
+      noteParts.push(`ท็อปปิ้ง: ${toppingNames.join(", ")}`);
+    }
+    if (customerNote && customerNote.trim()) {
+      noteParts.push(`โน้ต: ${customerNote.trim()}`);
+    }
+
+    const cartItem = {
+      menuItem: {
+        id: product.id,
+        name: product.name || product.title,
+        price: discountedUnitPrice,
+        storeId: product.storeId || "store_canteen01",
+        image: selectedImg || product.mainImg || product.image || "/crispy_fried_chicken.jpg",
+      },
+      quantity: quantityNumber,
+      customNotes: noteParts.join(" | "),
+    };
+
+    // 6. Seamless Navigation to Authoritative Booking Flow
+    navigate("/booking", {
+      state: {
+        cartItems: [cartItem],
+        pickupTime: selectedTimeSlot?.time || "12:15",
+        bookingDate: bookingDate,
+        storeId: product.storeId || "store_canteen01",
+        storeName: store?.name || product.shopName || "ร้านครัวโรงเรียน QueueUp Canteen",
+        storeLocation: store?.location || product.shopLocation || "โรงอาหาร 1 (อาคารเรียน 2)",
+      },
+    });
   };
 
   // 12. Payment Success Handler -> Save Order & Queue Snapshot

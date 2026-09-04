@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Utensils, QrCode, ArrowLeft, Sparkles, AlertCircle, Clock, CheckCircle2 } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import { Utensils, QrCode, ArrowLeft, Sparkles, AlertCircle, Clock, CheckCircle2, ShoppingBag } from 'lucide-react';
 import { CartItem, Order, CustomerProfile } from '../types';
 import { db } from '../firebase/config.js';
 import { createAuthoritativeStoreOrder } from '../services/orderCreationService';
@@ -13,17 +15,49 @@ interface FoodBookingPageProps {
 }
 
 export const FoodBooking: React.FC<FoodBookingPageProps> = ({
-  cartItems = [],
-  currentUser,
+  cartItems: propCartItems = [],
+  currentUser: propCurrentUser,
   onBookingSuccess,
-  onBack
+  onBack: propOnBack
 }) => {
-  const [pickupTime, setPickupTime] = useState('12:15');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const reduxUser = useSelector((state: any) => state.auth?.user);
+
+  // Fallback to router state or local storage if props are not provided
+  const locationState = location.state as {
+    cartItems?: CartItem[];
+    pickupTime?: string;
+    bookingDate?: string;
+    storeId?: string;
+    storeName?: string;
+    storeLocation?: string;
+  } | null;
+
+  const cartItems = propCartItems.length > 0 ? propCartItems : (locationState?.cartItems || []);
+  const currentUser = propCurrentUser || reduxUser || (() => {
+    try {
+      const saved = localStorage.getItem('queueup_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  })();
+
+  const [pickupTime, setPickupTime] = useState(locationState?.pickupTime || '12:15');
   const [paymentMethod, setPaymentMethod] = useState<'promptpay' | 'cash'>('promptpay');
   const [customInstructions, setCustomInstructions] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
+
+  const onBack = propOnBack || (() => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/home');
+    }
+  });
 
   const calculateTotal = () => {
     return cartItems.reduce((sum, item) => sum + item.menuItem.price * item.quantity, 0);
@@ -33,15 +67,16 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
     e.preventDefault();
     if (cartItems.length === 0) return;
 
-    if (!currentUser?.phone) {
-      setOrderError('กรุณากรอกเบอร์โทรศัพท์ในหน้าโปรไฟล์ก่อนทำการจองคิวอาหาร');
+    const userPhone = currentUser?.phone || currentUser?.phoneNumber || '';
+    if (!userPhone) {
+      setOrderError('กรุณากรอกเบอร์โทรศัพท์ในหน้าโปรไฟล์ก่อนทำการจองคิวอาหาร เพื่อรับการแจ้งเตือนคิว');
       return;
     }
 
     setIsSubmitting(true);
     setOrderError(null);
 
-    const storeId = cartItems[0]?.menuItem?.storeId || 'store_canteen01';
+    const storeId = locationState?.storeId || cartItems[0]?.menuItem?.storeId || 'store_canteen01';
     const userId = currentUser?.id || currentUser?.uid;
 
     if (!userId) {
@@ -54,9 +89,10 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
       const result = await createAuthoritativeStoreOrder(db, {
         storeId,
         userId,
-        customerName: currentUser?.name || currentUser?.displayName || 'ลูกค้า QueueUp',
-        customerPhone: currentUser?.phone,
+        customerName: currentUser?.name || currentUser?.displayName || currentUser?.fullName || 'ลูกค้า QueueUp',
+        customerPhone: userPhone,
         pickupTime,
+        pickupDate: locationState?.bookingDate,
         paymentMethod,
         items: cartItems.map((c) => ({
           productId: c.menuItem.id,
@@ -166,14 +202,25 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
               </div>
             </div>
 
-            {onBack && (
+            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
               <button
-                onClick={onBack}
-                className="px-6 py-3 bg-[#8B0000] hover:bg-[#700000] text-white font-bold text-sm rounded-2xl shadow-lg transition-all cursor-pointer"
+                type="button"
+                onClick={() => navigate('/user/account/profile?tab=bookings')}
+                className="px-6 py-3 bg-[#8B0000] hover:bg-[#700000] text-white font-bold text-sm rounded-2xl shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
               >
-                กลับสู่หน้าหลัก
+                <Clock className="w-4 h-4" />
+                ดูสถานะคิวในบัญชีของฉัน
               </button>
-            )}
+
+              <button
+                type="button"
+                onClick={() => navigate('/home')}
+                className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-sm rounded-2xl border border-slate-300 transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <ShoppingBag className="w-4 h-4" />
+                สั่งเมนูอื่นเพิ่ม
+              </button>
+            </div>
           </div>
         ) : (
           /* Booking Form */
