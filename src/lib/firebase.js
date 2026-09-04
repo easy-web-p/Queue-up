@@ -335,7 +335,8 @@ export const saveOrderToFirestore = async (orderPayload) => {
     id: orderId,
     orderId,
     storeId,
-    paymentStatus: orderPayload.paymentStatus || 'pending',
+    status: orderPayload.status || 'PENDING',
+    queueStatus: orderPayload.queueStatus || 'waiting',
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };

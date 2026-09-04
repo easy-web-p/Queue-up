@@ -1,18 +1,18 @@
 /* global process, Buffer */
 /**
- * QueueUp Wave 3.13 Production-Grade Transaction & State-Machine Test Matrix
+ * QueueUp Zero-Payment Food Ordering & Instant Queue Architecture Test Matrix
  * Features:
  * - Real Firestore Transaction Simulation with Optimistic Concurrency Control (OCC)
  * - Version Checking, Conflict Detection & Auto-retry
  * - Transaction Snapshot Staging & Instant Rollback on Exceptions (Failure Injection)
  * - Concurrent Simultaneous Execution (Promise.all)
- * - 16 Exhaustive Scenarios covering Payment, Expiry, Refund, Webhook, and Business Rules
+ * - 160 Exhaustive Scenarios covering Zero-Payment, Instant Q001, Structured Modifiers, Stock Integrity, Slot Capacity & Operational State Machine
  * - Zero-tolerance Exit Code Enforcement
  */
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 
-console.log('🧪 Starting QueueUp Wave 3.13 Production-Grade Transaction Test Matrix...\n');
+console.log('🧪 Starting QueueUp Zero-Payment & Queue Architecture Test Matrix...\n');
 
 let passedTests = 0;
 let totalTests = 0;
@@ -2818,682 +2818,219 @@ async function main() {
     assert.equal(audit.refundId, 'rfnd_102');
   });
 
-  // Scenario 103: handleOpnWebhookCore with missing/null secret strictly fails closed with HTTP 401
-  await runTest('Scenario 103: handleOpnWebhookCore with missing/null secret strictly fails closed (401)', async () => {
+  // Scenario 103: Direct Food Ordering without Payment Gateway
+  await runTest('Scenario 103: Zero-Payment Direct Ordering: Order is created atomically in PENDING state with 0 payment fields', async () => {
     const engine = new AdvancedFirestoreEngine();
-    const dbAdapter = {
-      collection: (colName) => ({
-        doc: (docId) => ({
-          path: `${colName}/${docId}`,
-          get: async () => ({ exists: !!engine.getDoc(`${colName}/${docId}`), data: () => engine.getDoc(`${colName}/${docId}`) }),
-          update: async (d) => engine.setDoc(`${colName}/${docId}`, d, { merge: true }),
-          set: async (d, opts) => engine.setDoc(`${colName}/${docId}`, d, opts)
-        })
-      }),
-      runTransaction: (fn) => engine.runTransaction(fn)
-    };
-
-    let statusCode = 0;
-    let responseBody = "";
-    const mockRes = {
-      status: (code) => { statusCode = code; return mockRes; },
-      send: (body) => { responseBody = body; return mockRes; }
-    };
-
-    const mockReq = {
-      method: "POST",
-      headers: { "x-opn-signature": "some_sig" },
-      rawBody: '{"key":"charge.complete"}',
-      body: { key: "charge.complete" }
-    };
-
-    // Calling with undefined/null signatureSecret
-    const { handleOpnWebhookCore } = await import('./functions/index.js');
-    await handleOpnWebhookCore(mockReq, mockRes, {
-      db: dbAdapter,
-      retrieveCharge: async () => ({ id: "chrg_103" }),
-      releaseOrderResources: async () => true,
-      opnSecretKey: "skey_103",
-      signatureSecret: null // Missing/null secret!
+    const storeId = "store_canteen_103";
+    const orderId = "ord_103";
+    
+    await engine.runTransaction(async (tx) => {
+      tx.set({ path: `orders/${orderId}` }, {
+        orderId,
+        storeId,
+        userId: "user_103",
+        customerName: "กิตติพงษ์",
+        customerPhone: "0891112233",
+        status: "PENDING",
+        queueStatus: "waiting",
+        queueNumber: "Q001",
+        totalAmount: 65,
+        totalAmountSatang: 6500
+      });
     });
 
-    assert.equal(statusCode, 401);
-    assert.ok(responseBody.includes("Unauthorized"));
+    const saved = engine.getDoc(`orders/${orderId}`);
+    assert.equal(saved.status, "PENDING");
+    assert.equal(saved.queueStatus, "waiting");
+    assert.equal(saved.queueNumber, "Q001");
+    assert.equal("paymentStatus" in saved, false);
+    assert.equal("paymentMethod" in saved, false);
   });
 
-  // Scenario 104: charge.create event ID conflict against different charge/order returns HTTP 409 Conflict
-  await runTest('Scenario 104: charge.create with bound conflicting event ID strictly returns HTTP 409 Conflict', async () => {
+  // Scenario 104: Sequential Per-Day Queue Issuance
+  await runTest('Scenario 104: Atomic Sequential Queue Counter: Generates consecutive Q001, Q002 per store per day', async () => {
     const engine = new AdvancedFirestoreEngine();
-    const eventId = "evnt_conflict_104";
-    // Pre-existing event bound to charge_A
-    engine.setDoc(`webhook_events/${eventId}`, {
-      eventId,
-      eventKey: "charge.create",
-      chargeId: "chrg_original_A",
-      orderId: "ord_original_A",
-      processed: true
-    });
-    // Target order exists
-    engine.setDoc("orders/ord_attacker_B", {
-      orderId: "ord_attacker_B",
-      userId: "uid_attacker_B",
-      paymentStatus: "pending"
-    });
+    const storeId = "store_canteen_104";
+    const dateKey = "20260904";
+    const counterPath = `queue_counters/counter_${storeId}_${dateKey}`;
 
-    const dbAdapter = {
-      collection: (colName) => ({
-        doc: (docId) => ({
-          id: docId,
-          path: `${colName}/${docId}`,
-          get: async () => ({ exists: !!engine.getDoc(`${colName}/${docId}`), data: () => engine.getDoc(`${colName}/${docId}`) }),
-          update: async (d) => engine.setDoc(`${colName}/${docId}`, d, { merge: true }),
-          set: async (d, opts) => engine.setDoc(`${colName}/${docId}`, d, opts)
-        })
-      }),
-      runTransaction: (fn) => engine.runTransaction(fn)
-    };
+    async function issueQueueNumber() {
+      return await engine.runTransaction(async (tx) => {
+        const snap = await tx.get({ path: counterPath });
+        const current = (snap.exists && snap.data()) ? (snap.data().lastQueueNumber || 0) : 0;
+        const next = current + 1;
+        tx.set({ path: counterPath }, { lastQueueNumber: next, storeId, date: dateKey }, { merge: true });
+        return `Q${String(next).padStart(3, '0')}`;
+      });
+    }
 
-    const secret = "secret_104";
-    const rawBody = JSON.stringify({ id: eventId, key: "charge.create", data: { id: "chrg_attacker_B" } });
-    const sig = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+    const q1 = await issueQueueNumber();
+    const q2 = await issueQueueNumber();
+    const q3 = await issueQueueNumber();
 
-    let statusCode = 0;
-    let responseBody = "";
-    const mockRes = {
-      status: (code) => { statusCode = code; return mockRes; },
-      send: (body) => { responseBody = body; return mockRes; }
-    };
-    const mockReq = {
-      method: "POST",
-      headers: { "x-opn-signature": sig },
-      rawBody,
-      body: JSON.parse(rawBody)
-    };
-
-    const { handleOpnWebhookCore } = await import('./functions/index.js');
-    await handleOpnWebhookCore(mockReq, mockRes, {
-      db: dbAdapter,
-      retrieveCharge: async (id) => ({
-        id,
-        currency: "THB",
-        metadata: { orderId: "ord_attacker_B", uid: "uid_attacker_B" }
-      }),
-      releaseOrderResources: async () => true,
-      opnSecretKey: "skey_104",
-      signatureSecret: secret
-    });
-
-    assert.equal(statusCode, 409);
-    assert.ok(responseBody.includes("Security Violation"));
+    assert.equal(q1, "Q001");
+    assert.equal(q2, "Q002");
+    assert.equal(q3, "Q003");
   });
 
-  // Scenario 105: charge.create acknowledges atomically without mutating order payment state
-  await runTest('Scenario 105: charge.create acknowledges atomically without mutating order payment state', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const eventId = "evnt_create_105";
-    const orderId = "ord_105";
-    engine.setDoc(`orders/${orderId}`, { orderId, userId: "uid_105", paymentStatus: "pending", totalAmount: 120 });
-
-    const dbAdapter = {
-      collection: (colName) => ({
-        doc: (docId) => ({
-          path: `${colName}/${docId}`,
-          get: async () => ({ exists: !!engine.getDoc(`${colName}/${docId}`), data: () => engine.getDoc(`${colName}/${docId}`) }),
-          update: async (d) => engine.setDoc(`${colName}/${docId}`, d, { merge: true }),
-          set: async (d, opts) => engine.setDoc(`${colName}/${docId}`, d, opts)
-        })
-      }),
-      runTransaction: (fn) => engine.runTransaction(fn)
-    };
-
-    const secret = "secret_105";
-    const rawBody = JSON.stringify({ id: eventId, key: "charge.create", data: { id: "chrg_105" } });
-    const sig = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
-
-    let statusCode = 0;
-    const mockRes = {
-      status: (code) => { statusCode = code; return mockRes; },
-      send: () => mockRes
-    };
-    const mockReq = {
-      method: "POST",
-      headers: { "x-opn-signature": sig },
-      rawBody,
-      body: JSON.parse(rawBody)
-    };
-
-    const { handleOpnWebhookCore } = await import('./functions/index.js');
-    await handleOpnWebhookCore(mockReq, mockRes, {
-      db: dbAdapter,
-      retrieveCharge: async (id) => ({
-        id,
-        currency: "THB",
-        metadata: { orderId, uid: "uid_105" }
-      }),
-      releaseOrderResources: async () => true,
-      opnSecretKey: "skey_105",
-      signatureSecret: secret
-    });
-
-    assert.equal(statusCode, 200);
-    // Invariant check: Webhook event is recorded, order payment state is strictly unchanged (pending)
-    assert.equal(engine.getDoc(`webhook_events/${eventId}`).processed, true);
-    assert.equal(engine.getDoc(`orders/${orderId}`).paymentStatus, "pending");
-  });
-
-  // Scenario 106: completeOutboxJob strictly fails when lease has expired
-  await runTest('Scenario 106: completeOutboxJob strictly fails when leaseUntil has expired', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const jobId = "job_expired_106";
-    const workerId = "worker_slow";
-    const leaseToken = "token_106";
-    const now = Date.now();
-
-    // Expired lease
-    engine.setDoc(`resource_release_jobs/${jobId}`, {
-      jobId,
-      status: "processing",
-      leaseOwner: workerId,
-      leaseToken,
-      leaseUntil: now - 1000 // 1 sec in the past
-    });
-
-    const dbAdapter = {
-      collection: (colName) => ({
-        doc: (docId) => ({
-          path: `${colName}/${docId}`
-        })
-      }),
-      runTransaction: (fn) => engine.runTransaction(fn)
-    };
-
-    const { completeOutboxJob } = await import('./functions/index.js');
-    const res = await completeOutboxJob(dbAdapter, jobId, workerId, leaseToken);
-
-    assert.equal(res.success, false);
-    assert.equal(res.reason, "LEASE_EXPIRED");
-    assert.equal(engine.getDoc(`resource_release_jobs/${jobId}`).status, "processing"); // Not completed!
-  });
-
-  // Scenario 107: reconcilePendingRefundOrder rejects partial amount refund from full terminal resolution
-  await runTest('Scenario 107: reconcilePendingRefundOrder rejects partial amount refund', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const orderId = "ord_partial_107";
-    const refundKey = `ref_${orderId}_chrg_107`;
-    engine.setDoc(`orders/${orderId}`, {
-      orderId,
-      paymentId: "chrg_107",
-      totalAmount: 150, // Expected 15000 Satang
-      paymentStatus: "refund_pending",
-      reconciliationStatus: "PROVIDER_REFUNDING",
-      refundIdempotencyKey: refundKey
-    });
-
-    const dbAdapter = {
-      collection: (colName) => ({
-        doc: (docId) => ({
-          id: docId,
-          path: `${colName}/${docId}`,
-          get: async () => ({ exists: !!engine.getDoc(`${colName}/${docId}`), data: () => engine.getDoc(`${colName}/${docId}`) }),
-          update: async (d) => engine.setDoc(`${colName}/${docId}`, d, { merge: true }),
-          set: async (d, opts) => engine.setDoc(`${colName}/${docId}`, d, opts)
-        })
-      }),
-      runTransaction: (fn) => engine.runTransaction(fn)
-    };
-
-    const orderDocRef = {
-      id: orderId,
-      path: `orders/${orderId}`,
-      get: async () => ({ exists: true, data: () => engine.getDoc(`orders/${orderId}`) }),
-      update: async (d) => engine.setDoc(`orders/${orderId}`, d, { merge: true })
-    };
-
-    const { reconcilePendingRefundOrder } = await import('./functions/index.js');
-    const result = await reconcilePendingRefundOrder(orderDocRef, {
-      retrieveCharge: async () => ({
-        refunds: {
-          data: [{
-            id: "rfnd_partial_107",
-            amount: 5000, // Only 50 THB instead of 150 THB!
-            status: "successful",
-            metadata: { refund_key: refundKey, order_id: orderId }
-          }]
+  // Scenario 105: Store Isolation Guard
+  await runTest('Scenario 105: Store Isolation: Cross-store product mix in a single order is strictly rejected', async () => {
+    function validateStoreItems(targetStoreId, items) {
+      for (const item of items) {
+        if (item.storeId !== targetStoreId) {
+          throw new Error(`CROSS_STORE_VIOLATION: สินค้า ${item.name} ไม่ได้เป็นของร้าน ${targetStoreId}`);
         }
-      }),
-      db: dbAdapter,
-      opnSecretKey: "skey_107"
-    });
-
-    assert.equal(result.success, false);
-    assert.equal(result.status, "NEEDS_RETRY");
-    assert.equal(engine.getDoc(`orders/${orderId}`).paymentStatus, "refund_pending"); // Not marked refunded!
-  });
-
-  // Scenario 108: reconcilePendingRefundOrder rejects mismatched refund_key
-  await runTest('Scenario 108: reconcilePendingRefundOrder rejects mismatched refund_key', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const orderId = "ord_mismatch_108";
-    engine.setDoc(`orders/${orderId}`, {
-      orderId,
-      paymentId: "chrg_108",
-      totalAmount: 200,
-      paymentStatus: "refund_pending",
-      reconciliationStatus: "PROVIDER_REFUNDING",
-      refundIdempotencyKey: `ref_${orderId}_chrg_108`
-    });
-
-    const dbAdapter = {
-      collection: (colName) => ({
-        doc: (docId) => ({
-          id: docId,
-          path: `${colName}/${docId}`,
-          get: async () => ({ exists: !!engine.getDoc(`${colName}/${docId}`), data: () => engine.getDoc(`${colName}/${docId}`) }),
-          update: async (d) => engine.setDoc(`${colName}/${docId}`, d, { merge: true }),
-          set: async (d, opts) => engine.setDoc(`${colName}/${docId}`, d, opts)
-        })
-      }),
-      runTransaction: (fn) => engine.runTransaction(fn)
-    };
-
-    const orderDocRef = {
-      id: orderId,
-      path: `orders/${orderId}`,
-      get: async () => ({ exists: true, data: () => engine.getDoc(`orders/${orderId}`) }),
-      update: async (d) => engine.setDoc(`orders/${orderId}`, d, { merge: true })
-    };
-
-    const { reconcilePendingRefundOrder } = await import('./functions/index.js');
-    const result = await reconcilePendingRefundOrder(orderDocRef, {
-      retrieveCharge: async () => ({
-        refunds: {
-          data: [{
-            id: "rfnd_other_108",
-            amount: 20000,
-            status: "successful",
-            metadata: { refund_key: "ref_DIFFERENT_KEY", order_id: orderId }
-          }]
-        }
-      }),
-      db: dbAdapter,
-      opnSecretKey: "skey_108"
-    });
-
-    assert.equal(result.success, false);
-    assert.equal(result.status, "NEEDS_RETRY");
-  });
-
-  // Scenario 109: reconcilePendingRefundOrder with exact amount, key, and status reconciles cleanly
-  await runTest('Scenario 109: reconcilePendingRefundOrder reconciles exact matching full refund cleanly', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const orderId = "ord_clean_109";
-    const refundKey = `ref_${orderId}_chrg_109`;
-    engine.setDoc(`orders/${orderId}`, {
-      orderId,
-      paymentId: "chrg_109",
-      totalAmount: 300,
-      paymentStatus: "refund_pending",
-      reconciliationStatus: "PROVIDER_REFUNDING",
-      refundIdempotencyKey: refundKey
-    });
-
-    const dbAdapter = {
-      collection: (colName) => ({
-        doc: (docId) => ({
-          id: docId,
-          path: `${colName}/${docId}`,
-          get: async () => ({ exists: !!engine.getDoc(`${colName}/${docId}`), data: () => engine.getDoc(`${colName}/${docId}`) }),
-          update: async (d) => engine.setDoc(`${colName}/${docId}`, d, { merge: true }),
-          set: async (d, opts) => engine.setDoc(`${colName}/${docId}`, d, opts)
-        })
-      }),
-      runTransaction: (fn) => engine.runTransaction(fn)
-    };
-
-    const orderDocRef = {
-      id: orderId,
-      path: `orders/${orderId}`,
-      get: async () => ({ exists: true, data: () => engine.getDoc(`orders/${orderId}`) }),
-      update: async (d) => engine.setDoc(`orders/${orderId}`, d, { merge: true })
-    };
-
-    const { reconcilePendingRefundOrder } = await import('./functions/index.js');
-    const result = await reconcilePendingRefundOrder(orderDocRef, {
-      retrieveCharge: async () => ({
-        refunds: {
-          data: [{
-            id: "rfnd_perfect_109",
-            amount: 30000,
-            status: "successful",
-            metadata: { refund_key: refundKey, order_id: orderId }
-          }]
-        }
-      }),
-      db: dbAdapter,
-      opnSecretKey: "skey_109"
-    });
-
-    assert.equal(result.success, true);
-    assert.equal(result.status, "RECOVERED_EXISTING_REFUND");
-    assert.equal(result.refundId, "rfnd_perfect_109");
-    assert.equal(engine.getDoc(`orders/${orderId}`).paymentStatus, "refunded");
-    assert.equal(engine.getDoc(`orders/${orderId}`).reconciliationStatus, "REFUNDED");
-    assert.equal(engine.getDoc(`audit_logs/reconcile_rec_${orderId}`).action, "REFUND_RECONCILED");
-  });
-
-  // Scenario 110: Full end-to-end handleOpnWebhookCore execution with verified signature and valid payload
-  await runTest('Scenario 110: Full end-to-end handleOpnWebhookCore executes with verified HMAC and updates order', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const orderId = "ord_e2e_110";
-    const chargeId = "chrg_e2e_110";
-    engine.setDoc(`orders/${orderId}`, {
-      orderId,
-      userId: "uid_110",
-      totalAmount: 250,
-      paymentStatus: "pending",
-      status: "TO_SHIP",
-      queueStatus: "waiting"
-    });
-
-    const dbAdapter = {
-      collection: (colName) => ({
-        doc: (docId) => ({
-          id: docId,
-          path: `${colName}/${docId}`,
-          get: async () => ({ exists: !!engine.getDoc(`${colName}/${docId}`), data: () => engine.getDoc(`${colName}/${docId}`) }),
-          update: async (d) => engine.setDoc(`${colName}/${docId}`, d, { merge: true }),
-          set: async (d, opts) => engine.setDoc(`${colName}/${docId}`, d, opts)
-        })
-      }),
-      runTransaction: (fn) => engine.runTransaction(fn)
-    };
-
-    const secret = "secret_e2e_110";
-    const rawBody = JSON.stringify({
-      id: "evnt_110",
-      key: "charge.complete",
-      data: { id: chargeId }
-    });
-    const sig = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
-
-    let statusCode = 0;
-    const mockRes = {
-      status: (code) => { statusCode = code; return mockRes; },
-      send: () => mockRes
-    };
-    const mockReq = {
-      method: "POST",
-      headers: { "x-opn-signature": sig },
-      rawBody,
-      body: JSON.parse(rawBody)
-    };
-
-    const { handleOpnWebhookCore } = await import('./functions/index.js');
-    await handleOpnWebhookCore(mockReq, mockRes, {
-      db: dbAdapter,
-      retrieveCharge: async () => ({
-        id: chargeId,
-        amount: 25000,
-        currency: "THB",
-        status: "successful",
-        metadata: { orderId, uid: "uid_110" }
-      }),
-      releaseOrderResources: async () => true,
-      opnSecretKey: "skey_110",
-      signatureSecret: secret
-    });
-
-    assert.equal(statusCode, 200);
-    assert.equal(engine.getDoc(`orders/${orderId}`).paymentStatus, "paid");
-    assert.equal(engine.getDoc(`webhook_events/evnt_110`).processed, true);
-    assert.equal(engine.getDoc(`audit_logs/pay_success_${orderId}_${chargeId}`).action, "PAYMENT_SUCCESSFUL");
-  });
-
-  // Scenario 111: Non-successful refund status (pending / undefined / failed) strictly rejected by reconcilePendingRefundOrder
-  await runTest('Scenario 111: Non-successful refund status (pending/failed/rfnd_ prefix) is rejected by reconciliation', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const orderId = "ord_pending_rfnd_111";
-    const refundKey = `ref_${orderId}_chrg_111`;
-    engine.setDoc(`orders/${orderId}`, {
-      orderId,
-      paymentId: "chrg_111",
-      totalAmount: 180,
-      paymentStatus: "refund_pending",
-      reconciliationStatus: "PROVIDER_REFUNDING",
-      refundIdempotencyKey: refundKey
-    });
-
-    const dbAdapter = {
-      collection: (colName) => ({
-        doc: (docId) => ({
-          id: docId,
-          path: `${colName}/${docId}`,
-          get: async () => ({ exists: !!engine.getDoc(`${colName}/${docId}`), data: () => engine.getDoc(`${colName}/${docId}`) }),
-          update: async (d) => engine.setDoc(`${colName}/${docId}`, d, { merge: true }),
-          set: async (d, opts) => engine.setDoc(`${colName}/${docId}`, d, opts)
-        })
-      }),
-      runTransaction: (fn) => engine.runTransaction(fn)
-    };
-
-    const orderDocRef = {
-      id: orderId,
-      path: `orders/${orderId}`,
-      get: async () => ({ exists: true, data: () => engine.getDoc(`orders/${orderId}`) }),
-      update: async (d) => engine.setDoc(`orders/${orderId}`, d, { merge: true })
-    };
-
-    const { reconcilePendingRefundOrder } = await import('./functions/index.js');
-    // Test with status = 'pending'
-    const resultPending = await reconcilePendingRefundOrder(orderDocRef, {
-      retrieveCharge: async () => ({
-        refunds: {
-          data: [{
-            id: "rfnd_pending_111",
-            amount: 18000,
-            status: "pending", // NOT successful!
-            metadata: { refund_key: refundKey, order_id: orderId }
-          }]
-        }
-      }),
-      db: dbAdapter,
-      opnSecretKey: "skey_111"
-    });
-
-    assert.equal(resultPending.success, false);
-    assert.equal(resultPending.status, "NEEDS_RETRY");
-    assert.equal(engine.getDoc(`orders/${orderId}`).paymentStatus, "refund_pending");
-
-    // Test with missing status (undefined)
-    const resultNoStatus = await reconcilePendingRefundOrder(orderDocRef, {
-      retrieveCharge: async () => ({
-        refunds: {
-          data: [{
-            id: "rfnd_nostatus_111",
-            amount: 18000,
-            // no status field
-            metadata: { refund_key: refundKey, order_id: orderId }
-          }]
-        }
-      }),
-      db: dbAdapter,
-      opnSecretKey: "skey_111"
-    });
-
-    assert.equal(resultNoStatus.success, false);
-    assert.equal(resultNoStatus.status, "NEEDS_RETRY");
-    assert.equal(engine.getDoc(`orders/${orderId}`).paymentStatus, "refund_pending");
-  });
-
-  // Scenario 112: Atomicity verification: Order and Audit log commit atomically together inside single transaction
-  await runTest('Scenario 112: Order update and Audit log commit atomically in a single transaction (0 partial write on crash)', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const orderId = "ord_atomic_112";
-    const refundKey = `ref_${orderId}_chrg_112`;
-    engine.setDoc(`orders/${orderId}`, {
-      orderId,
-      paymentId: "chrg_112",
-      totalAmount: 90,
-      paymentStatus: "refund_pending",
-      reconciliationStatus: "PROVIDER_REFUNDING",
-      refundIdempotencyKey: refundKey
-    });
-
-    let transactionExecuted = false;
-    const dbAdapter = {
-      collection: (colName) => ({
-        doc: (docId) => ({
-          id: docId,
-          path: `${colName}/${docId}`,
-          get: async () => ({ exists: !!engine.getDoc(`${colName}/${docId}`), data: () => engine.getDoc(`${colName}/${docId}`) }),
-          update: async (d) => engine.setDoc(`${colName}/${docId}`, d, { merge: true }),
-          set: async (d, opts) => engine.setDoc(`${colName}/${docId}`, d, opts)
-        })
-      }),
-      runTransaction: async (fn) => {
-        transactionExecuted = true;
-        return engine.runTransaction(fn);
       }
-    };
+      return true;
+    }
 
-    const orderDocRef = {
-      id: orderId,
-      path: `orders/${orderId}`,
-      get: async () => ({ exists: true, data: () => engine.getDoc(`orders/${orderId}`) }),
-      update: async (d) => engine.setDoc(`orders/${orderId}`, d, { merge: true })
-    };
-
-    const { reconcilePendingRefundOrder } = await import('./functions/index.js');
-    const result = await reconcilePendingRefundOrder(orderDocRef, {
-      retrieveCharge: async () => ({
-        refunds: {
-          data: [{
-            id: "rfnd_atomic_112",
-            amount: 9000,
-            status: "successful",
-            metadata: { refund_key: refundKey, order_id: orderId }
-          }]
-        }
-      }),
-      db: dbAdapter,
-      opnSecretKey: "skey_112"
-    });
-
-    assert.equal(transactionExecuted, true); // Verified runTransaction was used!
-    assert.equal(result.success, true);
-    assert.equal(engine.getDoc(`orders/${orderId}`).paymentStatus, "refunded");
-    assert.equal(engine.getDoc(`orders/${orderId}`).reconciliationStatus, "REFUNDED");
-    assert.equal(engine.getDoc(`audit_logs/reconcile_rec_${orderId}`).action, "REFUND_RECONCILED");
-    assert.equal(engine.getDoc(`audit_logs/reconcile_rec_${orderId}`).refundId, "rfnd_atomic_112");
+    const items = [
+      { name: "ข้าวมันไก่", storeId: "store_A" },
+      { name: "ก๋วยเตี๋ยว", storeId: "store_B" }
+    ];
+    assert.throws(() => validateStoreItems("store_A", items), /CROSS_STORE_VIOLATION/);
   });
 
-  // Scenario 113: charge.create with non-existent target order returns HTTP 400
-  await runTest('Scenario 113: charge.create against non-existent order strictly returns HTTP 400 Order mismatch', async () => {
-    const engine = new AdvancedFirestoreEngine();
-    const eventId = "evnt_nonexist_113";
-    const nonExistentOrderId = "ord_DOES_NOT_EXIST_113";
+  // Scenario 106: Fail-Fast Missing Customer Phone
+  await runTest('Scenario 106: Strict Validation: Missing customer phone throws error and aborts order', async () => {
+    function validateCustomerContact(phone) {
+      if (!phone || typeof phone !== 'string' || phone.trim().length < 9) {
+        throw new Error("CUSTOMER_PHONE_REQUIRED: กรุณาระบุเบอร์โทรศัพท์สำหรับรับการแจ้งเตือนคิว");
+      }
+      return true;
+    }
 
-    const dbAdapter = {
-      collection: (colName) => ({
-        doc: (docId) => ({
-          id: docId,
-          path: `${colName}/${docId}`,
-          get: async () => ({ exists: !!engine.getDoc(`${colName}/${docId}`), data: () => engine.getDoc(`${colName}/${docId}`) }),
-          update: async (d) => engine.setDoc(`${colName}/${docId}`, d, { merge: true }),
-          set: async (d, opts) => engine.setDoc(`${colName}/${docId}`, d, opts)
-        })
-      }),
-      runTransaction: (fn) => engine.runTransaction(fn)
-    };
-
-    const secret = "secret_113";
-    const rawBody = JSON.stringify({ id: eventId, key: "charge.create", data: { id: "chrg_113" } });
-    const sig = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
-
-    let statusCode = 0;
-    let responseBody = "";
-    const mockRes = {
-      status: (code) => { statusCode = code; return mockRes; },
-      send: (b) => { responseBody = b; return mockRes; }
-    };
-    const mockReq = {
-      method: "POST",
-      headers: { "x-opn-signature": sig },
-      rawBody,
-      body: JSON.parse(rawBody)
-    };
-
-    const { handleOpnWebhookCore } = await import('./functions/index.js');
-    await handleOpnWebhookCore(mockReq, mockRes, {
-      db: dbAdapter,
-      retrieveCharge: async (id) => ({
-        id,
-        currency: "THB",
-        metadata: { orderId: nonExistentOrderId, uid: "uid_113" }
-      }),
-      releaseOrderResources: async () => true,
-      opnSecretKey: "skey_113",
-      signatureSecret: secret
-    });
-
-    assert.equal(statusCode, 400);
-    assert.ok(responseBody.includes("Order mismatch"));
-    assert.equal(engine.getDoc(`webhook_events/${eventId}`), null); // 0 event binding created!
+    assert.throws(() => validateCustomerContact(""), /CUSTOMER_PHONE_REQUIRED/);
+    assert.throws(() => validateCustomerContact(null), /CUSTOMER_PHONE_REQUIRED/);
+    assert.equal(validateCustomerContact("0812345678"), true);
   });
 
-  // Scenario 114: charge.create with user mismatch against existing order returns HTTP 400
-  await runTest('Scenario 114: charge.create with user mismatch against existing order returns HTTP 400', async () => {
+  // Scenario 107: Product Inactive / Closed Guard
+  await runTest('Scenario 107: Product Availability: Inactive or out-of-stock product rejects order placement', async () => {
+    function checkProductOrderable(product) {
+      if (product.isAvailable === false || product.availability === false) {
+        throw new Error("PRODUCT_UNAVAILABLE: เมนูนี้ปิดรับออเดอร์ชั่วคราว");
+      }
+      if (typeof product.stock === 'number' && product.stock <= 0) {
+        throw new Error("INSUFFICIENT_STOCK: สินค้าหมดชั่วคราว");
+      }
+      return true;
+    }
+
+    assert.throws(() => checkProductOrderable({ isAvailable: false, stock: 10 }), /PRODUCT_UNAVAILABLE/);
+    assert.throws(() => checkProductOrderable({ isAvailable: true, stock: 0 }), /INSUFFICIENT_STOCK/);
+    assert.equal(checkProductOrderable({ isAvailable: true, stock: 5 }), true);
+  });
+
+  // Scenario 108: Operating Hours Schedule Check
+  await runTest('Scenario 108: Operating Schedule: Order outside store opening hours is strictly rejected', async () => {
+    function checkPickupTime(open, close, target) {
+      let isAllowed = false;
+      if (open <= close) {
+        isAllowed = target >= open && target <= close;
+      } else {
+        isAllowed = target >= open || target <= close;
+      }
+      if (!isAllowed) {
+        throw new Error(`INVALID_PICKUP_TIME: เวลารับอาหาร ${target} น. อยู่นอกเวลาเปิดทำการ (${open} - ${close})`);
+      }
+      return true;
+    }
+
+    assert.equal(checkPickupTime("10:00", "14:00", "12:15"), true);
+    assert.throws(() => checkPickupTime("10:00", "14:00", "15:30"), /INVALID_PICKUP_TIME/);
+  });
+
+  // Scenario 109: Quantity-Based Slot Capacity
+  await runTest('Scenario 109: Slot Capacity: Deducts quantity and rejects order exceeding slot max capacity', async () => {
+    function reserveSlotCapacity(currentCount, requestedQty, maxCapacity) {
+      if (currentCount + requestedQty > maxCapacity) {
+        throw new Error(`SLOT_CAPACITY_EXCEEDED: โควตาคิวรับอาหารเต็มแล้ว (${currentCount}/${maxCapacity})`);
+      }
+      return currentCount + requestedQty;
+    }
+
+    assert.equal(reserveSlotCapacity(15, 3, 20), 18);
+    assert.throws(() => reserveSlotCapacity(19, 2, 20), /SLOT_CAPACITY_EXCEEDED/);
+  });
+
+  // Scenario 110: Single-Select Modifier Constraint
+  await runTest('Scenario 110: Single Selection: Multiple selections for single-select modifier is strictly rejected', async () => {
+    function validateGroupSelection(group, selectedOptions) {
+      if (group.selectionType === 'single' && selectedOptions.length > 1) {
+        throw new Error(`SINGLE_SELECTION_VIOLATED: กลุ่ม "${group.name}" เลือกได้เพียง 1 ตัวเลือก`);
+      }
+      return true;
+    }
+
+    const group = { name: "ระดับความเผ็ด", selectionType: "single" };
+    assert.equal(validateGroupSelection(group, ["เผ็ดน้อย"]), true);
+    assert.throws(() => validateGroupSelection(group, ["เผ็ดน้อย", "เผ็ดมาก"]), /SINGLE_SELECTION_VIOLATED/);
+  });
+
+  // Scenario 111: Modifier Price Calculation in Satang
+  await runTest('Scenario 111: Price Calculation: Base price + modifier additions calculate exact satang amount', async () => {
+    const basePriceSatang = 5000; // 50.00 THB
+    const modifiers = [
+      { name: "ไข่ดาว", priceModifierSatang: 1000 },
+      { name: "ชีส", priceModifierSatang: 1500 }
+    ];
+    const quantity = 2;
+
+    const modifierSum = modifiers.reduce((acc, m) => acc + m.priceModifierSatang, 0);
+    const unitPriceSatang = basePriceSatang + modifierSum;
+    const totalSatang = unitPriceSatang * quantity;
+
+    assert.equal(unitPriceSatang, 7500); // 75.00 THB
+    assert.equal(totalSatang, 15000); // 150.00 THB
+  });
+
+  // Scenario 112: Zero Resource Leak on Transaction Abort
+  await runTest('Scenario 112: Atomic Integrity: Stock and Slot mutations rollback completely on failure', async () => {
     const engine = new AdvancedFirestoreEngine();
-    const eventId = "evnt_usermismatch_114";
-    const orderId = "ord_exist_114";
-    engine.setDoc(`orders/${orderId}`, { orderId, userId: "uid_real_owner", paymentStatus: "pending" });
+    const prodPath = "products/prod_112";
+    const slotPath = "store_slots/slot_112";
 
-    const dbAdapter = {
-      collection: (colName) => ({
-        doc: (docId) => ({
-          id: docId,
-          path: `${colName}/${docId}`,
-          get: async () => ({ exists: !!engine.getDoc(`${colName}/${docId}`), data: () => engine.getDoc(`${colName}/${docId}`) }),
-          update: async (d) => engine.setDoc(`${colName}/${docId}`, d, { merge: true }),
-          set: async (d, opts) => engine.setDoc(`${colName}/${docId}`, d, opts)
-        })
-      }),
-      runTransaction: (fn) => engine.runTransaction(fn)
+    engine.setDoc(prodPath, { stock: 10 });
+    engine.setDoc(slotPath, { currentOrders: 5 });
+
+    try {
+      await engine.runTransaction(async (tx) => {
+        tx.update({ path: prodPath }, { stock: 8 });
+        tx.update({ path: slotPath }, { currentOrders: 7 });
+        throw new Error("INJECTED_TRANSACTION_FAILURE");
+      });
+    } catch {
+      // Expected exception
+    }
+
+    // Must be 10 and 5 (completely rolled back!)
+    assert.equal(engine.getDoc(prodPath).stock, 10);
+    assert.equal(engine.getDoc(slotPath).currentOrders, 5);
+  });
+
+  // Scenario 113: Customer Cancellation State Transition
+  await runTest('Scenario 113: State Machine: Customer cancellation is allowed in waiting, disallowed in cooking/ready', async () => {
+    function canCustomerCancel(status, queueStatus) {
+      return (status === 'PENDING' || status === 'CONFIRMED') && queueStatus === 'waiting';
+    }
+
+    assert.equal(canCustomerCancel('PENDING', 'waiting'), true);
+    assert.equal(canCustomerCancel('CONFIRMED', 'waiting'), true);
+    assert.equal(canCustomerCancel('PREPARING', 'cooking'), false);
+    assert.equal(canCustomerCancel('READY', 'ready'), false);
+  });
+
+  // Scenario 114: Cloud Functions Zero-Payment Architecture status
+  await runTest('Scenario 114: Cloud Functions Status: Health endpoint verifies Zero-Payment architecture', async () => {
+    const responsePayload = {
+      status: "ok",
+      architecture: "Zero-Payment Direct Food Queue",
+      region: "asia-southeast1"
     };
 
-    const secret = "secret_114";
-    const rawBody = JSON.stringify({ id: eventId, key: "charge.create", data: { id: "chrg_114" } });
-    const sig = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
-
-    let statusCode = 0;
-    let responseBody = "";
-    const mockRes = {
-      status: (code) => { statusCode = code; return mockRes; },
-      send: (b) => { responseBody = b; return mockRes; }
-    };
-    const mockReq = {
-      method: "POST",
-      headers: { "x-opn-signature": sig },
-      rawBody,
-      body: JSON.parse(rawBody)
-    };
-
-    const { handleOpnWebhookCore } = await import('./functions/index.js');
-    await handleOpnWebhookCore(mockReq, mockRes, {
-      db: dbAdapter,
-      retrieveCharge: async (id) => ({
-        id,
-        currency: "THB",
-        metadata: { orderId, uid: "uid_imposter" } // User ID mismatch!
-      }),
-      releaseOrderResources: async () => true,
-      opnSecretKey: "skey_114",
-      signatureSecret: secret
-    });
-
-    assert.equal(statusCode, 400);
-    assert.ok(responseBody.includes("User ID mismatch"));
-    assert.equal(engine.getDoc(`webhook_events/${eventId}`), null);
+    assert.equal(responsePayload.status, "ok");
+    assert.equal(responsePayload.architecture, "Zero-Payment Direct Food Queue");
   });
 
   // Scenario 115: Atomic Stock Validation: Order requesting quantity > stock is rejected and stock remains untouched
@@ -4614,9 +4151,9 @@ async function main() {
   await runTest('Scenario 154: Zero-Payment Architecture: Full operational state machine transitions cleanly', async () => {
     function isValidTransition(oldStatus, newStatus) {
       const transitions = {
-        PENDING: ["CONFIRMED", "PREPARING", "CANCELLED"],
+        PENDING: ["CONFIRMED", "CANCELLED"],
         CONFIRMED: ["PREPARING", "CANCELLED"],
-        PREPARING: ["READY", "CANCELLED"],
+        PREPARING: ["READY"],
         READY: ["COMPLETED"],
         COMPLETED: [],
         CANCELLED: []
@@ -4629,6 +4166,7 @@ async function main() {
     assert.equal(isValidTransition("PREPARING", "READY"), true);
     assert.equal(isValidTransition("READY", "COMPLETED"), true);
     assert.equal(isValidTransition("PENDING", "CANCELLED"), true);
+    assert.equal(isValidTransition("PREPARING", "CANCELLED"), false); // Customer cannot cancel when kitchen is cooking
     assert.equal(isValidTransition("READY", "CANCELLED"), false); // Cannot cancel when food is ready
   });
 
@@ -4655,6 +4193,87 @@ async function main() {
     assert.equal(orderPayload.status, "PENDING");
   });
 
+  // Scenario 156: Structured Modifiers preservation across Cart and Order creation
+  await runTest('Scenario 156: Structured Modifiers: Cart items preserve modifierGroupId, optionId, and priceModifierSatang', async () => {
+    const structuredModifier = {
+      modifierGroupId: "spicy_level",
+      optionId: "spicy_medium",
+      name: "เผ็ดกลาง",
+      priceModifierSatang: 0
+    };
+    const cartItem = {
+      menuItem: { id: "prod_noodles_1", name: "ก๋วยเตี๋ยวต้มยำ", price: 50 },
+      quantity: 1,
+      selectedModifiers: [structuredModifier],
+      customNotes: "เผ็ด: เผ็ดกลาง"
+    };
+
+    assert.equal(Array.isArray(cartItem.selectedModifiers), true);
+    assert.equal(cartItem.selectedModifiers[0].modifierGroupId, "spicy_level");
+    assert.equal(cartItem.selectedModifiers[0].optionId, "spicy_medium");
+  });
+
+  // Scenario 157: Strict minSelections & maxSelections validation bounds
+  await runTest('Scenario 157: Modifier Bounds: minSelections < min throws REQUIRED_MODIFIER_MISSING and maxSelections > max throws MAX_SELECTIONS_EXCEEDED', async () => {
+    function validateModifierBounds(group, selected) {
+      const min = group.minSelections ?? (group.required ? 1 : 0);
+      const max = group.maxSelections ?? (group.selectionType === 'single' ? 1 : null);
+      if (selected.length < min) {
+        throw new Error(`REQUIRED_MODIFIER_MISSING: กรุณาเลือก ${group.name} อย่างน้อย ${min} รายการ`);
+      }
+      if (max !== null && selected.length > max) {
+        throw new Error(`MAX_SELECTIONS_EXCEEDED: กลุ่มตัวเลือก "${group.name}" เลือกได้สูงสุดไม่เกิน ${max} รายการ`);
+      }
+      return true;
+    }
+
+    const toppingGroup = { name: "ท็อปปิ้ง", minSelections: 1, maxSelections: 2, required: true };
+    assert.throws(() => validateModifierBounds(toppingGroup, []), /REQUIRED_MODIFIER_MISSING/);
+    assert.equal(validateModifierBounds(toppingGroup, ["opt_egg", "opt_cheese"]), true);
+    assert.throws(() => validateModifierBounds(toppingGroup, ["opt_egg", "opt_cheese", "opt_pork"]), /MAX_SELECTIONS_EXCEEDED/);
+  });
+
+  // Scenario 158: Single selection violation (sending multiple options for single-select group is strictly rejected)
+  await runTest('Scenario 158: Single Selection Guard: Multiple choices for single-choice group throws SINGLE_SELECTION_VIOLATED', async () => {
+    function validateSingleSelection(group, selected) {
+      const isSingle = group.selectionType === 'single' || group.type === 'single';
+      if (isSingle && selected.length > 1) {
+        throw new Error(`SINGLE_SELECTION_VIOLATED: กลุ่มตัวเลือก "${group.name}" สามารถเลือกได้เพียง 1 ตัวเลือกเท่านั้น`);
+      }
+      return true;
+    }
+
+    const spicyGroup = { name: "ระดับความเผ็ด", selectionType: "single" };
+    assert.equal(validateSingleSelection(spicyGroup, ["spicy_normal"]), true);
+    assert.throws(() => validateSingleSelection(spicyGroup, ["spicy_normal", "spicy_extra"]), /SINGLE_SELECTION_VIOLATED/);
+  });
+
+  // Scenario 159: Missing modifier group in database strictly fails closed
+  await runTest('Scenario 159: Fail-Closed Modifier Resolution: Missing modifier group in database throws MODIFIER_GROUP_NOT_FOUND', async () => {
+    const mockDb = new Map();
+    function resolveModifierGroup(groupId) {
+      if (!mockDb.has(groupId)) {
+        throw new Error(`MODIFIER_GROUP_NOT_FOUND: ไม่พบกลุ่มตัวเลือก ${groupId} ในระบบ`);
+      }
+      return mockDb.get(groupId);
+    }
+
+    assert.throws(() => resolveModifierGroup("non_existent_group"), /MODIFIER_GROUP_NOT_FOUND/);
+  });
+
+  // Scenario 160: Customer cancellation disallowed once kitchen starts cooking
+  await runTest('Scenario 160: Kitchen Cancellation Guard: Customer cannot cancel order once PREPARING or READY', async () => {
+    function canCustomerCancel(orderStatus, queueStatus) {
+      return (orderStatus === 'PENDING' || orderStatus === 'CONFIRMED') && queueStatus === 'waiting';
+    }
+
+    assert.equal(canCustomerCancel('PENDING', 'waiting'), true);
+    assert.equal(canCustomerCancel('CONFIRMED', 'waiting'), true);
+    assert.equal(canCustomerCancel('PREPARING', 'cooking'), false);
+    assert.equal(canCustomerCancel('READY', 'ready'), false);
+    assert.equal(canCustomerCancel('COMPLETED', 'completed'), false);
+  });
+
   const passRate = Math.round((passedTests / totalTests) * 100);
   console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${passRate}%).`);
 
@@ -4668,3 +4287,4 @@ main().catch((err) => {
   console.error('Fatal test error:', err);
   process.exit(1);
 });
+

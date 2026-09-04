@@ -35,7 +35,7 @@ const MOCK_MERCHANT_ORDERS = [
     id: "240809QUEUE02",
     customerName: "สมชาย สายกิน (ม.3/2)",
     phone: "089-876-5432",
-    status: "TO_SHIP",
+    status: "PREPARING",
     statusText: "กำลังปรุงคิวอาหาร",
     time: "11:45 น.",
     items: [
@@ -569,8 +569,8 @@ function MerchantDashboard() {
               {[
                 { id: "ALL", label: "ทั้งหมด" },
                 { id: "PENDING", label: "ออเดอร์ใหม่ / รอยืนยัน" },
-                { id: "TO_SHIP", label: "กำลังปรุงคิวอาหาร" },
-                { id: "TO_RECEIVE", label: "พร้อมรับที่เคาน์เตอร์" },
+                { id: "PREPARING", label: "กำลังปรุงคิวอาหาร" },
+                { id: "READY", label: "พร้อมรับที่เคาน์เตอร์" },
                 { id: "COMPLETED", label: "เสร็จสิ้นแล้ว" },
               ].map((sub) => (
                 <button
@@ -649,7 +649,7 @@ function MerchantDashboard() {
                           onClick={() =>
                             handleUpdateOrderStatus(
                               order.id,
-                              "TO_SHIP",
+                              "PREPARING",
                               "กำลังปรุงคิวอาหาร (ประมาณ 10 นาที)"
                             )
                           }
@@ -658,14 +658,14 @@ function MerchantDashboard() {
                         </button>
                       )}
 
-                      {order.status === "TO_SHIP" && (
+                      {order.status === "PREPARING" && (
                         <button
                           className="merchant-btn-next-step"
                           style={{ background: "#2563eb" }}
                           onClick={() =>
                             handleUpdateOrderStatus(
                               order.id,
-                              "TO_RECEIVE",
+                              "READY",
                               "พร้อมรับที่เคาน์เตอร์ 1 (คิว A05)"
                             )
                           }
@@ -674,7 +674,7 @@ function MerchantDashboard() {
                         </button>
                       )}
 
-                      {order.status === "TO_RECEIVE" && (
+                      {order.status === "READY" && (
                         <button
                           className="merchant-btn-next-step"
                           style={{ background: "#16a34a" }}

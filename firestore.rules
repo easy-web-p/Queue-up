@@ -40,12 +40,10 @@ service cloud.firestore {
     function isValidOrderStateTransition(oldStatus, oldQueue, newStatus, newQueue) {
       return (oldStatus == newStatus && oldQueue == newQueue) ||
              (oldStatus == 'PENDING' && oldQueue == 'waiting' && newStatus == 'CONFIRMED' && newQueue == 'waiting') ||
-             (oldStatus == 'PENDING' && oldQueue == 'waiting' && newStatus == 'PREPARING' && newQueue == 'cooking') ||
              (oldStatus == 'CONFIRMED' && oldQueue == 'waiting' && newStatus == 'PREPARING' && newQueue == 'cooking') ||
-             (oldStatus == 'TO_SHIP' && oldQueue == 'waiting' && newStatus == 'PREPARING' && newQueue == 'cooking') ||
              (oldStatus == 'PREPARING' && oldQueue == 'cooking' && newStatus == 'READY' && newQueue == 'ready') ||
              (oldStatus == 'READY' && oldQueue == 'ready' && newStatus == 'COMPLETED' && newQueue == 'completed') ||
-             ((oldStatus == 'PENDING' || oldStatus == 'CONFIRMED' || oldStatus == 'TO_SHIP' || oldStatus == 'PREPARING') && newStatus == 'CANCELLED' && newQueue == 'cancelled');
+             ((oldStatus == 'PENDING' || oldStatus == 'CONFIRMED') && newStatus == 'CANCELLED' && newQueue == 'cancelled');
     }
 
     // ==========================================
@@ -276,9 +274,9 @@ service cloud.firestore {
           )
         ) ||
         (
-          // 🔒 Customer can only cancel prior to kitchen preparation (PENDING/CONFIRMED/TO_SHIP & waiting)
+          // 🔒 Customer can only cancel prior to kitchen preparation (PENDING/CONFIRMED & waiting)
           resource.data.userId == request.auth.uid &&
-          (resource.data.status == 'PENDING' || resource.data.status == 'CONFIRMED' || resource.data.status == 'TO_SHIP') &&
+          (resource.data.status == 'PENDING' || resource.data.status == 'CONFIRMED') &&
           (resource.data.queueStatus == 'waiting' || !('queueStatus' in resource.data)) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['cancelReason', 'status', 'queueStatus', 'updatedAt']) &&
           request.resource.data.status == 'CANCELLED' &&

@@ -377,30 +377,70 @@ function ProductDetail() {
     };
   };
 
-  // Helper to validate required modifiers
+  // Helper to validate required modifiers dynamically
   const validateRequiredModifiers = () => {
     const missing = [];
-    if (!spicyLevel) missing.push("ระดับความเผ็ด");
-    if (!noodleType) missing.push("ประเภทเส้น");
-    if (!soupType) missing.push("ประเภทน้ำซุป");
+    if (!spicyLevel) missing.push("ระดับความเผ็ด (Spicy Level)");
+    if (!noodleType) missing.push("ประเภทเส้น (Noodle Type)");
+    if (!soupType) missing.push("ประเภทน้ำซุป (Soup Type)");
     return missing;
   };
 
   const createCurrentCartItem = () => {
     const noteParts = [];
+    const structuredModifiers = [];
+
     const spicyObj = SPICY_OPTIONS.find((s) => s.id === spicyLevel);
-    if (spicyObj) noteParts.push(`เผ็ด: ${spicyObj.name}`);
+    if (spicyObj) {
+      noteParts.push(`เผ็ด: ${spicyObj.name}`);
+      structuredModifiers.push({
+        modifierGroupId: "spicy_level",
+        optionId: spicyObj.id,
+        name: spicyObj.name,
+        priceModifier: 0,
+        priceModifierSatang: 0,
+      });
+    }
     
     const noodleObj = NOODLE_OPTIONS.find((n) => n.id === noodleType);
-    if (noodleObj) noteParts.push(`เส้น: ${noodleObj.name}`);
+    if (noodleObj) {
+      noteParts.push(`เส้น: ${noodleObj.name}`);
+      structuredModifiers.push({
+        modifierGroupId: "noodle_type",
+        optionId: noodleObj.id,
+        name: noodleObj.name,
+        priceModifier: 0,
+        priceModifierSatang: 0,
+      });
+    }
 
     const soupObj = SOUP_OPTIONS.find((sp) => sp.id === soupType);
-    if (soupObj) noteParts.push(`ซุป: ${soupObj.name}`);
+    if (soupObj) {
+      noteParts.push(`ซุป: ${soupObj.name}`);
+      structuredModifiers.push({
+        modifierGroupId: "soup_type",
+        optionId: soupObj.id,
+        name: soupObj.name,
+        priceModifier: 0,
+        priceModifierSatang: 0,
+      });
+    }
 
     if (selectedToppings && selectedToppings.length > 0) {
-      const toppingNames = selectedToppings.map(
-        (topId) => TOPPING_OPTIONS.find((opt) => opt.id === topId)?.name || topId
-      );
+      const toppingNames = [];
+      for (const topId of selectedToppings) {
+        const topOpt = TOPPING_OPTIONS.find((opt) => opt.id === topId);
+        if (topOpt) {
+          toppingNames.push(topOpt.name);
+          structuredModifiers.push({
+            modifierGroupId: "toppings",
+            optionId: topOpt.id,
+            name: topOpt.name,
+            priceModifier: topOpt.price || 0,
+            priceModifierSatang: (topOpt.price || 0) * 100,
+          });
+        }
+      }
       noteParts.push(`ท็อปปิ้ง: ${toppingNames.join(", ")}`);
     }
     if (customerNote && customerNote.trim()) {
@@ -416,6 +456,7 @@ function ProductDetail() {
         image: selectedImg || product.mainImg || product.image || "/crispy_fried_chicken.jpg",
       },
       quantity: quantity,
+      selectedModifiers: structuredModifiers,
       customNotes: noteParts.join(" | "),
     };
   };
@@ -431,7 +472,7 @@ function ProductDetail() {
     try {
       const existing = JSON.parse(localStorage.getItem("queueup_cart") || "[]");
       localStorage.setItem("queueup_cart", JSON.stringify([...existing, newItem]));
-      alert(`🛒 เพิ่ม "${newItem.menuItem.name}" (จำนวน ${newItem.quantity} ชาม) ลงในตะกร้าเรียบร้อยแล้ว!`);
+      alert(`🛒 เพิ่ม "${newItem.menuItem.name}" (จำนวน ${newItem.quantity} ชาม) พร้อมตัวเลือกที่ระบุ ลงในตะกร้าเรียบร้อยแล้ว!`);
     } catch {
       // ignore
     }

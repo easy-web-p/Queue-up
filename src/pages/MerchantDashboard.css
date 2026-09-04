@@ -209,9 +209,14 @@
   color: #d97706;
 }
 
-.merchant-order-badge-status.to_ship {
+.merchant-order-badge-status.preparing {
   background: #dbeafe;
   color: #2563eb;
+}
+
+.merchant-order-badge-status.ready {
+  background: #dcfce7;
+  color: #16a34a;
 }
 
 .merchant-order-badge-status.to_receive {

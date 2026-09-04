@@ -236,30 +236,52 @@ export async function createAuthoritativeStoreOrder(
       let itemModifierSatang = 0;
 
       const selectedModifiers = itemReq.selectedModifiers || [];
-      const selectedModifierGroupIds = new Set(selectedModifiers.map((m) => m.modifierGroupId));
+      const allowedGroupIds = new Set(prodData.modifierGroupIds || []);
 
-      // 4.3.1 Validate Linked Modifier Groups & Required Modifiers
+      // 4.3.1 Validate Linked Modifier Groups & Required Constraints
       if (prodData.modifierGroupIds && prodData.modifierGroupIds.length > 0) {
         for (const mgId of prodData.modifierGroupIds) {
           const modRef = doc(db, 'modifier_groups', mgId);
           const modSnap = await tx.get(modRef);
-          if (modSnap.exists()) {
-            const modData = modSnap.data() as ModifierGroup;
-            const isRequired = Boolean(modData.required || modData.isRequired || (modData.minSelections && modData.minSelections > 0) || (modData.minSelect && modData.minSelect > 0));
-            if (isRequired && !selectedModifierGroupIds.has(mgId)) {
-              throw new Error(`REQUIRED_MODIFIER_MISSING: กรุณาเลือก ${modData.name || 'ตัวเลือกที่จำเป็น'} สำหรับเมนู "${prodData.name}"`);
-            }
+          if (!modSnap.exists()) {
+            throw new Error(`MODIFIER_GROUP_NOT_FOUND: ไม่พบกลุ่มตัวเลือก ${mgId} ในระบบสำหรับเมนู "${prodData.name}"`);
+          }
+
+          const modData = modSnap.data() as ModifierGroup;
+          if (modData.storeId !== storeId) {
+            throw new Error(`CROSS_STORE_MODIFIER_VIOLATION: กลุ่มตัวเลือก ${mgId} ไม่ได้เป็นของร้าน ${storeId}`);
+          }
+
+          const groupSelections = selectedModifiers.filter((m) => m.modifierGroupId === mgId);
+          const minSelections = modData.minSelections ?? modData.minSelect ?? (modData.required || modData.isRequired ? 1 : 0);
+          const maxSelections = modData.maxSelections ?? modData.maxSelect ?? ((modData.selectionType === 'single' || (modData as any).type === 'single') ? 1 : null);
+          const isSingle = modData.selectionType === 'single' || (modData as any).type === 'single';
+
+          if (groupSelections.length < minSelections) {
+            throw new Error(`REQUIRED_MODIFIER_MISSING: กรุณาเลือก ${modData.name || 'ตัวเลือกที่จำเป็น'} อย่างน้อย ${minSelections} รายการ สำหรับเมนู "${prodData.name}"`);
+          }
+
+          if (maxSelections !== null && groupSelections.length > maxSelections) {
+            throw new Error(`MAX_SELECTIONS_EXCEEDED: กลุ่มตัวเลือก "${modData.name}" เลือกได้สูงสุดไม่เกิน ${maxSelections} รายการ`);
+          }
+
+          if (isSingle && groupSelections.length > 1) {
+            throw new Error(`SINGLE_SELECTION_VIOLATED: กลุ่มตัวเลือก "${modData.name}" สามารถเลือกได้เพียง 1 ตัวเลือกเท่านั้น`);
           }
         }
       }
 
-      // 4.3.2 Validate Selected Modifier Options
+      // 4.3.2 Validate Selected Modifier Options & Product Linkage
       if (selectedModifiers.length > 0) {
         for (const selMod of selectedModifiers) {
+          if (!allowedGroupIds.has(selMod.modifierGroupId)) {
+            throw new Error(`INVALID_PRODUCT_MODIFIER: กลุ่มตัวเลือก ${selMod.modifierGroupId} ไม่ได้เป็นของสินค้า "${prodData.name}"`);
+          }
+
           const modRef = doc(db, 'modifier_groups', selMod.modifierGroupId);
           const modSnap = await tx.get(modRef);
           if (!modSnap.exists()) {
-            throw new Error(`MODIFIER_NOT_FOUND: ไม่พบกลุ่มตัวเลือก ${selMod.modifierGroupId}`);
+            throw new Error(`MODIFIER_GROUP_NOT_FOUND: ไม่พบกลุ่มตัวเลือก ${selMod.modifierGroupId}`);
           }
           const modData = modSnap.data() as ModifierGroup;
           if (modData.storeId !== storeId) {

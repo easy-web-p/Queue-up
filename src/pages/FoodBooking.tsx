@@ -128,7 +128,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
           productId: c.menuItem.id,
           quantity: c.quantity,
           customNotes: c.customNotes || customInstructions || '',
-          selectedModifiers: []
+          selectedModifiers: c.selectedModifiers || []
         }))
       });
 
