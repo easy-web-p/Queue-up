@@ -4,7 +4,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { setUser, clearUser } from "../store/authSlice.js";
 import { db, doc, setDoc, getDoc, deleteDoc } from "../firebase/config.js";
 import ShopeeSearchBar from "../components/ShopeeSearchBar.jsx";
-import PaymentModal from "../components/PaymentModal.jsx";
 import ChatModal from "../components/ChatModal.jsx";
 import Footer from "../components/Footer.jsx";
 import { getUserBehaviorInsights } from "../services/aiBehaviorEngine.js";
@@ -45,13 +44,12 @@ function UserProfile() {
   const [editingField, setEditingField] = useState(null); // 'name' | 'lastname' | 'gender' | 'birthdate' | 'email' | 'phone'
   const [promoCodeInput, setPromoCodeInput] = useState("");
   const [couponTab, setCouponTab] = useState("usable"); // 'usable' | 'expired'
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatStoreName, setChatStoreName] = useState("");
   const [chatOrderContext, setChatOrderContext] = useState(null);
 
   // Booking & Purchase History State
-  const [orders, setOrders] = useState(() => {
+  const [orders] = useState(() => {
     const saved = localStorage.getItem("queueup_user_orders");
     return saved ? JSON.parse(saved) : [
       {
@@ -63,7 +61,6 @@ function UserProfile() {
         statusText: "คิวรอปรุงอาหาร (Q001)",
         queueNo: "Q001",
         totalAmount: 65,
-        paymentMethod: "QR PromptPay / สแกนผ่านแอปธนาคาร",
         items: [
           {
             id: "p1",
@@ -84,7 +81,6 @@ function UserProfile() {
         statusText: "รับอาหารสำเร็จเรียบร้อยแล้ว",
         queueNo: "B12",
         totalAmount: 45,
-        paymentMethod: "พร้อมเพย์โรงเรียน",
         items: [
           {
             id: "p2",
@@ -100,7 +96,6 @@ function UserProfile() {
   });
   const [orderStatusTab, setOrderStatusTab] = useState("ALL");
   const [orderSearchQuery, setOrderSearchQuery] = useState("");
-  const [selectedOrderForPayment, setSelectedOrderForPayment] = useState(null);
 
   // Bank & Payment Accounts State
   const [bankName, setBankName] = useState(() => localStorage.getItem("queueup_bank_name") || "กรุงไทย (Krungthai Bank)");
@@ -201,23 +196,6 @@ function UserProfile() {
     },
     orders || []
   );
-
-  const handleOpenPayment = (order) => {
-    setSelectedOrderForPayment(order);
-    setIsPaymentModalOpen(true);
-  };
-
-  const handlePaymentSuccess = () => {
-    if (selectedOrderForPayment) {
-      setOrders((prev) =>
-        prev.map((o) =>
-          o.id === selectedOrderForPayment.id
-            ? { ...o, status: "TO_SHIP", statusText: "กำลังเตรียมคิวอาหาร (ประมาณ 10 นาที)" }
-            : o
-        )
-      );
-    }
-  };
 
   // Fetch Firestore Profile Data on Mount
   useEffect(() => {
@@ -1194,14 +1172,6 @@ function UserProfile() {
                       </div>
 
                       <div className="shopee-order-actions">
-                        {order.status === "TO_PAY" && (
-                          <button
-                            className="shopee-btn-action-primary"
-                            onClick={() => handleOpenPayment(order)}
-                          >
-                            ชำระเงินตอนนี้
-                          </button>
-                        )}
                         {order.status === "TO_RECEIVE" && (
                           <button
                             className="shopee-btn-action-primary"
@@ -1582,20 +1552,6 @@ function UserProfile() {
           </div>
         </div>
       )}
-
-      {/* Payment Gateway Modal */}
-      <PaymentModal
-        isOpen={isPaymentModalOpen}
-        onClose={() => setIsPaymentModalOpen(false)}
-        amount={selectedOrderForPayment ? selectedOrderForPayment.totalPrice : 65}
-        orderId={selectedOrderForPayment ? selectedOrderForPayment.id : "240809QUEUE01"}
-        itemTitle={
-          selectedOrderForPayment && selectedOrderForPayment.items[0]
-            ? selectedOrderForPayment.items[0].name
-            : "รายการจองอาหาร"
-        }
-        onPaymentSuccess={handlePaymentSuccess}
-      />
 
       {/* Floating Bottom-Right Chat Button */}
       <button

@@ -29,8 +29,7 @@ export default function ClientAuthWizard({ onSuccess, onCancel }: ClientAuthWiza
     fullName: '',
     phone: '',
     email: '',
-    location: 'อาคารเรียนรวม 3',
-    paymentMethod: 'PromptPay'
+    location: 'อาคารเรียนรวม 3'
   });
 
   // โหลด Facebook SDK ของจริงเมื่อคอมโพเนนต์เริ่มทำงาน
@@ -123,8 +122,7 @@ export default function ClientAuthWizard({ onSuccess, onCancel }: ClientAuthWiza
             fullName: existingUser.name,
             phone: existingUser.phone || '081-234-5678',
             email: existingUser.email,
-            location: existingUser.address || 'อาคารเรียนรวม 3',
-            paymentMethod: 'PromptPay'
+            location: existingUser.address || 'อาคารเรียนรวม 3'
           });
           setCurrentStep(3);
         } else {
@@ -152,7 +150,6 @@ export default function ClientAuthWizard({ onSuccess, onCancel }: ClientAuthWiza
       phone: formData.phone || '081-234-5678',
       email: formData.email,
       address: formData.location || 'อาคารเรียนรวม 3',
-      preferredPayment: 'promptpay',
       favoriteDishes: ['ข้าวผัดกะเพราหมูสับ + ไข่ดาว'],
       isVerified: true,
       points: 50,

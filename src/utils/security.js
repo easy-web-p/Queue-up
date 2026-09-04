@@ -62,7 +62,6 @@ export const sanitizeOrderData = (order) => {
     orderId: sanitizeInput(order.orderId || ""),
     itemTitle: sanitizeInput(order.itemTitle || ""),
     amount: Number(order.amount) || 0,
-    paymentMethod: sanitizeInput(order.paymentMethod || "promptpay"),
     timestamp: new Date().toISOString(),
   };
 };

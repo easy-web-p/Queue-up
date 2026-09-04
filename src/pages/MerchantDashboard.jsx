@@ -47,8 +47,8 @@ const MOCK_MERCHANT_ORDERS = [
     id: "240809QUEUE03",
     customerName: "วรรณวิสา สดใส (ม.5/1)",
     phone: "086-555-4321",
-    status: "TO_PAY",
-    statusText: "รอตรวจสอบสลิปการโอนเงิน",
+    status: "PENDING",
+    statusText: "รอร้านรับออเดอร์เข้าครัว",
     time: "11:50 น.",
     items: [
       { name: "ไก่ทอดซอสเกาหลี ชุบแป้งกรอบ", variant: "เผ็ดมาก", qty: 2, price: 138 },
@@ -643,7 +643,7 @@ function MerchantDashboard() {
                     </div>
 
                     <div className="merchant-order-actions-row">
-                      {(order.status === "PENDING" || order.status === "TO_PAY") && (
+                      {order.status === "PENDING" && (
                         <button
                           className="merchant-btn-next-step"
                           onClick={() =>
