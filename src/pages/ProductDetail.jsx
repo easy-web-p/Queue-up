@@ -55,14 +55,14 @@ function generateUpcomingCalendarDays() {
 
 // ⏰ TIME SLOTS DATA FOR CALENDAR SELECTION
 const BASE_TIME_SLOTS = [
-  { time: "11:00", discount: "-50%", capacity: 20, remaining: 20, status: "AVAILABLE" },
-  { time: "11:30", discount: "-50%", capacity: 20, remaining: 20, status: "AVAILABLE" },
-  { time: "12:00", discount: "-50%", capacity: 20, remaining: 20, status: "AVAILABLE" },
-  { time: "12:30", discount: "-20%", capacity: 20, remaining: 20, status: "AVAILABLE" },
-  { time: "13:00", discount: "-10%", capacity: 20, remaining: 20, status: "AVAILABLE" },
-  { time: "13:30", discount: "-10%", capacity: 20, remaining: 20, status: "AVAILABLE" },
-  { time: "14:00", discount: "-10%", capacity: 20, remaining: 20, status: "AVAILABLE" },
-  { time: "14:30", discount: "-10%", capacity: 20, remaining: 20, status: "AVAILABLE" },
+  { time: "11:00", discount: "-50%", status: "AVAILABLE" },
+  { time: "11:30", discount: "-50%", status: "AVAILABLE" },
+  { time: "12:00", discount: "-50%", status: "AVAILABLE" },
+  { time: "12:30", discount: "-20%", status: "AVAILABLE" },
+  { time: "13:00", discount: "-10%", status: "AVAILABLE" },
+  { time: "13:30", discount: "-10%", status: "AVAILABLE" },
+  { time: "14:00", discount: "-10%", status: "AVAILABLE" },
+  { time: "14:30", discount: "-10%", status: "AVAILABLE" },
 ];
 
 // 🍜 CATEGORY-AWARE DYNAMIC MODIFIER CONFIGURATIONS (Zero fake bypass defaults for required groups)
@@ -1067,7 +1067,7 @@ function ProductDetail() {
                       เลือกรอบเวลารับ ({selectedDay.fullDateStr}):
                     </span>
                     <span className="badge bg-success-subtle text-success">
-                      รอบละ 20 คิว
+                      รอบละ {store?.maxOrdersPerSlot || 10} คิว
                     </span>
                   </div>
                   <div className="queue-pd-time-slots-grid">
@@ -1084,7 +1084,7 @@ function ProductDetail() {
                         <span className="fw-bold">{slot.time}</span>
                         <span className="small text-danger fw-bold">{slot.discount}</span>
                         <span className="queue-pd-slot-cap">
-                          {slot.status === "FULL" ? "เต็ม" : `ว่าง ${slot.remaining}`}
+                          {slot.status === "FULL" ? "เต็ม" : (slot.remaining !== undefined && slot.remaining !== null ? `ว่าง ${slot.remaining}` : "เปิดจอง")}
                         </span>
                       </button>
                     ))}

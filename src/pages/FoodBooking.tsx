@@ -55,16 +55,9 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
   } | null;
 
   const cartItems = propCartItems.length > 0 ? propCartItems : (locationState?.cartItems || []);
-  const currentUser = propCurrentUser || reduxUser || (() => {
-    try {
-      const saved = localStorage.getItem('queueup_user');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  })();
+  const currentUser = propCurrentUser || reduxUser || null;
 
-  const [pickupTime, setPickupTime] = useState(locationState?.pickupTime || '12:15');
+  const [pickupTime, setPickupTime] = useState<string>(locationState?.pickupTime || '');
   const [pickupDate, setPickupDate] = useState<string>(() => {
     const raw = locationState?.bookingDate;
     if (raw && /^\d{4}-\d{2}-\d{2}$/.test(raw.trim())) {
@@ -111,6 +104,11 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
 
     if (!storeId) {
       setOrderError('ไม่พบรหัสร้านค้า กรุณาเลือกรายการอาหารใหม่อีกครั้ง');
+      return;
+    }
+
+    if (!pickupTime) {
+      setOrderError('กรุณาเลือกรอบเวลารับอาหาร');
       return;
     }
 

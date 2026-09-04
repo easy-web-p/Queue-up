@@ -51,9 +51,10 @@ export function generateStoreId() {
  * @param {number} index - Queue number index
  * @returns {string} e.g., 'ST01-Q005'
  */
-export function generateStoreQueueNo(storeId = "STORE-DEMO01", index = 1) {
-  const storePrefix = storeId.replace("STORE-", "").substring(0, 3).toUpperCase();
+export function generateStoreQueueNo(storeId = "", index = 1) {
   const queueFormatted = String(index).padStart(3, "0");
+  if (!storeId) return `Q${queueFormatted}`;
+  const storePrefix = storeId.replace("STORE-", "").replace("store_", "").substring(0, 3).toUpperCase();
   return `${storePrefix}-Q${queueFormatted}`;
 }
 

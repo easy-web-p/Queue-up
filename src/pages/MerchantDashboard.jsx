@@ -70,11 +70,11 @@ function MerchantDashboard() {
     } catch {
       // ignore
     }
-    const storeId = user?.storeId || (user && user.uid ? `store_${user.uid.substring(0, 10)}` : "");
+    const storeId = user?.storeId || "";
     return {
       storeId,
-      name: cleanDisplayName(user?.merchantStoreName, user?.email),
-      phone: user?.phone || "",
+      name: cleanDisplayName(user?.merchantStoreName || user?.storeName, user?.email),
+      phone: user?.phone || user?.businessPhone || "",
       location: user?.canteenLocation || "",
     };
   };
@@ -106,11 +106,6 @@ function MerchantDashboard() {
   const [storePhone, setStorePhone] = useState(initialStore.phone);
   const [canteenLocation, setCanteenLocation] = useState(initialStore.location);
   const [storeHours, setStoreHours] = useState("07:00 - 15:00 น.");
-
-  const [privateBankName, setPrivateBankName] = useState("PromptPay (พร้อมเพย์)");
-  const [privateAccountNo, setPrivateAccountNo] = useState(initialStore.promptpayNo);
-  const [privateAccountOwner, setPrivateAccountOwner] = useState(initialStore.promptpayName);
-  const [isSavedFinance, setIsSavedFinance] = useState(false);
   const [isSavedProfile, setIsSavedProfile] = useState(false);
 
   const [staffList, setStaffList] = useState([
@@ -307,8 +302,13 @@ function MerchantDashboard() {
 
     if (!user || !user.uid) return;
 
-    const merchantId = user.merchantId || "MCH-" + user.uid.substring(0, 8);
-    const storeId = user.storeId || "STORE-DEMO01";
+    const targetStoreId = user.storeId || currentStoreId;
+    if (!targetStoreId) {
+      alert("ไม่พบรหัสร้านค้า (Store ID Required) ไม่สามารถบันทึกข้อมูลร้านค้าได้");
+      return;
+    }
+
+    const merchantId = user.merchantId || `MCH-${user.uid.substring(0, 8)}`;
 
     const publicStoreData = {
       isMerchantRegistered: true,
@@ -331,57 +331,21 @@ function MerchantDashboard() {
       await setDoc(doc(db, "merchantProfiles", merchantId), publicStoreData, { merge: true });
 
       // 3. shops/{storeId}
-      await setDoc(doc(db, "shops", storeId), publicStoreData, { merge: true });
+      await setDoc(doc(db, "shops", targetStoreId), publicStoreData, { merge: true });
 
       // 4. Audit Log
       await recordAuditLog(db, {
         action: "UPDATE_STORE_PROFILE",
         actorUid: user.uid,
         merchantId,
-        metadata: { storeName, canteenLocation, storePhone },
+        metadata: { storeName, canteenLocation, storePhone, storeId: targetStoreId },
       });
 
       setIsSavedProfile(true);
       setTimeout(() => setIsSavedProfile(false), 3000);
     } catch (err) {
       console.error("Save store profile error:", err);
-    }
-  };
-
-  const handleSavePrivateFinance = async (e) => {
-    e.preventDefault();
-    if (!user || !user.uid) return;
-
-    const merchantId = user.merchantId || "MCH-" + user.uid.substring(0, 8);
-    try {
-      await setDoc(
-        doc(db, "merchantProfiles", merchantId, "private", "finance"),
-        {
-          ownerUid: user.uid,
-          bankName: privateBankName,
-          accountNumber: privateAccountNo,
-          accountOwner: privateAccountOwner,
-          updatedAt: new Date().toISOString(),
-        },
-        { merge: true }
-      );
-
-      // Audit Log
-      await recordAuditLog(db, {
-        action: "CHANGE_FINANCE",
-        actorUid: user.uid,
-        merchantId,
-        metadata: {
-          accountOwner: privateAccountOwner,
-          bankName: privateBankName,
-        },
-      });
-
-      setIsSavedFinance(true);
-      setTimeout(() => setIsSavedFinance(false), 3000);
-    } catch (err) {
-      console.error("Save private finance error:", err);
-      alert("เกิดข้อผิดพลาดในการบันทึกข้อมูลการเงินลับ");
+      alert(`เกิดข้อผิดพลาดในการบันทึกข้อมูลร้านค้า: ${err.message || err}`);
     }
   };
 
@@ -665,59 +629,33 @@ function MerchantDashboard() {
               </div>
 
               <div className="col-md-6">
-                <form onSubmit={handleSavePrivateFinance} className="p-3 bg-dark text-white rounded-3 border border-secondary">
+                <div className="p-4 bg-dark text-white rounded-3 border border-secondary space-y-3">
                   <div className="d-flex align-items-center justify-content-between mb-3">
                     <h5 className="fw-bold text-warning mb-0">
-                      <i className="bi bi-shield-lock-fill me-2" />
-                      ข้อมูลการเงินรับโอน
+                      <i className="bi bi-shield-check me-2" />
+                      นโยบายการให้บริการแบบ Zero-Payment
                     </h5>
-                    <span className="badge bg-secondary">ความปลอดภัยขั้นสูง</span>
+                    <span className="badge bg-success">โหมดไร้สลิป 100%</span>
                   </div>
 
                   <p className="small text-slate-300 mb-3">
-                    ข้อมูลส่วนนี้ปลอดภัยด้วยระบบสิทธิ์การเข้าถึง Private Subcollection
+                    ร้านค้าดำเนินงานด้วยระบบ Zero-Payment & Instant Queue ไม่มีการเรียกเก็บเงินหรือตรวจสอบสลิปในขั้นตอนนี้
                   </p>
 
-                  <div className="mb-3">
-                    <label className="form-label text-slate-200">ธนาคาร / PromptPay:</label>
-                    <input
-                      type="text"
-                      className="form-control bg-secondary text-white border-dark"
-                      value={privateBankName}
-                      onChange={(e) => setPrivateBankName(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="mb-3">
-                    <label className="form-label text-slate-200">เลขที่บัญชี / เบอร์พร้อมเพย์:</label>
-                    <input
-                      type="text"
-                      className="form-control bg-secondary text-white border-dark"
-                      value={privateAccountNo}
-                      onChange={(e) => setPrivateAccountNo(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="mb-3">
-                    <label className="form-label text-slate-200">ชื่อเจ้าของบัญชี:</label>
-                    <input
-                      type="text"
-                      className="form-control bg-secondary text-white border-dark"
-                      value={privateAccountOwner}
-                      onChange={(e) => setPrivateAccountOwner(e.target.value)}
-                    />
-                  </div>
-
-                  {isSavedFinance && (
-                    <div className="alert alert-success py-2 px-3 small mb-3">
-                      <i className="bi bi-check-circle-fill me-1" /> บันทึกข้อมูลการเงินลับเรียบร้อยแล้ว!
+                  <div className="p-3 bg-secondary bg-opacity-25 rounded-2 border border-secondary mb-3">
+                    <div className="fw-bold text-white small mb-1">⚡ Instant Queue & Kitchen Sync</div>
+                    <div className="text-light small text-opacity-75">
+                      ออเดอร์จากลูกค้าจะถูกส่งตรงเข้าบอร์ดคิว (KDS) ทันทีที่ลูกค้าทำการจองเวลา
                     </div>
-                  )}
+                  </div>
 
-                  <button type="submit" className="btn btn-warning w-100 font-weight-bold text-dark">
-                    <i className="bi bi-save-fill me-1" /> บันทึกข้อมูลการเงินลับ
-                  </button>
-                </form>
+                  <div className="p-3 bg-secondary bg-opacity-25 rounded-2 border border-secondary mb-3">
+                    <div className="fw-bold text-white small mb-1">🛡️ Capacity Protection</div>
+                    <div className="text-light small text-opacity-75">
+                      ระบบคลาวด์จะจำกัดออเดอร์ตามกำลังการผลิตต่อสล็อตเวลาโดยอัตโนมัติ เพื่อป้องกันการสั่งอาหารเกินกำลัง
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
