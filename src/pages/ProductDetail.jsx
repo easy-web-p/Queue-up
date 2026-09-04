@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { db, doc, getDoc } from "../firebase/config.js";
-import PaymentModal from "../components/PaymentModal.jsx";
 import ShopeeSearchBar from "../components/ShopeeSearchBar.jsx";
 import ChatModal from "../components/ChatModal.jsx";
 import Footer from "../components/Footer.jsx";
@@ -13,7 +12,6 @@ import {
   checkUserFavoriteInFirestore,
   toggleUserFavoriteInFirestore,
 } from "../lib/firebase.js";
-import { generateStoreQueueNo } from "../services/storeIsolationEngine.js";
 import "./ProductDetail.css";
 
 // 7. TIME SLOT DATA ARCHITECTURE (Pickup Time Slot Reservation)
@@ -112,7 +110,6 @@ function ProductDetail() {
   const [guestCount, setGuestCount] = useState("1 จาน");
   const [bookingDate, setBookingDate] = useState("17 ส.ค.");
   const [selectedTimeSlot, setSelectedTimeSlot] = useState(TIME_SLOTS[1]);
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
 
@@ -229,6 +226,58 @@ function ProductDetail() {
     };
   };
 
+  // Helper to validate required modifiers
+  const validateRequiredModifiers = () => {
+    const missing = [];
+    if (!spicyLevel) {
+      missing.push("ระดับความเผ็ด");
+    }
+    return missing;
+  };
+
+  const createCurrentCartItem = () => {
+    const noteParts = [];
+    if (spicyLevel) noteParts.push(`เผ็ด: ${spicyLevel}`);
+    if (selectedToppings && selectedToppings.length > 0) {
+      const toppingNames = selectedToppings.map(
+        (topId) => DEFAULT_MODIFIERS[1]?.options?.find((opt) => opt.id === topId)?.name || topId
+      );
+      noteParts.push(`ท็อปปิ้ง: ${toppingNames.join(", ")}`);
+    }
+    if (customerNote && customerNote.trim()) {
+      noteParts.push(`โน้ต: ${customerNote.trim()}`);
+    }
+
+    return {
+      menuItem: {
+        id: product.id,
+        name: product.name || product.title,
+        price: discountedUnitPrice,
+        storeId: product.storeId || "store_canteen01",
+        image: selectedImg || product.mainImg || product.image || "/crispy_fried_chicken.jpg",
+      },
+      quantity: quantityNumber,
+      customNotes: noteParts.join(" | "),
+    };
+  };
+
+  const handleAddToCart = () => {
+    const missing = validateRequiredModifiers();
+    if (missing.length > 0) {
+      alert(`⚠️ กรุณาเลือกรายละเอียดอาหารให้ครบถ้วนก่อนใส่ตะกร้า:\n• ${missing.join("\n• ")}`);
+      return;
+    }
+
+    const newItem = createCurrentCartItem();
+    try {
+      const existing = JSON.parse(localStorage.getItem("queueup_cart") || "[]");
+      localStorage.setItem("queueup_cart", JSON.stringify([...existing, newItem]));
+      alert(`🛒 เพิ่ม "${newItem.menuItem.name}" (จำนวน ${newItem.quantity} จาน) ลงในตะกร้าเรียบร้อยแล้ว!`);
+    } catch {
+      // ignore
+    }
+  };
+
   // 8. ORDER VALIDATION BEFORE CHECKOUT
   const handleNextBooking = async () => {
     // 1. Store Open Guard
@@ -249,7 +298,14 @@ function ProductDetail() {
       return;
     }
 
-    // 4. Profile Completeness Check
+    // 4. Required Modifier Validation
+    const missingMods = validateRequiredModifiers();
+    if (missingMods.length > 0) {
+      alert(`⚠️ กรุณาเลือกรายละเอียดอาหารให้ครบถ้วน:\n• ${missingMods.join("\n• ")}`);
+      return;
+    }
+
+    // 5. Profile Completeness Check
     const { isComplete, missing } = await checkProfileCompleteness();
     if (!isComplete) {
       setMissingProfileFields(missing);
@@ -257,30 +313,7 @@ function ProductDetail() {
       return;
     }
 
-    // 5. Build custom instruction notes from modifiers
-    const noteParts = [];
-    if (spicyLevel) noteParts.push(`เผ็ด: ${spicyLevel}`);
-    if (selectedToppings && selectedToppings.length > 0) {
-      const toppingNames = selectedToppings.map(
-        (topId) => DEFAULT_MODIFIERS[1]?.options?.find((opt) => opt.id === topId)?.name || topId
-      );
-      noteParts.push(`ท็อปปิ้ง: ${toppingNames.join(", ")}`);
-    }
-    if (customerNote && customerNote.trim()) {
-      noteParts.push(`โน้ต: ${customerNote.trim()}`);
-    }
-
-    const cartItem = {
-      menuItem: {
-        id: product.id,
-        name: product.name || product.title,
-        price: discountedUnitPrice,
-        storeId: product.storeId || "store_canteen01",
-        image: selectedImg || product.mainImg || product.image || "/crispy_fried_chicken.jpg",
-      },
-      quantity: quantityNumber,
-      customNotes: noteParts.join(" | "),
-    };
+    const cartItem = createCurrentCartItem();
 
     // 6. Seamless Navigation to Authoritative Booking Flow
     navigate("/booking", {
@@ -293,17 +326,6 @@ function ProductDetail() {
         storeLocation: store?.location || product.shopLocation || "โรงอาหาร 1 (อาคารเรียน 2)",
       },
     });
-  };
-
-  // 12. Payment Success Handler -> Save Order & Queue Snapshot
-  const [currentQueueNo] = useState(() => {
-    const targetStore = (product && product.storeId) ? product.storeId : "store_canteen01";
-    return generateStoreQueueNo(targetStore, 6);
-  });
-
-  const handlePaymentSuccess = () => {
-    setIsPaymentModalOpen(false);
-    navigate("/user/account/profile?tab=bookings");
   };
 
   return (
@@ -549,8 +571,8 @@ function ProductDetail() {
               </div>
             </div>
 
-            {/* BOOKING FOOTER & SUBMIT */}
-            <div className="queue-pd-booking-footer">
+            {/* BOOKING FOOTER & ACTIONS */}
+            <div className="queue-pd-booking-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
               <div>
                 <div className="queue-pd-booking-summary-text">
                   {guestCount} · {bookingDate}, {selectedTimeSlot.time} น. / {selectedTimeSlot.discount}
@@ -560,14 +582,27 @@ function ProductDetail() {
                 </div>
               </div>
 
-              <button
-                className="queue-pd-btn-next"
-                onClick={handleNextBooking}
-                disabled={store?.isOpen === false || store?.status === "closed" || product?.availability === false}
-              >
-                <i className="bi bi-calendar-check me-1" />
-                ถัดไป / ยืนยันการจองคิว
-              </button>
+              <div className="d-flex gap-2">
+                <button
+                  type="button"
+                  className="btn btn-outline-danger fw-bold px-3 py-2 rounded-3 d-flex align-items-center gap-1"
+                  onClick={handleAddToCart}
+                  disabled={store?.isOpen === false || store?.status === "closed" || product?.availability === false}
+                >
+                  <i className="bi bi-cart-plus-fill" />
+                  เพิ่มลงตะกร้า
+                </button>
+
+                <button
+                  type="button"
+                  className="queue-pd-btn-next"
+                  onClick={handleNextBooking}
+                  disabled={store?.isOpen === false || store?.status === "closed" || product?.availability === false}
+                >
+                  <i className="bi bi-bag-check-fill me-1" />
+                  สั่งซื้อ / ไปที่ตะกร้า
+                </button>
+              </div>
             </div>
 
             {/* 15. RECOMMENDED MENU FROM SAME STORE */}
@@ -600,32 +635,6 @@ function ProductDetail() {
           </div>
         </div>
       </div>
-
-      {/* 12. PAYMENT MODAL */}
-      <PaymentModal
-        isOpen={isPaymentModalOpen}
-        onClose={() => setIsPaymentModalOpen(false)}
-        onPaymentSuccess={handlePaymentSuccess}
-        onSuccess={handlePaymentSuccess}
-        productId={product.id}
-        quantity={quantityNumber}
-        modifiers={[
-          { id: "spicy", value: spicyLevel },
-          { id: "topping", value: selectedToppings },
-          { id: "note", value: customerNote },
-        ]}
-        booking={{
-          date: bookingDate,
-          timeSlot: selectedTimeSlot?.time || "12:00",
-        }}
-        storeId={product.storeId || "store_canteen01"}
-        shopName={store?.name || product.shopName || "ร้านครัวโรงเรียน QueueUp Canteen"}
-        shopLocation={store?.location || product.shopLocation || "โรงอาหาร 1 (อาคารเรียน 2)"}
-        itemTitle={product.name || product.title}
-        amount={totalCalculatedPrice}
-        itemPrice={totalCalculatedPrice}
-        queueNo={currentQueueNo}
-      />
 
       {/* 17. CHAT ASSISTANT FLOATING BUTTON */}
       <button

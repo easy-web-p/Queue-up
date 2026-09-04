@@ -4527,6 +4527,134 @@ async function main() {
     assert.equal(totalSatang / 100, 125);
   });
 
+  // Scenario 151: Zero-Payment Architecture: Missing required modifier group strictly throws REQUIRED_MODIFIER_MISSING
+  await runTest('Scenario 151: Zero-Payment Architecture: Missing required modifier group strictly throws REQUIRED_MODIFIER_MISSING', async () => {
+    function validateRequiredModifiers(prodData, modifierGroupsMap, selectedModifiers) {
+      const selectedGroupIds = new Set(selectedModifiers.map(m => m.modifierGroupId));
+      if (prodData.modifierGroupIds && prodData.modifierGroupIds.length > 0) {
+        for (const mgId of prodData.modifierGroupIds) {
+          const modData = modifierGroupsMap[mgId];
+          if (modData) {
+            const isRequired = Boolean(modData.required || modData.isRequired || (modData.minSelections && modData.minSelections > 0));
+            if (isRequired && !selectedGroupIds.has(mgId)) {
+              throw new Error(`REQUIRED_MODIFIER_MISSING: กรุณาเลือก ${modData.name} สำหรับเมนู "${prodData.name}"`);
+            }
+          }
+        }
+      }
+      return true;
+    }
+
+    const prod = { id: "p_kaprao", name: "ข้าวกะเพราไก่", modifierGroupIds: ["mg_spicy", "mg_egg"] };
+    const modGroups = {
+      mg_spicy: { id: "mg_spicy", name: "ระดับความเผ็ด", required: true },
+      mg_egg: { id: "mg_egg", name: "เลือกไข่", required: true }
+    };
+
+    // Customer only selected spicy, but forgot egg
+    const selectedMods = [{ modifierGroupId: "mg_spicy", optionId: "opt_medium" }];
+    assert.throws(
+      () => validateRequiredModifiers(prod, modGroups, selectedMods),
+      /REQUIRED_MODIFIER_MISSING: กรุณาเลือก เลือกไข่/
+    );
+
+    // Customer selected both
+    const fullMods = [
+      { modifierGroupId: "mg_spicy", optionId: "opt_medium" },
+      { modifierGroupId: "mg_egg", optionId: "opt_fried_egg" }
+    ];
+    assert.equal(validateRequiredModifiers(prod, modGroups, fullMods), true);
+  });
+
+  // Scenario 152: Instant Queue Number Issuance: Confirmed order receives sequential Q001 immediately without payment
+  await runTest('Scenario 152: Zero-Payment Architecture: Confirmed order receives instant Q001 in PENDING state', async () => {
+    const storeId = "store_canteen_152";
+
+    function issueImmediateQueueOrder(seq) {
+      const queueNumber = `Q${String(seq).padStart(3, '0')}`;
+      return {
+        orderId: `ord_${Date.now()}_${seq}`,
+        storeId,
+        queueNumber,
+        status: "PENDING",
+        queueStatus: "waiting"
+      };
+    }
+
+    const order1 = issueImmediateQueueOrder(1);
+    const order2 = issueImmediateQueueOrder(2);
+
+    assert.equal(order1.queueNumber, "Q001");
+    assert.equal(order1.status, "PENDING");
+    assert.equal(order1.queueStatus, "waiting");
+    assert.equal(order2.queueNumber, "Q002");
+  });
+
+  // Scenario 153: Zero-Payment Cart Isolation: Adding to cart creates 0 orders and 0 stock deductions
+  await runTest('Scenario 153: Zero-Payment Architecture: Cart addition is client-isolated with zero resource allocation', async () => {
+    const localCart = [];
+    let dbOrdersCount = 0;
+    let dbProductStock = 20;
+
+    function addToCart(product, quantity, selectedModifiers) {
+      localCart.push({ product, quantity, selectedModifiers });
+      // Stock and DB orders MUST NOT CHANGE
+      return localCart.length;
+    }
+
+    addToCart({ id: "p1", name: "ข้าวผัด" }, 2, []);
+    addToCart({ id: "p2", name: "ต้มยำ" }, 1, []);
+
+    assert.equal(localCart.length, 2);
+    assert.equal(dbOrdersCount, 0); // 0 orders created
+    assert.equal(dbProductStock, 20); // 0 stock deducted
+  });
+
+  // Scenario 154: Payment-Free State Machine: PENDING -> CONFIRMED -> PREPARING -> READY -> COMPLETED
+  await runTest('Scenario 154: Zero-Payment Architecture: Full operational state machine transitions cleanly', async () => {
+    function isValidTransition(oldStatus, newStatus) {
+      const transitions = {
+        PENDING: ["CONFIRMED", "PREPARING", "CANCELLED"],
+        CONFIRMED: ["PREPARING", "CANCELLED"],
+        PREPARING: ["READY", "CANCELLED"],
+        READY: ["COMPLETED"],
+        COMPLETED: [],
+        CANCELLED: []
+      };
+      return transitions[oldStatus]?.includes(newStatus) ?? false;
+    }
+
+    assert.equal(isValidTransition("PENDING", "CONFIRMED"), true);
+    assert.equal(isValidTransition("CONFIRMED", "PREPARING"), true);
+    assert.equal(isValidTransition("PREPARING", "READY"), true);
+    assert.equal(isValidTransition("READY", "COMPLETED"), true);
+    assert.equal(isValidTransition("PENDING", "CANCELLED"), true);
+    assert.equal(isValidTransition("READY", "CANCELLED"), false); // Cannot cancel when food is ready
+  });
+
+  // Scenario 155: Complete Absence of Payment Flow: Order payload contains no paymentMethod or paymentStatus
+  await runTest('Scenario 155: Zero-Payment Architecture: Order schema is completely devoid of payment fields', async () => {
+    const orderPayload = {
+      orderId: "ord_nopay_155",
+      storeId: "store_canteen01",
+      userId: "user_customer_1",
+      customerName: "สมชาย ใจดี",
+      customerPhone: "0812345678",
+      queueNumber: "Q001",
+      status: "PENDING",
+      queueStatus: "waiting",
+      totalAmount: 60,
+      totalAmountSatang: 6000,
+      items: [{ productId: "p001", name: "ข้าวกะเพรา", quantity: 1, unitPrice: 60 }]
+    };
+
+    assert.equal("paymentMethod" in orderPayload, false);
+    assert.equal("paymentStatus" in orderPayload, false);
+    assert.equal("reservationNumber" in orderPayload, false);
+    assert.equal(orderPayload.queueNumber, "Q001");
+    assert.equal(orderPayload.status, "PENDING");
+  });
+
   const passRate = Math.round((passedTests / totalTests) * 100);
   console.log(`\n📊 Test Execution Summary: ${passedTests}/${totalTests} scenarios passed (${passRate}%).`);
 

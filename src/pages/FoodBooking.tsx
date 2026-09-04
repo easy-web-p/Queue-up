@@ -45,7 +45,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
   })();
 
   const [pickupTime, setPickupTime] = useState(locationState?.pickupTime || '12:15');
-  const [paymentMethod, setPaymentMethod] = useState<'promptpay' | 'cash'>('promptpay');
+  const [pickupDate, setPickupDate] = useState(locationState?.bookingDate || '2026-09-04');
   const [customInstructions, setCustomInstructions] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
@@ -92,8 +92,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
         customerName: currentUser?.name || currentUser?.displayName || currentUser?.fullName || 'ลูกค้า QueueUp',
         customerPhone: userPhone,
         pickupTime,
-        pickupDate: locationState?.bookingDate,
-        paymentMethod,
+        pickupDate: pickupDate || locationState?.bookingDate,
         items: cartItems.map((c) => ({
           productId: c.menuItem.id,
           quantity: c.quantity,
@@ -104,10 +103,11 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
 
       const orderData = result.order as Order;
 
-      // Update local history cache for instant UI rendering
+      // Update local history cache for instant UI rendering and clear cart
       try {
         const existing = JSON.parse(localStorage.getItem('queueup_user_orders') || '[]');
         localStorage.setItem('queueup_user_orders', JSON.stringify([orderData, ...existing]));
+        localStorage.removeItem('queueup_cart');
       } catch {
         // ignore
       }
@@ -142,8 +142,8 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
               </button>
             )}
             <div>
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">สร้างคำสั่งซื้อ (Create Order)</h1>
-              <p className="text-xs text-slate-500 font-medium">สั่งอาหารล่วงหน้า ตรวจสอบโควตาคิว และชำระเงิน</p>
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">สั่งอาหารและจองคิว (Order & Queue)</h1>
+              <p className="text-xs text-slate-500 font-medium">ตรวจสอบรายการอาหาร ระบุเวลารับ และยืนยันรับคิวทันที</p>
             </div>
           </div>
           <div className="hidden sm:flex items-center gap-1.5 bg-amber-50 text-amber-800 px-3 py-1.5 rounded-full text-xs font-bold border border-amber-200">
@@ -161,25 +161,23 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
         )}
 
         {createdOrder ? (
-          /* Order Created Summary View (Separating Order Creation from Confirmed Payment) */
-          <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border-2 border-amber-500 text-center space-y-6 animate-fade-in">
-            <div className="inline-flex p-4 rounded-full bg-amber-100 text-amber-600 mb-2">
-              <Clock className="w-12 h-12" />
+          /* Order Created Summary View (Instant Q001 Queue Issuance) */
+          <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border-2 border-emerald-500 text-center space-y-6 animate-fade-in">
+            <div className="inline-flex p-4 rounded-full bg-emerald-100 text-emerald-600 mb-2">
+              <CheckCircle2 className="w-12 h-12" />
             </div>
             <div>
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900">สร้างคำสั่งซื้อเรียบร้อยแล้ว</h2>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900">สั่งอาหารและออกหมายเลขคิวสำเร็จ!</h2>
               <p className="text-xs text-slate-500 mt-1">
-                {createdOrder.paymentMethod === 'promptpay'
-                  ? 'กรุณาชำระเงินผ่าน PromptPay เพื่อยืนยันการรับคิวอาหารอย่างสมบูรณ์'
-                  : 'กรุณาชำระเงินสดที่หน้าร้านค้าเมื่อถึงเวลารับอาหาร'}
+                ร้านค้าได้รับออเดอร์แล้ว กรุณาไปรับอาหารตามเวลาที่นัดหมาย
               </p>
             </div>
             
             <div className="bg-gradient-to-r from-[#8B0000] via-[#A50000] to-[#800000] text-white p-6 rounded-3xl shadow-xl max-w-sm mx-auto">
-              <span className="text-xs font-extrabold uppercase tracking-widest text-amber-200">รหัสการจองชั่วคราว (Reservation No.)</span>
-              <div className="text-5xl font-black my-2 tracking-wider text-amber-300">{(createdOrder as any).reservationNumber || createdOrder.queueNumber || 'R001'}</div>
-              <div className="inline-block px-3 py-1 bg-amber-400 text-amber-950 rounded-full text-xs font-black">
-                {createdOrder.paymentMethod === 'promptpay' ? 'รอการชำระเงิน (Pending Payment)' : 'รอชำระเงินสดหน้าร้าน'}
+              <span className="text-xs font-extrabold uppercase tracking-widest text-amber-200">หมายเลขคิวของคุณ (Queue Number)</span>
+              <div className="text-6xl font-black my-2 tracking-wider text-amber-300">{createdOrder.queueNumber || 'Q001'}</div>
+              <div className="inline-block px-3 py-1 bg-emerald-400 text-emerald-950 rounded-full text-xs font-black">
+                คิวรอทำอาหาร (PENDING)
               </div>
             </div>
 
@@ -197,8 +195,8 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
                 <span className="font-bold text-[#8B0000]">฿{Number(createdOrder.totalAmount).toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
-                <span>สถานะการชำระเงิน:</span>
-                <span className="font-bold text-amber-600">รอชำระเงิน (Pending)</span>
+                <span>สถานะคิว:</span>
+                <span className="font-bold text-emerald-600">ยืนยันคิวแล้ว (Confirmed)</span>
               </div>
             </div>
 
@@ -295,47 +293,13 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
               />
             </div>
 
-            {/* Payment Method Select */}
-            <div>
-              <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2">
-                เลือกช่องทางการชำระเงิน *
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('promptpay')}
-                  className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
-                    paymentMethod === 'promptpay'
-                      ? 'bg-amber-50/80 border-[#8B0000] shadow-sm'
-                      : 'bg-slate-50 border-slate-200 hover:bg-amber-50'
-                  }`}
-                >
-                  <span className="text-xs font-black text-slate-900 block">PromptPay QR Code</span>
-                  <span className="text-[11px] text-slate-500 font-medium">สร้างรายการชำระเงินและสแกนจ่าย</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('cash')}
-                  className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
-                    paymentMethod === 'cash'
-                      ? 'bg-amber-50/80 border-[#8B0000] shadow-sm'
-                      : 'bg-slate-50 border-slate-200 hover:bg-amber-50'
-                  }`}
-                >
-                  <span className="text-xs font-black text-slate-900 block">เงินสดหน้าร้าน</span>
-                  <span className="text-[11px] text-slate-500 font-medium">ชำระสดเมื่อรับอาหารที่แผง</span>
-                </button>
-              </div>
-            </div>
-
             <button
               type="submit"
               disabled={cartItems.length === 0 || isSubmitting}
               className="w-full py-4 bg-gradient-to-r from-[#8B0000] via-[#A50000] to-[#800000] hover:from-[#700000] hover:to-[#8B0000] text-white font-black text-base rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
             >
-              <QrCode className="w-5 h-5" />
-              <span>{isSubmitting ? 'กำลังตรวจสอบโควตาและสร้างคำสั่งซื้อ...' : 'ยืนยันสร้างคำสั่งซื้อ'}</span>
+              <ShoppingBag className="w-5 h-5" />
+              <span>{isSubmitting ? 'กำลังตรวจสอบโควตาและบันทึกคิว...' : 'ยืนยันสั่งอาหาร'}</span>
             </button>
 
           </form>

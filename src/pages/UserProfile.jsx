@@ -59,9 +59,9 @@ function UserProfile() {
         shopName: "ร้านครัวโรงเรียน QueueUp Canteen",
         shopLocation: "โรงอาหารอาคาร 1 เคาน์เตอร์ 2",
         orderDate: "09 ส.ค. 2026, 11:42 น.",
-        status: "TO_PAY",
-        statusText: "รอชำระเงินในระบบ (กรุณาชำระเงินเพื่อยืนยันคิว)",
-        queueNo: "A05",
+        status: "PENDING",
+        statusText: "คิวรอปรุงอาหาร (Q001)",
+        queueNo: "Q001",
         totalAmount: 65,
         paymentMethod: "QR PromptPay / สแกนผ่านแอปธนาคาร",
         items: [
@@ -1112,11 +1112,10 @@ function UserProfile() {
               <div className="shopee-purchase-tabs mb-3">
                 {[
                   { id: "ALL", label: "ทั้งหมด" },
-                  { id: "TO_PAY", label: "ที่ต้องชำระ" },
-                  { id: "TO_SHIP", label: "กำลังปรุง/เตรียมคิว" },
+                  { id: "PENDING", label: "คิวรอปรุง/กำลังปรุง" },
                   { id: "TO_RECEIVE", label: "พร้อมรับที่เคาน์เตอร์" },
                   { id: "COMPLETED", label: "สำเร็จแล้ว" },
-                  { id: "REFUND", label: "ยกเลิก/คืนเงิน" },
+                  { id: "CANCELLED", label: "ยกเลิกแล้ว" },
                 ].map((tab) => (
                   <div
                     key={tab.id}

@@ -1,4 +1,6 @@
-export type QueueStatus = 'waiting' | 'pending_slip' | 'cooking' | 'ready' | 'completed' | 'cancelled';
+export type QueueStatus = 'waiting' | 'cooking' | 'ready' | 'completed' | 'cancelled';
+
+export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED';
 
 export interface ModifierOption {
   id: string;
@@ -12,11 +14,14 @@ export interface ModifierOption {
 export interface ModifierGroup {
   id: string;
   storeId: string;             // 🔒 Store isolation
-  name: string;                // e.g. "ระดับความหวาน", "ท็อปปิ้ง"
-  isRequired: boolean;
-  selectionType: 'single' | 'multiple';
+  name: string;                // e.g. "ระดับความเผ็ด", "เพิ่มไข่"
+  isRequired?: boolean;
+  required?: boolean;
+  selectionType?: 'single' | 'multiple';
   minSelect?: number;
   maxSelect?: number;
+  minSelections?: number;
+  maxSelections?: number;
   options: ModifierOption[];
 }
 
@@ -69,33 +74,34 @@ export interface CartItem {
   menuItem: MenuItem;
   quantity: number;
   customInstructions?: string;
+  customNotes?: string;
   selectedModifiers?: Record<string, string | string[]>;
 }
 
 export interface Order {
   id: string;
   orderId?: string;
+  storeId?: string;
   userId?: string;
-  queueNumber: string;
   customerName: string;
   customerPhone?: string;
-  subtotal?: number;
+  queueNumber: string;         // e.g. "Q001"
+  status: OrderStatus;
+  queueStatus: QueueStatus;
+  totalAmountSatang?: number;  // 🔒 Exact satang
   totalAmount: number;
-  totalSatang?: number;        // 🔒 Exact satang
+  finalAmountSatang?: number;
   finalAmount?: number;
+  discountAppliedSatang?: number;
   discountApplied?: number;
   pointsEarned?: number;
   items: CartItem[];
-  queueStatus: QueueStatus;
-  status?: string;
-  paymentMethod: 'promptpay' | 'cash' | 'card' | string;
-  paymentStatus: 'pending' | 'paid' | 'verified' | 'failed' | 'cancelled' | 'refunded' | 'refund_pending';
   pickupTime: string;
-  createdAt: string;
-  updatedAt?: string;
+  pickupDate?: string;
+  slotId?: string;
+  createdAt: any;
+  updatedAt?: any;
   estimatedReadyTime?: string;
-  slipUrl?: string;
-  storeId?: string;
   shopName?: string;
   storeName?: string;
   customInstructions?: string;

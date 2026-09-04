@@ -1,10 +1,10 @@
-﻿/**
- * 📦 orderCreationService.ts (Wave 4.2.5.x Production-Hardened)
+/**
+ * 📦 orderCreationService.ts (Zero-Payment Architecture)
  * Comprehensive Order Creation Boundary.
  * Enforces Store Availability, Pickup Date/Time validation in Bangkok Timezone (Asia/Bangkok),
- * Item-variant normalization, Product Price/Stock Integrity, Modifier Verification,
- * Date-scoped Slot Capacity Reservation (Quantity-based), Sequential Atomic Reservation Numbering,
- * Strict pickupTime HH:mm regex validation, Clean TypeScript types, and Clear Separation of Order Status vs Payment Status.
+ * Required Modifier Enforcement, Product Price/Stock Integrity, Option Verification,
+ * Date-scoped Slot Capacity Reservation (Quantity-based), Sequential Atomic Queue Numbering (Q001, Q002...),
+ * and Immediate Order Creation in PENDING / waiting state.
  */
 
 import {
@@ -15,7 +15,7 @@ import {
   type Firestore
 } from 'firebase/firestore';
 import { evaluateStoreAvailability, type StoreOperationalState } from './storeOperationsService';
-import type { MenuItem, ModifierGroup, Order } from '../types';
+import type { MenuItem, ModifierGroup, Order, OrderStatus, QueueStatus } from '../types';
 
 export interface SelectedModifierOption {
   modifierGroupId: string;
@@ -48,19 +48,16 @@ export interface CreateOrderRequest {
   customerPhone: string;
   items: OrderItemRequest[];
   pickupTime: string; // Must match HH:mm (e.g. "12:15")
-  pickupDate?: string; // e.g. "2026-09-03" (YYYY-MM-DD or YYYYMMDD)
-  paymentMethod: 'promptpay' | 'cash';
+  pickupDate?: string; // e.g. "2026-09-04" (YYYY-MM-DD or YYYYMMDD)
 }
 
 export interface OrderCreationResult {
   success: boolean;
   orderId: string;
-  reservationNumber: string; // e.g. "R001"
-  queueNumber: string | null; // null before payment confirmation!
+  queueNumber: string; // e.g. "Q001"
   totalAmountSatang: number;
   totalAmountBaht: number;
-  paymentStatus: 'pending';
-  orderStatus: 'PENDING_PAYMENT' | 'WAITING_CASH_CONFIRMATION';
+  orderStatus: OrderStatus;
   order: Partial<Order>;
 }
 
@@ -87,13 +84,13 @@ export function getBangkokYmd(date: Date = new Date()): { ymd: string; ymdClean:
 }
 
 /**
- * 🔒 Atomic Store Order Creation Transaction
+ * 🔒 Atomic Store Order Creation Transaction (Direct to Q001)
  */
 export async function createAuthoritativeStoreOrder(
   db: Firestore,
   request: CreateOrderRequest
 ): Promise<OrderCreationResult> {
-  const { storeId, userId, customerName, customerPhone, items, pickupTime, paymentMethod } = request;
+  const { storeId, userId, customerName, customerPhone, items, pickupTime } = request;
 
   // 1. Strict Fail-Fast Validation (Zero fake defaults)
   if (!userId || userId === 'guest_user') {
@@ -124,7 +121,6 @@ export async function createAuthoritativeStoreOrder(
 
   if (request.pickupDate) {
     const rawDate = request.pickupDate.trim();
-    // Validate YYYY-MM-DD or YYYYMMDD format
     const isIsoDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDate);
     const isCleanDate = /^\d{8}$/.test(rawDate);
     if (!isIsoDate && !isCleanDate) {
@@ -143,7 +139,7 @@ export async function createAuthoritativeStoreOrder(
   const targetPickupDateObj = new Date(Date.UTC(pYear, pMonth - 1, pDay, 12, 0, 0));
   const targetBangkok = getBangkokYmd(targetPickupDateObj);
 
-  // 4. Normalize Items by unique item variant (productId + sorted modifier keys)
+  // 4. Normalize Items by unique item variant
   const productTotalQuantityMap = new Map<string, number>();
   let totalOrderItemsCount = 0;
 
@@ -199,7 +195,7 @@ export async function createAuthoritativeStoreOrder(
     }
 
     // -------------------------------------------------------------
-    // 4.3 Authoritative Product Stock & Price Pre-read
+    // 4.3 Authoritative Product Stock, Modifier & Price Verification
     // -------------------------------------------------------------
     const productDataCache = new Map<string, MenuItem>();
     for (const [prodId, requiredTotalQty] of productTotalQuantityMap.entries()) {
@@ -230,7 +226,7 @@ export async function createAuthoritativeStoreOrder(
       productDataCache.set(prodId, prodData);
     }
 
-    // Process every individual cart item (with distinct modifiers/notes)
+    // Process every individual cart item (with modifier validation & price calculation)
     let calculatedTotalSatang = 0;
     const validatedOrderItems: ValidatedOrderItem[] = [];
 
@@ -239,8 +235,27 @@ export async function createAuthoritativeStoreOrder(
       const basePriceSatang = prodData.priceSatang ?? Math.round((Number(prodData.price) || 0) * 100);
       let itemModifierSatang = 0;
 
-      if (itemReq.selectedModifiers && itemReq.selectedModifiers.length > 0) {
-        for (const selMod of itemReq.selectedModifiers) {
+      const selectedModifiers = itemReq.selectedModifiers || [];
+      const selectedModifierGroupIds = new Set(selectedModifiers.map((m) => m.modifierGroupId));
+
+      // 4.3.1 Validate Linked Modifier Groups & Required Modifiers
+      if (prodData.modifierGroupIds && prodData.modifierGroupIds.length > 0) {
+        for (const mgId of prodData.modifierGroupIds) {
+          const modRef = doc(db, 'modifier_groups', mgId);
+          const modSnap = await tx.get(modRef);
+          if (modSnap.exists()) {
+            const modData = modSnap.data() as ModifierGroup;
+            const isRequired = Boolean(modData.required || modData.isRequired || (modData.minSelections && modData.minSelections > 0) || (modData.minSelect && modData.minSelect > 0));
+            if (isRequired && !selectedModifierGroupIds.has(mgId)) {
+              throw new Error(`REQUIRED_MODIFIER_MISSING: กรุณาเลือก ${modData.name || 'ตัวเลือกที่จำเป็น'} สำหรับเมนู "${prodData.name}"`);
+            }
+          }
+        }
+      }
+
+      // 4.3.2 Validate Selected Modifier Options
+      if (selectedModifiers.length > 0) {
+        for (const selMod of selectedModifiers) {
           const modRef = doc(db, 'modifier_groups', selMod.modifierGroupId);
           const modSnap = await tx.get(modRef);
           if (!modSnap.exists()) {
@@ -277,7 +292,7 @@ export async function createAuthoritativeStoreOrder(
         subtotalSatang,
         subtotal: subtotalSatang / 100,
         customNotes: itemReq.customNotes || '',
-        selectedModifiers: itemReq.selectedModifiers || []
+        selectedModifiers
       });
     }
 
@@ -303,7 +318,6 @@ export async function createAuthoritativeStoreOrder(
       currentSlotOrders = Number(slotData.currentOrders) || 0;
     }
 
-    // Checks slot capacity (1 unit of capacity per order / food portion reservation)
     if (currentSlotOrders + 1 > authoritativeCapacity) {
       throw new Error(`SLOT_CAPACITY_EXCEEDED: รอบเวลารับอาหาร ${cleanPickupTime} น. ของวันที่ ${targetYmd} คิวเต็มแล้ว (${currentSlotOrders}/${authoritativeCapacity})`);
     }
@@ -324,7 +338,7 @@ export async function createAuthoritativeStoreOrder(
     );
 
     // -------------------------------------------------------------
-    // 4.5 Atomic Sequential Reservation Numbering per Store & Date
+    // 4.5 Atomic Sequential Queue Numbering per Store & Date (Q001, Q002...)
     // -------------------------------------------------------------
     const counterDocId = `counter_${storeId}_${targetYmdClean}`;
     const counterRef = doc(db, 'queue_counters', counterDocId);
@@ -345,15 +359,16 @@ export async function createAuthoritativeStoreOrder(
       { merge: true }
     );
 
-    const reservationNumber = `R${String(sequenceNumber).padStart(3, '0')}`;
+    const queueNumber = `Q${String(sequenceNumber).padStart(3, '0')}`;
 
     // -------------------------------------------------------------
-    // 4.6 Create Canonical Order: queueNumber is NULL before Payment
+    // 4.6 Create Canonical Order (Instant Q001 in PENDING / waiting state)
     // -------------------------------------------------------------
     const orderDocRef = doc(collection(db, 'orders'));
     const orderId = orderDocRef.id;
 
-    const initialOrderStatus = paymentMethod === 'promptpay' ? 'PENDING_PAYMENT' : 'WAITING_CASH_CONFIRMATION';
+    const initialOrderStatus: OrderStatus = 'PENDING';
+    const initialQueueStatus: QueueStatus = 'waiting';
 
     const orderPayload = {
       id: orderId,
@@ -362,12 +377,9 @@ export async function createAuthoritativeStoreOrder(
       userId,
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim(),
-      reservationNumber,
-      queueNumber: null as string | null, // Strictly null before payment confirmation
+      queueNumber,
       status: initialOrderStatus,
-      queueStatus: 'waiting_payment',
-      paymentMethod,
-      paymentStatus: 'pending', // Strictly pending until payment webhook/cashier confirmation
+      queueStatus: initialQueueStatus,
       totalAmountSatang: calculatedTotalSatang,
       totalAmount: calculatedTotalSatang / 100,
       finalAmountSatang: calculatedTotalSatang,
@@ -387,13 +399,12 @@ export async function createAuthoritativeStoreOrder(
     return {
       success: true,
       orderId,
-      reservationNumber,
-      queueNumber: null,
+      queueNumber,
       totalAmountSatang: calculatedTotalSatang,
       totalAmountBaht: calculatedTotalSatang / 100,
-      paymentStatus: 'pending',
       orderStatus: initialOrderStatus,
       order: orderPayload as unknown as Partial<Order>
     };
   });
 }
+

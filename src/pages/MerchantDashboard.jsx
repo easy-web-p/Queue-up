@@ -568,7 +568,7 @@ function MerchantDashboard() {
             <div className="merchant-queue-subtabs">
               {[
                 { id: "ALL", label: "ทั้งหมด" },
-                { id: "TO_PAY", label: "รอชำระเงิน / ตรวจสอบสลิป" },
+                { id: "PENDING", label: "ออเดอร์ใหม่ / รอยืนยัน" },
                 { id: "TO_SHIP", label: "กำลังปรุงคิวอาหาร" },
                 { id: "TO_RECEIVE", label: "พร้อมรับที่เคาน์เตอร์" },
                 { id: "COMPLETED", label: "เสร็จสิ้นแล้ว" },
@@ -643,7 +643,7 @@ function MerchantDashboard() {
                     </div>
 
                     <div className="merchant-order-actions-row">
-                      {order.status === "TO_PAY" && (
+                      {(order.status === "PENDING" || order.status === "TO_PAY") && (
                         <button
                           className="merchant-btn-next-step"
                           onClick={() =>
@@ -654,7 +654,7 @@ function MerchantDashboard() {
                             )
                           }
                         >
-                          <i className="bi bi-check-circle-fill me-1" /> ยืนยันชำระเงิน & รับออเดอร์เข้าครัว
+                          <i className="bi bi-check-circle-fill me-1" /> ยืนยันรับออเดอร์เข้าครัว
                         </button>
                       )}
 
