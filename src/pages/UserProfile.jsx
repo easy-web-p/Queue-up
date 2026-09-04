@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { setUser, clearUser } from "../store/authSlice.js";
 import { db, doc, setDoc, getDoc, deleteDoc } from "../firebase/config.js";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import ShopeeSearchBar from "../components/ShopeeSearchBar.jsx";
 import ChatModal from "../components/ChatModal.jsx";
 import Footer from "../components/Footer.jsx";
@@ -48,60 +49,13 @@ function UserProfile() {
   const [chatStoreName, setChatStoreName] = useState("");
   const [chatOrderContext, setChatOrderContext] = useState(null);
 
-  // Booking & Purchase History State
-  const [orders] = useState(() => {
+  // 🔔 Real-time Booking & Purchase History State (Connected to Firestore /orders)
+  const [orders, setOrders] = useState(() => {
     const saved = localStorage.getItem("queueup_user_orders");
-    return saved ? JSON.parse(saved) : [
-      {
-        id: "240809QUEUE01",
-        shopName: "ร้านครัวโรงเรียน QueueUp Canteen",
-        shopLocation: "โรงอาหารอาคาร 1 เคาน์เตอร์ 2",
-        orderDate: "09 ส.ค. 2026, 11:42 น.",
-        status: "PENDING",
-        statusText: "คิวรอปรุงอาหาร (Q001)",
-        queueNo: "Q001",
-        totalAmount: 65,
-        items: [
-          {
-            id: "p1",
-            name: "ชุดข้าวผัดกุ้งกะทะร้อน + ไข่ดาวสด",
-            price: 65,
-            quantity: 1,
-            variant: "เผ็ดน้อย / ไม่ใส่ต้นหอม",
-            image: "/logo.png",
-          },
-        ],
-      },
-      {
-        id: "240808QUEUE02",
-        shopName: "ร้านชาไข่มุก บราวน์ชูการ์ Express",
-        shopLocation: "อาคารเรียน 3 ฝั่งสนามฟุตบอล",
-        orderDate: "08 ส.ค. 2026, 15:20 น.",
-        status: "COMPLETED",
-        statusText: "รับอาหารสำเร็จเรียบร้อยแล้ว",
-        queueNo: "B12",
-        totalAmount: 45,
-        items: [
-          {
-            id: "p2",
-            name: "ชาไทยเฉาก๊วย หวาน 50%",
-            price: 45,
-            quantity: 1,
-            variant: "หวานน้อย 50%",
-            image: "https://images.unsplash.com/photo-1558857563-b371033873b8?w=300&auto=format&fit=crop&q=80",
-          },
-        ],
-      },
-    ];
+    return saved ? JSON.parse(saved) : [];
   });
   const [orderStatusTab, setOrderStatusTab] = useState("ALL");
   const [orderSearchQuery, setOrderSearchQuery] = useState("");
-
-  // Bank & Payment Accounts State
-  const [bankName, setBankName] = useState(() => localStorage.getItem("queueup_bank_name") || "กรุงไทย (Krungthai Bank)");
-  const [bankAccountNo, setBankAccountNo] = useState(() => localStorage.getItem("queueup_bank_account_no") || "123-4-56789-0");
-  const [bankAccountName, setBankAccountName] = useState(() => localStorage.getItem("queueup_bank_account_name") || "ด.ช. พิสิษฐ์ แก้วกุลพิสิษฐ์");
-  const [isEditingPayment, setIsEditingPayment] = useState(false);
 
   // Auto Save Status Ticker State
   const [autoSaveStatus, setAutoSaveStatus] = useState("บันทึกอัตโนมัติเรียบร้อย");
@@ -197,6 +151,84 @@ function UserProfile() {
     orders || []
   );
 
+  // 🔄 Real-Time Firestore Order Listener (onSnapshot for Instant Status Updates)
+  useEffect(() => {
+    if (!user || !user.uid) return;
+
+    try {
+      const q = query(
+        collection(db, "orders"),
+        where("userId", "==", user.uid)
+      );
+
+      const unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          const liveOrders = snapshot.docs.map((docSnap) => {
+            const data = docSnap.data();
+            const qNum = data.queueNumber || "Q---";
+            let statusText = "รอรับออเดอร์";
+            const qStatus = data.queueStatus || data.status?.toLowerCase() || "waiting";
+
+            if (qStatus === "waiting" || data.status === "PENDING") {
+              statusText = `คิวรอรับออเดอร์ (${qNum})`;
+            } else if (qStatus === "confirmed" || data.status === "CONFIRMED") {
+              statusText = `ร้านค้ารับออเดอร์แล้ว (${qNum})`;
+            } else if (qStatus === "cooking" || data.status === "PREPARING") {
+              statusText = `กำลังปรุงอาหาร (${qNum})`;
+            } else if (qStatus === "ready" || data.status === "READY") {
+              statusText = `พร้อมรับอาหารที่เคาน์เตอร์ (${qNum})`;
+            } else if (qStatus === "completed" || data.status === "COMPLETED") {
+              statusText = "รับอาหารสำเร็จเรียบร้อยแล้ว";
+            } else if (qStatus === "cancelled" || data.status === "CANCELLED") {
+              statusText = "ยกเลิกออเดอร์แล้ว";
+            }
+
+            return {
+              id: docSnap.id,
+              ...data,
+              queueNo: qNum,
+              statusText,
+              shopName: data.storeName || data.shopName || (data.storeId ? `ร้านค้า (${data.storeId})` : "ร้านค้า"),
+              totalPrice: data.totalAmount || data.finalAmount || 0,
+              items: (data.items || []).map((it) => ({
+                id: it.productId || it.id,
+                name: it.name || it.menuItem?.name || "รายการอาหาร",
+                price: it.unitPrice || it.menuItem?.price || 0,
+                quantity: it.quantity || 1,
+                variant: it.customNotes || (it.selectedModifiers || []).map((m) => m.name || m.optionId).join(", "),
+                image: it.image || it.menuItem?.image || "/logo.png",
+              })),
+            };
+          });
+
+          // Sort by createdAt descending
+          liveOrders.sort((a, b) => {
+            const timeA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+            const timeB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+            return timeB - timeA;
+          });
+
+          if (liveOrders.length > 0) {
+            setOrders(liveOrders);
+            try {
+              localStorage.setItem("queueup_user_orders", JSON.stringify(liveOrders));
+            } catch {
+              // ignore
+            }
+          }
+        },
+        (err) => {
+          console.warn("UserProfile onSnapshot orders warning:", err);
+        }
+      );
+
+      return () => unsubscribe();
+    } catch (err) {
+      console.warn("UserProfile setup onSnapshot error:", err);
+    }
+  }, [user]);
+
   // Fetch Firestore Profile Data on Mount
   useEffect(() => {
     if (user && user.uid) {
@@ -209,9 +241,6 @@ function UserProfile() {
           if (data.birthDate) setBirthDate(data.birthDate);
           if (data.phone) setPhone(data.phone);
           if (data.photo || data.photoURL) setAvatar(data.photo || data.photoURL);
-          if (data.bankName) setBankName(data.bankName);
-          if (data.bankAccountNo) setBankAccountNo(data.bankAccountNo);
-          if (data.bankAccountName) setBankAccountName(data.bankAccountName);
           
           // 🔒 รหัสบัญชี (Account ID)
           const savedId = data.accountId;
@@ -300,9 +329,6 @@ function UserProfile() {
       birthDate: fieldKey === "birthDate" ? value : birthDate,
       email: fieldKey === "email" ? value : email,
       phone: fieldKey === "phone" ? value : phone,
-      bankName: fieldKey === "bankName" ? value : bankName,
-      bankAccountNo: fieldKey === "bankAccountNo" ? value : bankAccountNo,
-      bankAccountName: fieldKey === "bankAccountName" ? value : bankAccountName,
       updatedAt: new Date().toISOString(),
     };
 
@@ -1272,98 +1298,33 @@ function UserProfile() {
                 </div>
               </div>
 
-              {/* ข้อมูลการชำระเงิน / บัญชีรับ-จ่ายเงิน */}
+              {/* ช่องทางรับการแจ้งเตือนคิวและติดต่อร้านค้า (Zero-Payment Queue Alerts) */}
               <div className="shopee-info-field-row">
                 <div className="shopee-field-header-row">
                   <span className="shopee-field-title">
-                    <i className="bi bi-credit-card-2-front-fill text-primary me-2" />
-                    ข้อมูลการชำระเงิน & บัญชีธนาคาร
+                    <i className="bi bi-bell-fill text-success me-2" />
+                    ช่องทางรับการแจ้งเตือนคิว & ข้อมูลติดต่อ
                   </span>
-                  <button
-                    className="shopee-edit-btn"
-                    onClick={() => setIsEditingPayment(!isEditingPayment)}
-                  >
-                    {isEditingPayment ? "ยกเลิก" : "จัดการข้อมูลการชำระเงิน"}
-                  </button>
                 </div>
 
-                {isEditingPayment ? (
-                  <div className="p-3 bg-light rounded-3 mt-2 border">
-                    <div className="row g-2 mb-2">
-                      <div className="col-md-6">
-                        <label className="form-label small fw-bold text-dark mb-1">ประเภทธนาคาร / ช่องทาง</label>
-                        <select
-                          className="form-select form-select-sm"
-                          value={bankName}
-                          onChange={(e) => {
-                            setBankName(e.target.value);
-                            triggerAutoSave("bankName", e.target.value);
-                          }}
-                        >
-                          <option value="PromptPay (พร้อมเพย์)">PromptPay (พร้อมเพย์ QR Code)</option>
-                          <option value="ธนาคารกสิกรไทย (KBANK)">ธนาคารกสิกรไทย (KBANK)</option>
-                          <option value="ธนาคารไทยพาณิชย์ (SCB)">ธนาคารไทยพาณิชย์ (SCB)</option>
-                          <option value="ธนาคารกรุงเทพ (BBL)">ธนาคารกรุงเทพ (BBL)</option>
-                          <option value="ธนาคารกรุงไทย (KTB)">ธนาคารกรุงไทย (KTB)</option>
-                        </select>
-                      </div>
-                      <div className="col-md-6">
-                        <label className="form-label small fw-bold text-dark mb-1">เลขบัญชี / เบอร์พร้อมเพย์</label>
-                        <input
-                          type="text"
-                          className="form-control form-control-sm"
-                          placeholder="เช่น 081-XXX-XXXX"
-                          value={bankAccountNo}
-                          onChange={(e) => {
-                            setBankAccountNo(e.target.value);
-                            triggerAutoSave("bankAccountNo", e.target.value);
-                          }}
-                        />
+                <div className="mt-2 p-3 rounded-3 bg-white border d-flex align-items-center justify-content-between">
+                  <div className="d-flex align-items-center gap-3">
+                    <div className="bg-success text-white rounded-circle p-2 d-flex align-items-center justify-content-center" style={{ width: "42px", height: "42px" }}>
+                      <i className="bi bi-bell-fill fs-5" />
+                    </div>
+                    <div>
+                      <div className="fw-bold text-dark fs-6">Zero-Payment Live Queue Tracking</div>
+                      <div className="text-muted small">
+                        เบอร์ติดต่อสำหรับแจ้งเตือน: <strong className="text-dark">{phone || "กรุณาระบุในข้อมูลส่วนบุคคล"}</strong> • ชื่อผู้รับอาหาร: <strong className="text-dark">{fullName || "ผู้ใช้งาน"}</strong>
                       </div>
                     </div>
-                    <div className="mb-2">
-                      <label className="form-label small fw-bold text-dark mb-1">ชื่อบัญชีผู้ถือ</label>
-                      <input
-                        type="text"
-                        className="form-control form-control-sm"
-                        placeholder="เช่น นายสมชาย ใจดี"
-                        value={bankAccountName}
-                        onChange={(e) => {
-                          setBankAccountName(e.target.value);
-                          triggerAutoSave("bankAccountName", e.target.value);
-                        }}
-                      />
-                    </div>
-                    <button
-                      className="btn btn-danger btn-sm px-3 mt-1 font-weight-bold"
-                      onClick={() => {
-                        handleSaveField("bankAccountNo", bankAccountNo);
-                        setIsEditingPayment(false);
-                      }}
-                    >
-                      <i className="bi bi-check-circle-fill me-1" /> บันทึกข้อมูลการชำระเงิน
-                    </button>
                   </div>
-                ) : (
-                  <div className="mt-2 p-3 rounded-3 bg-white border d-flex align-items-center justify-content-between">
-                    <div className="d-flex align-items-center gap-3">
-                      <div className="bg-danger text-white rounded-circle p-2 d-flex align-items-center justify-content-center" style={{ width: "42px", height: "42px" }}>
-                        <i className="bi bi-qr-code-scan fs-5" />
-                      </div>
-                      <div>
-                        <div className="fw-bold text-dark fs-6">{bankName}</div>
-                        <div className="text-muted small">
-                          หมายเลข: <strong className="text-dark">{bankAccountNo || "ยังไม่ได้บันทึก"}</strong> • ชื่อบัญชี: <strong className="text-dark">{bankAccountName || "ยังไม่ได้บันทึก"}</strong>
-                        </div>
-                      </div>
-                    </div>
-                    <span className="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" style={{ fontSize: "0.75rem" }}>
-                      <i className="bi bi-shield-check me-1" /> พร้อมใช้งาน
-                    </span>
-                  </div>
-                )}
+                  <span className="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" style={{ fontSize: "0.75rem" }}>
+                    <i className="bi bi-shield-check me-1" /> เชื่อมต่อระบบคิวสด
+                  </span>
+                </div>
                 <div className="shopee-field-hint mt-2">
-                  ข้อมูลการชำระเงินนี้ใช้สำหรับสแกนจ่ายค่าอาหารในโรงอาหาร การรับเงินคืน (Refund) และต่อยอดเปิดร้านค้าเพื่อรับโอนเงิน
+                  ระบบ Zero-Payment จะใช้หมายเลขโทรศัพท์นี้ในการออกบัตรคิวและส่งสัญญาณแจ้งเตือนเมื่ออาหารปรุงเสร็จ
                 </div>
               </div>
 

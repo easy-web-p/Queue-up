@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { Utensils, ArrowLeft, Sparkles, AlertCircle, Clock, CheckCircle2, ShoppingBag, Store, MapPin, Calendar, Compass, ChevronRight } from 'lucide-react';
-import { CartItem, Order, CustomerProfile } from '../types';
+import { CartItem, Order, CustomerProfile, SelectedModifierOption } from '../types';
 import { db } from '../firebase/config.js';
 import { createAuthoritativeStoreOrder, getBangkokYmd } from '../services/orderCreationService';
 import { soundManager } from '../utils/audioNotification.js';
@@ -90,8 +90,9 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
   });
 
   const calculateItemUnitPrice = (item: CartItem) => {
-    const base = item.menuItem.price || 0;
-    const modTotal = (item.selectedModifiers || []).reduce((sum, m) => {
+    const base = item.menuItem?.price || 0;
+    const mods = Array.isArray(item.selectedModifiers) ? (item.selectedModifiers as SelectedModifierOption[]) : [];
+    const modTotal = mods.reduce((sum, m) => {
       const p = typeof m.priceModifier === 'number'
         ? m.priceModifier
         : (m.priceModifierSatang ? m.priceModifierSatang / 100 : 0);
@@ -332,15 +333,19 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
                           <span className="font-bold text-slate-800">{item.menuItem.name}</span>
                           <span className="text-xs text-slate-500 font-semibold">x{item.quantity}</span>
                         </div>
-                        {item.selectedModifiers && item.selectedModifiers.length > 0 && (
+                        {Array.isArray(item.selectedModifiers) && item.selectedModifiers.length > 0 && (
                           <div className="text-[11px] text-slate-500 flex flex-wrap gap-1">
-                            {item.selectedModifiers.map((m, mIdx) => (
-                              <span key={mIdx} className="bg-slate-200/80 px-1.5 py-0.5 rounded text-slate-700">
-                                {m.name || m.optionId}
-                                {((m.priceModifier && m.priceModifier > 0) || (m.priceModifierSatang && m.priceModifierSatang > 0)) &&
-                                  ` (+฿${m.priceModifier || ((m.priceModifierSatang || 0) / 100)})`}
-                              </span>
-                            ))}
+                            {(item.selectedModifiers as SelectedModifierOption[]).map((m, mIdx) => {
+                              const priceMod = typeof m.priceModifier === 'number'
+                                ? m.priceModifier
+                                : (m.priceModifierSatang ? m.priceModifierSatang / 100 : 0);
+                              return (
+                                <span key={mIdx} className="bg-slate-200/80 px-1.5 py-0.5 rounded text-slate-700">
+                                  {m.name || m.optionId}
+                                  {priceMod > 0 && ` (+฿${priceMod})`}
+                                </span>
+                              );
+                            })}
                           </div>
                         )}
                         {item.customNotes && (

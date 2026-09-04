@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { switchRole, clearUser } from "../store/authSlice.js";
 import { db, doc, getDoc, setDoc } from "../firebase/config.js";
+import { collection, query, where, onSnapshot, updateDoc, serverTimestamp } from "firebase/firestore";
 import { SHARED_PRODUCTS } from "../data/mockProducts.js";
 import ChatModal from "../components/ChatModal.jsx";
 import BookingCalendar from "../components/BookingCalendar.jsx";
@@ -89,32 +90,30 @@ function MerchantDashboard() {
     return rawName;
   };
 
-  // Read Store Profile & storeId from LocalStorage & User Auth Context (Full Onboarding Tracing)
+  // Read Store Profile & storeId from LocalStorage & User Auth Context (Zero Fake Fallback)
   const getInitialStoreData = () => {
     try {
       const userKey = user && user.uid ? `queueup_merchant_store_${user.uid}` : null;
       const stored = (userKey && localStorage.getItem(userKey)) || localStorage.getItem("queueup_merchant_store");
       if (stored) {
         const m = JSON.parse(stored);
+        const storeId = m.storeId || user?.storeId || (user && user.uid ? `store_${user.uid.substring(0, 10)}` : "");
         return {
-          storeId: m.storeId || (user && user.uid ? `store_${user.uid.substring(0, 10)}` : "store_canteen01"),
-          name: cleanDisplayName(m.merchantStoreName || m.storeName || (user && user.merchantStoreName), user?.email),
-          phone: m.phone || m.businessPhone || (user && user.phone) || "081-234-5678",
-          location: m.canteenLocation ? (m.counterNo ? `${m.canteenLocation} (${m.counterNo})` : m.canteenLocation) : (user && user.canteenLocation) || "โรงอาหาร 1 (อาคารเรียน 2)",
-          promptpayName: cleanOwnerName(m.promptpayName || (user && user.promptpayName) || (user ? user.name : ""), user?.email),
-          promptpayNo: m.promptpayNo || (user && user.promptpayNo) || "081-234-5678",
+          storeId,
+          name: cleanDisplayName(m.merchantStoreName || m.storeName || user?.merchantStoreName, user?.email),
+          phone: m.phone || m.businessPhone || user?.phone || "",
+          location: m.canteenLocation ? (m.counterNo ? `${m.canteenLocation} (${m.counterNo})` : m.canteenLocation) : user?.canteenLocation || "",
         };
       }
     } catch {
       // ignore
     }
+    const storeId = user?.storeId || (user && user.uid ? `store_${user.uid.substring(0, 10)}` : "");
     return {
-      storeId: user && user.uid ? `store_${user.uid.substring(0, 10)}` : "store_canteen01",
-      name: cleanDisplayName(user && user.merchantStoreName, user?.email),
-      phone: (user && user.phone) || "081-234-5678",
-      location: (user && user.canteenLocation) || "โรงอาหาร 1 (อาคารเรียน 2)",
-      promptpayName: cleanOwnerName((user && user.promptpayName) || (user ? user.name : ""), user?.email),
-      promptpayNo: (user && user.promptpayNo) || "081-234-5678",
+      storeId,
+      name: cleanDisplayName(user?.merchantStoreName, user?.email),
+      phone: user?.phone || "",
+      location: user?.canteenLocation || "",
     };
   };
 
@@ -122,53 +121,36 @@ function MerchantDashboard() {
   const [currentStoreId] = useState(initialStore.storeId);
 
   const [merchantOrders, setMerchantOrders] = useState(() => {
-    // 1. Read store-specific merchant orders first
-    const storeSpecific = localStorage.getItem(`queueup_merchant_orders_${initialStore.storeId}`);
-    if (storeSpecific) {
-      try {
-        return JSON.parse(storeSpecific);
-      } catch {
-        // ignore
+    // Read store-specific merchant orders from cache if present
+    if (initialStore.storeId) {
+      const storeSpecific = localStorage.getItem(`queueup_merchant_orders_${initialStore.storeId}`);
+      if (storeSpecific) {
+        try {
+          return JSON.parse(storeSpecific);
+        } catch {
+          // ignore
+        }
       }
     }
-
-    // 2. Read global customer orders and filter strictly by storeId
-    const globalUserOrders = localStorage.getItem("queueup_user_orders");
-    if (globalUserOrders) {
-      try {
-        const parsed = JSON.parse(globalUserOrders);
-        const filtered = parsed.filter((o) => o.storeId === initialStore.storeId);
-        if (filtered.length > 0) return filtered;
-      } catch {
-        // ignore
-      }
-    }
-
-    // 3. Demo orders apply ONLY to the default canteen ("store_canteen01")
-    if (initialStore.storeId === "store_canteen01") {
-      return MOCK_MERCHANT_ORDERS.map((o) => ({ ...o, storeId: "store_canteen01" }));
-    }
-
-    // NEW merchant stores will have [] (0 orders from other stores!)
     return [];
   });
 
   const [menuItems, setMenuItems] = useState(() => {
-    const savedMenu = localStorage.getItem(`queueup_merchant_menu_${initialStore.storeId}`);
-    if (savedMenu) {
-      try {
-        return JSON.parse(savedMenu);
-      } catch {
-        // ignore
+    if (initialStore.storeId) {
+      const savedMenu = localStorage.getItem(`queueup_merchant_menu_${initialStore.storeId}`);
+      if (savedMenu) {
+        try {
+          return JSON.parse(savedMenu);
+        } catch {
+          // ignore
+        }
       }
+      return SHARED_PRODUCTS.filter((p) => p.storeId === initialStore.storeId).map((p) => ({
+        ...p,
+        isAvailable: true,
+      }));
     }
-    if (initialStore.storeId === "store_canteen01") {
-      return SHARED_PRODUCTS.map((p) => ({ ...p, isAvailable: true }));
-    }
-    return SHARED_PRODUCTS.filter((p) => p.storeId === initialStore.storeId).map((p) => ({
-      ...p,
-      isAvailable: true,
-    }));
+    return [];
   });
 
   const [storeName, setStoreName] = useState(initialStore.name);

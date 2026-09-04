@@ -55,12 +55,12 @@ function generateUpcomingCalendarDays() {
 
 // ⏰ TIME SLOTS DATA FOR CALENDAR SELECTION
 const BASE_TIME_SLOTS = [
-  { time: "11:00", discount: "-50%", capacity: 20, remaining: 12, status: "AVAILABLE" },
-  { time: "11:30", discount: "-50%", capacity: 20, remaining: 8, status: "AVAILABLE" },
-  { time: "12:00", discount: "-50%", capacity: 20, remaining: 4, status: "LIMITED" },
-  { time: "12:30", discount: "-20%", capacity: 20, remaining: 0, status: "FULL" },
-  { time: "13:00", discount: "-10%", capacity: 20, remaining: 15, status: "AVAILABLE" },
-  { time: "13:30", discount: "-10%", capacity: 20, remaining: 18, status: "AVAILABLE" },
+  { time: "11:00", discount: "-50%", capacity: 20, remaining: 20, status: "AVAILABLE" },
+  { time: "11:30", discount: "-50%", capacity: 20, remaining: 20, status: "AVAILABLE" },
+  { time: "12:00", discount: "-50%", capacity: 20, remaining: 20, status: "AVAILABLE" },
+  { time: "12:30", discount: "-20%", capacity: 20, remaining: 20, status: "AVAILABLE" },
+  { time: "13:00", discount: "-10%", capacity: 20, remaining: 20, status: "AVAILABLE" },
+  { time: "13:30", discount: "-10%", capacity: 20, remaining: 20, status: "AVAILABLE" },
   { time: "14:00", discount: "-10%", capacity: 20, remaining: 20, status: "AVAILABLE" },
   { time: "14:30", discount: "-10%", capacity: 20, remaining: 20, status: "AVAILABLE" },
 ];
@@ -502,7 +502,8 @@ function ProductDetail() {
   useEffect(() => {
     let isMounted = true;
     async function updateSlotCapacities() {
-      const storeId = product?.storeId || store?.id || "store_canteen01";
+      const storeId = product?.storeId || store?.id || store?.storeId;
+      if (!storeId) return;
       const isoDate = selectedDay?.isoDateStr || calendarDays[0]?.isoDateStr;
       const defaultCap = store?.maxOrdersPerSlot || 20;
       if (storeId && isoDate) {
@@ -520,7 +521,7 @@ function ProductDetail() {
     return () => {
       isMounted = false;
     };
-  }, [product?.storeId, store?.id, store?.maxOrdersPerSlot, selectedDay?.isoDateStr, calendarDays]);
+  }, [product?.storeId, store?.id, store?.storeId, store?.maxOrdersPerSlot, selectedDay?.isoDateStr, calendarDays]);
 
   // 4. Favorite Toggle Handler
   const handleToggleFavorite = async () => {
@@ -567,11 +568,12 @@ function ProductDetail() {
 
   // 15. Store Menu Recommendations
   const recommendedProducts = useMemo(() => {
-    const storeId = product?.storeId || "store_canteen01";
+    const storeId = product?.storeId || store?.id || store?.storeId;
+    if (!storeId) return [];
     return SHARED_PRODUCTS.filter(
       (p) => p.storeId === storeId && p.id !== product.id
     ).slice(0, 4);
-  }, [product]);
+  }, [product, store]);
 
   // 11. Profile Completeness Check
   const checkProfileCompleteness = async () => {
@@ -669,12 +671,15 @@ function ProductDetail() {
       noteParts.push(`โน้ต: ${customerNote.trim()}`);
     }
 
+    const realStoreId = product?.storeId || store?.id || store?.storeId || "";
+
     return {
       menuItem: {
         id: product.id,
         name: product.name || product.title,
-        price: discountedUnitPrice,
-        storeId: product.storeId || "store_canteen01",
+        price: basePrice, // 🔒 Base Price only, modifiers will be added by canonical calculation
+        storeId: realStoreId,
+        storeName: store?.name || product.shopName || "",
         image: selectedImg || product.mainImg || product.image || "/crispy_fried_chicken.jpg",
       },
       quantity: quantity,
@@ -735,6 +740,12 @@ function ProductDetail() {
       return;
     }
 
+    const resolvedStoreId = product?.storeId || store?.id || store?.storeId;
+    if (!resolvedStoreId) {
+      alert("⚠️ ไม่พบรหัสร้านค้าของเมนูนี้ กรุณาเลือกร้านค้าใหม่อีกครั้ง");
+      return;
+    }
+
     const cartItem = createCurrentCartItem();
 
     // 6. Seamless Navigation to Authoritative Booking Flow (Strict ISO date format YYYY-MM-DD)
@@ -744,9 +755,9 @@ function ProductDetail() {
         pickupTime: selectedTimeSlot?.time || "12:00",
         bookingDate: selectedDay.isoDateStr,
         bookingDateLabel: selectedDay.fullDateStr,
-        storeId: product.storeId || "store_canteen01",
-        storeName: store?.name || product.shopName || "ร้านป้าแดง ตามสั่ง & ไก่ทอด",
-        storeLocation: store?.location || product.shopLocation || "โรงอาหาร 2 (โรงอาหารกลาง 1) ชั้น 1",
+        storeId: resolvedStoreId,
+        storeName: store?.name || product.shopName || `ร้านค้า (${resolvedStoreId})`,
+        storeLocation: store?.location || product.shopLocation || "จุดรับอาหารของร้านค้า",
       },
     });
   };

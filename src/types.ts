@@ -1,4 +1,4 @@
-export type QueueStatus = 'waiting' | 'cooking' | 'ready' | 'completed' | 'cancelled';
+export type QueueStatus = 'waiting' | 'confirmed' | 'cooking' | 'ready' | 'completed' | 'cancelled';
 
 export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED';
 

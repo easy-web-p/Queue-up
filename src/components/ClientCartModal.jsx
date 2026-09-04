@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { ShoppingBag, Trash2, Plus, Minus, Upload, CheckCircle2 } from 'lucide-react';
+import { ShoppingBag, Trash2, Plus, Minus, ArrowRight, Utensils } from 'lucide-react';
 
 export const ClientCartModal = ({
   isOpen,
@@ -9,13 +8,6 @@ export const ClientCartModal = ({
   onRemoveItem,
   onCheckout,
 }) => {
-  const [customerName, setCustomerName] = useState('พิมพ์ชนก เรียนดี');
-  const [customerPhone, setCustomerPhone] = useState('081-234-5678');
-  const [orderType] = useState('preorder');
-  const [pickupTime] = useState('12:00');
-  const [uploadedSlip, setUploadedSlip] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
   if (!isOpen) return null;
 
   const totalAmount = cartItems.reduce(
@@ -23,16 +15,13 @@ export const ClientCartModal = ({
     0
   );
 
-  const handleConfirmOrder = (e) => {
+  const handleProceedToBooking = (e) => {
     e.preventDefault();
     if (cartItems.length === 0) return;
-
-    setIsSubmitting(true);
-    setTimeout(() => {
-      onCheckout(customerName, customerPhone, orderType, pickupTime, uploadedSlip || undefined);
-      setIsSubmitting(false);
-      onClose();
-    }, 600);
+    if (onCheckout) {
+      onCheckout();
+    }
+    onClose();
   };
 
   return (
@@ -68,19 +57,24 @@ export const ClientCartModal = ({
                   <div key={index} className="p-3 bg-light rounded-3 border d-flex align-items-center justify-content-between gap-2">
                     <div>
                       <h6 className="fw-bold mb-0 small">{item.menuItem?.name}</h6>
-                      <small className="text-muted">{item.menuItem?.price} ฿ / จาน</small>
+                      <small className="text-muted">{item.menuItem?.price} ฿ / รายการ</small>
+                      {item.customNotes && (
+                        <div className="text-muted text-xs mt-1" style={{ fontSize: '0.75rem' }}>
+                          {item.customNotes}
+                        </div>
+                      )}
                     </div>
                     <div className="d-flex align-items-center gap-2">
                       <div className="btn-group btn-group-sm">
-                        <button onClick={() => onUpdateQuantity(index, -1)} className="btn btn-outline-secondary">
+                        <button onClick={() => onUpdateQuantity && onUpdateQuantity(index, -1)} className="btn btn-outline-secondary">
                           <Minus className="w-3 h-3" />
                         </button>
                         <span className="btn btn-outline-secondary disabled text-dark fw-bold">{item.quantity}</span>
-                        <button onClick={() => onUpdateQuantity(index, 1)} className="btn btn-outline-secondary">
+                        <button onClick={() => onUpdateQuantity && onUpdateQuantity(index, 1)} className="btn btn-outline-secondary">
                           <Plus className="w-3 h-3" />
                         </button>
                       </div>
-                      <button onClick={() => onRemoveItem(index)} className="btn btn-sm btn-outline-danger border-0">
+                      <button onClick={() => onRemoveItem && onRemoveItem(index)} className="btn btn-sm btn-outline-danger border-0">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -88,61 +82,31 @@ export const ClientCartModal = ({
                 ))}
               </div>
 
-              {/* Form */}
-              <form id="checkout-form" onSubmit={handleConfirmOrder} className="space-y-3 pt-3 border-top">
-                <div className="row g-2">
-                  <div className="col-6">
-                    <label className="form-label text-muted small fw-bold mb-1">ชื่อผู้สั่ง</label>
-                    <input
-                      type="text"
-                      required
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      className="form-control form-control-sm"
-                    />
-                  </div>
-                  <div className="col-6">
-                    <label className="form-label text-muted small fw-bold mb-1">เบอร์โทรศัพท์</label>
-                    <input
-                      type="tel"
-                      required
-                      value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
-                      className="form-control form-control-sm"
-                    />
-                  </div>
+              {/* Zero-Payment Summary Notice */}
+              <div className="p-3 bg-amber-50 rounded-3 border border-amber-200 text-amber-900 small">
+                <div className="d-flex align-items-center gap-2 fw-bold mb-1">
+                  <Utensils className="w-4 h-4 text-amber-700" />
+                  <span>ระบบ Zero-Payment สั่งปุ๊บรับคิวทันที</span>
                 </div>
-
-                <div className="p-3 bg-dark text-white rounded-3 space-y-2">
-                  <div className="d-flex justify-content-between align-items-center">
-                    <span className="small text-warning fw-bold">ยอดชำระทั้งสิ้น</span>
-                    <h5 className="fw-bold mb-0 text-white">{totalAmount} บาท</h5>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setUploadedSlip('https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=400')}
-                    className="btn btn-warning btn-sm w-100 fw-bold d-flex align-items-center justify-content-center gap-1"
-                  >
-                    <Upload className="w-4 h-4" />
-                    <span>{uploadedSlip ? 'แนบสลิปเรียบร้อยแล้ว' : 'แนบรูปสลิปจำลอง PromptPay'}</span>
-                  </button>
-                </div>
-              </form>
+                <div>คุณสามารถเลือกวันและเวลารับอาหารได้ในขั้นตอนถัดไป โดยไม่ต้องชำระเงินล่วงหน้า</div>
+              </div>
             </>
           )}
         </div>
 
         {/* Footer Checkout Button */}
         {cartItems.length > 0 && (
-          <div className="p-3 bg-light border-top">
+          <div className="p-3 bg-light border-top d-flex align-items-center justify-content-between gap-3">
+            <div>
+              <small className="text-muted d-block">ยอดรวมโดยประมาณ</small>
+              <h5 className="fw-bold text-dark mb-0">{totalAmount} ฿</h5>
+            </div>
             <button
-              type="submit"
-              form="checkout-form"
-              disabled={isSubmitting}
-              className="btn btn-theme-red w-100 py-2 fw-bold d-flex align-items-center justify-content-center gap-2"
+              onClick={handleProceedToBooking}
+              className="btn btn-theme-red px-4 py-2 fw-bold d-flex align-items-center gap-2"
             >
-              <CheckCircle2 className="w-5 h-5" />
-              <span>{isSubmitting ? 'กำลังออกตั๋วคิว...' : 'ยืนยันการสั่งและรับตั๋วคิว Live Ticket'}</span>
+              <span>ไปหน้าจองคิวอาหาร</span>
+              <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         )}
