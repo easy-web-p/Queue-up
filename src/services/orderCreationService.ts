@@ -145,8 +145,11 @@ export async function createAuthoritativeStoreOrder(
   const targetPickupDateObj = new Date(Date.UTC(pYear, pMonth - 1, pDay, 12, 0, 0));
   const targetBangkok = getBangkokYmd(targetPickupDateObj);
 
-  // 4. Try HTTPS Callable Cloud Function (Server-Authoritative) in Browser
-  if (typeof window !== 'undefined' && functions) {
+  // 4. In Browser Runtime: Mandate HTTPS Callable Cloud Function (Server-Authoritative Only, Zero Client Fallback)
+  if (typeof window !== 'undefined') {
+    if (!functions) {
+      throw new Error('FUNCTIONS_UNAVAILABLE: ระบบเชื่อมต่อ Cloud Functions ไม่พร้อมใช้งาน');
+    }
     try {
       const createOrderCallable = httpsCallable<CreateOrderRequest, OrderCreationResult>(
         functions,
@@ -156,17 +159,76 @@ export async function createAuthoritativeStoreOrder(
       if (response && response.data && response.data.success) {
         return response.data;
       }
+      throw new Error('ORDER_CREATION_FAILED: ไม่สามารถสร้างคำสั่งซื้อได้');
     } catch (callableErr: any) {
-      if (callableErr?.code && callableErr?.message) {
-        if (callableErr.code !== 'functions/unavailable' && callableErr.code !== 'functions/not-found') {
-          throw new Error(callableErr.message);
-        }
-      }
-      console.warn('Falling back to direct Firestore transaction execution:', callableErr);
+      // Direct pass-through of authoritative server error message
+      const serverMessage = callableErr?.message || callableErr?.details || 'เกิดข้อผิดพลาดในการสร้างคำสั่งซื้อ';
+      throw new Error(serverMessage);
     }
   }
 
-  // 5. Normalize Items by unique item variant
+  // Non-browser / Direct Server-side Transaction Execution
+  return await executeAuthoritativeOrderTransaction(db, request);
+}
+
+/**
+ * 🔒 Pure 3-Phase ACID Order Creation Transaction
+ * Used for direct server/test executions where Admin/Direct Firestore access is permitted.
+ */
+export async function executeAuthoritativeOrderTransaction(
+  db: Firestore,
+  request: CreateOrderRequest
+): Promise<OrderCreationResult> {
+  const { storeId, userId, customerName, customerPhone, items, pickupTime } = request;
+
+  // 1. Strict Fail-Fast Validation (Zero fake defaults)
+  if (!userId || userId === 'guest_user') {
+    throw new Error('AUTHENTICATION_REQUIRED: กรุณาเข้าสู่ระบบก่อนทำการสั่งจองอาหาร');
+  }
+  if (!customerPhone || !customerPhone.trim()) {
+    throw new Error('CUSTOMER_PHONE_REQUIRED: กรุณาระบุเบอร์โทรศัพท์สำหรับรับการแจ้งเตือนคิว');
+  }
+  if (!storeId || !storeId.trim()) {
+    throw new Error('STORE_ID_REQUIRED: ไม่พบรหัสร้านค้า');
+  }
+  if (!items || items.length === 0) {
+    throw new Error('ORDER_ITEMS_EMPTY: รายการอาหารในคำสั่งซื้อว่างเปล่า');
+  }
+
+  // 2. Strict Pickup Time Format Validation (HH:mm format 00:00 - 23:59)
+  if (!pickupTime || !/^([01]\d|2[0-3]):[0-5]\d$/.test(pickupTime.trim())) {
+    throw new Error('INVALID_PICKUP_TIME_FORMAT: รูปแบบเวลารับอาหารไม่ถูกต้อง (ต้องเป็น HH:mm เช่น 12:15)');
+  }
+  const cleanPickupTime = pickupTime.trim();
+
+  // 3. Authoritative Bangkok Time Resolution & Validation
+  const now = new Date();
+  const currentBangkok = getBangkokYmd(now);
+
+  let targetYmd = currentBangkok.ymd;
+  let targetYmdClean = currentBangkok.ymdClean;
+
+  if (request.pickupDate) {
+    const rawDate = request.pickupDate.trim();
+    const isIsoDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDate);
+    const isCleanDate = /^\d{8}$/.test(rawDate);
+    if (!isIsoDate && !isCleanDate) {
+      throw new Error('INVALID_DATE_FORMAT: รูปแบบวันที่ไม่ถูกต้อง (ต้องเป็น YYYY-MM-DD)');
+    }
+    const clean = rawDate.replace(/-/g, '');
+    if (clean < currentBangkok.ymdClean) {
+      throw new Error('PAST_DATE_NOT_ALLOWED: ไม่สามารถเลือกวันที่ย้อนหลังได้');
+    }
+    targetYmd = isIsoDate ? rawDate : `${rawDate.slice(0, 4)}-${rawDate.slice(4, 6)}-${rawDate.slice(6, 8)}`;
+    targetYmdClean = clean;
+  }
+
+  // Parse Target Date to find correct DayOfWeek for the pickup day
+  const [pYear, pMonth, pDay] = targetYmd.split('-').map(Number);
+  const targetPickupDateObj = new Date(Date.UTC(pYear, pMonth - 1, pDay, 12, 0, 0));
+  const targetBangkok = getBangkokYmd(targetPickupDateObj);
+
+  // Normalize Items by unique item variant
   const productTotalQuantityMap = new Map<string, number>();
   let totalOrderItemsCount = 0;
 
@@ -181,7 +243,6 @@ export async function createAuthoritativeStoreOrder(
   }
 
   return await runTransaction(db, async (tx) => {
-
     // =========================================================================
     // 📖 PHASE 1: READ ALL REQUIRED DOCUMENTS FIRST (Strict Read-Before-Write)
     // =========================================================================

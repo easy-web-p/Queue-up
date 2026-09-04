@@ -296,8 +296,11 @@ export const createOrderAuthoritative = onCall(
           });
         }
 
-        // 2.3 Slot Capacity
-        const authoritativeCapacity = Number(shopData.maxOrdersPerSlot) || 20;
+        // 2.3 Slot Capacity (Fail-Closed)
+        if (typeof shopData.maxOrdersPerSlot !== "number" || shopData.maxOrdersPerSlot <= 0) {
+          throw new HttpsError("failed-precondition", "STORE_CAPACITY_NOT_CONFIGURED: ร้านค้ายังไม่ได้กำหนดขีดจำกัดโควตาคิวรับอาหาร");
+        }
+        const authoritativeCapacity = shopData.maxOrdersPerSlot;
         let currentSlotOrders = 0;
         if (slotSnap.exists) {
           const slotData = slotSnap.data();
@@ -306,6 +309,7 @@ export const createOrderAuthoritative = onCall(
         if (currentSlotOrders + 1 > authoritativeCapacity) {
           throw new HttpsError("resource-exhausted", `SLOT_CAPACITY_EXCEEDED: รอบเวลารับอาหาร ${cleanPickupTime} น. ของวันที่ ${targetYmd} คิวเต็มแล้ว (${currentSlotOrders}/${authoritativeCapacity})`);
         }
+
 
         // 2.4 Queue Number Generation
         let sequenceNumber = 1;
