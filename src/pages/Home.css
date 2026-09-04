@@ -695,3 +695,90 @@ html[data-theme="dark"] .queue-carousel-arrow-btn:hover {
   background: #ff5a36 !important;
   border-color: #ff5a36 !important;
 }
+
+/* ==========================================================================
+   CANTEEN LIVE QUEUE & CALENDAR PRE-BOOKING STATUS BAR
+   ========================================================================== */
+.queue-canteen-status-bar {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 16px 20px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.queue-canteen-status-list {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.queue-canteen-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 8px 14px;
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.queue-canteen-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.queue-canteen-dot.online {
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+}
+
+.queue-canteen-dot.busy {
+  background: #f59e0b;
+  box-shadow: 0 0 6px #f59e0b;
+}
+
+.queue-canteen-action-btn {
+  background: linear-gradient(135deg, #8b0000 0%, #b22222 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 14px;
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(139, 0, 0, 0.2);
+}
+
+.queue-canteen-action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(139, 0, 0, 0.3);
+}
+
+html[data-theme="dark"] .queue-canteen-status-bar {
+  background: #151a23 !important;
+  border-color: #242c3d !important;
+}
+
+html[data-theme="dark"] .queue-canteen-chip {
+  background: #1e2638 !important;
+  border-color: #2f3b52 !important;
+  color: #e2e8f0 !important;
+}
+

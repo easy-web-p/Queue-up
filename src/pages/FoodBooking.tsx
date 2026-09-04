@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { Utensils, QrCode, ArrowLeft, Sparkles, AlertCircle, Clock, CheckCircle2, ShoppingBag } from 'lucide-react';
+import { Utensils, ArrowLeft, Sparkles, AlertCircle, Clock, CheckCircle2, ShoppingBag, Store, MapPin, Calendar, Compass, ChevronRight } from 'lucide-react';
 import { CartItem, Order, CustomerProfile } from '../types';
 import { db } from '../firebase/config.js';
 import { createAuthoritativeStoreOrder } from '../services/orderCreationService';
@@ -13,6 +13,34 @@ interface FoodBookingPageProps {
   onBookingSuccess?: (createdOrder: Order) => void;
   onBack?: () => void;
 }
+
+const getTodayYmdStr = () => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const formatThaiDate = (ymdStr?: string) => {
+  if (!ymdStr) return '';
+  try {
+    const parts = ymdStr.split('-');
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10) + 543;
+      const monthNames = [
+        'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+        'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
+      ];
+      const monthIndex = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      return `${day} ${monthNames[monthIndex] || ''} ${year}`;
+    }
+  } catch {
+    // fallback
+  }
+  return ymdStr;
+};
 
 export const FoodBooking: React.FC<FoodBookingPageProps> = ({
   cartItems: propCartItems = [],
@@ -45,11 +73,14 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
   })();
 
   const [pickupTime, setPickupTime] = useState(locationState?.pickupTime || '12:15');
-  const [pickupDate, setPickupDate] = useState(locationState?.bookingDate || '2026-09-04');
+  const [pickupDate, setPickupDate] = useState(locationState?.bookingDate || getTodayYmdStr());
   const [customInstructions, setCustomInstructions] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
+
+  const storeName = locationState?.storeName || 'ร้านป้าแดง ตามสั่ง & ไก่ทอด';
+  const storeLocation = locationState?.storeLocation || 'ล็อค 02 โรงอาหารกลาง 1 (ชั้น 1)';
 
   const onBack = propOnBack || (() => {
     if (window.history.length > 1) {
@@ -142,13 +173,34 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
               </button>
             )}
             <div>
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">สั่งอาหารและจองคิว (Order & Queue)</h1>
-              <p className="text-xs text-slate-500 font-medium">ตรวจสอบรายการอาหาร ระบุเวลารับ และยืนยันรับคิวทันที</p>
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">ยืนยันรายการและรับคิว (Order & Queue)</h1>
+              <p className="text-xs text-slate-500 font-medium">ระบบ Zero-Payment สั่งปุ๊บรับหมายเลขคิวทันที</p>
             </div>
           </div>
           <div className="hidden sm:flex items-center gap-1.5 bg-amber-50 text-amber-800 px-3 py-1.5 rounded-full text-xs font-bold border border-amber-200">
             <Sparkles className="w-4 h-4 text-amber-600" />
             รับแต้มสะสม CRM x2
+          </div>
+        </div>
+
+        {/* Store Info Banner */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-100 text-[#8B0000] flex items-center justify-center font-bold">
+              <Store className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-sm font-black text-slate-900">{storeName}</div>
+              <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                <MapPin className="w-3.5 h-3.5 text-[#8B0000]" />
+                {storeLocation}
+              </div>
+            </div>
+          </div>
+          <div className="text-right">
+            <span className="text-[11px] font-bold px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full">
+              🟢 ร้านเปิดให้บริการ
+            </span>
           </div>
         </div>
 
@@ -183,6 +235,18 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
 
             <div className="bg-slate-50 p-4 rounded-2xl max-w-sm mx-auto text-left text-xs font-medium text-slate-600 space-y-2 border border-slate-200">
               <div className="flex justify-between">
+                <span>ร้านค้า:</span>
+                <span className="font-bold text-slate-800">{storeName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>ตำแหน่งร้าน:</span>
+                <span className="font-bold text-slate-800">{storeLocation}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>วันที่นัดรับ:</span>
+                <span className="font-bold text-slate-800">{formatThaiDate(pickupDate)}</span>
+              </div>
+              <div className="flex justify-between">
                 <span>เวลารับอาหาร:</span>
                 <span className="font-bold text-slate-800">{createdOrder.pickupTime} น.</span>
               </div>
@@ -197,6 +261,17 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
               <div className="flex justify-between">
                 <span>สถานะคิว:</span>
                 <span className="font-bold text-emerald-600">ยืนยันคิวแล้ว (Confirmed)</span>
+              </div>
+            </div>
+
+            {/* Wayfinding Tip */}
+            <div className="bg-amber-50/80 border border-amber-200 p-4 rounded-2xl max-w-sm mx-auto text-left text-xs flex items-start gap-2.5">
+              <Compass className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold text-amber-900 block">เส้นทางเดินรับอาหาร:</span>
+                <p className="text-amber-800 text-[11px] mt-0.5">
+                  เดินเข้าทางเข้าหลักโรงอาหาร ผ่านเสา C3 ตรงไป 40 วินาที รับที่จุด Pick-up หน้าล็อค 02
+                </p>
               </div>
             </div>
 
@@ -256,18 +331,43 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
               )}
             </div>
 
+            {/* Date Selection Review */}
+            <div>
+              <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-[#8B0000]" />
+                วันที่ต้องการรับอาหาร *
+              </label>
+              <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
+                <div>
+                  <span className="text-xs font-bold text-slate-800 block">
+                    {formatThaiDate(pickupDate) || pickupDate}
+                  </span>
+                  <span className="text-[11px] text-emerald-600 font-semibold">
+                    ✓ ระบบเปิดรับจองล่วงหน้า
+                  </span>
+                </div>
+                <input
+                  type="date"
+                  value={pickupDate}
+                  onChange={(e) => setPickupDate(e.target.value)}
+                  className="text-xs font-bold bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-slate-700 focus:outline-none focus:border-[#8B0000]"
+                />
+              </div>
+            </div>
+
             {/* Pickup Time Select */}
             <div>
-              <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-[#8B0000]" />
                 เลือกระบุเวลารับอาหารพักเที่ยง *
               </label>
-              <div className="grid grid-cols-3 gap-3">
-                {['11:45', '12:15', '12:30'].map((time) => (
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                {['11:30', '11:45', '12:00', '12:15', '12:30', '12:45'].map((time) => (
                   <button
                     key={time}
                     type="button"
                     onClick={() => setPickupTime(time)}
-                    className={`py-3 rounded-2xl text-xs font-bold transition-all border cursor-pointer ${
+                    className={`py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
                       pickupTime === time
                         ? 'bg-[#8B0000] text-white border-[#8B0000] shadow-md'
                         : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-amber-50'
@@ -311,3 +411,4 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
 };
 
 export default FoodBooking;
+

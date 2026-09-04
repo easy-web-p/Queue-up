@@ -364,6 +364,41 @@ function Home() {
           />
         </section>
 
+        {/* 3.5 Live Canteen Queue & Pre-Booking Calendar Status Bar */}
+        <section className="queue-canteen-status-bar">
+          <div className="queue-canteen-status-list">
+            <div className="queue-canteen-chip">
+              <span className="queue-canteen-dot online" />
+              <span>
+                <strong>{language === "en" ? "Canteen 1:" : "โรงอาหารกลาง 1:"}</strong>{" "}
+                {language === "en" ? "Wait ~3 mins (Open)" : "คิวเฉลี่ย ~3 นาที (เปิดปกติ)"}
+              </span>
+            </div>
+            <div className="queue-canteen-chip">
+              <span className="queue-canteen-dot online" />
+              <span>
+                <strong>{language === "en" ? "Canteen 2:" : "โรงอาหาร 2:"}</strong>{" "}
+                {language === "en" ? "Wait ~2 mins (Open)" : "คิวเฉลี่ย ~2 นาที (คล่องตัว)"}
+              </span>
+            </div>
+            <div className="queue-canteen-chip">
+              <i className="bi bi-calendar-event text-danger" />
+              <span>
+                <strong>{language === "en" ? "Pre-Booking Slot:" : "รอบนัดรับเที่ยงนี้:"}</strong> 11:30 - 13:00 น.
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="queue-canteen-action-btn"
+            onClick={() => navigate("/search?keyword=ทั้งหมด")}
+          >
+            <i className="bi bi-compass" />
+            {language === "en" ? "Explore & Order" : "เลือกเมนูและจองคิวทันที"}
+          </button>
+        </section>
+
         {/* 4. Food Categories Carousel */}
         <section className="queue-category-section">
           <h5 className="fw-bold queue-category-title mb-3">
