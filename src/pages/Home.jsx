@@ -399,6 +399,89 @@ function Home() {
           </button>
         </section>
 
+        {/* 3.5 QueueUp for Campus Hub Section */}
+        <section className="p-4 p-md-5 rounded-4 shadow-sm mb-4" style={{ backgroundColor: "#241C16", border: "1px solid rgba(255, 122, 26, 0.25)" }}>
+          <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+            <div>
+              <span className="badge font-monospace fw-bold mb-1" style={{ backgroundColor: "#FF7A1A", color: "#FFFFFF" }}>
+                QUEUEUP FOR CAMPUS
+              </span>
+              <h4 className="fw-bold text-white mb-0">ศูนย์รวมบริการโรงอาหารอัจฉริยะในสถานศึกษา</h4>
+              <p className="text-secondary small mb-0">ระบบสนับสนุนผู้ประกอบการนักเรียน กระเป๋าเงินดิจิทัล และระบบดูแลสุขภาพผู้เรียน</p>
+            </div>
+          </div>
+
+          <div className="row g-3">
+            <div className="col-12 col-sm-6 col-lg-3">
+              <div
+                className="p-3 rounded-4 h-100 d-flex flex-column justify-content-between"
+                style={{ backgroundColor: "#16100C", border: "1px solid rgba(255, 122, 26, 0.2)", cursor: "pointer" }}
+                onClick={() => navigate("/campus/onboarding")}
+              >
+                <div>
+                  <div className="fs-3 mb-2">🧑‍🎓</div>
+                  <h6 className="fw-bold text-white mb-1">ร้านค้านักเรียน</h6>
+                  <p className="text-secondary small mb-0">ยื่นขอเปิดร้านค้าในโรงอาหาร บ่มเพาะทักษะธุรกิจ</p>
+                </div>
+                <button type="button" className="btn btn-sm rounded-pill mt-3 w-100 fw-bold" style={{ border: "1px solid #FF7A1A", color: "#FF7A1A" }}>
+                  ยื่นขอเปิดร้าน ›
+                </button>
+              </div>
+            </div>
+
+            <div className="col-12 col-sm-6 col-lg-3">
+              <div
+                className="p-3 rounded-4 h-100 d-flex flex-column justify-content-between"
+                style={{ backgroundColor: "#16100C", border: "1px solid rgba(255, 122, 26, 0.2)", cursor: "pointer" }}
+                onClick={() => navigate("/campus/guardian")}
+              >
+                <div>
+                  <div className="fs-3 mb-2">🛡️</div>
+                  <h6 className="fw-bold text-white mb-1">ผู้ปกครอง (Guardian)</h6>
+                  <p className="text-secondary small mb-0">เติมเงิน กำหนดวงเงินรายวัน และบล็อกหมวดอาหาร</p>
+                </div>
+                <button type="button" className="btn btn-sm rounded-pill mt-3 w-100 fw-bold" style={{ border: "1px solid #FF7A1A", color: "#FF7A1A" }}>
+                  จัดการกระเป๋าเงิน ›
+                </button>
+              </div>
+            </div>
+
+            <div className="col-12 col-sm-6 col-lg-3">
+              <div
+                className="p-3 rounded-4 h-100 d-flex flex-column justify-content-between"
+                style={{ backgroundColor: "#16100C", border: "1px solid rgba(255, 122, 26, 0.2)", cursor: "pointer" }}
+                onClick={() => navigate("/campus/approvals")}
+              >
+                <div>
+                  <div className="fs-3 mb-2">👨‍🏫</div>
+                  <h6 className="fw-bold text-white mb-1">อาจารย์ / ผู้ดูแล</h6>
+                  <p className="text-secondary small mb-0">อนุมัติร้านค้านักเรียน และตรวจสอบสุขอนามัย</p>
+                </div>
+                <button type="button" className="btn btn-sm rounded-pill mt-3 w-100 fw-bold" style={{ border: "1px solid #FF7A1A", color: "#FF7A1A" }}>
+                  แผงควบคุมอาจารย์ ›
+                </button>
+              </div>
+            </div>
+
+            <div className="col-12 col-sm-6 col-lg-3">
+              <div
+                className="p-3 rounded-4 h-100 d-flex flex-column justify-content-between"
+                style={{ backgroundColor: "#16100C", border: "1px solid rgba(255, 122, 26, 0.2)", cursor: "pointer" }}
+                onClick={() => navigate("/campus/monitor")}
+              >
+                <div>
+                  <div className="fs-3 mb-2">📺</div>
+                  <h6 className="fw-bold text-white mb-1">จอแสดงคิวสด</h6>
+                  <p className="text-secondary small mb-0">จอแสดงผลคิวปรุงเสร็จแบบเรียลไทม์ในโรงอาหาร</p>
+                </div>
+                <button type="button" className="btn btn-sm rounded-pill mt-3 w-100 fw-bold" style={{ border: "1px solid #FF7A1A", color: "#FF7A1A" }}>
+                  เปิดจอคิวสด ›
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* 4. Food Categories Carousel */}
         <section className="queue-category-section">
           <h5 className="fw-bold queue-category-title mb-3">
