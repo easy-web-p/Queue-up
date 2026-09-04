@@ -1,15 +1,18 @@
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getAuth } from "firebase-admin/auth";
 import { onRequest, onCall, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 
 initializeApp();
 const db = getFirestore();
+const authAdmin = getAuth();
 
 /**
  * ============================================================================
- * QUEUEUP CLOUD FUNCTIONS (ZERO-PAYMENT ARCHITECTURE)
+ * QUEUEUP & QUEUEUP FOR CAMPUS CLOUD FUNCTIONS
  * Direct Food Ordering, Authoritative Order Creation & Queue Issuance
+ * Student Vendor Workflow, Campus Wallet & Emergency Medical Protocols
  * ============================================================================
  */
 
@@ -48,7 +51,7 @@ function getBangkokYmd(date = new Date()) {
 }
 
 /**
- * 🔒 Server-Authoritative Order Creation (Instant Q001 via Zero-Payment)
+ * 🔒 Server-Authoritative Order Creation (5-Phase Ordering with Campus Wallet support)
  */
 export const createOrderAuthoritative = onCall(
   { region: "asia-southeast1", cors: true },
@@ -67,6 +70,8 @@ export const createOrderAuthoritative = onCall(
       items,
       pickupTime,
       pickupDate,
+      paymentMode, // 'CAMPUS_WALLET' | 'DIRECT_ZERO_PAYMENT'
+      studentId,   // Required if paymentMode === 'CAMPUS_WALLET'
     } = request.data || {};
 
     if (userId && userId !== authUid && request.auth.token?.admin !== true) {
@@ -142,10 +147,13 @@ export const createOrderAuthoritative = onCall(
       productTotalQuantityMap.set(it.productId, (productTotalQuantityMap.get(it.productId) || 0) + qty);
     }
 
+    const isCampusWallet = paymentMode === "CAMPUS_WALLET";
+    const effectiveStudentId = isCampusWallet ? (studentId || authUid) : null;
+
     try {
       return await db.runTransaction(async (tx) => {
         // ===================================================================
-        // PHASE 1: READ ALL REQUIRED DOCUMENTS
+        // PHASE 0 & 1: READ ALL REQUIRED DOCUMENTS
         // ===================================================================
         const shopRef = db.collection("shops").doc(storeId);
         const shopSnap = await tx.get(shopRef);
@@ -153,6 +161,17 @@ export const createOrderAuthoritative = onCall(
           throw new HttpsError("not-found", `STORE_NOT_FOUND: ร้านค้ารหัส ${storeId} ไม่มีอยู่ในระบบ`);
         }
         const shopData = shopSnap.data();
+
+        // Optional Campus Wallet & Student documents
+        let walletSnap = null;
+        let walletRef = null;
+        let studentSnap = null;
+        if (isCampusWallet && effectiveStudentId) {
+          walletRef = db.collection("wallets").doc(effectiveStudentId);
+          walletSnap = await tx.get(walletRef);
+          const studentRef = db.collection("students").doc(effectiveStudentId);
+          studentSnap = await tx.get(studentRef);
+        }
 
         // Read all product documents
         const productSnapMap = new Map();
@@ -232,7 +251,6 @@ export const createOrderAuthoritative = onCall(
           }
         }
 
-
         // 2.2 Product Stock & Modifier Integrity
         for (const [prodId, requiredTotalQty] of productTotalQuantityMap.entries()) {
           const prodData = productSnapMap.get(prodId).data();
@@ -250,9 +268,12 @@ export const createOrderAuthoritative = onCall(
 
         let calculatedTotalSatang = 0;
         const validatedOrderItems = [];
+        const itemCategories = new Set();
 
         for (const itemReq of items) {
           const prodData = productSnapMap.get(itemReq.productId).data();
+          if (prodData.category) itemCategories.add(prodData.category);
+
           const basePriceSatang = prodData.priceSatang ?? Math.round((Number(prodData.price) || 0) * 100);
           let itemModifierSatang = 0;
 
@@ -323,6 +344,7 @@ export const createOrderAuthoritative = onCall(
           validatedOrderItems.push({
             productId: itemReq.productId,
             name: prodData.name,
+            category: prodData.category || "General",
             quantity: Number(itemReq.quantity),
             unitPriceSatang,
             unitPrice: unitPriceSatang / 100,
@@ -333,7 +355,47 @@ export const createOrderAuthoritative = onCall(
           });
         }
 
-        // 2.3 Slot Capacity (Fail-Closed)
+        // 2.3 Campus Wallet Spending Rules Enforcement (Phase 0)
+        let walletData = null;
+        if (isCampusWallet) {
+          if (!walletSnap || !walletSnap.exists) {
+            throw new HttpsError("not-found", "CAMPUS_WALLET_NOT_FOUND: ไม่พบบัญชีกระเป๋าเงินดิจิทัลสำหรับนักเรียน");
+          }
+          walletData = walletSnap.data();
+          if (walletData.isLocked === true) {
+            throw new HttpsError("failed-precondition", "CAMPUS_WALLET_LOCKED: กระเป๋าเงินถูกระงับการใช้งานชั่วคราวโดยผู้ปกครองหรือโรงเรียน");
+          }
+
+          const currentBalance = Number(walletData.balanceSatang) || 0;
+          if (currentBalance < calculatedTotalSatang) {
+            throw new HttpsError("failed-precondition", `INSUFFICIENT_WALLET_BALANCE: ยอดเงินในกระเป๋าไม่เพียงพอ (คงเหลือ ${currentBalance / 100} บาท, ยอดสั่งซื้อ ${calculatedTotalSatang / 100} บาท)`);
+          }
+
+          // Check Daily Limit
+          const dailyLimitSatang = typeof walletData.dailyLimitSatang === "number" ? walletData.dailyLimitSatang : 20000; // default 200 THB
+          const lastSpentDate = walletData.lastSpentDate || "";
+          const spentToday = lastSpentDate === targetYmd ? (Number(walletData.spentTodaySatang) || 0) : 0;
+          if (spentToday + calculatedTotalSatang > dailyLimitSatang) {
+            throw new HttpsError("failed-precondition", `DAILY_LIMIT_EXCEEDED: ยอดการใช้จ่ายเกินวงเงินรายวัน (${dailyLimitSatang / 100} บาท/วัน) วันนี้ใช้ไปแล้ว ${spentToday / 100} บาท`);
+          }
+
+          // Check Weekly Limit
+          const weeklyLimitSatang = typeof walletData.weeklyLimitSatang === "number" ? walletData.weeklyLimitSatang : 100000; // default 1000 THB
+          const spentThisWeek = Number(walletData.spentThisWeekSatang) || 0;
+          if (spentThisWeek + calculatedTotalSatang > weeklyLimitSatang) {
+            throw new HttpsError("failed-precondition", `WEEKLY_LIMIT_EXCEEDED: ยอดการใช้จ่ายเกินวงเงินรายสัปดาห์ (${weeklyLimitSatang / 100} บาท/สัปดาห์)`);
+          }
+
+          // Check Blocked Categories
+          const blockedCategories = Array.isArray(walletData.blockedCategories) ? walletData.blockedCategories : [];
+          for (const cat of itemCategories) {
+            if (blockedCategories.includes(cat)) {
+              throw new HttpsError("failed-precondition", `BLOCKED_CATEGORY_VIOLATION: หมวดหมู่สินค้า "${cat}" ถูกจำกัดการซื้อโดยผู้ปกครอง`);
+            }
+          }
+        }
+
+        // 2.4 Slot Capacity (Fail-Closed)
         if (typeof shopData.maxOrdersPerSlot !== "number" || shopData.maxOrdersPerSlot <= 0) {
           throw new HttpsError("failed-precondition", "STORE_CAPACITY_NOT_CONFIGURED: ร้านค้ายังไม่ได้กำหนดขีดจำกัดโควตาคิวรับอาหาร");
         }
@@ -347,8 +409,7 @@ export const createOrderAuthoritative = onCall(
           throw new HttpsError("resource-exhausted", `SLOT_CAPACITY_EXCEEDED: รอบเวลารับอาหาร ${cleanPickupTime} น. ของวันที่ ${targetYmd} คิวเต็มแล้ว (${currentSlotOrders}/${authoritativeCapacity})`);
         }
 
-
-        // 2.4 Queue Number Generation
+        // 2.5 Queue Number Generation
         let sequenceNumber = 1;
         if (counterSnap.exists) {
           sequenceNumber = (Number(counterSnap.data().lastSequence) || 0) + 1;
@@ -356,7 +417,7 @@ export const createOrderAuthoritative = onCall(
         const queueNumber = `Q${String(sequenceNumber).padStart(3, "0")}`;
 
         // ===================================================================
-        // PHASE 3: WRITE ALL MUTATIONS ATOMICALLY
+        // PHASE 3 & 4: WRITE ALL MUTATIONS ATOMICALLY (Including Wallet Deduction)
         // ===================================================================
         // Update product stock
         for (const [prodId, requiredTotalQty] of productTotalQuantityMap.entries()) {
@@ -411,6 +472,9 @@ export const createOrderAuthoritative = onCall(
           queueNumber,
           status: "PENDING",
           queueStatus: "waiting",
+          paymentMode: isCampusWallet ? "CAMPUS_WALLET" : "DIRECT_ZERO_PAYMENT",
+          paymentStatus: isCampusWallet ? "PAID" : "NOT_APPLICABLE",
+          studentId: effectiveStudentId,
           totalAmountSatang: calculatedTotalSatang,
           totalAmount: calculatedTotalSatang / 100,
           finalAmountSatang: calculatedTotalSatang,
@@ -427,6 +491,37 @@ export const createOrderAuthoritative = onCall(
 
         tx.set(orderDocRef, orderPayload);
 
+        // Phase 4: Atomic Wallet Deduction & Transaction Log
+        if (isCampusWallet && walletRef && walletData) {
+          const currentBal = Number(walletData.balanceSatang) || 0;
+          const lastSpentDate = walletData.lastSpentDate || "";
+          const spentToday = lastSpentDate === targetYmd ? (Number(walletData.spentTodaySatang) || 0) : 0;
+          const spentThisWeek = Number(walletData.spentThisWeekSatang) || 0;
+
+          tx.update(walletRef, {
+            balanceSatang: currentBal - calculatedTotalSatang,
+            spentTodaySatang: spentToday + calculatedTotalSatang,
+            spentThisWeekSatang: spentThisWeek + calculatedTotalSatang,
+            lastSpentDate: targetYmd,
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+
+          const txRef = db.collection("wallet_transactions").doc();
+          tx.set(txRef, {
+            id: txRef.id,
+            walletId: effectiveStudentId,
+            studentId: effectiveStudentId,
+            orderId,
+            amountSatang: calculatedTotalSatang,
+            type: "SPEND",
+            storeId,
+            storeName: shopData.name || "Campus Store",
+            actorUid: authUid,
+            note: `ซื้ออาหารคิว ${queueNumber} ที่ร้าน ${shopData.name || storeId}`,
+            timestamp: FieldValue.serverTimestamp(),
+          });
+        }
+
         return {
           success: true,
           orderId,
@@ -434,6 +529,7 @@ export const createOrderAuthoritative = onCall(
           totalAmountSatang: calculatedTotalSatang,
           totalAmountBaht: calculatedTotalSatang / 100,
           orderStatus: "PENDING",
+          paymentMode: isCampusWallet ? "CAMPUS_WALLET" : "DIRECT_ZERO_PAYMENT",
           order: orderPayload,
         };
       });
@@ -446,6 +542,308 @@ export const createOrderAuthoritative = onCall(
 );
 
 /**
+ * 🎓 Submit Vendor Approval Request (Student Entrepreneur Onboarding)
+ */
+export const submitVendorApprovalRequest = onCall(
+  { region: "asia-southeast1", cors: true },
+  async (request) => {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "กรุณาเข้าสู่ระบบก่อนยื่นคำขอเปิดร้านค้า");
+    }
+
+    const {
+      studentName,
+      studentCode,
+      class: studentClass,
+      room,
+      shopName,
+      requestedZone,
+      productCategories,
+      menuPreview,
+    } = request.data || {};
+
+    if (!studentName || !studentCode || !shopName || !requestedZone) {
+      throw new HttpsError("invalid-argument", "กรุณากรอกข้อมูลนักเรียนและข้อมูลร้านค้าให้ครบถ้วน");
+    }
+
+    const approvalDocRef = db.collection("vendor_approvals").doc();
+    const payload = {
+      id: approvalDocRef.id,
+      studentVendorId: request.auth.uid,
+      studentName: String(studentName).trim(),
+      studentCode: String(studentCode).trim(),
+      class: String(studentClass || "").trim(),
+      room: String(room || "").trim(),
+      shopName: String(shopName).trim(),
+      requestedZone: String(requestedZone).trim(),
+      productCategories: Array.isArray(productCategories) ? productCategories : ["Snacks"],
+      menuPreview: Array.isArray(menuPreview) ? menuPreview : [],
+      status: "PENDING",
+      submittedAt: FieldValue.serverTimestamp(),
+    };
+
+    await approvalDocRef.set(payload);
+
+    return {
+      success: true,
+      approvalId: approvalDocRef.id,
+      message: "ยื่นคำขอเปิดร้านค้าสำเร็จ กรุณารออาจารย์หรือผู้รับผิดชอบโรงอาหารอนุมัติ",
+    };
+  }
+);
+
+/**
+ * 👨‍🏫 Review Vendor Approval Request (Staff Supervisor / Admin Approval Panel)
+ */
+export const reviewVendorApprovalRequest = onCall(
+  { region: "asia-southeast1", cors: true },
+  async (request) => {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "กรุณาเข้าสู่ระบบก่อนทำการตรวจสอบ");
+    }
+
+    const tokenRole = request.auth.token?.role;
+    const isStaffOrAdmin = tokenRole === "staff_supervisor" || tokenRole === "admin" || request.auth.token?.admin === true;
+    
+    // Check in staff_supervisors collection if token role is not yet refreshed
+    let isAuthorized = isStaffOrAdmin;
+    if (!isAuthorized) {
+      const staffDoc = await db.collection("staff_supervisors").doc(request.auth.uid).get();
+      if (staffDoc.exists && staffDoc.data().canApproveVendors) {
+        isAuthorized = true;
+      }
+    }
+
+    if (!isAuthorized) {
+      throw new HttpsError("permission-denied", "คุณไม่มีสิทธิ์ในการอนุมัติหรือปฏิเสธคำขอเปิดร้านค้า (ต้องเป็น Staff Supervisor หรือ Admin)");
+    }
+
+    const { approvalId, decision, rejectionReason } = request.data || {};
+    if (!approvalId || !["APPROVED", "REJECTED"].includes(decision)) {
+      throw new HttpsError("invalid-argument", "กรุณาระบุ approvalId และ decision ('APPROVED' หรือ 'REJECTED')");
+    }
+
+    const approvalRef = db.collection("vendor_approvals").doc(approvalId);
+    const approvalSnap = await approvalRef.get();
+    if (!approvalSnap.exists) {
+      throw new HttpsError("not-found", "ไม่พบเอกสารคำขอนี้ในระบบ");
+    }
+
+    const approvalData = approvalSnap.data();
+    const studentVendorId = approvalData.studentVendorId;
+
+    if (decision === "APPROVED") {
+      // 1. Update Approval Doc
+      await approvalRef.update({
+        status: "APPROVED",
+        approvedBy: request.auth.uid,
+        approvedByName: request.auth.token?.name || "อาจารย์ผู้ดูแลระบบ",
+        approvedAt: FieldValue.serverTimestamp(),
+      });
+
+      // 2. Set Custom User Claims for student vendor role
+      try {
+        await authAdmin.setCustomUserClaims(studentVendorId, {
+          role: "student_vendor",
+        });
+      } catch (err) {
+        console.warn("[reviewVendorApprovalRequest] Warning setting custom claims:", err);
+      }
+
+      // 3. Ensure Shop Document is created and linked
+      const shopDocRef = db.collection("shops").doc(`shop_${studentVendorId}`);
+      await shopDocRef.set(
+        {
+          id: shopDocRef.id,
+          name: approvalData.shopName,
+          ownerUid: studentVendorId,
+          ownerName: approvalData.studentName,
+          zone: approvalData.requestedZone,
+          status: "active",
+          isOpen: true,
+          maxOrdersPerSlot: 10,
+          categories: approvalData.productCategories || ["Campus Snacks"],
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      // 4. Update user profile role
+      await db.collection("users").doc(studentVendorId).set(
+        {
+          role: "student_vendor",
+          storeId: shopDocRef.id,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      return {
+        success: true,
+        status: "APPROVED",
+        shopId: shopDocRef.id,
+        message: "อนุมัติเปิดร้านค้าให้นักเรียนสำเร็จและเปิดใช้งานร้านเรียบร้อย",
+      };
+    } else {
+      // REJECTED
+      await approvalRef.update({
+        status: "REJECTED",
+        rejectionReason: rejectionReason || "ข้อมูลไม่ผ่านเกณฑ์การเปิดร้านในโรงเรียน",
+        reviewedBy: request.auth.uid,
+        reviewedAt: FieldValue.serverTimestamp(),
+      });
+
+      return {
+        success: true,
+        status: "REJECTED",
+        message: "บันทึกผลการปฏิเสธคำขอเรียบร้อยแล้ว",
+      };
+    }
+  }
+);
+
+/**
+ * 💳 Top-up Campus Wallet (Staff or Guardian)
+ */
+export const topupCampusWallet = onCall(
+  { region: "asia-southeast1", cors: true },
+  async (request) => {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "กรุณาเข้าสู่ระบบก่อนทำรายการเติมเงิน");
+    }
+
+    const { studentId, amountSatang, note, paymentMethod } = request.data || {};
+    const amt = Number(amountSatang);
+    if (!studentId || !Number.isInteger(amt) || amt <= 0) {
+      throw new HttpsError("invalid-argument", "กรุณาระบุ studentId และจำนวนเงิน (Satang) ที่ถูกต้อง");
+    }
+
+    const walletRef = db.collection("wallets").doc(studentId);
+
+    return await db.runTransaction(async (tx) => {
+      const walletSnap = await tx.get(walletRef);
+      let currentBal = 0;
+      let walletData = {};
+
+      if (walletSnap.exists) {
+        walletData = walletSnap.data();
+        currentBal = Number(walletData.balanceSatang) || 0;
+      }
+
+      const newBal = currentBal + amt;
+
+      tx.set(
+        walletRef,
+        {
+          studentId,
+          balanceSatang: newBal,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      const txRef = db.collection("wallet_transactions").doc();
+      tx.set(txRef, {
+        id: txRef.id,
+        walletId: studentId,
+        studentId,
+        amountSatang: amt,
+        type: "TOPUP",
+        actorUid: request.auth.uid,
+        paymentMethod: paymentMethod || "PROMPTPAY",
+        note: note || "เติมเงินเข้ากระเป๋านักเรียน",
+        timestamp: FieldValue.serverTimestamp(),
+      });
+
+      return {
+        success: true,
+        studentId,
+        addedSatang: amt,
+        newBalanceSatang: newBal,
+        newBalanceBaht: newBal / 100,
+      };
+    });
+  }
+);
+
+/**
+ * 🛡️ Update Campus Wallet Spending Limits & Categories (Guardian / Supervisor)
+ */
+export const updateCampusWalletLimits = onCall(
+  { region: "asia-southeast1", cors: true },
+  async (request) => {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "กรุณาเข้าสู่ระบบก่อนตั้งค่ากระเป๋าเงิน");
+    }
+
+    const { studentId, dailyLimitSatang, weeklyLimitSatang, blockedCategories, isLocked } = request.data || {};
+    if (!studentId) {
+      throw new HttpsError("invalid-argument", "กรุณาระบุ studentId");
+    }
+
+    const walletRef = db.collection("wallets").doc(studentId);
+    const updatePayload = {
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+
+    if (typeof dailyLimitSatang === "number" && dailyLimitSatang >= 0) {
+      updatePayload.dailyLimitSatang = dailyLimitSatang;
+    }
+    if (typeof weeklyLimitSatang === "number" && weeklyLimitSatang >= 0) {
+      updatePayload.weeklyLimitSatang = weeklyLimitSatang;
+    }
+    if (Array.isArray(blockedCategories)) {
+      updatePayload.blockedCategories = blockedCategories;
+    }
+    if (typeof isLocked === "boolean") {
+      updatePayload.isLocked = isLocked;
+    }
+
+    await walletRef.set(updatePayload, { merge: true });
+
+    return {
+      success: true,
+      studentId,
+      message: "อัปเดตการตั้งค่าและวงเงินการใช้งานเรียบร้อยแล้ว",
+    };
+  }
+);
+
+/**
+ * 🚨 Log Emergency Medical / Allergy Lookup (Immutable Audit Trail)
+ */
+export const logEmergencyLookup = onCall(
+  { region: "asia-southeast1", cors: true },
+  async (request) => {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "กรุณาเข้าสู่ระบบก่อนเข้าถึงข้อมูลฉุกเฉิน");
+    }
+
+    const { studentId, studentName, reason } = request.data || {};
+    if (!studentId) {
+      throw new HttpsError("invalid-argument", "กรุณาระบุ studentId");
+    }
+
+    const auditRef = db.collection("audit_logs").doc();
+    await auditRef.set({
+      id: auditRef.id,
+      action: "EMERGENCY_MEDICAL_LOOKUP",
+      actorUid: request.auth.uid,
+      targetStudentId: studentId,
+      targetStudentName: studentName || "N/A",
+      reason: reason || "การรักษาพยาบาลหรืออุบัติเหตุฉุกเฉิน",
+      timestamp: FieldValue.serverTimestamp(),
+    });
+
+    return {
+      success: true,
+      auditId: auditRef.id,
+    };
+  }
+);
+
+/**
  * Health check & platform status endpoint
  */
 export const getSystemHealth = onRequest(
@@ -454,7 +852,7 @@ export const getSystemHealth = onRequest(
     try {
       res.status(200).json({
         status: "ok",
-        architecture: "Zero-Payment Direct Food Queue",
+        architecture: "Zero-Payment Direct Food Queue with QueueUp for Campus Extension",
         timestamp: new Date().toISOString(),
         region: "asia-southeast1",
       });
@@ -473,4 +871,3 @@ export const scheduledDailyMaintenance = onSchedule(
     console.log("[QueueUp] Daily maintenance routine triggered successfully.");
   }
 );
-

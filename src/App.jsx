@@ -19,6 +19,13 @@ import PageRouteLoader from "./components/PageRouteLoader.jsx";
 import CookieConsentBanner from "./components/CookieConsentBanner.jsx";
 import CookieSessionTracker from "./components/CookieSessionTracker.jsx";
 
+// QueueUp for Campus Pages
+import StudentVendorOnboarding from "./pages/StudentVendorOnboarding.tsx";
+import VendorApprovalPanel from "./pages/VendorApprovalPanel.tsx";
+import GuardianDashboard from "./pages/GuardianDashboard.tsx";
+import EmergencyLookup from "./pages/EmergencyLookup.tsx";
+import CampusQueueMonitor from "./pages/CampusQueueMonitor.tsx";
+
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
@@ -82,11 +89,18 @@ function App() {
             <Route path="/food-booking" element={<ProtectedRoute><FoodBooking /></ProtectedRoute>} />
 
             {/* Merchant Dashboard & Onboarding Routes */}
-            <Route path="/merchant/dashboard" element={<ProtectedRoute allowedRoles={["merchant", "admin"]}><MerchantDashboard /></ProtectedRoute>} />
-            <Route path="/Merchant/Dashboard" element={<ProtectedRoute allowedRoles={["merchant", "admin"]}><MerchantDashboard /></ProtectedRoute>} />
-            <Route path="/Merchant/dashboard" element={<ProtectedRoute allowedRoles={["merchant", "admin"]}><MerchantDashboard /></ProtectedRoute>} />
-            <Route path="/portal/th-onboarding" element={<ProtectedRoute allowedRoles={["customer", "merchant", "admin"]}><MerchantOnboarding /></ProtectedRoute>} />
-            <Route path="/portal/onboarding" element={<ProtectedRoute allowedRoles={["customer", "merchant", "admin"]}><MerchantOnboarding /></ProtectedRoute>} />
+            <Route path="/merchant/dashboard" element={<ProtectedRoute allowedRoles={["merchant", "student_vendor", "admin"]}><MerchantDashboard /></ProtectedRoute>} />
+            <Route path="/Merchant/Dashboard" element={<ProtectedRoute allowedRoles={["merchant", "student_vendor", "admin"]}><MerchantDashboard /></ProtectedRoute>} />
+            <Route path="/Merchant/dashboard" element={<ProtectedRoute allowedRoles={["merchant", "student_vendor", "admin"]}><MerchantDashboard /></ProtectedRoute>} />
+            <Route path="/portal/th-onboarding" element={<ProtectedRoute allowedRoles={["customer", "merchant", "student_vendor", "admin"]}><MerchantOnboarding /></ProtectedRoute>} />
+            <Route path="/portal/onboarding" element={<ProtectedRoute allowedRoles={["customer", "merchant", "student_vendor", "admin"]}><MerchantOnboarding /></ProtectedRoute>} />
+
+            {/* QueueUp for Campus Routes */}
+            <Route path="/campus/onboarding" element={<ProtectedRoute><StudentVendorOnboarding /></ProtectedRoute>} />
+            <Route path="/campus/approvals" element={<ProtectedRoute allowedRoles={["staff_supervisor", "admin"]}><VendorApprovalPanel /></ProtectedRoute>} />
+            <Route path="/campus/guardian" element={<ProtectedRoute><GuardianDashboard /></ProtectedRoute>} />
+            <Route path="/campus/emergency" element={<ProtectedRoute allowedRoles={["staff_supervisor", "admin"]}><EmergencyLookup /></ProtectedRoute>} />
+            <Route path="/campus/monitor" element={<CampusQueueMonitor />} />
 
             {/* Admin Routes */}
             <Route path="/admin" element={<ProtectedRoute allowedRoles={["admin"]}><StoreAdminPage /></ProtectedRoute>} />

@@ -13,8 +13,8 @@
     "test:auth": "node test-auth-lifecycle.js",
     "test:rules": "node test-firestore-rules-integration.js",
     "test:storage": "node test-storage-rules-integration.js",
-    "test:campus": "node test-campus-security-rules.js",
-    "test": "node test-transaction-e2e.js && node test-auth-lifecycle.js && node test-firestore-rules-integration.js && node test-storage-rules-integration.js && node test-campus-security-rules.js"
+    "test:campus": "node test-campus-security-rules.js && node test-campus-integration.js",
+    "test": "node test-transaction-e2e.js && node test-auth-lifecycle.js && node test-firestore-rules-integration.js && node test-storage-rules-integration.js && node test-campus-security-rules.js && node test-campus-integration.js"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.12.0",
