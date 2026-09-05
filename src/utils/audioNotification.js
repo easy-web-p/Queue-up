@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 🔔 WEB AUDIO API SOUND NOTIFICATION UTILITY
  * Pure Synthesized Audio - Zero external MP3 downloads, 0ms latency, 100% offline-ready.
  */
@@ -19,6 +19,24 @@ class AudioNotificationService {
       this.ctx.resume();
     }
     return this.ctx;
+  }
+
+  // 🔓 Explicit Browser Autoplay Unlock via User Gesture (ปุ่มเริ่มกะครัว / เปิดเสียง)
+  async unlockAudio() {
+    try {
+      const ctx = this.getAudioContext();
+      if (ctx && ctx.state === 'suspended') {
+        await ctx.resume();
+      }
+      return ctx ? ctx.state === 'running' : false;
+    } catch (err) {
+      console.warn('Audio unlock warning:', err);
+      return false;
+    }
+  }
+
+  isUnlocked() {
+    return !!(this.ctx && this.ctx.state === 'running');
   }
 
   // 🍜 1. Order Ready Chime (เสียงแจ้งเตือนอาหารปรุงเสร็จ พร้อมรับประทาน)

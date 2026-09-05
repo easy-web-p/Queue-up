@@ -13,6 +13,16 @@ export const MerchantKDS: React.FC<Props> = ({
   onUpdateOrderStatus,
 }) => {
   const [mobileTab, setMobileTab] = React.useState<'pending' | 'confirmed' | 'cooking' | 'ready'>('pending');
+  const [audioEnabled, setAudioEnabled] = React.useState(soundManager.isUnlocked());
+
+  const handleUnlockAudio = async () => {
+    const success = await soundManager.unlockAudio();
+    if (success) {
+      soundManager.playNewOrderAlert();
+      setAudioEnabled(true);
+    }
+  };
+
   const pendingOrders = orders.filter((o) => o.status === 'PENDING' || (o.queueStatus === 'waiting' && o.status !== 'CONFIRMED'));
   const confirmedOrders = orders.filter((o) => o.status === 'CONFIRMED' || (o.queueStatus === 'confirmed'));
   const cookingOrders = orders.filter((o) => o.status === 'PREPARING' || o.queueStatus === 'cooking');
@@ -128,6 +138,28 @@ export const MerchantKDS: React.FC<Props> = ({
           </span>
         </div>
       </div>
+
+      {/* 🔔 Audio Autoplay Permission Unlocker Banner */}
+      {!audioEnabled && (
+        <div className="bg-amber-500/10 border border-amber-500/30 text-amber-200 p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🔔</span>
+            <div>
+              <h4 className="text-sm font-bold text-amber-300 mb-0.5">เริ่มกะครัว & เปิดเสียงแจ้งเตือนออเดอร์</h4>
+              <p className="text-xs text-amber-200/80 mb-0">
+                เบราว์เซอร์ต้องการการแตะหน้าจอ 1 ครั้งเพื่อเปิดระบบเสียงเตือนออเดอร์เข้าและอาหารปรุงเสร็จ
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleUnlockAudio}
+            className="w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-95 text-slate-950 font-black text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 whitespace-nowrap min-h-[44px]"
+          >
+            <span>เปิดเสียงเตือนเดี๋ยวนี้ 🔊</span>
+          </button>
+        </div>
+      )}
 
       {/* 📱 Mobile Stage Tab Bar (Visible on mobile screens < 768px) */}
       <div className="md:hidden flex items-center gap-1.5 bg-slate-200/80 p-1.5 rounded-2xl overflow-x-auto">
