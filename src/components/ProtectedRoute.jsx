@@ -11,7 +11,7 @@ import { canAccessRole, isUserSuperAdmin } from "../utils/authRoles.js";
  * 2. Enforces Role-Based Access Control for merchant & admin dashboard routes.
  * 3. Hides admin routes from non-admin users by returning 404 (Security by Information Hiding).
  */
-export default function ProtectedRoute({ children, allowedRoles = [] }) {
+export function ProtectedRoute({ children, allowedRoles = [], requireApprovedVendor = false }) {
   const { user, isLoading } = useSelector((state) => state.auth);
   const location = useLocation();
   const navigate = useNavigate();
@@ -151,6 +151,15 @@ export default function ProtectedRoute({ children, allowedRoles = [] }) {
     }
   }
 
+  // 3. Student Vendor Approval Check (ห้ามเข้าหน้าจัดการเมนูหรือ KDS ก่อนผ่านอนุมัติ)
+  if (requireApprovedVendor && currentUser?.role === 'student_vendor') {
+    const isApproved = currentUser?.isApprovedVendor === true || currentUser?.vendorStatus === 'APPROVED';
+    if (!isApproved) {
+      return <Navigate to="/student-vendor/onboarding" replace />;
+    }
+  }
+
   return children;
 }
 
+export default ProtectedRoute;

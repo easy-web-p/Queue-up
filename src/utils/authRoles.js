@@ -32,26 +32,33 @@ export function getEffectiveRoles(user) {
     (user.isTokenVerified === true && email === SUPER_ADMIN_EMAIL)
   );
 
+  const roles = new Set(["customer"]);
+
   if (isSuperAdmin) {
-    return ["customer", "merchant", "admin"];
+    return ["customer", "merchant", "admin", "staff_supervisor"];
   }
 
   // Merchant privilege (only for verified Firebase Auth sessions)
   const isMerchant = Boolean(
     (Array.isArray(user.roles) && user.roles.includes("merchant")) ||
     user.isMerchantVerified === true ||
-    user.isMerchantRegistered === true
+    user.isMerchantRegistered === true ||
+    user.role === "merchant"
   );
 
   if (isMerchant) {
-    return ["customer", "merchant"];
+    roles.add("merchant");
   }
 
-  if (Array.isArray(user.roles) && user.roles.length > 0) {
-    return user.roles;
+  if (user.role) {
+    roles.add(user.role);
   }
 
-  return ["customer"];
+  if (Array.isArray(user.roles)) {
+    user.roles.forEach((r) => roles.add(r));
+  }
+
+  return Array.from(roles);
 }
 
 /**
