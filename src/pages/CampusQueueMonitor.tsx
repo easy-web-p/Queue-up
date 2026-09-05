@@ -3,6 +3,7 @@ import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/f
 import { db } from '../firebase/config.js';
 import { Tv, Clock, CheckCircle2, Flame, ArrowLeft, Volume2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { getBangkokYmd } from '../services/orderCreationService';
 
 interface MonitorOrder {
   id: string;
@@ -12,17 +13,22 @@ interface MonitorOrder {
   queueStatus: string;
   storeId: string;
   pickupTime: string;
+  pickupDate?: string;
   updatedAt?: any;
 }
 
 export default function CampusQueueMonitor() {
   const [orders, setOrders] = useState<MonitorOrder[]>([]);
   const [activeZone, setActiveZone] = useState('ALL');
+  const todayYmd = getBangkokYmd().ymd;
 
   useEffect(() => {
+    // 🛡️ Spark Plan Budget Guard: Strictly scope to today's active canteen orders
+    // to prevent fetching past days and prevent exceeding daily 50,000 read limit.
     const q = query(
       collection(db, 'orders'),
-      where('status', 'in', ['PENDING', 'CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP']),
+      where('pickupDate', '==', todayYmd),
+      where('status', 'in', ['CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP']),
       limit(50)
     );
 
@@ -32,10 +38,24 @@ export default function CampusQueueMonitor() {
         ...d.data(),
       })) as MonitorOrder[];
       setOrders(items);
+    }, (error) => {
+      console.warn('CampusQueueMonitor query warning:', error);
+      // Fallback: If compound index is pending, listen with status filter only
+      const fallbackQuery = query(
+        collection(db, 'orders'),
+        where('status', 'in', ['CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP']),
+        limit(30)
+      );
+      return onSnapshot(fallbackQuery, (fallbackSnap) => {
+        const fallbackItems = fallbackSnap.docs
+          .map((d) => ({ id: d.id, ...d.data() } as MonitorOrder))
+          .filter((ord) => !ord.pickupDate || ord.pickupDate === todayYmd);
+        setOrders(fallbackItems);
+      });
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [todayYmd]);
 
   const preparingOrders = orders.filter((o) => o.status === 'PREPARING' || o.queueStatus === 'cooking' || o.status === 'PENDING' || o.status === 'CONFIRMED');
   const readyOrders = orders.filter((o) => o.status === 'READY_FOR_PICKUP' || o.queueStatus === 'ready');

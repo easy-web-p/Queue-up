@@ -69,4 +69,11 @@ runTest('/staff_supervisors directory write access is restricted to admins only'
   assert(staffSection.includes('allow write: if isAdmin();'), 'Staff supervisor write must be admin only');
 });
 
+// 8. /emergency_audit_logs strict Append-Only immutability check
+runTest('/emergency_audit_logs enforces strict Append-Only immutability (allow update, delete: if false;)', () => {
+  const auditSection = rulesContent.substring(rulesContent.indexOf('match /emergency_audit_logs/{auditId}'));
+  assert(auditSection.includes('allow update, delete: if false;'), 'Emergency audit logs must never be editable or erasable');
+  assert(auditSection.includes('allow create: if isStaffSupervisor() || isAdmin();'), 'Emergency audit logs creation must be authorized');
+});
+
 console.log(`\n📊 Campus Security Rules Summary: ${passedTests}/${totalTests} tests passed (100%).\n`);

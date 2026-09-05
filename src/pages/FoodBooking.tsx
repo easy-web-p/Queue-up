@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectCartItems, clearCart } from '../store/cartSlice';
@@ -75,6 +75,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
   const [paymentMode, setPaymentMode] = useState<'DIRECT_ZERO_PAYMENT' | 'CAMPUS_WALLET'>('DIRECT_ZERO_PAYMENT');
   const [customInstructions, setCustomInstructions] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [orderError, setOrderError] = useState<string | null>(null);
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
 
@@ -108,7 +109,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
 
   const handleConfirmOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (cartItems.length === 0) return;
+    if (isSubmittingRef.current || isSubmitting || cartItems.length === 0) return;
 
     if (!storeId) {
       setOrderError('ไม่พบรหัสร้านค้า กรุณาเลือกรายการอาหารใหม่อีกครั้ง');
@@ -126,16 +127,16 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
       return;
     }
 
-    setIsSubmitting(true);
-    setOrderError(null);
-
     const userId = currentUser?.id || currentUser?.uid;
 
     if (!userId) {
       setOrderError('กรุณาเข้าสู่ระบบก่อนทำการสั่งจองคิวอาหาร');
-      setIsSubmitting(false);
       return;
     }
+
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
+    setOrderError(null);
 
     try {
       const result = await createAuthoritativeStoreOrder(db, {
@@ -175,6 +176,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
       console.error('Order creation failed:', err);
       setOrderError(err?.message || 'เกิดข้อผิดพลาดในการสร้างคำสั่งซื้อ กรุณาลองใหม่อีกครั้ง');
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   };

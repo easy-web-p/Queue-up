@@ -427,5 +427,14 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ==========================================
+    // 19. EMERGENCY AUDIT LOGS (Strict Append-Only Immutable Log)
+    // ==========================================
+    match /emergency_audit_logs/{auditId} {
+      allow read: if isStaffSupervisor() || isAdmin();
+      allow create: if isStaffSupervisor() || isAdmin();
+      allow update, delete: if false; // 🔒 Strict Append-Only: Impossible to alter or erase audit logs
+    }
+
   }
 }
