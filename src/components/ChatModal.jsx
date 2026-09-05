@@ -332,9 +332,9 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
         <main className="queueup-chat-main">
           {!activeChat ? (
             <div className="d-flex flex-column align-items-center justify-content-center h-100 p-4 text-center bg-white">
-              <i className="bi bi-chat-square-text text-muted mb-3" style={{ fontSize: "3.5rem", opacity: 0.4 }} />
+              <i className="bi bi-chat-square-text text-slate-400 mb-3 text-6xl opacity-40" />
               <h5 className="fw-bold text-dark mb-2">ยังไม่มีรายการแชทกับร้านค้า</h5>
-              <p className="text-muted small mb-0 px-3" style={{ maxWidth: "340px", lineHeight: "1.6" }}>
+              <p className="text-muted small mb-0 px-3 max-w-[340px] leading-relaxed">
                 คุณสามารถเพิ่มแชทและเริ่มการสนทนากับทางร้านได้ โดยกดปุ่ม{" "}
                 <span className="text-danger fw-bold"><i className="bi bi-chat-dots-fill me-1" />แชทเลย</span> ที่รายการคำสั่งซื้อของคุณ
               </p>
@@ -355,7 +355,7 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
                   <div>
                     <div className="queueup-chat-header-title">{activeChat.storeName}</div>
                     <div className="queueup-chat-header-status">
-                      <i className="bi bi-circle-fill text-success me-1" style={{ fontSize: "8px" }} />
+                      <i className="bi bi-circle-fill text-success me-1 text-[8px]" />
                       {activeChat.statusText}
                     </div>
                   </div>

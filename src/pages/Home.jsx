@@ -400,101 +400,120 @@ function Home() {
         </section>
 
         {/* 3.5 QueueUp for Campus Hub Section */}
-        <section className="p-4 p-md-5 rounded-4 shadow-sm mb-4" style={{ backgroundColor: "#241C16", border: "1px solid rgba(255, 122, 26, 0.25)" }}>
-          <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+        <section className="p-6 sm:p-8 rounded-3xl shadow-xl mb-6 bg-[#241C16] border border-[#FF7A1A]/30 text-white font-['IBM_Plex_Sans_Thai'] relative overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
             <div>
-              <span className="badge font-monospace fw-bold mb-1" style={{ backgroundColor: "#FF7A1A", color: "#FFFFFF" }}>
+              <span className="inline-block px-3 py-1 bg-[#FF7A1A] text-white font-['JetBrains_Mono'] font-bold text-xs rounded-full shadow-sm mb-2">
                 QUEUEUP FOR CAMPUS
               </span>
-              <h4 className="fw-bold text-white mb-0">ศูนย์รวมบริการโรงอาหารอัจฉริยะในสถานศึกษา</h4>
-              <p className="text-secondary small mb-0">ระบบสนับสนุนผู้ประกอบการนักเรียน กระเป๋าเงินดิจิทัล และระบบดูแลสุขภาพผู้เรียน</p>
+              <h4 className="font-['Kanit'] font-black text-xl sm:text-2xl text-white mb-1">
+                ศูนย์รวมบริการโรงอาหารอัจฉริยะในสถานศึกษา
+              </h4>
+              <p className="text-stone-400 text-xs sm:text-sm mb-0">
+                ระบบสนับสนุนผู้ประกอบการนักเรียน กระเป๋าเงินดิจิทัล และระบบดูแลสุขภาพผู้เรียน
+              </p>
             </div>
           </div>
 
-          <div className="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-5 g-3">
-            <div className="col">
-              <div
-                className="p-3 rounded-4 h-100 d-flex flex-column justify-content-between"
-                style={{ backgroundColor: "#16100C", border: "1px solid rgba(255, 122, 26, 0.25)", cursor: "pointer" }}
-                onClick={() => navigate("/student-vendor/apply")}
-              >
-                <div>
-                  <div className="fs-3 mb-2">🧑‍🎓</div>
-                  <h6 className="fw-bold text-white mb-1">ร้านค้านักเรียน</h6>
-                  <p className="text-secondary small mb-0">ยื่นขอเปิดร้านค้าในโรงอาหาร บ่มเพาะทักษะธุรกิจ</p>
-                </div>
-                <button type="button" className="btn btn-sm rounded-pill mt-3 w-100 fw-bold" style={{ border: "1px solid #FF7A1A", color: "#FF7A1A" }}>
-                  ยื่นขอเปิดร้าน ›
-                </button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            {/* 1. Student Vendor */}
+            <div
+              className="p-5 rounded-2xl bg-[#16100C] border border-[#FF7A1A]/25 hover:border-[#FF7A1A] hover:shadow-lg hover:shadow-[#FF7A1A]/10 transition-all duration-300 flex flex-col justify-between cursor-pointer group hover:-translate-y-1"
+              onClick={() => navigate("/student-vendor/apply")}
+            >
+              <div>
+                <div className="text-3xl mb-3 group-hover:scale-110 transition-transform inline-block">🧑‍🎓</div>
+                <h6 className="font-['Kanit'] font-bold text-white text-base mb-1">ร้านค้านักเรียน</h6>
+                <p className="text-stone-400 text-xs leading-relaxed mb-0">
+                  ยื่นขอเปิดร้านค้าในโรงอาหาร บ่มเพาะทักษะธุรกิจ
+                </p>
               </div>
+              <button
+                type="button"
+                className="w-full py-2.5 rounded-xl border border-[#FF7A1A] text-[#FF7A1A] group-hover:bg-[#FF7A1A] group-hover:text-white font-['Kanit'] font-bold text-xs transition-all mt-4 text-center cursor-pointer"
+              >
+                ยื่นขอเปิดร้าน ›
+              </button>
             </div>
 
-            <div className="col">
-              <div
-                className="p-3 rounded-4 h-100 d-flex flex-column justify-content-between"
-                style={{ backgroundColor: "#16100C", border: "1px solid rgba(255, 122, 26, 0.25)", cursor: "pointer" }}
-                onClick={() => navigate("/guardian")}
-              >
-                <div>
-                  <div className="fs-3 mb-2">🛡️</div>
-                  <h6 className="fw-bold text-white mb-1">ผู้ปกครอง (Guardian)</h6>
-                  <p className="text-secondary small mb-0">เติมเงิน กำหนดวงเงินรายวัน และบล็อกหมวดอาหาร</p>
-                </div>
-                <button type="button" className="btn btn-sm rounded-pill mt-3 w-100 fw-bold" style={{ border: "1px solid #FF7A1A", color: "#FF7A1A" }}>
-                  จัดการกระเป๋าเงิน ›
-                </button>
+            {/* 2. Guardian Portal */}
+            <div
+              className="p-5 rounded-2xl bg-[#16100C] border border-[#FF7A1A]/25 hover:border-[#FF7A1A] hover:shadow-lg hover:shadow-[#FF7A1A]/10 transition-all duration-300 flex flex-col justify-between cursor-pointer group hover:-translate-y-1"
+              onClick={() => navigate("/guardian")}
+            >
+              <div>
+                <div className="text-3xl mb-3 group-hover:scale-110 transition-transform inline-block">🛡️</div>
+                <h6 className="font-['Kanit'] font-bold text-white text-base mb-1">ผู้ปกครอง (Guardian)</h6>
+                <p className="text-stone-400 text-xs leading-relaxed mb-0">
+                  เติมเงิน กำหนดวงเงินรายวัน และบล็อกหมวดอาหาร
+                </p>
               </div>
+              <button
+                type="button"
+                className="w-full py-2.5 rounded-xl border border-[#FF7A1A] text-[#FF7A1A] group-hover:bg-[#FF7A1A] group-hover:text-white font-['Kanit'] font-bold text-xs transition-all mt-4 text-center cursor-pointer"
+              >
+                จัดการกระเป๋าเงิน ›
+              </button>
             </div>
 
-            <div className="col">
-              <div
-                className="p-3 rounded-4 h-100 d-flex flex-column justify-content-between"
-                style={{ backgroundColor: "#16100C", border: "1px solid rgba(255, 122, 26, 0.25)", cursor: "pointer" }}
-                onClick={() => navigate("/admin/vendor-approvals")}
-              >
-                <div>
-                  <div className="fs-3 mb-2">👨‍🏫</div>
-                  <h6 className="fw-bold text-white mb-1">อาจารย์ / ฝ่ายปกครอง</h6>
-                  <p className="text-secondary small mb-0">อนุมัติร้านค้านักเรียน และตรวจสอบสุขอนามัย</p>
-                </div>
-                <button type="button" className="btn btn-sm rounded-pill mt-3 w-100 fw-bold" style={{ border: "1px solid #FF7A1A", color: "#FF7A1A" }}>
-                  แผงควบคุมอาจารย์ ›
-                </button>
+            {/* 3. Teacher/Supervisor Approvals */}
+            <div
+              className="p-5 rounded-2xl bg-[#16100C] border border-[#FF7A1A]/25 hover:border-[#FF7A1A] hover:shadow-lg hover:shadow-[#FF7A1A]/10 transition-all duration-300 flex flex-col justify-between cursor-pointer group hover:-translate-y-1"
+              onClick={() => navigate("/admin/vendor-approvals")}
+            >
+              <div>
+                <div className="text-3xl mb-3 group-hover:scale-110 transition-transform inline-block">👨‍🏫</div>
+                <h6 className="font-['Kanit'] font-bold text-white text-base mb-1">อาจารย์ / ฝ่ายปกครอง</h6>
+                <p className="text-stone-400 text-xs leading-relaxed mb-0">
+                  อนุมัติร้านค้านักเรียน และตรวจสอบสุขอนามัย
+                </p>
               </div>
+              <button
+                type="button"
+                className="w-full py-2.5 rounded-xl border border-[#FF7A1A] text-[#FF7A1A] group-hover:bg-[#FF7A1A] group-hover:text-white font-['Kanit'] font-bold text-xs transition-all mt-4 text-center cursor-pointer"
+              >
+                แผงควบคุมอาจารย์ ›
+              </button>
             </div>
 
-            <div className="col">
-              <div
-                className="p-3 rounded-4 h-100 d-flex flex-column justify-content-between"
-                style={{ backgroundColor: "#16100C", border: "1px solid rgba(255, 122, 26, 0.25)", cursor: "pointer" }}
-                onClick={() => navigate("/campus/monitor")}
-              >
-                <div>
-                  <div className="fs-3 mb-2">📺</div>
-                  <h6 className="fw-bold text-white mb-1">จอแสดงคิวสด</h6>
-                  <p className="text-secondary small mb-0">จอแสดงผลคิวปรุงเสร็จแบบเรียลไทม์ในโรงอาหาร</p>
-                </div>
-                <button type="button" className="btn btn-sm rounded-pill mt-3 w-100 fw-bold" style={{ border: "1px solid #FF7A1A", color: "#FF7A1A" }}>
-                  เปิดจอคิวสด ›
-                </button>
+            {/* 4. Live Canteen Monitor */}
+            <div
+              className="p-5 rounded-2xl bg-[#16100C] border border-[#FF7A1A]/25 hover:border-[#FF7A1A] hover:shadow-lg hover:shadow-[#FF7A1A]/10 transition-all duration-300 flex flex-col justify-between cursor-pointer group hover:-translate-y-1"
+              onClick={() => navigate("/campus/monitor")}
+            >
+              <div>
+                <div className="text-3xl mb-3 group-hover:scale-110 transition-transform inline-block">📺</div>
+                <h6 className="font-['Kanit'] font-bold text-white text-base mb-1">จอแสดงคิวสด</h6>
+                <p className="text-stone-400 text-xs leading-relaxed mb-0">
+                  จอแสดงผลคิวปรุงเสร็จแบบเรียลไทม์ในโรงอาหาร
+                </p>
               </div>
+              <button
+                type="button"
+                className="w-full py-2.5 rounded-xl border border-[#FF7A1A] text-[#FF7A1A] group-hover:bg-[#FF7A1A] group-hover:text-white font-['Kanit'] font-bold text-xs transition-all mt-4 text-center cursor-pointer"
+              >
+                เปิดจอคิวสด ›
+              </button>
             </div>
 
-            <div className="col">
-              <div
-                className="p-3 rounded-4 h-100 d-flex flex-column justify-content-between"
-                style={{ backgroundColor: "#16100C", border: "1px solid rgba(239, 68, 68, 0.35)", cursor: "pointer" }}
-                onClick={() => navigate("/emergency")}
-              >
-                <div>
-                  <div className="fs-3 mb-2">🚨</div>
-                  <h6 className="fw-bold text-white mb-1">พยาบาล & ฉุกเฉิน</h6>
-                  <p className="text-secondary small mb-0">ค้นหาประวัติแพ้อาหาร โรคประจำตัว และบันทึก Audit</p>
-                </div>
-                <button type="button" className="btn btn-sm rounded-pill mt-3 w-100 fw-bold" style={{ border: "1px solid #ef4444", color: "#ef4444" }}>
-                  ข้อมูลฉุกเฉิน ›
-                </button>
+            {/* 5. Medical & Emergency */}
+            <div
+              className="p-5 rounded-2xl bg-[#16100C] border border-red-500/35 hover:border-red-500 hover:shadow-lg hover:shadow-red-500/10 transition-all duration-300 flex flex-col justify-between cursor-pointer group hover:-translate-y-1"
+              onClick={() => navigate("/emergency")}
+            >
+              <div>
+                <div className="text-3xl mb-3 group-hover:scale-110 transition-transform inline-block">🚨</div>
+                <h6 className="font-['Kanit'] font-bold text-white text-base mb-1">พยาบาล & ฉุกเฉิน</h6>
+                <p className="text-stone-400 text-xs leading-relaxed mb-0">
+                  ค้นหาประวัติแพ้อาหาร โรคประจำตัว และบันทึก Audit
+                </p>
               </div>
+              <button
+                type="button"
+                className="w-full py-2.5 rounded-xl border border-red-500 text-red-400 group-hover:bg-red-500 group-hover:text-white font-['Kanit'] font-bold text-xs transition-all mt-4 text-center cursor-pointer"
+              >
+                ข้อมูลฉุกเฉิน ›
+              </button>
             </div>
           </div>
         </section>
@@ -605,20 +624,20 @@ function Home() {
           <div className="row g-3">
             {aiInsights && aiInsights.lastOrderedItem ? (
               <div className="col-md-6">
-                <div className="p-3 rounded-3 border bg-gradient text-dark d-flex align-items-center justify-content-between" style={{ background: "#f0f9ff", borderColor: "#bae6fd" }}>
+                <div className="p-4 rounded-2xl border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/40 text-slate-900 dark:text-slate-100 flex items-center justify-between gap-3 shadow-xs">
                   <div>
-                    <span className="badge bg-primary mb-1">
-                      <i className="bi bi-lightning-charge-fill me-1" />
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-sky-500 text-white text-[11px] font-bold mb-1.5 shadow-xs">
+                      <i className="bi bi-lightning-charge-fill" />
                       AI Quick Re-order (สั่งต่อใน 1 คลิก)
                     </span>
-                    <h6 className="fw-bold mb-1">{aiInsights.lastOrderedItem.itemTitle}</h6>
-                    <p className="text-muted small mb-0">
+                    <h6 className="font-['Kanit'] font-bold text-sm mb-1">{aiInsights.lastOrderedItem.itemTitle}</h6>
+                    <p className="text-slate-500 dark:text-slate-400 text-xs mb-0">
                       {aiInsights.lastOrderedItem.variant ? `ตัวเลือก: ${aiInsights.lastOrderedItem.variant} • ` : ""}
                       ราคา ฿{aiInsights.lastOrderedItem.price}
                     </p>
                   </div>
                   <button
-                    className="btn btn-sm btn-primary fw-bold shadow-sm"
+                    className="px-4 py-2 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-['Kanit'] font-bold text-xs rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer shrink-0"
                     onClick={() => {
                       recordUserOrderBehavior(aiInsights.lastOrderedItem);
                       navigate(`/product/${aiInsights.lastOrderedItem.itemId || "prod-default"}`);
@@ -631,12 +650,12 @@ function Home() {
               </div>
             ) : (
               <div className="col-md-6">
-                <div className="p-3 rounded-3 border text-dark" style={{ background: "#fafafa" }}>
-                  <span className="badge bg-secondary mb-1">
-                    <i className="bi bi-lightbulb-fill me-1" />
+                <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-slate-900 dark:text-slate-100 shadow-xs">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-600 text-white text-[11px] font-bold mb-1.5">
+                    <i className="bi bi-lightbulb-fill text-amber-300" />
                     AI Behavioral Learning
                   </span>
-                  <p className="small mb-0 text-muted">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-0 leading-relaxed">
                     {aiInsights?.aiSuggestion || "ระบบกำลังเรียนรู้พฤติกรรมการสั่งซื้อของคุณ สั่งอาหารมื้อนี้เพื่อเปิดใช้งาน 1-Click Quick Re-order"}
                   </p>
                 </div>

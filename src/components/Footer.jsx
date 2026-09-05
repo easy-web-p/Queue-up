@@ -35,8 +35,8 @@ export default function Footer() {
             <div className="qup-footer-shield-badge">
               <i className="bi bi-shield-check-fill" />
               <div>
-                <div style={{ lineHeight: "1.2" }}>{securityReport.shieldVersion}</div>
-                <div style={{ fontSize: "11px", opacity: 0.8, marginTop: "2px" }}>
+                <div className="leading-tight">{securityReport.shieldVersion}</div>
+                <div className="text-[11px] opacity-80 mt-0.5">
                   สถานะระบบ: {securityReport.status}
                 </div>
               </div>
@@ -161,14 +161,14 @@ export default function Footer() {
               <a href="#ios" className="qup-footer-app-btn">
                 <i className="bi bi-apple fs-4" />
                 <div>
-                  <div style={{ fontSize: "10px", lineHeight: "1" }}>Download on</div>
+                  <div className="text-[10px] leading-none">Download on</div>
                   <div className="fw-bold">App Store</div>
                 </div>
               </a>
               <a href="#android" className="qup-footer-app-btn">
                 <i className="bi bi-google-play fs-4" />
                 <div>
-                  <div style={{ fontSize: "10px", lineHeight: "1" }}>Get it on</div>
+                  <div className="text-[10px] leading-none">Get it on</div>
                   <div className="fw-bold">Google Play</div>
                 </div>
               </a>
@@ -187,8 +187,7 @@ export default function Footer() {
             <span>•</span>
             <button
               onClick={scrollToTop}
-              className="text-slate-400 bg-transparent border-0 p-0 text-decoration-underline"
-              style={{ cursor: "pointer", fontSize: "0.85rem" }}
+              className="text-slate-400 bg-transparent border-0 p-0 underline cursor-pointer text-xs hover:text-white transition-colors"
             >
               เลื่อนกลับสู่ด้านบนสุด ⬆️
             </button>

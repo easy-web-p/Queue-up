@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchShopsFromFirestore } from '../lib/firebase';
-import { Send, MessageSquare, X, Store, Check, Sparkles } from 'lucide-react';
+import { Send, MessageSquare, X, Store, Sparkles } from 'lucide-react';
 
 export const ClientChatDrawer = ({
   isOpen,

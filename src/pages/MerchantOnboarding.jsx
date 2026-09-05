@@ -305,7 +305,7 @@ function MerchantOnboarding() {
                 <button type="button" className="btn btn-outline-secondary px-4 rounded-pill" onClick={() => setStep(0)}>
                   ยกเลิก
                 </button>
-                <button type="submit" className="shopee-onboarding-btn-primary px-5 style={{ minWidth: '180px' }}">
+                <button type="submit" className="shopee-onboarding-btn-primary px-5 min-w-[180px]">
                   ถัดไป (ข้อมูลชำระเงิน) &rarr;
                 </button>
               </div>
