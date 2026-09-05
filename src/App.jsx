@@ -103,6 +103,16 @@ function App() {
             <Route path="/campus/emergency" element={<ProtectedRoute allowedRoles={["staff_supervisor", "admin"]}><EmergencyLookup /></ProtectedRoute>} />
             <Route path="/campus/monitor" element={<CampusQueueMonitor />} />
 
+            {/* Spec-Defined Route Aliases */}
+            <Route path="/student-vendor/apply" element={<ProtectedRoute><StudentVendorOnboarding /></ProtectedRoute>} />
+            <Route path="/student-vendor/earnings" element={<ProtectedRoute allowedRoles={["student_vendor", "merchant", "admin"]}><StudentVendorEarnings /></ProtectedRoute>} />
+            <Route path="/guardian" element={<ProtectedRoute><GuardianDashboard /></ProtectedRoute>} />
+            <Route path="/guardian/dashboard" element={<ProtectedRoute><GuardianDashboard /></ProtectedRoute>} />
+            <Route path="/campus/queue-monitor" element={<CampusQueueMonitor />} />
+            <Route path="/admin/vendor-approvals" element={<ProtectedRoute allowedRoles={["staff_supervisor", "admin"]}><VendorApprovalPanel /></ProtectedRoute>} />
+            <Route path="/emergency" element={<ProtectedRoute allowedRoles={["staff_supervisor", "admin"]}><EmergencyLookup /></ProtectedRoute>} />
+            <Route path="/merchant/kds" element={<ProtectedRoute allowedRoles={["merchant", "student_vendor", "admin"]}><MerchantDashboard /></ProtectedRoute>} />
+
             {/* Admin Routes */}
             <Route path="/admin" element={<ProtectedRoute allowedRoles={["admin"]}><StoreAdminPage /></ProtectedRoute>} />
             <Route path="/Admin" element={<ProtectedRoute allowedRoles={["admin"]}><StoreAdminPage /></ProtectedRoute>} />
