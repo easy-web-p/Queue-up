@@ -20,25 +20,25 @@ function PdpaPolicy() {
   };
 
   return (
-    <div className="pdpa-page-wrapper">
+    <div className="pdpa-page-wrapper min-h-screen bg-slate-100 dark:bg-slate-950 font-sans text-slate-800 dark:text-slate-100 pb-16">
       {/* Header Search Bar */}
       <ShopeeSearchBar />
 
       {/* Main Content Container */}
-      <main className="pdpa-page-container">
+      <main className="pdpa-page-container max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         {/* Page Banner Header */}
-        <div className="pdpa-page-header">
-          <div className="d-flex align-items-center gap-3">
-            <div className="pdpa-header-icon-box">
+        <div className="pdpa-page-header bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="pdpa-header-icon-box w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 text-white flex items-center justify-center text-2xl shadow-md shadow-orange-500/20">
               <i className="bi bi-shield-check" />
             </div>
             <div>
-              <h1 className="pdpa-page-title">
+              <h1 className="pdpa-page-title text-xl sm:text-2xl font-black text-slate-900 dark:text-white mb-1">
                 {language === "en"
                   ? "Terms of Service & Privacy Policy (PDPA)"
                   : "ข้อตกลงและนโยบายความเป็นส่วนตัว (PDPA Policy & Terms)"}
               </h1>
-              <p className="pdpa-page-subtitle">
+              <p className="pdpa-page-subtitle text-xs text-slate-500 dark:text-slate-400 mb-0">
                 {language === "en"
                   ? "Personal Data Protection Act B.E. 2562 — QueueUp School Food CRM v2.5"
                   : "พระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 — QueueUp School Food CRM v2.5"}
@@ -48,50 +48,70 @@ function PdpaPolicy() {
         </div>
 
         {/* Tab Navigation Controls */}
-        <div className="pdpa-page-tabs">
+        <div className="pdpa-page-tabs flex items-center gap-2 overflow-x-auto pb-2">
           <button
-            className={`pdpa-page-tab-btn ${activeTab === "privacy" ? "active" : ""}`}
+            className={`pdpa-page-tab-btn px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 border-0 ${
+              activeTab === "privacy"
+                ? "active bg-[#ee4d2d] text-white shadow-md shadow-orange-500/20 font-black"
+                : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
+            }`}
             onClick={() => handleTabChange("privacy")}
           >
-            <i className="bi bi-file-earmark-lock me-2" />
+            <i className="bi bi-file-earmark-lock" />
             {language === "en" ? "Privacy Policy (PDPA)" : "นโยบายความเป็นส่วนตัว (PDPA)"}
           </button>
 
           <button
-            className={`pdpa-page-tab-btn ${activeTab === "terms" ? "active" : ""}`}
+            className={`pdpa-page-tab-btn px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 border-0 ${
+              activeTab === "terms"
+                ? "active bg-[#ee4d2d] text-white shadow-md shadow-orange-500/20 font-black"
+                : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
+            }`}
             onClick={() => handleTabChange("terms")}
           >
-            <i className="bi bi-file-earmark-text me-2" />
+            <i className="bi bi-file-earmark-text" />
             {language === "en" ? "Terms of Service" : "เงื่อนไขการใช้งาน (Terms)"}
           </button>
 
           <button
-            className={`pdpa-page-tab-btn ${activeTab === "parent" ? "active" : ""}`}
+            className={`pdpa-page-tab-btn px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 border-0 ${
+              activeTab === "parent"
+                ? "active bg-[#ee4d2d] text-white shadow-md shadow-orange-500/20 font-black"
+                : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
+            }`}
             onClick={() => handleTabChange("parent")}
           >
-            <i className="bi bi-people-fill me-2" />
+            <i className="bi bi-people-fill" />
             {language === "en" ? "Minor & Parent Policy" : "นโยบายผู้ปกครอง & ผู้เยาว์"}
           </button>
 
           <button
-            className={`pdpa-page-tab-btn ${activeTab === "merchant" ? "active" : ""}`}
+            className={`pdpa-page-tab-btn px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 border-0 ${
+              activeTab === "merchant"
+                ? "active bg-[#ee4d2d] text-white shadow-md shadow-orange-500/20 font-black"
+                : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
+            }`}
             onClick={() => handleTabChange("merchant")}
           >
-            <i className="bi bi-shop me-2" />
+            <i className="bi bi-shop" />
             {language === "en" ? "Merchant Policy" : "นโยบายร้านค้า & โรงอาหาร"}
           </button>
 
           <button
-            className={`pdpa-page-tab-btn ${activeTab === "refund" ? "active" : ""}`}
+            className={`pdpa-page-tab-btn px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 border-0 ${
+              activeTab === "refund"
+                ? "active bg-[#ee4d2d] text-white shadow-md shadow-orange-500/20 font-black"
+                : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
+            }`}
             onClick={() => handleTabChange("refund")}
           >
-            <i className="bi bi-arrow-counterclockwise me-2" />
+            <i className="bi bi-arrow-counterclockwise" />
             {language === "en" ? "Refund Policy" : "นโยบายการคืนเงิน"}
           </button>
         </div>
 
         {/* Tab Content Box */}
-        <div className="pdpa-page-content-card">
+        <div className="pdpa-page-content-card bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-10 shadow-sm leading-relaxed space-y-6">
           {/* TAB 1: PRIVACY POLICY */}
           {activeTab === "privacy" && (
             <div className="pdpa-content-section">
@@ -195,9 +215,9 @@ function PdpaPolicy() {
           )}
 
           {/* Action Footer */}
-          <div className="pdpa-page-actions">
-            <Link to="/home" className="btn btn-primary fw-bold px-4 py-2 rounded-pill">
-              <i className="bi bi-house-door-fill me-2" />
+          <div className="pdpa-page-actions pt-6 border-t border-slate-100 dark:border-slate-800 flex justify-center">
+            <Link to="/home" className="btn btn-primary fw-bold px-6 py-2.5 rounded-full bg-[#ee4d2d] hover:bg-[#ff7337] text-white border-0 shadow-lg shadow-orange-500/30 font-black text-sm flex items-center gap-2 transition-all cursor-pointer">
+              <i className="bi bi-house-door-fill" />
               กลับสู่หน้าหลักโรงอาหาร
             </Link>
           </div>

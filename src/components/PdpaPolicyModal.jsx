@@ -11,55 +11,55 @@ export default function PdpaPolicyModal({ isOpen, onClose, initialTab = "privacy
   if (!isOpen) return null;
 
   return (
-    <div className="pdpa-modal-overlay" tabIndex="-1">
-      <div className="pdpa-modal-card">
+    <div className="pdpa-modal-overlay fixed inset-0 z-[100002] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 transition-all" tabIndex="-1">
+      <div className="pdpa-modal-card w-full max-w-4xl max-h-[90vh] bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 text-white rounded-3xl border border-slate-700/80 shadow-2xl flex flex-col overflow-hidden font-sans">
         {/* Header */}
-        <div className="pdpa-modal-header">
-          <div className="d-flex align-items-center gap-2">
-            <i className="bi bi-shield-check text-warning fs-3" />
+        <div className="pdpa-modal-header p-5 sm:p-6 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
+          <div className="flex items-center gap-3">
+            <i className="bi bi-shield-check text-amber-400 text-3xl" />
             <div>
-              <h4 className="fw-bold mb-0 text-white fs-5">
+              <h4 className="font-bold mb-0 text-white text-base sm:text-lg">
                 ข้อตกลงและนโยบายความเป็นส่วนตัว (PDPA Policy & Terms)
               </h4>
-              <span className="text-slate-300 small">
+              <span className="text-slate-400 text-xs">
                 พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 — QueueUp School Food CRM v2.5
               </span>
             </div>
           </div>
-          <button type="button" className="btn-close btn-close-white" onClick={onClose} />
+          <button type="button" className="btn-close btn-close-white cursor-pointer" onClick={onClose} />
         </div>
 
         {/* Tab Navigation */}
-        <div className="pdpa-nav-tabs">
+        <div className="pdpa-nav-tabs flex items-center gap-1.5 p-3 bg-slate-950/60 border-b border-slate-800 overflow-x-auto text-xs font-bold">
           <button
-            className={`pdpa-tab-btn ${activeTab === "privacy" ? "active" : ""}`}
+            className={`pdpa-tab-btn px-3.5 py-2 rounded-xl transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 border-0 ${activeTab === "privacy" ? "active bg-amber-500 text-slate-950 font-black shadow-md" : "bg-transparent text-slate-400 hover:text-white hover:bg-slate-800"}`}
             onClick={() => setActiveTab("privacy")}
           >
-            <i className="bi bi-file-earmark-lock me-1" /> นโยบายความเป็นส่วนตัว (PDPA)
+            <i className="bi bi-file-earmark-lock" /> นโยบายความเป็นส่วนตัว (PDPA)
           </button>
           <button
-            className={`pdpa-tab-btn ${activeTab === "terms" ? "active" : ""}`}
+            className={`pdpa-tab-btn px-3.5 py-2 rounded-xl transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 border-0 ${activeTab === "terms" ? "active bg-amber-500 text-slate-950 font-black shadow-md" : "bg-transparent text-slate-400 hover:text-white hover:bg-slate-800"}`}
             onClick={() => setActiveTab("terms")}
           >
-            <i className="bi bi-file-earmark-text me-1" /> เงื่อนไขการใช้งาน (Terms)
+            <i className="bi bi-file-earmark-text" /> เงื่อนไขการใช้งาน (Terms)
           </button>
           <button
-            className={`pdpa-tab-btn ${activeTab === "parent" ? "active" : ""}`}
+            className={`pdpa-tab-btn px-3.5 py-2 rounded-xl transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 border-0 ${activeTab === "parent" ? "active bg-amber-500 text-slate-950 font-black shadow-md" : "bg-transparent text-slate-400 hover:text-white hover:bg-slate-800"}`}
             onClick={() => setActiveTab("parent")}
           >
-            <i className="bi bi-people-fill me-1" /> นโยบายผู้ปกครอง & ผู้เยาว์
+            <i className="bi bi-people-fill" /> นโยบายผู้ปกครอง & ผู้เยาว์
           </button>
           <button
-            className={`pdpa-tab-btn ${activeTab === "merchant" ? "active" : ""}`}
+            className={`pdpa-tab-btn px-3.5 py-2 rounded-xl transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 border-0 ${activeTab === "merchant" ? "active bg-amber-500 text-slate-950 font-black shadow-md" : "bg-transparent text-slate-400 hover:text-white hover:bg-slate-800"}`}
             onClick={() => setActiveTab("merchant")}
           >
-            <i className="bi bi-shop me-1" /> นโยบายร้านค้า & โรงอาหาร
+            <i className="bi bi-shop" /> นโยบายร้านค้า & โรงอาหาร
           </button>
           <button
-            className={`pdpa-tab-btn ${activeTab === "refund" ? "active" : ""}`}
+            className={`pdpa-tab-btn px-3.5 py-2 rounded-xl transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 border-0 ${activeTab === "refund" ? "active bg-amber-500 text-slate-950 font-black shadow-md" : "bg-transparent text-slate-400 hover:text-white hover:bg-slate-800"}`}
             onClick={() => setActiveTab("refund")}
           >
-            <i className="bi bi-arrow-counterclockwise me-1" /> นโยบายการคืนเงิน
+            <i className="bi bi-arrow-counterclockwise" /> นโยบายการคืนเงิน
           </button>
         </div>
 
@@ -170,11 +170,11 @@ export default function PdpaPolicyModal({ isOpen, onClose, initialTab = "privacy
         </div>
 
         {/* Footer */}
-        <div className="pdpa-modal-footer">
-          <div className="text-slate-400 small me-auto">
-            <i className="bi bi-lock-fill me-1" /> ข้อมูลทั้งหมดได้รับการดูแลภายใต้ พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562
+        <div className="pdpa-modal-footer p-4 sm:p-5 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between flex-wrap gap-3">
+          <div className="text-slate-400 text-xs">
+            <i className="bi bi-lock-fill me-1 text-amber-500" /> ข้อมูลทั้งหมดได้รับการดูแลภายใต้ พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562
           </div>
-          <button type="button" className="btn btn-warning font-weight-bold px-4" onClick={onClose}>
+          <button type="button" className="btn btn-warning font-weight-bold px-5 py-2.5 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black shadow-lg cursor-pointer border-0 text-sm" onClick={onClose}>
             รับทราบและปิดหน้านี้ ✕
           </button>
         </div>
