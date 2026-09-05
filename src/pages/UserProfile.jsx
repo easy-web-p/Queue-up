@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { setUser, clearUser } from "../store/authSlice.js";
@@ -6,6 +6,7 @@ import { db, doc, setDoc, getDoc, deleteDoc } from "../firebase/config.js";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import ShopeeSearchBar from "../components/ShopeeSearchBar.jsx";
 import ChatModal from "../components/ChatModal.jsx";
+import ClientQueueTicket from "../components/ClientQueueTicket.jsx";
 import Footer from "../components/Footer.jsx";
 import { getUserBehaviorInsights } from "../services/aiBehaviorEngine.js";
 import { getSecurityHealthReport } from "../services/aiSecurityShield.js";
@@ -53,6 +54,21 @@ function UserProfile() {
   const [orders, setOrders] = useState([]);
   const [orderStatusTab, setOrderStatusTab] = useState("ALL");
   const [orderSearchQuery, setOrderSearchQuery] = useState("");
+
+  // 🎫 Active Live Queue Ticket Selector
+  const activeLiveOrder = useMemo(() => {
+    return orders.find((ord) => {
+      if (!ord) return false;
+      const s = (ord.status || "").toUpperCase();
+      const qs = (ord.queueStatus || "").toLowerCase();
+      return (
+        s !== "COMPLETED" &&
+        s !== "CANCELLED" &&
+        qs !== "completed" &&
+        qs !== "cancelled"
+      );
+    });
+  }, [orders]);
 
   // Auto Save Status Ticker State
   const [autoSaveStatus, setAutoSaveStatus] = useState("บันทึกอัตโนมัติเรียบร้อย");
@@ -1185,6 +1201,33 @@ function UserProfile() {
           {activeTab === "bookings" && (
             <div>
               <h2 className="shopee-panel-title">การจอง & ประวัติการสั่งซื้อของฉัน</h2>
+
+              {/* 🎫 Active Live Queue Ticket */}
+              {activeLiveOrder && (
+                <div className="mb-4">
+                  <div className="d-flex align-items-center justify-content-between mb-2">
+                    <span className="text-xs font-bold text-uppercase tracking-wider text-muted">
+                      ⚡ คิวสดที่กำลังดำเนินการ (Active Live Queue)
+                    </span>
+                    <span className="badge bg-danger text-white text-xs px-2.5 py-1 rounded-pill">
+                      Live Real-Time
+                    </span>
+                  </div>
+                  <ClientQueueTicket
+                    activeOrder={activeLiveOrder}
+                    onOpenChat={(ord) => {
+                      setChatStoreName(ord.shopName || ord.storeName || "ร้านค้า");
+                      setChatOrderContext({
+                        orderId: ord.id,
+                        itemTitle: ord.items?.[0]?.name,
+                        queueNo: ord.statusText || ord.queueNumber,
+                        price: ord.totalPrice || ord.totalAmount,
+                      });
+                      setIsChatOpen(true);
+                    }}
+                  />
+                </div>
+              )}
 
               {/* Top Status Tabs */}
               <div className="shopee-purchase-tabs mb-3">

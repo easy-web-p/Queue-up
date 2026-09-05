@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { addItem } from "../store/cartSlice";
+import { detectMatchedAllergens } from "../utils/allergenMatcher";
 import { db, doc, getDoc } from "../firebase/config.js";
 import ShopeeSearchBar from "../components/ShopeeSearchBar.jsx";
 import ChatModal from "../components/ChatModal.jsx";
@@ -485,14 +486,36 @@ function ProductDetail() {
     loadStudentAllergyProfile();
   }, [user?.uid]);
 
-  const matchedAllergens = useMemo(() => {
-    if (!studentAllergies.length) return [];
-    const prodText = `${productTitle} ${productCategory} ${product?.description || ""}`.toLowerCase();
-    return studentAllergies.filter((all) => {
-      const cleanAll = all.replace(/\s*\(.*?\)\s*/g, "").toLowerCase().trim();
-      return prodText.includes(cleanAll) || prodText.includes(all.toLowerCase().trim());
+  // 🔎 Extract currently selected modifier names to detect topping/variant allergens
+  const selectedModifierNames = useMemo(() => {
+    const names = [];
+    activeModifierGroups.forEach((grp) => {
+      const val = selectedModifiersMap[grp.id];
+      if (grp.selectionType === "single" && val) {
+        const opt = grp.options.find((o) => o.id === val);
+        if (opt) names.push(opt.name);
+      } else if (Array.isArray(val)) {
+        val.forEach((optId) => {
+          const opt = grp.options.find((o) => o.id === optId);
+          if (opt) names.push(opt.name);
+        });
+      }
     });
-  }, [studentAllergies, productTitle, productCategory, product?.description]);
+    return names;
+  }, [activeModifierGroups, selectedModifiersMap]);
+
+  // 🛡️ Intelligent Allergen Cross-Check (Menu + Category + Desc + Chosen Modifiers)
+  const allergenResult = useMemo(() => {
+    return detectMatchedAllergens({
+      studentAllergies,
+      productTitle,
+      productCategory,
+      productDescription: product?.description || "",
+      selectedModifierNames,
+    });
+  }, [studentAllergies, productTitle, productCategory, product?.description, selectedModifierNames]);
+
+  const matchedAllergens = allergenResult.matchedAllergenNames;
 
   // Load Product & Store from Firestore database service layer
   useEffect(() => {
@@ -723,6 +746,15 @@ function ProductDetail() {
       return;
     }
 
+    // 🚨 Allergen Safety Confirmation Guard
+    if (allergenResult.hasAllergens) {
+      const warningDetails = allergenResult.details.map((d) => `• ${d.allergenName}: ${d.details}`).join("\n");
+      const confirmProceed = window.confirm(
+        `🚨 คำเตือนความปลอดภัยด้านสุขภาพ (Health & Allergy Alert)!\n\nเมนูหรือตัวเลือกที่คุณเลือก มีส่วนผสมที่ตรงกับประวัติการแพ้อาหารของคุณ:\n${warningDetails}\n\nคุณแน่ใจหรือไม่ว่าต้องการเพิ่มลงในตะกร้า?`
+      );
+      if (!confirmProceed) return;
+    }
+
     const newItem = createCurrentCartItem();
     dispatch(addItem(newItem));
     alert(`🛒 เพิ่ม "${newItem.menuItem.name}" (จำนวน ${newItem.quantity} ชาม) พร้อมตัวเลือกที่ระบุ ลงในตะกร้าเรียบร้อยแล้ว!`);
@@ -761,6 +793,15 @@ function ProductDetail() {
       setMissingProfileFields(missing);
       setIsIncompleteProfileModalOpen(true);
       return;
+    }
+
+    // 5.5 Allergen Safety Confirmation Guard
+    if (allergenResult.hasAllergens) {
+      const warningDetails = allergenResult.details.map((d) => `• ${d.allergenName}: ${d.details}`).join("\n");
+      const confirmProceed = window.confirm(
+        `🚨 คำเตือนความปลอดภัยด้านสุขภาพ (Health & Allergy Alert)!\n\nเมนูหรือตัวเลือกที่คุณเลือก มีส่วนผสมที่ตรงกับประวัติการแพ้อาหารของคุณ:\n${warningDetails}\n\nคุณแน่ใจหรือไม่ว่าต้องการดำเนินการสั่งซื้อต่อไป?`
+      );
+      if (!confirmProceed) return;
     }
 
     const resolvedStoreId = product?.storeId || store?.id || store?.storeId;
@@ -938,12 +979,26 @@ function ProductDetail() {
             </div>
 
             {/* ⚠️ Student Allergy Safety Warning Banner */}
-            {matchedAllergens.length > 0 && (
-              <div className="p-3 my-2 rounded-3 bg-danger-subtle border border-danger text-danger small font-semibold flex items-center gap-2 shadow-sm">
-                <span className="fs-4">⚠️</span>
-                <div>
-                  <strong className="d-block text-danger fw-bold">แจ้งเตือนสารก่อภูมิแพ้ประจำตัวนักเรียน!</strong>
-                  <span>เมนูนี้อาจมีส่วนผสมของ <b>{matchedAllergens.join(", ")}</b> ซึ่งตรงกับประวัติการแพ้อาหารที่คุณหรือผู้ปกครองได้ระบุไว้</span>
+            {allergenResult.hasAllergens && (
+              <div className="p-3 my-2 rounded-3 bg-danger-subtle border border-danger text-danger small shadow-sm">
+                <div className="d-flex align-items-center gap-2 mb-1">
+                  <span className="fs-4">🚨</span>
+                  <div>
+                    <strong className="d-block text-danger fw-bold fs-6">แจ้งเตือนสารก่อภูมิแพ้ประจำตัวนักเรียน! (Allergy Shield)</strong>
+                    <span className="text-dark">เมนูนี้มีสารก่อภูมิแพ้ที่ตรงกับประวัติสุขภาพของคุณ: <b>{matchedAllergens.join(", ")}</b></span>
+                  </div>
+                </div>
+                {allergenResult.details && allergenResult.details.length > 0 && (
+                  <div className="mt-2 pt-2 border-top border-danger-subtle d-flex flex-wrap gap-1">
+                    {allergenResult.details.map((detail, dIdx) => (
+                      <span key={dIdx} className="badge bg-danger text-white fw-normal px-2 py-1">
+                        ⚠️ {detail.details || detail.allergenName}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="text-danger-emphasis text-xs mt-1">
+                  * หากมีอาการแพ้รุนแรง กรุณาแจ้งร้านค้าเพิ่มเติม หรือหลีกเลี่ยงการสั่งซื้อเมนู/ตัวเลือกนี้
                 </div>
               </div>
             )}

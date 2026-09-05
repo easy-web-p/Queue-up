@@ -7,6 +7,7 @@ import { CartItem, Order, CustomerProfile, SelectedModifierOption } from '../typ
 import { db } from '../firebase/config.js';
 import { createAuthoritativeStoreOrder, getBangkokYmd } from '../services/orderCreationService';
 import { soundManager } from '../utils/audioNotification.js';
+import { ClientQueueTicket } from '../components/ClientQueueTicket.jsx';
 
 interface FoodBookingPageProps {
   cartItems?: CartItem[];
@@ -249,37 +250,9 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
               </p>
             </div>
             
-            <div className="bg-gradient-to-r from-[#8B0000] via-[#A50000] to-[#800000] text-white p-6 rounded-3xl shadow-xl max-w-sm mx-auto">
-              <span className="text-xs font-extrabold uppercase tracking-widest text-amber-200">หมายเลขคิวของคุณ (Queue Number)</span>
-              <div className="text-6xl font-black my-2 tracking-wider text-amber-300">{createdOrder.queueNumber || 'Q001'}</div>
-              <div className="inline-block px-3 py-1 bg-amber-400 text-amber-950 rounded-full text-xs font-black">
-                รอร้านค้ารับออเดอร์ (PENDING)
-              </div>
-            </div>
-
-            <div className="bg-slate-50 p-4 rounded-2xl max-w-sm mx-auto text-left text-xs font-medium text-slate-600 space-y-2 border border-slate-200">
-              <div className="flex justify-between">
-                <span>ร้านค้า:</span>
-                <span className="font-bold text-slate-800">{storeName}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>เวลานัดรับ:</span>
-                <span className="font-bold text-slate-800">{pickupTime} น. ({formatThaiDate(pickupDate)})</span>
-              </div>
-              <div className="flex justify-between">
-                <span>วิธีชำระเงิน:</span>
-                <span className="font-bold text-slate-800">
-                  {paymentMode === 'CAMPUS_WALLET' ? '💳 กระเป๋าเงินดิจิทัลนักเรียน (ตัดยอดแล้ว)' : '⚡ Zero-Payment (ชำระหน้าร้าน)'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>ยอดชำระ:</span>
-                <span className="font-bold text-[#8B0000]">฿{Number(createdOrder.totalAmount).toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span>สถานะคิว:</span>
-                <span className="font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">รอร้านรับออเดอร์ (PENDING)</span>
-              </div>
+            {/* 🎟️ Live Interactive Queue Ticket with 5-Phase Stepper */}
+            <div className="max-w-md mx-auto text-left">
+              <ClientQueueTicket activeOrder={createdOrder} />
             </div>
 
             {/* Wayfinding Tip */}
