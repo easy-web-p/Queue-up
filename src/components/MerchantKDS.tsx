@@ -12,6 +12,7 @@ export const MerchantKDS: React.FC<Props> = ({
   orders,
   onUpdateOrderStatus,
 }) => {
+  const [mobileTab, setMobileTab] = React.useState<'pending' | 'confirmed' | 'cooking' | 'ready'>('pending');
   const pendingOrders = orders.filter((o) => o.status === 'PENDING' || (o.queueStatus === 'waiting' && o.status !== 'CONFIRMED'));
   const confirmedOrders = orders.filter((o) => o.status === 'CONFIRMED' || (o.queueStatus === 'confirmed'));
   const cookingOrders = orders.filter((o) => o.status === 'PREPARING' || o.queueStatus === 'cooking');
@@ -85,7 +86,7 @@ export const MerchantKDS: React.FC<Props> = ({
           {order.customerPhone && (
             <a
               href={`tel:${order.customerPhone}`}
-              className="text-slate-400 hover:text-slate-700 p-1 rounded-lg bg-slate-50 hover:bg-slate-100"
+              className="text-slate-500 hover:text-slate-800 p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors"
               title="โทรติดต่อลูกค้า"
             >
               <Phone className="w-3.5 h-3.5" />
@@ -98,7 +99,7 @@ export const MerchantKDS: React.FC<Props> = ({
             onUpdateOrderStatus(order.id, nextStatus);
             soundAction();
           }}
-          className={`w-full py-2.5 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5 ${btnClass}`}
+          className={`w-full min-h-[44px] py-2.5 text-white font-extrabold text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5 active:scale-95 ${btnClass}`}
         >
           {btnIcon}
           <span>{btnLabel}</span>
@@ -128,10 +129,65 @@ export const MerchantKDS: React.FC<Props> = ({
         </div>
       </div>
 
+      {/* 📱 Mobile Stage Tab Bar (Visible on mobile screens < 768px) */}
+      <div className="md:hidden flex items-center gap-1.5 bg-slate-200/80 p-1.5 rounded-2xl overflow-x-auto">
+        <button
+          type="button"
+          onClick={() => setMobileTab('pending')}
+          className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center justify-center gap-1.5 ${
+            mobileTab === 'pending'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+          <span>คิวใหม่ ({pendingOrders.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMobileTab('confirmed')}
+          className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center justify-center gap-1.5 ${
+            mobileTab === 'confirmed'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+          <span>รอปรุง ({confirmedOrders.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMobileTab('cooking')}
+          className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center justify-center gap-1.5 ${
+            mobileTab === 'cooking'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-orange-500"></span>
+          <span>กำลังปรุง ({cookingOrders.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMobileTab('ready')}
+          className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center justify-center gap-1.5 ${
+            mobileTab === 'ready'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <span>พร้อมรับ ({readyOrders.length})</span>
+        </button>
+      </div>
+
       {/* KDS 4-Column Synchronized Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Column 1: PENDING (New Queue) */}
-        <div className="bg-slate-100 rounded-3xl p-4 border border-slate-200/80 space-y-4">
+        <div className={`bg-slate-100 rounded-3xl p-4 border border-slate-200/80 space-y-4 ${mobileTab === 'pending' ? 'block' : 'hidden md:block'}`}>
           <div className="flex items-center justify-between px-2">
             <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2 font-['Kanit']">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
@@ -158,7 +214,7 @@ export const MerchantKDS: React.FC<Props> = ({
         </div>
 
         {/* Column 2: CONFIRMED (Accepted, Waiting to Cook) */}
-        <div className="bg-blue-50/60 rounded-3xl p-4 border border-blue-100 space-y-4">
+        <div className={`bg-blue-50/60 rounded-3xl p-4 border border-blue-100 space-y-4 ${mobileTab === 'confirmed' ? 'block' : 'hidden md:block'}`}>
           <div className="flex items-center justify-between px-2">
             <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2 font-['Kanit']">
               <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse"></span>
@@ -185,7 +241,7 @@ export const MerchantKDS: React.FC<Props> = ({
         </div>
 
         {/* Column 3: PREPARING (Cooking) */}
-        <div className="bg-orange-50/60 rounded-3xl p-4 border border-orange-100 space-y-4">
+        <div className={`bg-orange-50/60 rounded-3xl p-4 border border-orange-100 space-y-4 ${mobileTab === 'cooking' ? 'block' : 'hidden md:block'}`}>
           <div className="flex items-center justify-between px-2">
             <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2 font-['Kanit']">
               <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse"></span>
@@ -211,7 +267,7 @@ export const MerchantKDS: React.FC<Props> = ({
         </div>
 
         {/* Column 4: READY (Ready for Pickup) */}
-        <div className="bg-emerald-50/60 rounded-3xl p-4 border border-emerald-100 space-y-4">
+        <div className={`bg-emerald-50/60 rounded-3xl p-4 border border-emerald-100 space-y-4 ${mobileTab === 'ready' ? 'block' : 'hidden md:block'}`}>
           <div className="flex items-center justify-between px-2">
             <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2 font-['Kanit']">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>

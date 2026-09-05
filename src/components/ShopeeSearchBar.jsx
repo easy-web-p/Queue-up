@@ -7,6 +7,8 @@ import { useAuth } from "../context/useAuth.js";
 import { clearUser, switchRole } from "../store/authSlice.js";
 import { isUserSuperAdmin } from "../utils/authRoles.js";
 import { usePreferences } from "../context/PreferencesContext.jsx";
+import { selectCartTotalCount, selectCartItems, updateQuantity, removeItem } from "../store/cartSlice";
+import ClientCartModal from "./ClientCartModal.jsx";
 import "./ShopeeSearchBar.css";
 
 const MOCK_PRODUCTS = [
@@ -30,6 +32,9 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
   const { user } = useSelector((state) => state.auth);
 
   // States
+  const cartTotalCount = useSelector(selectCartTotalCount);
+  const cartItems = useSelector(selectCartItems);
+  const [isCartOpen, setIsCartOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [scope, setScope] = useState("shop"); // 'shop' (ในร้านนี้) | 'all' (ทั้งหมด)
@@ -768,13 +773,30 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
         {/* Shopping Cart Icon */}
         <div
           className="shopee-cart-container"
-          onClick={() => navigate("/user/purchase")}
-          title="ดูตะกร้า / คิวของคุณ"
+          onClick={() => setIsCartOpen(true)}
+          title="ดูตะกร้าอาหารของคุณ"
+          role="button"
+          tabIndex={0}
         >
           <i className="bi bi-cart3 shopee-cart-icon" />
-          <span className="shopee-cart-badge-count">4</span>
+          {cartTotalCount > 0 && (
+            <span className="shopee-cart-badge-count">{cartTotalCount}</span>
+          )}
         </div>
       </div>
+
+      {/* Global Client Cart Modal */}
+      <ClientCartModal
+        isOpen={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+        cartItems={cartItems}
+        onUpdateQuantity={(index, delta) => dispatch(updateQuantity({ index, delta }))}
+        onRemoveItem={(index) => dispatch(removeItem(index))}
+        onCheckout={() => {
+          setIsCartOpen(false);
+          navigate("/food-booking");
+        }}
+      />
     </header>
   );
 }

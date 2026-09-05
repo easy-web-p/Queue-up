@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import { selectCartItems, clearCart } from '../store/cartSlice';
 import { Utensils, ArrowLeft, Sparkles, AlertCircle, Clock, CheckCircle2, ShoppingBag, Store, MapPin, Calendar, Compass, Wallet, CreditCard } from 'lucide-react';
 import { CartItem, Order, CustomerProfile, SelectedModifierOption } from '../types';
 import { db } from '../firebase/config.js';
@@ -42,7 +43,9 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const dispatch = useDispatch();
   const reduxUser = useSelector((state: any) => state.auth?.user);
+  const reduxCartItems = useSelector(selectCartItems);
 
   // Fallback to router state or local storage if props are not provided
   const locationState = location.state as {
@@ -54,7 +57,11 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
     storeLocation?: string;
   } | null;
 
-  const cartItems = propCartItems.length > 0 ? propCartItems : (locationState?.cartItems || []);
+  const cartItems = propCartItems.length > 0 
+    ? propCartItems 
+    : ((locationState?.cartItems && locationState.cartItems.length > 0) 
+        ? locationState.cartItems 
+        : reduxCartItems);
   const currentUser = propCurrentUser || reduxUser || null;
 
   const [pickupTime, setPickupTime] = useState<string>(locationState?.pickupTime || '');
@@ -150,8 +157,9 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
 
       const orderData = result.order as Order;
 
-      // Clear cart
+      // Clear Redux Cart and LocalStorage
       try {
+        dispatch(clearCart());
         localStorage.removeItem('queueup_cart');
       } catch {
         // ignore
@@ -172,7 +180,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF8F5] py-8 px-4 sm:px-6">
+    <div className="min-h-screen bg-[#FAF8F5] py-6 sm:py-8 px-3 sm:px-6 pb-28 sm:pb-8">
       <div className="max-w-3xl mx-auto space-y-6">
         
         {/* Header */}
@@ -394,7 +402,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
                     key={time}
                     type="button"
                     onClick={() => setPickupTime(time)}
-                    className={`py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                    className={`min-h-[44px] py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer flex items-center justify-center ${
                       pickupTime === time
                         ? 'bg-[#8B0000] text-white border-[#8B0000] shadow-md'
                         : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-amber-50'
@@ -472,6 +480,24 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
               <span>{isSubmitting ? 'กำลังตรวจสอบโควตาและบันทึกคิว...' : 'ยืนยันสั่งอาหาร'}</span>
             </button>
 
+
+            {/* 📱 Mobile-First Sticky Checkout Bar (Fixed at bottom for mobile < 640px) */}
+            <div className="fixed bottom-0 left-0 right-0 z-30 sm:hidden bg-white/95 backdrop-blur-md border-t border-slate-200 p-3 px-4 shadow-2xl flex items-center justify-between gap-3">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-extrabold text-slate-500 uppercase">ยอดรวมสุทธิ</span>
+                <span className="text-lg font-black text-[#8B0000]">
+                  ฿{calculateTotal().toLocaleString()}
+                </span>
+              </div>
+              <button
+                type="submit"
+                disabled={cartItems.length === 0 || isSubmitting}
+                className="flex-1 py-3 px-4 bg-gradient-to-r from-[#8B0000] to-[#FF7A1A] hover:opacity-95 text-white font-extrabold text-sm rounded-xl shadow-lg flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 min-h-[48px] cursor-pointer"
+              >
+                <ShoppingBag className="w-4 h-4" />
+                <span>{isSubmitting ? 'กำลังบันทึก...' : 'ยืนยันสั่งอาหาร'}</span>
+              </button>
+            </div>
           </form>
         )}
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
+import { addItem } from "../store/cartSlice";
 import { db, doc, getDoc } from "../firebase/config.js";
 import ShopeeSearchBar from "../components/ShopeeSearchBar.jsx";
 import ChatModal from "../components/ChatModal.jsx";
@@ -425,6 +426,7 @@ function resolveStoreByStoreId(storeId) {
 function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
 
   const initialProduct = resolveProductByParam(id);
@@ -722,13 +724,8 @@ function ProductDetail() {
     }
 
     const newItem = createCurrentCartItem();
-    try {
-      const existing = JSON.parse(localStorage.getItem("queueup_cart") || "[]");
-      localStorage.setItem("queueup_cart", JSON.stringify([...existing, newItem]));
-      alert(`🛒 เพิ่ม "${newItem.menuItem.name}" (จำนวน ${newItem.quantity} ชาม) พร้อมตัวเลือกที่ระบุ ลงในตะกร้าเรียบร้อยแล้ว!`);
-    } catch {
-      // ignore
-    }
+    dispatch(addItem(newItem));
+    alert(`🛒 เพิ่ม "${newItem.menuItem.name}" (จำนวน ${newItem.quantity} ชาม) พร้อมตัวเลือกที่ระบุ ลงในตะกร้าเรียบร้อยแล้ว!`);
   };
 
   // 8. ORDER VALIDATION BEFORE CHECKOUT
