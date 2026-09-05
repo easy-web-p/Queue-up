@@ -121,19 +121,24 @@ export default function AllergyAlertSetting() {
   };
 
   return (
-    <div className="min-h-screen bg-[#16100C] text-white font-['IBM_Plex_Sans_Thai'] pb-20">
+    <div className="min-h-screen bg-slate-100 dark:bg-[#16100C] text-slate-800 dark:text-slate-100 font-['IBM_Plex_Sans_Thai'] pb-20 transition-colors">
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-[#241C16]/95 backdrop-blur border-b border-white/10 px-6 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-30 bg-white/95 dark:bg-[#241C16]/95 backdrop-blur border-b border-slate-200 dark:border-white/10 px-6 py-4 flex items-center justify-between shadow-xs">
         <div className="flex items-center space-x-3">
-          <Link to="/guardian/dashboard" className="p-2 bg-[#16100C] border border-white/10 rounded-xl text-[#FF7A1A] hover:bg-[#FF7A1A]/10 transition-colors">
+          <Link
+            to="/guardian/dashboard"
+            className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#16100C] dark:hover:bg-[#FF7A1A]/10 border border-slate-200 dark:border-white/10 rounded-xl text-[#FF7A1A] transition-colors"
+          >
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-xl font-bold font-['Kanit'] text-white flex items-center gap-2">
-              <HeartPulse className="w-5 h-5 text-red-400" />
+            <h1 className="text-xl font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
+              <HeartPulse className="w-5 h-5 text-red-500" />
               ข้อมูลแพ้อาหาร & สุขภาพ (Allergy & Health Alerts)
             </h1>
-            <p className="text-xs text-[#9CA3AF]">ระบุสารก่อภูมิแพ้เพื่อเตือนภัยโรงอาหารและบันทึกประวัติการปฐมพยาบาล</p>
+            <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">
+              ระบุสารก่อภูมิแพ้เพื่อเตือนภัยโรงอาหารและบันทึกประวัติการปฐมพยาบาล
+            </p>
           </div>
         </div>
       </header>
@@ -146,10 +151,10 @@ export default function AllergyAlertSetting() {
               <button
                 key={child.id}
                 onClick={() => setSelectedChild(child)}
-                className={`px-4 py-2.5 rounded-2xl font-['Kanit'] text-sm font-semibold transition-all shrink-0 ${
+                className={`px-4 py-2.5 rounded-2xl font-['Kanit'] text-sm font-semibold transition-all shrink-0 cursor-pointer ${
                   selectedChild?.id === child.id
-                    ? 'bg-[#FF7A1A] text-white shadow-lg shadow-[#FF7A1A]/20'
-                    : 'bg-[#241C16] text-[#9CA3AF] hover:text-white border border-white/10'
+                    ? 'bg-[#FF7A1A] text-white shadow-lg shadow-orange-500/20'
+                    : 'bg-white dark:bg-[#241C16] text-slate-600 dark:text-[#9CA3AF] hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-white/10'
                 }`}
               >
                 {child.studentName} ({child.studentId})
@@ -159,22 +164,22 @@ export default function AllergyAlertSetting() {
         )}
 
         {selectedChild ? (
-          <div className="bg-[#241C16] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-8">
+          <div className="bg-white dark:bg-[#241C16] border border-slate-200 dark:border-white/10 rounded-3xl p-6 sm:p-8 shadow-xl space-y-8">
             {/* Child Info Banner */}
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-4">
               <div>
-                <span className="text-xs text-red-400 font-bold uppercase tracking-wider">บันทึกเวชระเบียนนักเรียน</span>
-                <h2 className="text-2xl font-bold font-['Kanit'] text-white mt-1">{selectedChild.studentName}</h2>
-                <p className="text-xs text-[#9CA3AF]">รหัสนักเรียน: {selectedChild.studentId}</p>
+                <span className="text-xs text-red-600 dark:text-red-400 font-bold uppercase tracking-wider">บันทึกเวชระเบียนนักเรียน</span>
+                <h2 className="text-2xl font-bold font-['Kanit'] text-slate-900 dark:text-white mt-1">{selectedChild.studentName}</h2>
+                <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">รหัสนักเรียน: {selectedChild.studentId}</p>
               </div>
-              <span className="px-3 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded-full text-xs font-bold">
+              <span className="px-3 py-1 bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-400 border border-red-200 dark:border-red-500/30 rounded-full text-xs font-bold">
                 Food Allergy Shield
               </span>
             </div>
 
             {/* Common Allergen Presets */}
             <div className="space-y-3">
-              <label className="block text-sm font-semibold text-[#E5E7EB]">
+              <label className="block text-sm font-bold text-slate-700 dark:text-[#E5E7EB]">
                 เลือกจากสารก่อภูมิแพ้ที่พบบ่อย (แตะเพื่อเพิ่ม):
               </label>
               <div className="flex flex-wrap gap-2">
@@ -185,10 +190,10 @@ export default function AllergyAlertSetting() {
                       key={preset}
                       type="button"
                       onClick={() => handleAddPresetAllergy(preset)}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all border ${
+                      className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all border cursor-pointer ${
                         isSelected
-                          ? 'bg-red-500/20 border-red-500 text-red-300'
-                          : 'bg-[#16100C] border-white/10 text-[#9CA3AF] hover:border-white/30'
+                          ? 'bg-red-50 dark:bg-red-500/20 border-red-300 dark:border-red-500 text-red-700 dark:text-red-300'
+                          : 'bg-slate-100 dark:bg-[#16100C] border-slate-200 dark:border-white/10 text-slate-700 dark:text-[#9CA3AF] hover:border-slate-300'
                       }`}
                     >
                       {preset} {isSelected ? '✓' : '+'}
@@ -200,7 +205,7 @@ export default function AllergyAlertSetting() {
 
             {/* Custom Allergen Input */}
             <div className="space-y-3">
-              <label className="block text-sm font-semibold text-[#E5E7EB]">
+              <label className="block text-sm font-bold text-slate-700 dark:text-[#E5E7EB]">
                 พิมพ์เพิ่มสารก่อภูมิแพ้อื่นๆ:
               </label>
               <form onSubmit={handleAddCustomAllergy} className="flex gap-2">
@@ -209,11 +214,11 @@ export default function AllergyAlertSetting() {
                   value={newAllergyInput}
                   onChange={(e) => setNewAllergyInput(e.target.value)}
                   placeholder="เช่น สตรอว์เบอร์รี, ผงชูรส, สารกันบูด"
-                  className="flex-1 px-4 py-3 bg-[#16100C] border border-white/20 rounded-xl text-white text-sm focus:outline-none focus:border-red-500"
+                  className="flex-1 px-4 py-3 bg-slate-50 dark:bg-[#16100C] border border-slate-300 dark:border-white/20 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm focus:outline-none focus:border-red-500"
                 />
                 <button
                   type="submit"
-                  className="px-5 py-3 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5"
+                  className="px-5 py-3 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
                 >
                   <Plus className="w-4 h-4" /> เพิ่ม
                 </button>
@@ -222,11 +227,11 @@ export default function AllergyAlertSetting() {
 
             {/* Active Allergies List */}
             <div className="space-y-3">
-              <label className="block text-sm font-semibold text-[#E5E7EB]">
+              <label className="block text-sm font-bold text-slate-700 dark:text-[#E5E7EB]">
                 รายการที่บันทึกไว้ในระบบ ({allergies.length} รายการ):
               </label>
               {allergies.length === 0 ? (
-                <p className="text-xs text-[#9CA3AF] italic bg-[#16100C] p-4 rounded-xl border border-white/5">
+                <p className="text-xs text-slate-500 dark:text-[#9CA3AF] italic bg-slate-50 dark:bg-[#16100C] p-4 rounded-xl border border-slate-200 dark:border-white/5">
                   ยังไม่ได้ระบุสารก่อภูมิแพ้ (นักเรียนไม่มีประวัติแพ้อาหาร)
                 </p>
               ) : (
@@ -234,13 +239,13 @@ export default function AllergyAlertSetting() {
                   {allergies.map((allergy) => (
                     <span
                       key={allergy}
-                      className="px-3 py-1.5 bg-red-950/60 border border-red-500/40 text-red-300 rounded-xl text-xs font-semibold flex items-center gap-2"
+                      className="px-3 py-1.5 bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-500/40 text-red-800 dark:text-red-300 rounded-xl text-xs font-semibold flex items-center gap-2"
                     >
                       ⚠️ {allergy}
                       <button
                         type="button"
                         onClick={() => handleRemoveAllergy(allergy)}
-                        className="p-0.5 hover:bg-red-800 rounded-full transition-colors text-white"
+                        className="p-0.5 hover:bg-red-200 dark:hover:bg-red-800 rounded-full transition-colors text-red-700 dark:text-white cursor-pointer"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -252,7 +257,7 @@ export default function AllergyAlertSetting() {
 
             {/* Health Notes & Emergency Instructions */}
             <div className="space-y-3">
-              <label className="block text-sm font-semibold text-[#E5E7EB]">
+              <label className="block text-sm font-bold text-slate-700 dark:text-[#E5E7EB]">
                 ข้อควรระวังพิเศษ & โรคประจำตัว (สำหรับคุณครูหรือห้องพยาบาล):
               </label>
               <textarea
@@ -260,14 +265,14 @@ export default function AllergyAlertSetting() {
                 value={healthNotes}
                 onChange={(e) => setHealthNotes(e.target.value)}
                 placeholder="เช่น หากมีอาการแพ้รุนแรง (ปากบวม หายใจไม่ออก) ให้รีบฉีดยา Epipen ที่อยู่ในกระเป๋า และโทรหาผู้ปกครองทันที..."
-                className="w-full p-4 bg-[#16100C] border border-white/20 rounded-2xl text-white text-sm focus:outline-none focus:border-red-500 leading-relaxed"
+                className="w-full p-4 bg-slate-50 dark:bg-[#16100C] border border-slate-300 dark:border-white/20 rounded-2xl text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm focus:outline-none focus:border-red-500 leading-relaxed"
               />
             </div>
 
             {/* Save Status & Action */}
             {saveMessage && (
-              <div className="p-4 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-400" />
+              <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-500/20 border border-emerald-300 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 {saveMessage}
               </div>
             )}
@@ -276,14 +281,14 @@ export default function AllergyAlertSetting() {
               type="button"
               onClick={handleSaveHealthInfo}
               disabled={isSaving}
-              className="w-full py-4 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-bold font-['Kanit'] rounded-2xl shadow-xl shadow-red-600/20 flex items-center justify-center gap-2 transition-all"
+              className="w-full py-4 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-bold font-['Kanit'] rounded-2xl shadow-xl shadow-red-600/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
               <Save className="w-5 h-5" />
               {isSaving ? 'กำลังบันทึกข้อมูล...' : 'บันทึกข้อมูลแพ้อาหารและคำแนะนำสุขภาพ'}
             </button>
           </div>
         ) : (
-          <div className="p-12 text-center bg-[#241C16] border border-white/10 rounded-3xl text-sm text-[#9CA3AF]">
+          <div className="p-12 text-center bg-white dark:bg-[#241C16] border border-slate-200 dark:border-white/10 rounded-3xl text-sm text-slate-600 dark:text-[#9CA3AF]">
             ไม่พบข้อมูลบุตรหลานที่ผูกบัญชีไว้
           </div>
         )}

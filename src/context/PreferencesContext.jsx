@@ -70,6 +70,7 @@ export function PreferencesProvider({ children }) {
 
       document.documentElement.dataset.theme = effectiveTheme;
       document.documentElement.setAttribute("data-theme", effectiveTheme);
+      document.documentElement.classList.toggle("dark", effectiveTheme === "dark");
       document.documentElement.lang = language;
 
       if (effectiveTheme === "dark") {

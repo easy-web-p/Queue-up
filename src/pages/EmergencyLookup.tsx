@@ -82,51 +82,56 @@ export default function EmergencyLookup() {
   };
 
   return (
-    <div className="min-h-screen bg-[#16100C] text-white font-['IBM_Plex_Sans_Thai'] pb-20">
+    <div className="min-h-screen bg-slate-100 dark:bg-[#16100C] text-slate-800 dark:text-slate-100 font-['IBM_Plex_Sans_Thai'] pb-20 transition-colors">
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-[#241C16]/95 backdrop-blur border-b border-red-500/30 px-6 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-30 bg-white/95 dark:bg-[#241C16]/95 backdrop-blur border-b border-red-200 dark:border-red-500/30 px-6 py-4 flex items-center justify-between shadow-xs">
         <div className="flex items-center space-x-3">
-          <Link to="/home" className="p-2 bg-[#16100C] border border-red-500/30 rounded-xl text-red-400 hover:bg-red-500/10 transition-colors">
+          <Link
+            to="/home"
+            className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#16100C] border border-red-200 dark:border-red-500/30 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+          >
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-xl font-bold font-['Kanit'] text-white flex items-center gap-2">
+            <h1 className="text-xl font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
               <AlertOctagon className="w-5 h-5 text-red-500" />
               ระบบค้นหาข้อมูลการแพ้อาหารและการพยาบาลฉุกเฉิน (Emergency Medical Lookup)
             </h1>
-            <p className="text-xs text-[#9CA3AF]">เข้าถึงประวัติการแพ้อาหาร โรคประจำตัว และเบอร์โทรฉุกเฉินพร้อมบันทึก Audit Log</p>
+            <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">
+              เข้าถึงประวัติการแพ้อาหาร โรคประจำตัว และเบอร์โทรฉุกเฉินพร้อมบันทึก Audit Log
+            </p>
           </div>
         </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-4 mt-8 space-y-6">
         {/* Search Box */}
-        <form onSubmit={handleLookup} className="bg-[#241C16] border border-red-500/30 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-4">
-          <div className="flex items-center gap-2 text-red-400 text-xs font-bold uppercase tracking-wider">
+        <form onSubmit={handleLookup} className="bg-white dark:bg-[#241C16] border border-red-200 dark:border-red-500/30 rounded-3xl p-6 sm:p-8 shadow-xl space-y-4">
+          <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-xs font-bold uppercase tracking-wider">
             <ShieldAlert className="w-4 h-4" />
             Authorized Personnel Only (บันทึก Audit Log อัตโนมัติทุกครั้ง)
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-[#E5E7EB] mb-2">รหัสประจำตัวนักเรียน (Student Code) *</label>
+              <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">รหัสประจำตัวนักเรียน (Student Code) *</label>
               <input
                 type="text"
                 required
                 value={studentCodeInput}
                 onChange={(e) => setStudentCodeInput(e.target.value)}
                 placeholder="เช่น STU58492"
-                className="w-full px-4 py-3 bg-[#16100C] border border-red-500/30 rounded-xl text-white font-['JetBrains_Mono'] focus:outline-none focus:border-red-500"
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-[#16100C] border border-red-300 dark:border-red-500/30 rounded-xl text-slate-900 dark:text-white font-['JetBrains_Mono'] placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-red-500"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[#E5E7EB] mb-2">เหตุผลการเข้าถึงข้อมูล *</label>
+              <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">เหตุผลการเข้าถึงข้อมูล *</label>
               <input
                 type="text"
                 required
                 value={lookupReason}
                 onChange={(e) => setLookupReason(e.target.value)}
-                className="w-full px-4 py-3 bg-[#16100C] border border-white/20 rounded-xl text-white text-xs focus:outline-none focus:border-red-500"
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-[#16100C] border border-slate-300 dark:border-white/20 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-xs focus:outline-none focus:border-red-500"
               />
             </div>
           </div>
@@ -134,7 +139,7 @@ export default function EmergencyLookup() {
           <button
             type="submit"
             disabled={isSearching}
-            className="w-full py-3.5 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-bold font-['Kanit'] rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all"
+            className="w-full py-3.5 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-bold font-['Kanit'] rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
           >
             <Search className="w-4 h-4" />
             {isSearching ? 'กำลังค้นหาและบันทึกประวัติ...' : 'ค้นหาข้อมูลฉุกเฉิน'}
@@ -143,78 +148,78 @@ export default function EmergencyLookup() {
 
         {/* Profile Details Card */}
         {studentProfile && (
-          <div className="bg-[#241C16] border-2 border-red-500/50 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 animate-fade-in">
-            <div className="flex items-start justify-between border-b border-white/10 pb-4">
+          <div className="bg-white dark:bg-[#241C16] border-2 border-red-400 dark:border-red-500/50 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6 animate-fade-in">
+            <div className="flex items-start justify-between border-b border-slate-200 dark:border-white/10 pb-4 flex-wrap gap-2">
               <div>
-                <span className="text-xs font-bold text-red-400 font-['JetBrains_Mono']">
+                <span className="text-xs font-bold text-red-600 dark:text-red-400 font-['JetBrains_Mono']">
                   {studentProfile.studentCode}
                 </span>
-                <h2 className="text-2xl font-bold font-['Kanit'] text-white mt-1 flex items-center gap-2">
+                <h2 className="text-2xl font-bold font-['Kanit'] text-slate-900 dark:text-white mt-1 flex items-center gap-2">
                   <User className="w-6 h-6 text-[#FF7A1A]" />
                   {studentProfile.name}
                 </h2>
-                <p className="text-xs text-[#9CA3AF]">
+                <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">
                   ชั้น: {studentProfile.class} {studentProfile.room ? `ห้อง ${studentProfile.room}` : ''}
                 </p>
               </div>
-              <span className="px-3 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded-full text-xs font-bold">
+              <span className="px-3 py-1 bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-400 border border-red-200 dark:border-red-500/30 rounded-full text-xs font-bold">
                 Medical Record
               </span>
             </div>
 
             {/* Critical Allergy Info */}
-            <div className="bg-red-950/40 border border-red-500/40 rounded-2xl p-4">
-              <h3 className="text-sm font-bold text-red-400 flex items-center gap-2 mb-2">
+            <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-500/40 rounded-2xl p-4">
+              <h3 className="text-sm font-bold text-red-700 dark:text-red-400 flex items-center gap-2 mb-2">
                 <HeartPulse className="w-4 h-4" /> ประวัติการแพ้อาหารและสารก่อภูมิแพ้ (Allergy Info):
               </h3>
               {studentProfile.allergyInfo && studentProfile.allergyInfo.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {studentProfile.allergyInfo.map((all, idx) => (
-                    <span key={idx} className="px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-lg shadow">
+                    <span key={idx} className="px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-lg shadow-xs">
                       ⚠️ {all}
                     </span>
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-[#E5E7EB]">ไม่มีประวัติการแพ้อาหารที่ระบุไว้ในระบบ</p>
+                <p className="text-xs text-slate-700 dark:text-[#E5E7EB]">ไม่มีประวัติการแพ้อาหารที่ระบุไว้ในระบบ</p>
               )}
             </div>
 
             {/* Health Notes */}
             {studentProfile.healthNotes && (
-              <div className="bg-[#16100C] border border-white/10 rounded-2xl p-4">
-                <h3 className="text-sm font-bold text-amber-400 flex items-center gap-2 mb-1">
+              <div className="bg-slate-50 dark:bg-[#16100C] border border-slate-200 dark:border-white/10 rounded-2xl p-4">
+                <h3 className="text-sm font-bold text-amber-600 dark:text-amber-400 flex items-center gap-2 mb-1">
                   <FileText className="w-4 h-4" /> ข้อควรระวังและโรคประจำตัว:
                 </h3>
-                <p className="text-xs text-[#E5E7EB]">{studentProfile.healthNotes}</p>
+                <p className="text-xs text-slate-700 dark:text-[#E5E7EB]">{studentProfile.healthNotes}</p>
               </div>
             )}
 
             {/* Guardian Contacts */}
-            <div className="bg-[#16100C] border border-white/10 rounded-2xl p-4">
+            <div className="bg-slate-50 dark:bg-[#16100C] border border-slate-200 dark:border-white/10 rounded-2xl p-4">
               <h3 className="text-sm font-bold text-[#FF7A1A] flex items-center gap-2 mb-2">
                 <Phone className="w-4 h-4" /> ผู้ปกครองที่ติดต่อได้:
               </h3>
-              <p className="text-xs text-[#9CA3AF]">
+              <p className="text-xs text-slate-600 dark:text-[#9CA3AF]">
                 Guardian IDs: {studentProfile.guardianIds?.join(', ') || 'N/A'}
               </p>
             </div>
 
             {/* 24-48 Hour Meal History (Acute Anaphylaxis & Food Poisoning Investigation) */}
-            <div className="bg-[#1C1510] border border-amber-500/30 rounded-2xl p-5 space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-amber-400 flex items-center gap-2">
+            <div className="bg-amber-50/50 dark:bg-[#1C1510] border border-amber-200 dark:border-amber-500/30 rounded-2xl p-5 space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h3 className="text-sm font-bold text-amber-800 dark:text-amber-400 flex items-center gap-2">
                   <Utensils className="w-4 h-4" /> ประวัติอาหารที่รับประทานในโรงเรียน (24–48 ชม. ล่าสุด):
                 </h3>
-                <span className="text-xs text-[#9CA3AF] flex items-center gap-1 font-['JetBrains_Mono']">
+                <span className="text-xs text-slate-600 dark:text-[#9CA3AF] flex items-center gap-1 font-['JetBrains_Mono']">
                   <Clock className="w-3.5 h-3.5" /> {recentOrders.length} ออเดอร์
                 </span>
               </div>
 
               {isLoadingOrders ? (
-                <p className="text-xs text-[#9CA3AF] py-2">กำลังดึงประวัติมื้ออาหาร...</p>
+                <p className="text-xs text-slate-500 dark:text-[#9CA3AF] py-2">กำลังดึงประวัติมื้ออาหาร...</p>
               ) : recentOrders.length === 0 ? (
-                <p className="text-xs text-[#9CA3AF] italic py-2">
+                <p className="text-xs text-slate-500 dark:text-[#9CA3AF] italic py-2">
                   ไม่พบประวัติการสั่งซื้ออาหารในระบบในช่วง 48 ชั่วโมงที่ผ่านมา
                 </p>
               ) : (
@@ -222,24 +227,24 @@ export default function EmergencyLookup() {
                   {recentOrders.map((ord) => (
                     <div
                       key={ord.id}
-                      className="p-3 bg-[#16100C] border border-white/10 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+                      className="p-3 bg-white dark:bg-[#16100C] border border-slate-200 dark:border-white/10 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
                     >
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="font-['JetBrains_Mono'] font-bold text-[#FF7A1A]">
                             {ord.queueNumber || 'Q---'}
                           </span>
-                          <span className="font-semibold text-white">
+                          <span className="font-semibold text-slate-900 dark:text-white">
                             {ord.storeName || `ร้านค้า (${ord.storeId})`}
                           </span>
-                          <span className="text-[#9CA3AF]">
+                          <span className="text-slate-500 dark:text-[#9CA3AF]">
                             รอบ {ord.pickupTime} น. ({ord.pickupDate || 'วันนี้'})
                           </span>
                         </div>
                         {/* Dishes & Modifiers */}
-                        <div className="text-[#E5E7EB] mt-1 space-x-2">
+                        <div className="text-slate-700 dark:text-[#E5E7EB] mt-1 space-x-2">
                           {ord.items?.map((item: any, idx: number) => (
-                            <span key={idx} className="inline-block bg-[#241C16] px-2 py-0.5 rounded border border-white/10 text-[11px]">
+                            <span key={idx} className="inline-block bg-slate-100 dark:bg-[#241C16] px-2 py-0.5 rounded border border-slate-200 dark:border-white/10 text-[11px]">
                               {item.quantity}x {item.name}
                               {item.customNotes ? ` [${item.customNotes}]` : ''}
                             </span>
@@ -248,10 +253,10 @@ export default function EmergencyLookup() {
                       </div>
 
                       <div className="text-right shrink-0">
-                        <span className="font-['JetBrains_Mono'] font-bold text-amber-400">
+                        <span className="font-['JetBrains_Mono'] font-bold text-amber-600 dark:text-amber-400">
                           ฿{Number(ord.totalAmount || 0).toFixed(2)}
                         </span>
-                        <span className="block text-[10px] text-[#9CA3AF]">
+                        <span className="block text-[10px] text-slate-500 dark:text-[#9CA3AF]">
                           {ord.status}
                         </span>
                       </div>
@@ -264,7 +269,7 @@ export default function EmergencyLookup() {
         )}
 
         {notFound && (
-          <div className="p-8 text-center bg-[#241C16] border border-white/10 rounded-3xl text-sm text-[#9CA3AF]">
+          <div className="p-8 text-center bg-white dark:bg-[#241C16] border border-slate-200 dark:border-white/10 rounded-3xl text-sm text-slate-600 dark:text-[#9CA3AF]">
             ไม่พบข้อมูลนักเรียนรหัส "{studentCodeInput}" ในฐานข้อมูลสถานศึกษา
           </div>
         )}

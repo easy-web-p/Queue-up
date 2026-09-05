@@ -398,16 +398,17 @@ function Home() {
         </section>
 
         {/* 3.5 QueueUp for Campus Hub Section */}
-        <section className="p-6 sm:p-8 rounded-3xl shadow-xl mb-6 bg-[#241C16] border border-[#FF7A1A]/30 text-white font-['IBM_Plex_Sans_Thai'] relative overflow-hidden">
+        {/* 3.5 QueueUp for Campus Hub Section */}
+        <section className="p-6 sm:p-8 rounded-3xl shadow-xl mb-6 bg-gradient-to-br from-amber-50/90 via-white to-orange-50/80 dark:from-[#241C16] dark:to-[#1C1510] border border-orange-200 dark:border-[#FF7A1A]/30 text-slate-900 dark:text-white font-['IBM_Plex_Sans_Thai'] relative overflow-hidden transition-colors">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
             <div>
               <span className="inline-block px-3 py-1 bg-[#FF7A1A] text-white font-['JetBrains_Mono'] font-bold text-xs rounded-full shadow-sm mb-2">
                 QUEUEUP FOR CAMPUS
               </span>
-              <h4 className="font-['Kanit'] font-black text-xl sm:text-2xl text-white mb-1">
+              <h4 className="font-['Kanit'] font-black text-xl sm:text-2xl text-slate-900 dark:text-white mb-1">
                 ศูนย์รวมบริการโรงอาหารอัจฉริยะในสถานศึกษา
               </h4>
-              <p className="text-stone-400 text-xs sm:text-sm mb-0">
+              <p className="text-slate-600 dark:text-stone-400 text-xs sm:text-sm mb-0">
                 ระบบสนับสนุนผู้ประกอบการนักเรียน กระเป๋าเงินดิจิทัล และระบบดูแลสุขภาพผู้เรียน
               </p>
             </div>
@@ -416,13 +417,13 @@ function Home() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {/* 1. Student Vendor */}
             <div
-              className="p-5 rounded-2xl bg-[#16100C] border border-[#FF7A1A]/25 hover:border-[#FF7A1A] hover:shadow-lg hover:shadow-[#FF7A1A]/10 transition-all duration-300 flex flex-col justify-between cursor-pointer group hover:-translate-y-1"
+              className="p-5 rounded-2xl bg-white dark:bg-[#16100C] border border-orange-200/80 dark:border-[#FF7A1A]/25 hover:border-[#FF7A1A] hover:shadow-lg hover:shadow-orange-500/10 transition-all duration-300 flex flex-col justify-between cursor-pointer group hover:-translate-y-1 shadow-xs"
               onClick={() => navigate("/student-vendor/apply")}
             >
               <div>
                 <div className="text-3xl mb-3 group-hover:scale-110 transition-transform inline-block">🧑‍🎓</div>
-                <h6 className="font-['Kanit'] font-bold text-white text-base mb-1">ร้านค้านักเรียน</h6>
-                <p className="text-stone-400 text-xs leading-relaxed mb-0">
+                <h6 className="font-['Kanit'] font-bold text-slate-900 dark:text-white text-base mb-1">ร้านค้านักเรียน</h6>
+                <p className="text-slate-600 dark:text-stone-400 text-xs leading-relaxed mb-0">
                   ยื่นขอเปิดร้านค้าในโรงอาหาร บ่มเพาะทักษะธุรกิจ
                 </p>
               </div>
@@ -436,13 +437,13 @@ function Home() {
 
             {/* 2. Guardian Portal */}
             <div
-              className="p-5 rounded-2xl bg-[#16100C] border border-[#FF7A1A]/25 hover:border-[#FF7A1A] hover:shadow-lg hover:shadow-[#FF7A1A]/10 transition-all duration-300 flex flex-col justify-between cursor-pointer group hover:-translate-y-1"
+              className="p-5 rounded-2xl bg-white dark:bg-[#16100C] border border-orange-200/80 dark:border-[#FF7A1A]/25 hover:border-[#FF7A1A] hover:shadow-lg hover:shadow-orange-500/10 transition-all duration-300 flex flex-col justify-between cursor-pointer group hover:-translate-y-1 shadow-xs"
               onClick={() => navigate("/guardian")}
             >
               <div>
                 <div className="text-3xl mb-3 group-hover:scale-110 transition-transform inline-block">🛡️</div>
-                <h6 className="font-['Kanit'] font-bold text-white text-base mb-1">ผู้ปกครอง (Guardian)</h6>
-                <p className="text-stone-400 text-xs leading-relaxed mb-0">
+                <h6 className="font-['Kanit'] font-bold text-slate-900 dark:text-white text-base mb-1">ผู้ปกครอง (Guardian)</h6>
+                <p className="text-slate-600 dark:text-stone-400 text-xs leading-relaxed mb-0">
                   เติมเงิน กำหนดวงเงินรายวัน และบล็อกหมวดอาหาร
                 </p>
               </div>
@@ -456,13 +457,13 @@ function Home() {
 
             {/* 3. Teacher/Supervisor Approvals */}
             <div
-              className="p-5 rounded-2xl bg-[#16100C] border border-[#FF7A1A]/25 hover:border-[#FF7A1A] hover:shadow-lg hover:shadow-[#FF7A1A]/10 transition-all duration-300 flex flex-col justify-between cursor-pointer group hover:-translate-y-1"
+              className="p-5 rounded-2xl bg-white dark:bg-[#16100C] border border-orange-200/80 dark:border-[#FF7A1A]/25 hover:border-[#FF7A1A] hover:shadow-lg hover:shadow-orange-500/10 transition-all duration-300 flex flex-col justify-between cursor-pointer group hover:-translate-y-1 shadow-xs"
               onClick={() => navigate("/admin/vendor-approvals")}
             >
               <div>
                 <div className="text-3xl mb-3 group-hover:scale-110 transition-transform inline-block">👨‍🏫</div>
-                <h6 className="font-['Kanit'] font-bold text-white text-base mb-1">อาจารย์ / ฝ่ายปกครอง</h6>
-                <p className="text-stone-400 text-xs leading-relaxed mb-0">
+                <h6 className="font-['Kanit'] font-bold text-slate-900 dark:text-white text-base mb-1">อาจารย์ / ฝ่ายปกครอง</h6>
+                <p className="text-slate-600 dark:text-stone-400 text-xs leading-relaxed mb-0">
                   อนุมัติร้านค้านักเรียน และตรวจสอบสุขอนามัย
                 </p>
               </div>
@@ -476,13 +477,13 @@ function Home() {
 
             {/* 4. Live Canteen Monitor */}
             <div
-              className="p-5 rounded-2xl bg-[#16100C] border border-[#FF7A1A]/25 hover:border-[#FF7A1A] hover:shadow-lg hover:shadow-[#FF7A1A]/10 transition-all duration-300 flex flex-col justify-between cursor-pointer group hover:-translate-y-1"
+              className="p-5 rounded-2xl bg-white dark:bg-[#16100C] border border-orange-200/80 dark:border-[#FF7A1A]/25 hover:border-[#FF7A1A] hover:shadow-lg hover:shadow-orange-500/10 transition-all duration-300 flex flex-col justify-between cursor-pointer group hover:-translate-y-1 shadow-xs"
               onClick={() => navigate("/campus/monitor")}
             >
               <div>
                 <div className="text-3xl mb-3 group-hover:scale-110 transition-transform inline-block">📺</div>
-                <h6 className="font-['Kanit'] font-bold text-white text-base mb-1">จอแสดงคิวสด</h6>
-                <p className="text-stone-400 text-xs leading-relaxed mb-0">
+                <h6 className="font-['Kanit'] font-bold text-slate-900 dark:text-white text-base mb-1">จอแสดงคิวสด</h6>
+                <p className="text-slate-600 dark:text-stone-400 text-xs leading-relaxed mb-0">
                   จอแสดงผลคิวปรุงเสร็จแบบเรียลไทม์ในโรงอาหาร
                 </p>
               </div>
@@ -496,19 +497,19 @@ function Home() {
 
             {/* 5. Medical & Emergency */}
             <div
-              className="p-5 rounded-2xl bg-[#16100C] border border-red-500/35 hover:border-red-500 hover:shadow-lg hover:shadow-red-500/10 transition-all duration-300 flex flex-col justify-between cursor-pointer group hover:-translate-y-1"
+              className="p-5 rounded-2xl bg-white dark:bg-[#16100C] border border-red-200 dark:border-red-500/35 hover:border-red-500 hover:shadow-lg hover:shadow-red-500/10 transition-all duration-300 flex flex-col justify-between cursor-pointer group hover:-translate-y-1 shadow-xs"
               onClick={() => navigate("/emergency")}
             >
               <div>
                 <div className="text-3xl mb-3 group-hover:scale-110 transition-transform inline-block">🚨</div>
-                <h6 className="font-['Kanit'] font-bold text-white text-base mb-1">พยาบาล & ฉุกเฉิน</h6>
-                <p className="text-stone-400 text-xs leading-relaxed mb-0">
+                <h6 className="font-['Kanit'] font-bold text-slate-900 dark:text-white text-base mb-1">พยาบาล & ฉุกเฉิน</h6>
+                <p className="text-slate-600 dark:text-stone-400 text-xs leading-relaxed mb-0">
                   ค้นหาประวัติแพ้อาหาร โรคประจำตัว และบันทึก Audit
                 </p>
               </div>
               <button
                 type="button"
-                className="w-full py-2.5 rounded-xl border border-red-500 text-red-400 group-hover:bg-red-500 group-hover:text-white font-['Kanit'] font-bold text-xs transition-all mt-4 text-center cursor-pointer"
+                className="w-full py-2.5 rounded-xl border border-red-500 text-red-500 dark:text-red-400 group-hover:bg-red-500 group-hover:text-white font-['Kanit'] font-bold text-xs transition-all mt-4 text-center cursor-pointer"
               >
                 ข้อมูลฉุกเฉิน ›
               </button>

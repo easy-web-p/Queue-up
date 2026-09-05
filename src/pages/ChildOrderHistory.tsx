@@ -111,19 +111,24 @@ export default function ChildOrderHistory() {
   };
 
   return (
-    <div className="min-h-screen bg-[#16100C] text-white font-['IBM_Plex_Sans_Thai'] pb-20">
+    <div className="min-h-screen bg-slate-100 dark:bg-[#16100C] text-slate-800 dark:text-slate-100 font-['IBM_Plex_Sans_Thai'] pb-20 transition-colors">
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-[#241C16]/95 backdrop-blur border-b border-white/10 px-6 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-30 bg-white/95 dark:bg-[#241C16]/95 backdrop-blur border-b border-slate-200 dark:border-white/10 px-6 py-4 flex items-center justify-between shadow-xs">
         <div className="flex items-center space-x-3">
-          <Link to="/guardian/dashboard" className="p-2 bg-[#16100C] border border-white/10 rounded-xl text-[#FF7A1A] hover:bg-[#FF7A1A]/10 transition-colors">
+          <Link
+            to="/guardian/dashboard"
+            className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#16100C] dark:hover:bg-[#FF7A1A]/10 border border-slate-200 dark:border-white/10 rounded-xl text-[#FF7A1A] transition-colors"
+          >
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-xl font-bold font-['Kanit'] text-white flex items-center gap-2">
+            <h1 className="text-xl font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
               <History className="w-5 h-5 text-[#FF7A1A]" />
               ประวัติการกินย้อนหลัง (Child Order History)
             </h1>
-            <p className="text-xs text-[#9CA3AF]">ตรวจสอบรายการอาหารและโภชนาการที่บุตรหลานรับประทานจริงในโรงเรียน</p>
+            <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">
+              ตรวจสอบรายการอาหารและโภชนาการที่บุตรหลานรับประทานจริงในโรงเรียน
+            </p>
           </div>
         </div>
       </header>
@@ -136,10 +141,10 @@ export default function ChildOrderHistory() {
               <button
                 key={child.id}
                 onClick={() => setSelectedChild(child)}
-                className={`px-4 py-2.5 rounded-2xl font-['Kanit'] text-sm font-semibold transition-all shrink-0 ${
+                className={`px-4 py-2.5 rounded-2xl font-['Kanit'] text-sm font-semibold transition-all shrink-0 cursor-pointer ${
                   selectedChild?.id === child.id
-                    ? 'bg-[#FF7A1A] text-white shadow-lg shadow-[#FF7A1A]/20'
-                    : 'bg-[#241C16] text-[#9CA3AF] hover:text-white border border-white/10'
+                    ? 'bg-[#FF7A1A] text-white shadow-lg shadow-orange-500/20'
+                    : 'bg-white dark:bg-[#241C16] text-slate-600 dark:text-[#9CA3AF] hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-white/10'
                 }`}
               >
                 {child.studentName} ({child.studentId})
@@ -149,19 +154,19 @@ export default function ChildOrderHistory() {
         )}
 
         {/* Privacy & Zero-Interference Notice */}
-        <div className="p-4 rounded-2xl bg-[#241C16] border border-white/10 flex items-start gap-3 text-xs text-[#9CA3AF]">
-          <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+        <div className="p-4 rounded-2xl bg-white dark:bg-[#241C16] border border-slate-200 dark:border-white/10 flex items-start gap-3 text-xs text-slate-600 dark:text-[#9CA3AF] shadow-xs">
+          <ShieldCheck className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
           <span>
-            <strong className="text-white">หลักการเคารพความเป็นส่วนตัว (Privacy by Design):</strong> ผู้ปกครองสามารถดูข้อมูลโภชนาการและรายการอาหารที่บุตรหลานสั่งจริงเพื่อดูแลสุขภาพ แต่ระบบจะไม่มีปุ่มแก้ไขหรือยกเลิกออเดอร์แทน เพื่อฝึกวินัยและอิสระในการตัดสินใจของนักเรียน
+            <strong className="text-slate-900 dark:text-white">หลักการเคารพความเป็นส่วนตัว (Privacy by Design):</strong> ผู้ปกครองสามารถดูข้อมูลโภชนาการและรายการอาหารที่บุตรหลานสั่งจริงเพื่อดูแลสุขภาพ แต่ระบบจะไม่มีปุ่มแก้ไขหรือยกเลิกออเดอร์แทน เพื่อฝึกวินัยและอิสระในการตัดสินใจของนักเรียน
           </span>
         </div>
 
         {selectedChild && (
           <div className="space-y-4">
             {isLoading ? (
-              <div className="p-12 text-center text-sm text-[#9CA3AF]">กำลังโหลดประวัติการสั่งอาหาร...</div>
+              <div className="p-12 text-center text-sm text-slate-500 dark:text-[#9CA3AF]">กำลังโหลดประวัติการสั่งอาหาร...</div>
             ) : orders.length === 0 ? (
-              <div className="p-12 text-center bg-[#241C16] border border-white/10 rounded-3xl text-sm text-[#9CA3AF] space-y-2">
+              <div className="p-12 text-center bg-white dark:bg-[#241C16] border border-slate-200 dark:border-white/10 rounded-3xl text-sm text-slate-600 dark:text-[#9CA3AF] space-y-2">
                 <Utensils className="w-8 h-8 text-[#FF7A1A] mx-auto opacity-50" />
                 <p>ยังไม่มีประวัติการสั่งซื้ออาหารของ {selectedChild.studentName}</p>
               </div>
@@ -169,18 +174,18 @@ export default function ChildOrderHistory() {
               orders.map((ord) => (
                 <div
                   key={ord.id}
-                  className="bg-[#241C16] border border-white/10 rounded-3xl p-6 shadow-xl space-y-4 transition-all hover:border-[#FF7A1A]/30"
+                  className="bg-white dark:bg-[#241C16] border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-md space-y-4 transition-all hover:border-[#FF7A1A]/40"
                 >
-                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/10 pb-3 flex-wrap gap-2">
                     <div className="flex items-center gap-3">
-                      <span className="px-3 py-1 bg-[#FF7A1A]/20 text-[#FF7A1A] rounded-xl font-['JetBrains_Mono'] font-bold text-sm">
+                      <span className="px-3 py-1 bg-orange-100 dark:bg-[#FF7A1A]/20 text-orange-700 dark:text-[#FF7A1A] rounded-xl font-['JetBrains_Mono'] font-bold text-sm">
                         {ord.queueNumber || 'Q---'}
                       </span>
                       <div>
-                        <span className="text-xs text-[#9CA3AF] block">
+                        <span className="text-xs text-slate-500 dark:text-[#9CA3AF] block">
                           วันที่ {ord.pickupDate || 'วันนี้'} • รอบรับอาหาร {ord.pickupTime} น.
                         </span>
-                        <span className="text-sm font-bold text-white">
+                        <span className="text-sm font-bold text-slate-900 dark:text-white">
                           {ord.storeName || `ร้านค้า (${ord.storeId})`}
                         </span>
                       </div>
@@ -193,23 +198,23 @@ export default function ChildOrderHistory() {
                     {ord.items && ord.items.map((item, idx) => (
                       <div key={idx} className="flex items-center justify-between text-xs py-1">
                         <div className="flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-md bg-[#16100C] text-[#FF7A1A] font-bold flex items-center justify-center font-['JetBrains_Mono']">
+                          <span className="w-5 h-5 rounded-md bg-slate-100 dark:bg-[#16100C] text-orange-600 dark:text-[#FF7A1A] font-bold flex items-center justify-center font-['JetBrains_Mono']">
                             {item.quantity}x
                           </span>
-                          <span className="text-white font-medium">{item.name}</span>
+                          <span className="text-slate-800 dark:text-white font-medium">{item.name}</span>
                           {item.customNotes && (
-                            <span className="text-[#9CA3AF] italic">({item.customNotes})</span>
+                            <span className="text-slate-500 dark:text-[#9CA3AF] italic">({item.customNotes})</span>
                           )}
                         </div>
-                        <span className="font-['JetBrains_Mono'] font-bold text-white">
+                        <span className="font-['JetBrains_Mono'] font-bold text-slate-900 dark:text-white">
                           ฿{Number(item.subtotal || 0).toFixed(2)}
                         </span>
                       </div>
                     ))}
                   </div>
 
-                  <div className="flex items-center justify-between border-t border-white/10 pt-3 text-xs">
-                    <span className="text-[#9CA3AF]">
+                  <div className="flex items-center justify-between border-t border-slate-100 dark:border-white/10 pt-3 text-xs">
+                    <span className="text-slate-500 dark:text-[#9CA3AF]">
                       การชำระ: {ord.paymentMode === 'CAMPUS_WALLET' ? '💳 กระเป๋าเงินนักเรียน' : '⚡ สั่งตรง Zero-Payment'}
                     </span>
                     <div className="text-sm font-bold font-['Kanit'] text-[#FF7A1A]">

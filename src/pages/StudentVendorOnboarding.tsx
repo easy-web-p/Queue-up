@@ -126,19 +126,24 @@ export default function StudentVendorOnboarding() {
   };
 
   return (
-    <div className="min-h-screen bg-[#16100C] text-white font-['IBM_Plex_Sans_Thai'] pb-20">
+    <div className="min-h-screen bg-slate-100 dark:bg-[#16100C] text-slate-800 dark:text-slate-100 font-['IBM_Plex_Sans_Thai'] pb-20 transition-colors">
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-[#241C16]/95 backdrop-blur border-b border-[#FF7A1A]/20 px-6 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-30 bg-white/95 dark:bg-[#241C16]/95 backdrop-blur border-b border-slate-200 dark:border-[#FF7A1A]/20 px-6 py-4 flex items-center justify-between shadow-xs">
         <div className="flex items-center space-x-3">
-          <Link to="/home" className="p-2 bg-[#16100C] border border-[#FF7A1A]/30 rounded-xl text-[#FF7A1A] hover:bg-[#FF7A1A]/10 transition-colors">
+          <Link
+            to="/home"
+            className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#16100C] dark:hover:bg-[#FF7A1A]/10 border border-slate-200 dark:border-[#FF7A1A]/30 rounded-xl text-[#FF7A1A] transition-colors"
+          >
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-xl font-bold font-['Kanit'] text-white flex items-center gap-2">
+            <h1 className="text-xl font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
               <Store className="w-5 h-5 text-[#FF7A1A]" />
               ยื่นขอเปิดร้านค้านักเรียน (Student Entrepreneur)
             </h1>
-            <p className="text-xs text-[#9CA3AF]">ระบบบ่มเพาะและจำลองการประกอบการธุรกิจโรงอาหารในสถานศึกษา</p>
+            <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">
+              ระบบบ่มเพาะและจำลองการประกอบการธุรกิจโรงอาหารในสถานศึกษา
+            </p>
           </div>
         </div>
       </header>
@@ -146,7 +151,7 @@ export default function StudentVendorOnboarding() {
       <main className="max-w-4xl mx-auto px-4 mt-8">
         {/* Status Banner if application already submitted */}
         {existingRequest && (
-          <div className="mb-8 p-6 rounded-2xl bg-[#241C16] border border-[#FF7A1A]/30 shadow-xl">
+          <div className="mb-8 p-6 rounded-2xl bg-white dark:bg-[#241C16] border border-slate-200 dark:border-[#FF7A1A]/30 shadow-xl">
             <div className="flex items-start gap-4">
               {existingRequest.status === 'PENDING' && (
                 <Clock className="w-8 h-8 text-amber-500 shrink-0 mt-1" />
@@ -158,38 +163,38 @@ export default function StudentVendorOnboarding() {
                 <XCircle className="w-8 h-8 text-red-500 shrink-0 mt-1" />
               )}
               <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold font-['Kanit']">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h3 className="text-lg font-bold font-['Kanit'] text-slate-900 dark:text-white">
                     สถานะใบสมัคร: {existingRequest.shopName}
                   </h3>
                   <span className={`px-3 py-1 rounded-full text-xs font-bold font-['JetBrains_Mono'] ${
                     existingRequest.status === 'APPROVED'
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30'
                       : existingRequest.status === 'REJECTED'
-                      ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                      : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                      ? 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-400 border border-red-300 dark:border-red-500/30'
+                      : 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-400 border border-amber-300 dark:border-amber-500/30'
                   }`}>
                     {existingRequest.status}
                   </span>
                 </div>
-                <p className="text-sm text-[#E5E7EB] mt-2">
-                  โซนที่ขอ: {existingRequest.requestedZone} | หมวดหมู่: {existingRequest.productCategories?.join(', ')}
+                <p className="text-sm text-slate-600 dark:text-[#E5E7EB] mt-2">
+                  โซนที่ขอ: <strong className="text-slate-900 dark:text-white">{existingRequest.requestedZone}</strong> | หมวดหมู่: <strong className="text-slate-900 dark:text-white">{existingRequest.productCategories?.join(', ')}</strong>
                 </p>
                 {existingRequest.status === 'APPROVED' && (
-                  <div className="mt-4 p-4 rounded-xl bg-emerald-950/40 border border-emerald-500/30">
-                    <p className="text-sm text-emerald-300 font-semibold">
+                  <div className="mt-4 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-500/30">
+                    <p className="text-sm text-emerald-800 dark:text-emerald-300 font-semibold">
                       🎉 ยินดีด้วย! ร้านค้าของคุณผ่านการอนุมัติแล้ว คุณสามารถเข้าสู่ Merchant Dashboard เพื่อจัดการเมนูและรับออเดอร์ได้ทันที
                     </p>
                     <button
                       onClick={() => navigate('/merchant/dashboard')}
-                      className="mt-3 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-semibold transition-colors"
+                      className="mt-3 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-semibold transition-colors cursor-pointer"
                     >
                       ไปยัง Merchant Dashboard
                     </button>
                   </div>
                 )}
                 {existingRequest.status === 'REJECTED' && (
-                  <div className="mt-4 p-4 rounded-xl bg-red-950/40 border border-red-500/30 text-sm text-red-300">
+                  <div className="mt-4 p-4 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-500/30 text-sm text-red-800 dark:text-red-300">
                     <p className="font-semibold">เหตุผลการปฏิเสธ:</p>
                     <p>{existingRequest.rejectionReason || 'ข้อมูลหรือเมนูอาหารไม่ผ่านเกณฑ์ความปลอดภัยของโรงเรียน'}</p>
                   </div>
@@ -200,90 +205,90 @@ export default function StudentVendorOnboarding() {
         )}
 
         {/* Application Form */}
-        <form onSubmit={handleSubmit} className="bg-[#241C16] border border-[#FF7A1A]/20 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
-          <div className="border-b border-white/10 pb-4">
-            <h2 className="text-xl font-bold font-['Kanit'] text-white">1. ข้อมูลผู้ประกอบการนักเรียน</h2>
-            <p className="text-xs text-[#9CA3AF]">กรอกข้อมูลสำหรับการตรวจสอบสถานะนักเรียน</p>
+        <form onSubmit={handleSubmit} className="bg-white dark:bg-[#241C16] border border-slate-200 dark:border-[#FF7A1A]/20 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
+          <div className="border-b border-slate-200 dark:border-white/10 pb-4">
+            <h2 className="text-xl font-bold font-['Kanit'] text-slate-900 dark:text-white">1. ข้อมูลผู้ประกอบการนักเรียน</h2>
+            <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">กรอกข้อมูลสำหรับการตรวจสอบสถานะนักเรียน</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-[#E5E7EB] mb-2">ชื่อ - นามสกุล นักเรียน *</label>
+              <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">ชื่อ - นามสกุล นักเรียน *</label>
               <input
                 type="text"
                 value={studentName}
                 onChange={(e) => setStudentName(e.target.value)}
                 required
-                className="w-full px-4 py-3 bg-[#16100C] border border-[#FF7A1A]/30 rounded-xl text-white focus:outline-none focus:border-[#FF7A1A]"
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-[#16100C] border border-slate-300 dark:border-[#FF7A1A]/30 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#FF7A1A] transition-colors"
                 placeholder="เช่น ด.ช. สุขุม สุขสำราญ"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[#E5E7EB] mb-2">รหัสประจำตัวนักเรียน *</label>
+              <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">รหัสประจำตัวนักเรียน *</label>
               <input
                 type="text"
                 value={studentCode}
                 onChange={(e) => setStudentCode(e.target.value)}
                 required
-                className="w-full px-4 py-3 bg-[#16100C] border border-[#FF7A1A]/30 rounded-xl text-white font-['JetBrains_Mono'] focus:outline-none focus:border-[#FF7A1A]"
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-[#16100C] border border-slate-300 dark:border-[#FF7A1A]/30 rounded-xl text-slate-900 dark:text-white font-['JetBrains_Mono'] placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#FF7A1A] transition-colors"
                 placeholder="เช่น STU58492"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[#E5E7EB] mb-2">ระดับชั้น (Class / Grade)</label>
+              <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">ระดับชั้น (Class / Grade)</label>
               <input
                 type="text"
                 value={className}
                 onChange={(e) => setClassName(e.target.value)}
-                className="w-full px-4 py-3 bg-[#16100C] border border-[#FF7A1A]/30 rounded-xl text-white focus:outline-none focus:border-[#FF7A1A]"
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-[#16100C] border border-slate-300 dark:border-[#FF7A1A]/30 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#FF7A1A] transition-colors"
                 placeholder="เช่น ม.4/2 หรือ Grade 10"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[#E5E7EB] mb-2">ห้องเรียน / อาคารประจำ</label>
+              <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">ห้องเรียน / อาคารประจำ</label>
               <input
                 type="text"
                 value={room}
                 onChange={(e) => setRoom(e.target.value)}
-                className="w-full px-4 py-3 bg-[#16100C] border border-[#FF7A1A]/30 rounded-xl text-white focus:outline-none focus:border-[#FF7A1A]"
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-[#16100C] border border-slate-300 dark:border-[#FF7A1A]/30 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#FF7A1A] transition-colors"
                 placeholder="เช่น ห้อง 421 อาคาร 4"
               />
             </div>
           </div>
 
-          <div className="border-b border-white/10 pb-4 pt-4">
-            <h2 className="text-xl font-bold font-['Kanit'] text-white">2. ข้อมูลร้านค้าและจุดจำหน่าย</h2>
-            <p className="text-xs text-[#9CA3AF]">ระบุโซนและประเภทอาหารที่ประสงค์จะจัดจำหน่าย</p>
+          <div className="border-b border-slate-200 dark:border-white/10 pb-4 pt-4">
+            <h2 className="text-xl font-bold font-['Kanit'] text-slate-900 dark:text-white">2. ข้อมูลร้านค้าและจุดจำหน่าย</h2>
+            <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">ระบุโซนและประเภทอาหารที่ประสงค์จะจัดจำหน่าย</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-[#E5E7EB] mb-2">ชื่อร้านค้า (Shop Name) *</label>
+              <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">ชื่อร้านค้า (Shop Name) *</label>
               <input
                 type="text"
                 value={shopName}
                 onChange={(e) => setShopName(e.target.value)}
                 required
-                className="w-full px-4 py-3 bg-[#16100C] border border-[#FF7A1A]/30 rounded-xl text-white focus:outline-none focus:border-[#FF7A1A]"
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-[#16100C] border border-slate-300 dark:border-[#FF7A1A]/30 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#FF7A1A] transition-colors"
                 placeholder="เช่น ปังปิ้งหลังคาแดง, ชาเขียวม.ปลาย"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[#E5E7EB] mb-2">โซนโรงอาหารที่ต้องการ *</label>
+              <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">โซนโรงอาหารที่ต้องการ *</label>
               <select
                 value={requestedZone}
                 onChange={(e) => setRequestedZone(e.target.value)}
-                className="w-full px-4 py-3 bg-[#16100C] border border-[#FF7A1A]/30 rounded-xl text-white focus:outline-none focus:border-[#FF7A1A]"
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-[#16100C] border border-slate-300 dark:border-[#FF7A1A]/30 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-[#FF7A1A] transition-colors"
               >
                 {zones.map((z) => (
-                  <option key={z} value={z}>{z}</option>
+                  <option key={z} value={z} className="bg-white dark:bg-[#16100C] text-slate-900 dark:text-white">{z}</option>
                 ))}
               </select>
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-[#E5E7EB] mb-2">หมวดหมู่สินค้าที่จำหน่าย</label>
+            <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">หมวดหมู่สินค้าที่จำหน่าย</label>
             <div className="flex flex-wrap gap-2">
               {categoryOptions.map((cat) => {
                 const isSelected = selectedCategories.includes(cat);
@@ -292,10 +297,10 @@ export default function StudentVendorOnboarding() {
                     key={cat}
                     type="button"
                     onClick={() => handleToggleCategory(cat)}
-                    className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                    className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
                       isSelected
-                        ? 'bg-[#FF7A1A] border-[#FF7A1A] text-white shadow-md shadow-orange-900/30'
-                        : 'bg-[#16100C] border-white/20 text-[#E5E7EB] hover:border-[#FF7A1A]/40'
+                        ? 'bg-[#FF7A1A] border-[#FF7A1A] text-white shadow-md shadow-orange-500/20'
+                        : 'bg-slate-100 dark:bg-[#16100C] border-slate-200 dark:border-white/20 text-slate-700 dark:text-[#E5E7EB] hover:border-[#FF7A1A]/60'
                     }`}
                   >
                     {cat}
@@ -305,36 +310,37 @@ export default function StudentVendorOnboarding() {
             </div>
           </div>
 
-          <div className="border-b border-white/10 pb-4 pt-4">
-            <h2 className="text-xl font-bold font-['Kanit'] text-white">3. ตัวอย่างรายการเมนู (Menu Preview)</h2>
-            <p className="text-xs text-[#9CA3AF]">ระบุอย่างน้อย 1 เมนูเพื่อประกอบการพิจารณาด้านสุขอนามัยและโภชนาการ</p>
+          <div className="border-b border-slate-200 dark:border-white/10 pb-4 pt-4">
+            <h2 className="text-xl font-bold font-['Kanit'] text-slate-900 dark:text-white">3. ตัวอย่างรายการเมนู (Menu Preview)</h2>
+            <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">ระบุอย่างน้อย 1 เมนูเพื่อประกอบการพิจารณาด้านสุขอนามัยและโภชนาการ</p>
           </div>
 
           <div className="space-y-3">
             {menuItems.map((item, idx) => (
-              <div key={idx} className="p-4 bg-[#16100C] border border-white/10 rounded-2xl flex flex-col md:flex-row gap-3 items-start md:items-center">
+              <div key={idx} className="p-4 bg-slate-50 dark:bg-[#16100C] border border-slate-200 dark:border-white/10 rounded-2xl flex flex-col md:flex-row gap-3 items-start md:items-center">
                 <input
                   type="text"
                   placeholder="ชื่อเมนู (เช่น ขนมปังปิ้งเนยนม)"
                   value={item.name}
                   onChange={(e) => handleMenuItemChange(idx, 'name', e.target.value)}
-                  className="flex-1 px-3 py-2 bg-[#241C16] border border-[#FF7A1A]/20 rounded-xl text-white text-sm"
+                  className="flex-1 w-full px-3 py-2 bg-white dark:bg-[#241C16] border border-slate-300 dark:border-[#FF7A1A]/20 rounded-xl text-slate-900 dark:text-white text-sm focus:outline-none focus:border-[#FF7A1A]"
                 />
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-[#9CA3AF]">ราคา (บาท):</span>
+                <div className="flex items-center gap-2 w-full md:w-auto">
+                  <span className="text-xs font-bold text-slate-600 dark:text-[#9CA3AF]">ราคา (บาท):</span>
                   <input
                     type="number"
                     min="1"
                     value={item.price}
                     onChange={(e) => handleMenuItemChange(idx, 'price', Number(e.target.value))}
-                    className="w-24 px-3 py-2 bg-[#241C16] border border-[#FF7A1A]/20 rounded-xl text-white font-['JetBrains_Mono'] text-sm"
+                    className="w-24 px-3 py-2 bg-white dark:bg-[#241C16] border border-slate-300 dark:border-[#FF7A1A]/20 rounded-xl text-slate-900 dark:text-white font-['JetBrains_Mono'] text-sm focus:outline-none focus:border-[#FF7A1A]"
                   />
                 </div>
                 {menuItems.length > 1 && (
                   <button
                     type="button"
                     onClick={() => handleRemoveMenuItem(idx)}
-                    className="p-2 text-red-400 hover:bg-red-500/10 rounded-xl transition-colors"
+                    className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-colors cursor-pointer"
+                    title="ลบเมนู"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -344,7 +350,7 @@ export default function StudentVendorOnboarding() {
             <button
               type="button"
               onClick={handleAddMenuItem}
-              className="px-4 py-2 border border-dashed border-[#FF7A1A]/40 text-[#FF7A1A] hover:bg-[#FF7A1A]/10 rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors"
+              className="px-4 py-2 border border-dashed border-[#FF7A1A]/50 text-[#FF7A1A] hover:bg-orange-50 dark:hover:bg-[#FF7A1A]/10 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer"
             >
               <Plus className="w-4 h-4" /> เพิ่มเมนูตัวอย่าง
             </button>
@@ -352,7 +358,7 @@ export default function StudentVendorOnboarding() {
 
           {statusMessage && (
             <div className={`p-4 rounded-xl text-sm font-semibold ${
-              statusMessage.type === 'success' ? 'bg-emerald-950/40 text-emerald-300 border border-emerald-500/30' : 'bg-red-950/40 text-red-300 border border-red-500/30'
+              statusMessage.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/30' : 'bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-300 border border-red-300 dark:border-red-500/30'
             }`}>
               {statusMessage.text}
             </div>
@@ -362,7 +368,7 @@ export default function StudentVendorOnboarding() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-4 bg-[#FF7A1A] hover:bg-[#E6680D] disabled:opacity-50 text-white font-bold font-['Kanit'] rounded-2xl shadow-lg shadow-orange-950/40 flex items-center justify-center gap-2 transition-all"
+              className="w-full py-4 bg-[#FF7A1A] hover:bg-[#E6680D] disabled:opacity-50 text-white font-bold font-['Kanit'] rounded-2xl shadow-lg shadow-orange-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
               {isSubmitting ? (
                 <span>กำลังบันทึกข้อมูล...</span>

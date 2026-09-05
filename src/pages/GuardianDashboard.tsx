@@ -251,36 +251,41 @@ export default function GuardianDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[#16100C] text-white font-['IBM_Plex_Sans_Thai'] pb-20">
+    <div className="min-h-screen bg-slate-100 dark:bg-[#16100C] text-slate-800 dark:text-slate-100 font-['IBM_Plex_Sans_Thai'] pb-20 transition-colors">
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-[#241C16]/95 backdrop-blur border-b border-[#FF7A1A]/20 px-6 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-30 bg-white/95 dark:bg-[#241C16]/95 backdrop-blur border-b border-slate-200 dark:border-[#FF7A1A]/20 px-6 py-4 flex items-center justify-between shadow-xs">
         <div className="flex items-center space-x-3">
-          <Link to="/home" className="p-2 bg-[#16100C] border border-[#FF7A1A]/30 rounded-xl text-[#FF7A1A] hover:bg-[#FF7A1A]/10 transition-colors">
+          <Link
+            to="/home"
+            className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#16100C] dark:hover:bg-[#FF7A1A]/10 border border-slate-200 dark:border-[#FF7A1A]/30 rounded-xl text-[#FF7A1A] transition-colors"
+          >
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-xl font-bold font-['Kanit'] text-white flex items-center gap-2">
+            <h1 className="text-xl font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
               <Shield className="w-5 h-5 text-[#FF7A1A]" />
               แดชบอร์ดผู้ปกครอง (Guardian Oversight & Campus Wallet)
             </h1>
-            <p className="text-xs text-[#9CA3AF]">ติดตามการใช้จ่าย กำหนดวงเงินรายวัน บล็อกอาหารไม่พึงประสงค์ และบันทึกข้อมูลแพ้อาหาร</p>
+            <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">
+              ติดตามการใช้จ่าย กำหนดวงเงินรายวัน บล็อกอาหารไม่พึงประสงค์ และบันทึกข้อมูลแพ้อาหาร
+            </p>
           </div>
         </div>
       </header>
 
       <main className="max-w-6xl mx-auto px-4 mt-8">
         {/* Child Selector / Multi-child switcher */}
-        <div className="flex items-center justify-between bg-[#241C16] border border-[#FF7A1A]/20 rounded-2xl p-4 mb-6">
+        <div className="flex items-center justify-between bg-white dark:bg-[#241C16] border border-slate-200 dark:border-[#FF7A1A]/20 rounded-2xl p-4 mb-6 shadow-xs flex-wrap gap-3">
           <div className="flex items-center gap-2 overflow-x-auto">
-            <span className="text-xs font-bold text-[#FF7A1A] mr-2">บุตรหลานในความดูแล:</span>
+            <span className="text-xs font-bold text-[#FF7A1A] mr-2 shrink-0">บุตรหลานในความดูแล:</span>
             {children.map((c) => (
               <button
                 key={c.id}
                 onClick={() => setSelectedChild(c)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
                   selectedChild?.id === c.id
-                    ? 'bg-[#FF7A1A] text-white shadow-lg shadow-orange-950/40'
-                    : 'bg-[#16100C] text-[#E5E7EB] hover:border-[#FF7A1A]/30 border border-white/10'
+                    ? 'bg-[#FF7A1A] text-white shadow-md shadow-orange-500/20'
+                    : 'bg-slate-100 dark:bg-[#16100C] text-slate-700 dark:text-[#E5E7EB] hover:border-[#FF7A1A]/40 border border-slate-200 dark:border-white/10'
                 }`}
               >
                 <User className="w-3.5 h-3.5" />
@@ -290,7 +295,7 @@ export default function GuardianDashboard() {
           </div>
           <button
             onClick={() => setIsLinkModalOpen(true)}
-            className="px-3 py-2 bg-[#FF7A1A]/20 hover:bg-[#FF7A1A]/30 text-[#FF7A1A] border border-[#FF7A1A]/30 rounded-xl text-xs font-bold flex items-center gap-1 shrink-0"
+            className="px-3 py-2 bg-orange-50 hover:bg-orange-100 dark:bg-[#FF7A1A]/20 dark:hover:bg-[#FF7A1A]/30 text-orange-700 dark:text-[#FF7A1A] border border-orange-300 dark:border-[#FF7A1A]/30 rounded-xl text-xs font-bold flex items-center gap-1 shrink-0 cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" /> เพิ่มบุตรหลาน
           </button>
@@ -301,29 +306,29 @@ export default function GuardianDashboard() {
             {/* Column 1 & 2: Wallet Overview & Controls */}
             <div className="lg:col-span-2 space-y-6">
               {/* Wallet Card */}
-              <div className="bg-gradient-to-br from-[#2D1B10] via-[#241C16] to-[#1A120D] border border-[#FF7A1A]/30 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+              <div className="bg-gradient-to-br from-orange-50/80 via-white to-amber-50/80 dark:from-[#2D1B10] dark:via-[#241C16] dark:to-[#1A120D] border border-orange-200 dark:border-[#FF7A1A]/30 rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
                   <Wallet className="w-48 h-48 text-[#FF7A1A]" />
                 </div>
 
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between flex-wrap gap-3">
                   <div>
                     <span className="text-xs font-bold uppercase text-[#FF7A1A] tracking-wider font-['JetBrains_Mono']">
                       Campus Digital Wallet
                     </span>
-                    <h2 className="text-2xl font-bold font-['Kanit'] text-white mt-1">
+                    <h2 className="text-2xl font-bold font-['Kanit'] text-slate-900 dark:text-white mt-1">
                       {selectedChild.studentName}
                     </h2>
-                    <p className="text-xs text-[#9CA3AF] font-['JetBrains_Mono']">
+                    <p className="text-xs text-slate-500 dark:text-[#9CA3AF] font-['JetBrains_Mono']">
                       Student ID: {selectedChild.studentId}
                     </p>
                   </div>
                   <button
                     onClick={() => setIsLocked(!isLocked)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 border transition-colors ${
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 border transition-colors cursor-pointer ${
                       isLocked
-                        ? 'bg-red-500/20 text-red-400 border-red-500/40'
-                        : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                        ? 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-400 border-red-300 dark:border-red-500/40'
+                        : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-400 border-emerald-300 dark:border-emerald-500/40'
                     }`}
                   >
                     {isLocked ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
@@ -332,22 +337,22 @@ export default function GuardianDashboard() {
                 </div>
 
                 <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="bg-[#16100C]/70 backdrop-blur p-4 rounded-2xl border border-white/10">
-                    <span className="text-xs text-[#9CA3AF]">ยอดเงินคงเหลือ</span>
-                    <p className="text-2xl font-bold font-['JetBrains_Mono'] text-white mt-1">
+                  <div className="bg-white/90 dark:bg-[#16100C]/70 backdrop-blur p-4 rounded-2xl border border-slate-200 dark:border-white/10 shadow-xs">
+                    <span className="text-xs text-slate-500 dark:text-[#9CA3AF]">ยอดเงินคงเหลือ</span>
+                    <p className="text-2xl font-bold font-['JetBrains_Mono'] text-slate-900 dark:text-white mt-1">
                       {((wallet?.balanceSatang || 0) / 100).toFixed(2)} <span className="text-sm font-normal text-[#FF7A1A]">฿</span>
                     </p>
                   </div>
-                  <div className="bg-[#16100C]/70 backdrop-blur p-4 rounded-2xl border border-white/10">
-                    <span className="text-xs text-[#9CA3AF]">ใช้ไปแล้ววันนี้</span>
-                    <p className="text-xl font-bold font-['JetBrains_Mono'] text-amber-400 mt-1">
-                      {((wallet?.spentTodaySatang || 0) / 100).toFixed(2)} <span className="text-sm font-normal text-[#9CA3AF]">฿</span>
+                  <div className="bg-white/90 dark:bg-[#16100C]/70 backdrop-blur p-4 rounded-2xl border border-slate-200 dark:border-white/10 shadow-xs">
+                    <span className="text-xs text-slate-500 dark:text-[#9CA3AF]">ใช้ไปแล้ววันนี้</span>
+                    <p className="text-xl font-bold font-['JetBrains_Mono'] text-amber-600 dark:text-amber-400 mt-1">
+                      {((wallet?.spentTodaySatang || 0) / 100).toFixed(2)} <span className="text-sm font-normal text-slate-400 dark:text-[#9CA3AF]">฿</span>
                     </p>
                   </div>
-                  <div className="bg-[#16100C]/70 backdrop-blur p-4 rounded-2xl border border-white/10">
-                    <span className="text-xs text-[#9CA3AF]">วงเงินสูงสุดต่อวัน</span>
-                    <p className="text-xl font-bold font-['JetBrains_Mono'] text-[#E5E7EB] mt-1">
-                      {dailyLimitBaht} <span className="text-sm font-normal text-[#9CA3AF]">฿</span>
+                  <div className="bg-white/90 dark:bg-[#16100C]/70 backdrop-blur p-4 rounded-2xl border border-slate-200 dark:border-white/10 shadow-xs">
+                    <span className="text-xs text-slate-500 dark:text-[#9CA3AF]">วงเงินสูงสุดต่อวัน</span>
+                    <p className="text-xl font-bold font-['JetBrains_Mono'] text-slate-800 dark:text-[#E5E7EB] mt-1">
+                      {dailyLimitBaht} <span className="text-sm font-normal text-slate-400 dark:text-[#9CA3AF]">฿</span>
                     </p>
                   </div>
                 </div>
@@ -355,7 +360,7 @@ export default function GuardianDashboard() {
                 <div className="mt-6 flex gap-3">
                   <button
                     onClick={() => setIsTopupOpen(true)}
-                    className="px-5 py-3 bg-[#FF7A1A] hover:bg-[#E6680D] text-white font-bold font-['Kanit'] text-sm rounded-xl shadow-lg shadow-orange-950/40 flex items-center gap-2 transition-all"
+                    className="px-5 py-3 bg-[#FF7A1A] hover:bg-[#E6680D] text-white font-bold font-['Kanit'] text-sm rounded-xl shadow-lg shadow-orange-500/20 flex items-center gap-2 transition-all cursor-pointer"
                   >
                     <CreditCard className="w-4 h-4" /> เติมเงินให้บุตรหลาน
                   </button>
@@ -366,16 +371,16 @@ export default function GuardianDashboard() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Link
                   to="/guardian/limits"
-                  className="bg-[#1C1510] border border-white/10 hover:border-[#FF7A1A]/50 p-5 rounded-2xl transition-all group shadow-lg flex flex-col justify-between"
+                  className="bg-white dark:bg-[#1C1510] border border-slate-200 dark:border-white/10 hover:border-[#FF7A1A]/50 p-5 rounded-2xl transition-all group shadow-sm flex flex-col justify-between"
                 >
                   <div>
-                    <div className="w-10 h-10 rounded-xl bg-[#FF7A1A]/10 text-[#FF7A1A] flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                    <div className="w-10 h-10 rounded-xl bg-orange-100 dark:bg-[#FF7A1A]/10 text-[#FF7A1A] flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                       <Sliders className="w-5 h-5" />
                     </div>
-                    <h4 className="text-base font-bold font-['Kanit'] text-white group-hover:text-[#FF7A1A] transition-colors">
+                    <h4 className="text-base font-bold font-['Kanit'] text-slate-900 dark:text-white group-hover:text-[#FF7A1A] transition-colors">
                       ตั้งค่าวงเงิน & บล็อกหมวด
                     </h4>
-                    <p className="text-xs text-[#9CA3AF] mt-1 line-clamp-2">
+                    <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-1 line-clamp-2">
                       กำหนดวงเงินรายวัน/สัปดาห์ และบล็อกอาหารต้องห้าม
                     </p>
                   </div>
@@ -386,58 +391,58 @@ export default function GuardianDashboard() {
 
                 <Link
                   to="/guardian/allergies"
-                  className="bg-[#1C1510] border border-white/10 hover:border-red-500/50 p-5 rounded-2xl transition-all group shadow-lg flex flex-col justify-between"
+                  className="bg-white dark:bg-[#1C1510] border border-slate-200 dark:border-white/10 hover:border-red-500/50 p-5 rounded-2xl transition-all group shadow-sm flex flex-col justify-between"
                 >
                   <div>
-                    <div className="w-10 h-10 rounded-xl bg-red-500/10 text-red-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                    <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-500/10 text-red-500 dark:text-red-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                       <HeartPulse className="w-5 h-5" />
                     </div>
-                    <h4 className="text-base font-bold font-['Kanit'] text-white group-hover:text-red-400 transition-colors">
+                    <h4 className="text-base font-bold font-['Kanit'] text-slate-900 dark:text-white group-hover:text-red-500 transition-colors">
                       ข้อมูลแพ้อาหาร & สุขภาพ
                     </h4>
-                    <p className="text-xs text-[#9CA3AF] mt-1 line-clamp-2">
+                    <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-1 line-clamp-2">
                       บันทึกรายการสารก่อภูมิแพ้และคำแนะนำสำหรับห้องพยาบาล
                     </p>
                   </div>
-                  <span className="text-xs font-bold text-red-400 mt-4 flex items-center gap-1">
+                  <span className="text-xs font-bold text-red-500 dark:text-red-400 mt-4 flex items-center gap-1">
                     จัดการข้อมูลแพ้ →
                   </span>
                 </Link>
 
                 <Link
                   to="/guardian/history"
-                  className="bg-[#1C1510] border border-white/10 hover:border-amber-400/50 p-5 rounded-2xl transition-all group shadow-lg flex flex-col justify-between"
+                  className="bg-white dark:bg-[#1C1510] border border-slate-200 dark:border-white/10 hover:border-amber-400/50 p-5 rounded-2xl transition-all group shadow-sm flex flex-col justify-between"
                 >
                   <div>
-                    <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                    <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                       <History className="w-5 h-5" />
                     </div>
-                    <h4 className="text-base font-bold font-['Kanit'] text-white group-hover:text-amber-400 transition-colors">
+                    <h4 className="text-base font-bold font-['Kanit'] text-slate-900 dark:text-white group-hover:text-amber-500 transition-colors">
                       ประวัติการกินย้อนหลัง
                     </h4>
-                    <p className="text-xs text-[#9CA3AF] mt-1 line-clamp-2">
+                    <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-1 line-clamp-2">
                       แสดงรายการอาหารที่บุตรหลานสั่งจริงแบบเรียลไทม์
                     </p>
                   </div>
-                  <span className="text-xs font-bold text-amber-400 mt-4 flex items-center gap-1">
+                  <span className="text-xs font-bold text-amber-600 dark:text-amber-400 mt-4 flex items-center gap-1">
                     ดูประวัติทั้งหมด →
                   </span>
                 </Link>
               </div>
 
               {/* Spending Rules & Restrictions Form */}
-              <div className="bg-[#241C16] border border-[#FF7A1A]/20 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
-                <div className="border-b border-white/10 pb-4">
-                  <h3 className="text-lg font-bold font-['Kanit'] text-white flex items-center gap-2">
+              <div className="bg-white dark:bg-[#241C16] border border-slate-200 dark:border-[#FF7A1A]/20 rounded-3xl p-6 sm:p-8 shadow-md space-y-6">
+                <div className="border-b border-slate-100 dark:border-white/10 pb-4">
+                  <h3 className="text-lg font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
                     <Shield className="w-5 h-5 text-[#FF7A1A]" />
                     กำหนดวงเงินและควบคุมพฤติกรรมการบริโภค
                   </h3>
-                  <p className="text-xs text-[#9CA3AF]">ระบบจะปฏิเสธการสั่งซื้อโดยอัตโนมัติหากเกินวงเงินหรืออยู่ในหมวดที่บล็อก</p>
+                  <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">ระบบจะปฏิเสธการสั่งซื้อโดยอัตโนมัติหากเกินวงเงินหรืออยู่ในหมวดที่บล็อก</p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-[#E5E7EB] mb-2">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">
                       วงเงินการใช้จ่ายรายวัน (บาท/วัน)
                     </label>
                     <input
@@ -445,11 +450,11 @@ export default function GuardianDashboard() {
                       min="0"
                       value={dailyLimitBaht}
                       onChange={(e) => setDailyLimitBaht(Number(e.target.value))}
-                      className="w-full px-4 py-3 bg-[#16100C] border border-[#FF7A1A]/30 rounded-xl text-white font-['JetBrains_Mono'] focus:outline-none focus:border-[#FF7A1A]"
+                      className="w-full px-4 py-3 bg-slate-50 dark:bg-[#16100C] border border-slate-300 dark:border-[#FF7A1A]/30 rounded-xl text-slate-900 dark:text-white font-['JetBrains_Mono'] focus:outline-none focus:border-[#FF7A1A]"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-[#E5E7EB] mb-2">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">
                       วงเงินการใช้จ่ายรายสัปดาห์ (บาท/สัปดาห์)
                     </label>
                     <input
@@ -457,13 +462,13 @@ export default function GuardianDashboard() {
                       min="0"
                       value={weeklyLimitBaht}
                       onChange={(e) => setWeeklyLimitBaht(Number(e.target.value))}
-                      className="w-full px-4 py-3 bg-[#16100C] border border-[#FF7A1A]/30 rounded-xl text-white font-['JetBrains_Mono'] focus:outline-none focus:border-[#FF7A1A]"
+                      className="w-full px-4 py-3 bg-slate-50 dark:bg-[#16100C] border border-slate-300 dark:border-[#FF7A1A]/30 rounded-xl text-slate-900 dark:text-white font-['JetBrains_Mono'] focus:outline-none focus:border-[#FF7A1A]"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#E5E7EB] mb-2">
+                  <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">
                     บล็อกหมวดหมู่อาหารที่ไม่พึงประสงค์ (Blocked Food Categories)
                   </label>
                   <div className="flex flex-wrap gap-2">
@@ -474,10 +479,10 @@ export default function GuardianDashboard() {
                           key={cat}
                           type="button"
                           onClick={() => toggleBlockedCategory(cat)}
-                          className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                          className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
                             isBlocked
-                              ? 'bg-red-950/60 border-red-500/50 text-red-300'
-                              : 'bg-[#16100C] border-white/20 text-[#9CA3AF] hover:border-[#FF7A1A]/40'
+                              ? 'bg-red-50 dark:bg-red-950/60 border-red-300 dark:border-red-500/50 text-red-700 dark:text-red-300'
+                              : 'bg-slate-100 dark:bg-[#16100C] border-slate-200 dark:border-white/20 text-slate-700 dark:text-[#9CA3AF] hover:border-[#FF7A1A]/40'
                           }`}
                         >
                           {isBlocked ? '🚫 ' : '+ '} {cat}
@@ -488,7 +493,7 @@ export default function GuardianDashboard() {
                 </div>
 
                 {saveStatus && (
-                  <div className="p-3 bg-white/5 border border-white/10 rounded-xl text-xs text-[#E5E7EB]">
+                  <div className="p-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-xs text-slate-800 dark:text-[#E5E7EB]">
                     {saveStatus}
                   </div>
                 )}
@@ -496,26 +501,26 @@ export default function GuardianDashboard() {
                 <button
                   onClick={handleSaveLimits}
                   disabled={isSaving}
-                  className="w-full py-3 bg-[#FF7A1A] hover:bg-[#E6680D] disabled:opacity-50 text-white font-bold font-['Kanit'] rounded-xl shadow-lg transition-all"
+                  className="w-full py-3 bg-[#FF7A1A] hover:bg-[#E6680D] disabled:opacity-50 text-white font-bold font-['Kanit'] rounded-xl shadow-md shadow-orange-500/20 transition-all cursor-pointer"
                 >
                   {isSaving ? 'กำลังบันทึก...' : 'บันทึกการตั้งค่าการควบคุม'}
                 </button>
               </div>
 
               {/* Allergy & Medical Notes Card */}
-              <div className="bg-[#241C16] border border-red-500/30 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
-                <div className="border-b border-white/10 pb-4">
-                  <h3 className="text-lg font-bold font-['Kanit'] text-white flex items-center gap-2">
+              <div className="bg-white dark:bg-[#241C16] border border-red-200 dark:border-red-500/30 rounded-3xl p-6 sm:p-8 shadow-md space-y-6">
+                <div className="border-b border-slate-100 dark:border-white/10 pb-4">
+                  <h3 className="text-lg font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
                     <HeartPulse className="w-5 h-5 text-red-500" />
                     ประวัติการแพ้อาหารและข้อมูลสุขภาพ (Allergy & Health Notes)
                   </h3>
-                  <p className="text-xs text-[#9CA3AF]">
+                  <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">
                     ข้อมูลนี้จะแจ้งเตือนเมื่อนักเรียนเลือกเมนูอาหาร และเข้าถึงได้โดยพยาบาลโรงเรียนในกรณีฉุกเฉิน
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#E5E7EB] mb-2">
+                  <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">
                     เลือกสารก่อภูมิแพ้ที่พบบ่อย (Common Allergens)
                   </label>
                   <div className="flex flex-wrap gap-2 mb-3">
@@ -526,10 +531,10 @@ export default function GuardianDashboard() {
                           key={preset}
                           type="button"
                           onClick={() => handleToggleAllergyPreset(preset)}
-                          className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                          className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
                             isSelected
-                              ? 'bg-red-600 text-white border-red-500 shadow-md'
-                              : 'bg-[#16100C] text-[#9CA3AF] border-white/20 hover:border-red-400'
+                              ? 'bg-red-600 text-white border-red-500 shadow-xs'
+                              : 'bg-slate-100 dark:bg-[#16100C] text-slate-700 dark:text-[#9CA3AF] border-slate-200 dark:border-white/20 hover:border-red-400'
                           }`}
                         >
                           {isSelected ? '⚠️ ' : '+ '} {preset}
@@ -544,11 +549,11 @@ export default function GuardianDashboard() {
                       value={newAllergyInput}
                       onChange={(e) => setNewAllergyInput(e.target.value)}
                       placeholder="เพิ่มสารก่อภูมิแพ้อื่นๆ (เช่น ผงชูรส, สีผสมอาหาร)"
-                      className="flex-1 px-4 py-2.5 bg-[#16100C] border border-red-500/30 rounded-xl text-xs text-white"
+                      className="flex-1 px-4 py-2.5 bg-slate-50 dark:bg-[#16100C] border border-slate-300 dark:border-red-500/30 rounded-xl text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-red-500"
                     />
                     <button
                       type="submit"
-                      className="px-4 py-2.5 bg-red-600/80 hover:bg-red-600 text-white text-xs font-bold rounded-xl"
+                      className="px-4 py-2.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl cursor-pointer"
                     >
                       เพิ่ม
                     </button>
@@ -556,7 +561,7 @@ export default function GuardianDashboard() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#E5E7EB] mb-2">
+                  <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">
                     ข้อควรระวังสุขภาพ / โรคประจำตัว
                   </label>
                   <textarea
@@ -564,12 +569,12 @@ export default function GuardianDashboard() {
                     value={healthNotes}
                     onChange={(e) => setHealthNotes(e.target.value)}
                     placeholder="เช่น แพ้อาหารรุนแรงต้องพกยา EpiPen, ภาวะ G6PD ห้ามทานถั่วปากอ้า, โรคหอบหืด..."
-                    className="w-full px-4 py-3 bg-[#16100C] border border-white/20 rounded-xl text-white text-xs focus:outline-none focus:border-red-500"
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-[#16100C] border border-slate-300 dark:border-white/20 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-xs focus:outline-none focus:border-red-500"
                   />
                 </div>
 
                 {healthSaveMessage && (
-                  <div className="p-3 bg-red-950/40 border border-red-500/30 rounded-xl text-xs text-red-300">
+                  <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-500/30 rounded-xl text-xs text-red-800 dark:text-red-300">
                     {healthSaveMessage}
                   </div>
                 )}
@@ -577,7 +582,7 @@ export default function GuardianDashboard() {
                 <button
                   onClick={handleSaveHealthProfile}
                   disabled={isSavingHealth}
-                  className="w-full py-3 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-bold font-['Kanit'] rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-bold font-['Kanit'] rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Save className="w-4 h-4" />
                   {isSavingHealth ? 'กำลังบันทึก...' : 'บันทึกข้อมูลการแพ้อาหาร'}
@@ -586,9 +591,9 @@ export default function GuardianDashboard() {
             </div>
 
             {/* Column 3: Transaction Feed */}
-            <div className="bg-[#241C16] border border-[#FF7A1A]/20 rounded-3xl p-6 shadow-xl flex flex-col h-full">
-              <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-4">
-                <h3 className="text-base font-bold font-['Kanit'] text-white flex items-center gap-2">
+            <div className="bg-white dark:bg-[#241C16] border border-slate-200 dark:border-[#FF7A1A]/20 rounded-3xl p-6 shadow-md flex flex-col h-full">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/10 pb-4 mb-4">
+                <h3 className="text-base font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
                   <History className="w-4 h-4 text-[#FF7A1A]" />
                   ประวัติการใช้จ่ายล่าสุด
                 </h3>
@@ -596,25 +601,25 @@ export default function GuardianDashboard() {
 
               <div className="space-y-3 flex-1 overflow-y-auto max-h-[600px] pr-1">
                 {transactions.length === 0 ? (
-                  <div className="text-center py-12 text-[#9CA3AF] text-xs">
+                  <div className="text-center py-12 text-slate-400 dark:text-[#9CA3AF] text-xs">
                     ยังไม่มีรายการใช้จ่าย
                   </div>
                 ) : (
                   transactions.map((tx) => (
                     <div
                       key={tx.id}
-                      className="p-3 bg-[#16100C] border border-white/5 rounded-2xl flex items-center justify-between"
+                      className="p-3 bg-slate-50 dark:bg-[#16100C] border border-slate-200 dark:border-white/5 rounded-2xl flex items-center justify-between"
                     >
                       <div>
-                        <p className="text-xs font-semibold text-white">
+                        <p className="text-xs font-semibold text-slate-900 dark:text-white">
                           {tx.storeName || tx.note || 'รายการใช้จ่าย'}
                         </p>
-                        <span className="text-[10px] text-[#9CA3AF] font-['JetBrains_Mono']">
+                        <span className="text-[10px] text-slate-500 dark:text-[#9CA3AF] font-['JetBrains_Mono']">
                           {tx.type}
                         </span>
                       </div>
                       <span className={`text-xs font-bold font-['JetBrains_Mono'] ${
-                        tx.type === 'TOPUP' ? 'text-emerald-400' : 'text-amber-400'
+                        tx.type === 'TOPUP' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
                       }`}>
                         {tx.type === 'TOPUP' ? '+' : '-'}{(tx.amountSatang / 100).toFixed(2)} ฿
                       </span>
@@ -625,13 +630,13 @@ export default function GuardianDashboard() {
             </div>
           </div>
         ) : (
-          <div className="p-12 text-center bg-[#241C16] border border-[#FF7A1A]/20 rounded-3xl">
-            <User className="w-12 h-12 text-[#9CA3AF] mx-auto mb-3 opacity-40" />
-            <h3 className="text-lg font-bold font-['Kanit'] text-[#E5E7EB]">ยังไม่มีข้อมูลบุตรหลานที่ผูกไว้</h3>
-            <p className="text-xs text-[#9CA3AF] mt-1 mb-4">กดปุ่มด้านล่างเพื่อผูกบัญชีนักเรียนเพื่อเริ่มต้นใช้งาน</p>
+          <div className="p-12 text-center bg-white dark:bg-[#241C16] border border-slate-200 dark:border-[#FF7A1A]/20 rounded-3xl shadow-sm">
+            <User className="w-12 h-12 text-slate-400 dark:text-[#9CA3AF] mx-auto mb-3 opacity-40" />
+            <h3 className="text-lg font-bold font-['Kanit'] text-slate-800 dark:text-[#E5E7EB]">ยังไม่มีข้อมูลบุตรหลานที่ผูกไว้</h3>
+            <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-1 mb-4">กดปุ่มด้านล่างเพื่อผูกบัญชีนักเรียนเพื่อเริ่มต้นใช้งาน</p>
             <button
               onClick={() => setIsLinkModalOpen(true)}
-              className="px-4 py-2 bg-[#FF7A1A] hover:bg-[#E6680D] text-white font-bold rounded-xl text-xs transition-colors"
+              className="px-4 py-2 bg-[#FF7A1A] hover:bg-[#E6680D] text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
             >
               ผูกบัญชีนักเรียน
             </button>
@@ -640,27 +645,27 @@ export default function GuardianDashboard() {
 
         {/* Top-up Modal */}
         {isTopupOpen && (
-          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-[#241C16] border border-[#FF7A1A]/30 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
-              <h3 className="text-lg font-bold font-['Kanit'] text-white flex items-center gap-2">
+          <div className="fixed inset-0 z-50 bg-slate-900/70 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-[#241C16] border border-slate-200 dark:border-[#FF7A1A]/30 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
+              <h3 className="text-lg font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
                 <CreditCard className="w-5 h-5 text-[#FF7A1A]" />
                 เติมเงินเข้ากระเป๋าบุตรหลาน
               </h3>
-              <p className="text-xs text-[#9CA3AF]">
-                เติมเงินให้: <strong className="text-white">{selectedChild?.studentName}</strong>
+              <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">
+                เติมเงินให้: <strong className="text-slate-900 dark:text-white">{selectedChild?.studentName}</strong>
               </p>
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-[#E5E7EB]">จำนวนเงิน (บาท)</label>
+                <label className="text-xs font-bold text-slate-700 dark:text-[#E5E7EB]">จำนวนเงิน (บาท)</label>
                 <div className="grid grid-cols-4 gap-2 mb-2">
                   {[50, 100, 200, 500].map((amt) => (
                     <button
                       key={amt}
                       type="button"
                       onClick={() => setTopupAmountBaht(amt)}
-                      className={`py-2 rounded-xl text-xs font-bold font-['JetBrains_Mono'] ${
+                      className={`py-2 rounded-xl text-xs font-bold font-['JetBrains_Mono'] cursor-pointer transition-colors ${
                         topupAmountBaht === amt
-                          ? 'bg-[#FF7A1A] text-white'
-                          : 'bg-[#16100C] text-[#E5E7EB] border border-white/10'
+                          ? 'bg-[#FF7A1A] text-white shadow-xs'
+                          : 'bg-slate-100 dark:bg-[#16100C] text-slate-700 dark:text-[#E5E7EB] border border-slate-200 dark:border-white/10 hover:border-[#FF7A1A]/40'
                       }`}
                     >
                       {amt} ฿
@@ -672,7 +677,7 @@ export default function GuardianDashboard() {
                   min="1"
                   value={topupAmountBaht}
                   onChange={(e) => setTopupAmountBaht(Number(e.target.value))}
-                  className="w-full px-4 py-3 bg-[#16100C] border border-[#FF7A1A]/30 rounded-xl text-white font-['JetBrains_Mono'] text-sm"
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-[#16100C] border border-slate-300 dark:border-[#FF7A1A]/30 rounded-xl text-slate-900 dark:text-white font-['JetBrains_Mono'] text-sm focus:outline-none focus:border-[#FF7A1A]"
                 />
               </div>
 
@@ -680,7 +685,7 @@ export default function GuardianDashboard() {
                 <button
                   type="button"
                   onClick={() => setIsTopupOpen(false)}
-                  className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-xl"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/20 text-slate-700 dark:text-white text-xs font-semibold rounded-xl cursor-pointer"
                 >
                   ยกเลิก
                 </button>
@@ -688,7 +693,7 @@ export default function GuardianDashboard() {
                   type="button"
                   disabled={isTopupProcessing}
                   onClick={handleTopup}
-                  className="px-4 py-2 bg-[#FF7A1A] hover:bg-[#E6680D] text-white text-xs font-semibold rounded-xl"
+                  className="px-4 py-2 bg-[#FF7A1A] hover:bg-[#E6680D] text-white text-xs font-semibold rounded-xl cursor-pointer"
                 >
                   {isTopupProcessing ? 'กำลังประมวลผล...' : 'ยืนยันการเติมเงิน'}
                 </button>
@@ -699,40 +704,40 @@ export default function GuardianDashboard() {
 
         {/* Link Child Modal */}
         {isLinkModalOpen && (
-          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-            <form onSubmit={handleLinkChild} className="bg-[#241C16] border border-[#FF7A1A]/30 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
-              <h3 className="text-lg font-bold font-['Kanit'] text-white flex items-center gap-2">
+          <div className="fixed inset-0 z-50 bg-slate-900/70 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+            <form onSubmit={handleLinkChild} className="bg-white dark:bg-[#241C16] border border-slate-200 dark:border-[#FF7A1A]/30 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
+              <h3 className="text-lg font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
                 <Plus className="w-5 h-5 text-[#FF7A1A]" />
                 ผูกบัญชีนักเรียนในความดูแล
               </h3>
               <div>
-                <label className="block text-xs font-semibold text-[#E5E7EB] mb-1">รหัสประจำตัวนักเรียน (Student Code / ID) *</label>
+                <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-1">รหัสประจำตัวนักเรียน (Student Code / ID) *</label>
                 <input
                   type="text"
                   required
                   value={newStudentId}
                   onChange={(e) => setNewStudentId(e.target.value)}
                   placeholder="เช่น STU58492 หรือ UID"
-                  className="w-full px-4 py-3 bg-[#16100C] border border-[#FF7A1A]/30 rounded-xl text-white font-['JetBrains_Mono'] text-xs"
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-[#16100C] border border-slate-300 dark:border-[#FF7A1A]/30 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 font-['JetBrains_Mono'] text-xs focus:outline-none focus:border-[#FF7A1A]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[#E5E7EB] mb-1">ชื่อ - นามสกุล นักเรียน *</label>
+                <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-1">ชื่อ - นามสกุล นักเรียน *</label>
                 <input
                   type="text"
                   required
                   value={newStudentName}
                   onChange={(e) => setNewStudentName(e.target.value)}
                   placeholder="เช่น ด.ช. ชลธี มีโชค"
-                  className="w-full px-4 py-3 bg-[#16100C] border border-[#FF7A1A]/30 rounded-xl text-white text-xs"
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-[#16100C] border border-slate-300 dark:border-[#FF7A1A]/30 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-xs focus:outline-none focus:border-[#FF7A1A]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[#E5E7EB] mb-1">ความสัมพันธ์</label>
+                <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-1">ความสัมพันธ์</label>
                 <select
                   value={relationship}
                   onChange={(e) => setRelationship(e.target.value as any)}
-                  className="w-full px-4 py-3 bg-[#16100C] border border-[#FF7A1A]/30 rounded-xl text-white text-xs"
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-[#16100C] border border-slate-300 dark:border-[#FF7A1A]/30 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none focus:border-[#FF7A1A]"
                 >
                   <option value="FATHER">บิดา (Father)</option>
                   <option value="MOTHER">มารดา (Mother)</option>
@@ -744,13 +749,13 @@ export default function GuardianDashboard() {
                 <button
                   type="button"
                   onClick={() => setIsLinkModalOpen(false)}
-                  className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-xl"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/20 text-slate-700 dark:text-white text-xs font-semibold rounded-xl cursor-pointer"
                 >
                   ยกเลิก
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[#FF7A1A] hover:bg-[#E6680D] text-white text-xs font-semibold rounded-xl"
+                  className="px-4 py-2 bg-[#FF7A1A] hover:bg-[#E6680D] text-white text-xs font-semibold rounded-xl cursor-pointer"
                 >
                   ส่งคำขอผูกบัญชี
                 </button>

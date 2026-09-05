@@ -183,47 +183,47 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF8F5] py-6 sm:py-8 px-3 sm:px-6 pb-28 sm:pb-8">
+    <div className="min-h-screen bg-[#FAF8F5] dark:bg-[#16100C] text-slate-800 dark:text-slate-100 py-6 sm:py-8 px-3 sm:px-6 pb-28 sm:pb-8 transition-colors">
       <div className="max-w-3xl mx-auto space-y-6">
         
         {/* Header */}
-        <div className="bg-white rounded-3xl p-6 shadow-xl border border-amber-100 flex items-center justify-between">
+        <div className="bg-white dark:bg-[#241C16] rounded-3xl p-6 shadow-xl border border-amber-100 dark:border-[#FF7A1A]/20 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {onBack && (
               <button
                 onClick={onBack}
-                className="p-2 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors cursor-pointer text-slate-700"
+                className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#16100C] dark:hover:bg-white/10 rounded-full transition-colors cursor-pointer text-slate-700 dark:text-white"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
             )}
             <div>
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">ยืนยันรายการและรับคิว (Order & Queue)</h1>
-              <p className="text-xs text-slate-500 font-medium">รองรับ Zero-Payment รับคิวทันที หรือชำระด้วยกระเป๋าเงินนักเรียน</p>
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">ยืนยันรายการและรับคิว (Order & Queue)</h1>
+              <p className="text-xs text-slate-500 dark:text-[#9CA3AF] font-medium">รองรับ Zero-Payment รับคิวทันที หรือชำระด้วยกระเป๋าเงินนักเรียน</p>
             </div>
           </div>
-          <div className="hidden sm:flex items-center gap-1.5 bg-amber-50 text-amber-800 px-3 py-1.5 rounded-full text-xs font-bold border border-amber-200">
-            <Sparkles className="w-4 h-4 text-amber-600" />
+          <div className="hidden sm:flex items-center gap-1.5 bg-amber-50 dark:bg-[#FF7A1A]/10 text-amber-800 dark:text-[#FF7A1A] px-3 py-1.5 rounded-full text-xs font-bold border border-amber-200 dark:border-[#FF7A1A]/30">
+            <Sparkles className="w-4 h-4 text-amber-600 dark:text-[#FF7A1A]" />
             รับแต้มสะสม CRM x2
           </div>
         </div>
 
         {/* Store Info Banner */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex items-center justify-between">
+        <div className="bg-white dark:bg-[#241C16] rounded-2xl p-4 shadow-xs border border-slate-200 dark:border-[#FF7A1A]/20 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-100 text-[#8B0000] flex items-center justify-center font-bold">
+            <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-[#FF7A1A]/20 text-[#8B0000] dark:text-[#FF7A1A] flex items-center justify-center font-bold">
               <Store className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-sm font-black text-slate-900">{storeName}</div>
-              <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                <MapPin className="w-3.5 h-3.5 text-[#8B0000]" />
+              <div className="text-sm font-black text-slate-900 dark:text-white">{storeName}</div>
+              <div className="text-xs text-slate-500 dark:text-[#9CA3AF] flex items-center gap-1 mt-0.5">
+                <MapPin className="w-3.5 h-3.5 text-[#8B0000] dark:text-[#FF7A1A]" />
                 {storeLocation}
               </div>
             </div>
           </div>
           <div className="text-right">
-            <span className="text-[11px] font-bold px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full">
+            <span className="text-[11px] font-bold px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-full">
               🟢 ร้านเปิดให้บริการ
             </span>
           </div>
@@ -231,7 +231,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
 
         {/* Error Alert */}
         {orderError && (
-          <div className="bg-red-50 border-2 border-red-200 text-red-800 p-4 rounded-2xl flex items-center gap-3 animate-fade-in">
+          <div className="bg-red-50 dark:bg-red-950/40 border-2 border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 p-4 rounded-2xl flex items-center gap-3 animate-fade-in">
             <AlertCircle className="w-6 h-6 text-red-600 shrink-0" />
             <div className="text-xs font-bold">{orderError}</div>
           </div>
@@ -239,13 +239,13 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
 
         {createdOrder ? (
           /* Order Created Summary View (Instant Q001 Queue Issuance) */
-          <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border-2 border-emerald-500 text-center space-y-6 animate-fade-in">
-            <div className="inline-flex p-4 rounded-full bg-emerald-100 text-emerald-600 mb-2">
+          <div className="bg-white dark:bg-[#241C16] rounded-3xl p-6 sm:p-8 shadow-2xl border-2 border-emerald-500 text-center space-y-6 animate-fade-in">
+            <div className="inline-flex p-4 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 mb-2">
               <CheckCircle2 className="w-12 h-12" />
             </div>
             <div>
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900">สั่งอาหารและออกหมายเลขคิวสำเร็จ!</h2>
-              <p className="text-xs text-slate-500 mt-1">
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">สั่งอาหารและออกหมายเลขคิวสำเร็จ!</h2>
+              <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-1">
                 ร้านค้าได้รับออเดอร์แล้ว กรุณาไปรับอาหารตามเวลาที่นัดหมาย
               </p>
             </div>
@@ -256,11 +256,11 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
             </div>
 
             {/* Wayfinding Tip */}
-            <div className="bg-amber-50/80 border border-amber-200 p-4 rounded-2xl max-w-sm mx-auto text-left text-xs flex items-start gap-2.5">
-              <Compass className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+            <div className="bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-700/50 p-4 rounded-2xl max-w-sm mx-auto text-left text-xs flex items-start gap-2.5">
+              <Compass className="w-5 h-5 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
               <div>
-                <span className="font-bold text-amber-900 block">เส้นทางเดินรับอาหาร:</span>
-                <p className="text-amber-800 text-[11px] mt-0.5">
+                <span className="font-bold text-amber-900 dark:text-amber-200 block">เส้นทางเดินรับอาหาร:</span>
+                <p className="text-amber-800 dark:text-amber-300 text-[11px] mt-0.5">
                   เดินเข้าทางเข้าหลักโรงอาหาร ผ่านเสา C3 ตรงไป 40 วินาที รับที่จุด Pick-up หน้าร้านค้า
                 </p>
               </div>
@@ -279,7 +279,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
               <button
                 type="button"
                 onClick={() => navigate('/home')}
-                className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-sm rounded-2xl border border-slate-300 transition-all cursor-pointer flex items-center justify-center gap-2"
+                className="px-6 py-3 bg-slate-100 hover:bg-slate-200 dark:bg-[#16100C] dark:hover:bg-white/10 text-slate-800 dark:text-white font-bold text-sm rounded-2xl border border-slate-300 dark:border-white/10 transition-all cursor-pointer flex items-center justify-center gap-2"
               >
                 <ShoppingBag className="w-4 h-4" />
                 สั่งเมนูอื่นเพิ่ม
@@ -288,35 +288,35 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
           </div>
         ) : (
           /* Booking Form */
-          <form onSubmit={handleConfirmOrder} className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-amber-100 space-y-6">
+          <form onSubmit={handleConfirmOrder} className="bg-white dark:bg-[#241C16] rounded-3xl p-6 sm:p-8 shadow-xl border border-amber-100 dark:border-[#FF7A1A]/20 space-y-6">
             
             {/* Selected Items Summary */}
             <div>
-              <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider mb-3 flex items-center gap-2">
-                <Utensils className="w-4 h-4 text-[#8B0000]" />
+              <h3 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wider mb-3 flex items-center gap-2">
+                <Utensils className="w-4 h-4 text-[#8B0000] dark:text-[#FF7A1A]" />
                 รายการอาหารในตระกร้า ({cartItems.length} รายการ)
               </h3>
               {cartItems.length === 0 ? (
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-center text-slate-500 text-sm font-medium">
+                <div className="bg-slate-50 dark:bg-[#16100C] border border-slate-200 dark:border-white/10 rounded-2xl p-6 text-center text-slate-500 dark:text-[#9CA3AF] text-sm font-medium">
                   ยังไม่มีรายการอาหารในตระกร้า กรุณาเลือกเมนูจากหน้าหลักก่อนดำเนินการ
                 </div>
               ) : (
-                <div className="divide-y divide-slate-100 bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-3">
+                <div className="divide-y divide-slate-100 dark:divide-white/10 bg-slate-50 dark:bg-[#16100C] rounded-2xl p-4 border border-slate-200 dark:border-white/10 space-y-3">
                   {cartItems.map((item, idx) => (
                     <div key={idx} className="pt-2 first:pt-0 flex items-start justify-between text-sm">
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-slate-800">{item.menuItem.name}</span>
-                          <span className="text-xs text-slate-500 font-semibold">x{item.quantity}</span>
+                          <span className="font-bold text-slate-800 dark:text-white">{item.menuItem.name}</span>
+                          <span className="text-xs text-slate-500 dark:text-[#9CA3AF] font-semibold">x{item.quantity}</span>
                         </div>
                         {Array.isArray(item.selectedModifiers) && item.selectedModifiers.length > 0 && (
-                          <div className="text-[11px] text-slate-500 flex flex-wrap gap-1">
+                          <div className="text-[11px] text-slate-500 dark:text-[#9CA3AF] flex flex-wrap gap-1">
                             {(item.selectedModifiers as SelectedModifierOption[]).map((m, mIdx) => {
                               const priceMod = typeof m.priceModifier === 'number'
                                 ? m.priceModifier
                                 : (m.priceModifierSatang ? m.priceModifierSatang / 100 : 0);
                               return (
-                                <span key={mIdx} className="bg-slate-200/80 px-1.5 py-0.5 rounded text-slate-700">
+                                <span key={mIdx} className="bg-slate-200/80 dark:bg-white/10 px-1.5 py-0.5 rounded text-slate-700 dark:text-slate-300">
                                   {m.name || m.optionId}
                                   {priceMod > 0 && ` (+฿${priceMod})`}
                                 </span>
@@ -325,15 +325,15 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
                           </div>
                         )}
                         {item.customNotes && (
-                          <p className="text-xs text-amber-700 italic">คำขอ: {item.customNotes}</p>
+                          <p className="text-xs text-amber-700 dark:text-amber-400 italic">คำขอ: {item.customNotes}</p>
                         )}
                       </div>
-                      <span className="font-extrabold text-slate-900 shrink-0">
+                      <span className="font-extrabold text-slate-900 dark:text-white shrink-0">
                         ฿{(calculateItemUnitPrice(item) * item.quantity).toFixed(2)}
                       </span>
                     </div>
                   ))}
-                  <div className="pt-3 flex justify-between font-black text-base text-[#8B0000]">
+                  <div className="pt-3 flex justify-between font-black text-base text-[#8B0000] dark:text-[#FF7A1A]">
                     <span>ยอดรวมทั้งหมด:</span>
                     <span>฿{calculateTotal().toFixed(2)}</span>
                   </div>
@@ -343,16 +343,16 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
 
             {/* Date Selection Review */}
             <div>
-              <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-[#8B0000]" />
+              <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-200 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-[#8B0000] dark:text-[#FF7A1A]" />
                 วันที่ต้องการรับอาหาร *
               </label>
-              <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
+              <div className="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-[#16100C] border border-slate-200 dark:border-white/10 rounded-2xl">
                 <div>
-                  <span className="text-xs font-bold text-slate-800 block">
+                  <span className="text-xs font-bold text-slate-800 dark:text-white block">
                     {formatThaiDate(pickupDate) || pickupDate}
                   </span>
-                  <span className="text-[11px] text-emerald-600 font-semibold">
+                  <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
                     ✓ ระบบเปิดรับจองล่วงหน้า
                   </span>
                 </div>
@@ -360,15 +360,15 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
                   type="date"
                   value={pickupDate}
                   onChange={(e) => setPickupDate(e.target.value)}
-                  className="text-xs font-bold bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-slate-700 focus:outline-none focus:border-[#8B0000]"
+                  className="text-xs font-bold bg-white dark:bg-[#241C16] border border-slate-300 dark:border-[#FF7A1A]/30 rounded-xl px-2.5 py-1.5 text-slate-700 dark:text-white focus:outline-none focus:border-[#8B0000] dark:focus:border-[#FF7A1A]"
                 />
               </div>
             </div>
 
             {/* Pickup Time Select */}
             <div>
-              <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-[#8B0000]" />
+              <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-200 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-[#8B0000] dark:text-[#FF7A1A]" />
                 เลือกระบุเวลารับอาหารพักเที่ยง *
               </label>
               <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
@@ -379,8 +379,8 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
                     onClick={() => setPickupTime(time)}
                     className={`min-h-[44px] py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer flex items-center justify-center ${
                       pickupTime === time
-                        ? 'bg-[#8B0000] text-white border-[#8B0000] shadow-md'
-                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-amber-50'
+                        ? 'bg-[#8B0000] dark:bg-[#FF7A1A] text-white border-[#8B0000] dark:border-[#FF7A1A] shadow-md'
+                        : 'bg-slate-50 dark:bg-[#16100C] text-slate-700 dark:text-[#E5E7EB] border-slate-200 dark:border-white/10 hover:bg-amber-50 dark:hover:bg-white/5'
                     }`}
                   >
                     {time} น.
@@ -391,8 +391,8 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
 
             {/* Payment Method Selector */}
             <div>
-              <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                <CreditCard className="w-4 h-4 text-[#8B0000]" />
+              <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-200 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <CreditCard className="w-4 h-4 text-[#8B0000] dark:text-[#FF7A1A]" />
                 เลือกวิธีการชำระเงิน (Payment Option) *
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -401,15 +401,15 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
                   onClick={() => setPaymentMode('DIRECT_ZERO_PAYMENT')}
                   className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
                     paymentMode === 'DIRECT_ZERO_PAYMENT'
-                      ? 'border-[#8B0000] bg-amber-50/60 ring-2 ring-[#8B0000]/20'
-                      : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
+                      ? 'border-[#8B0000] dark:border-[#FF7A1A] bg-amber-50/60 dark:bg-[#FF7A1A]/10 ring-2 ring-[#8B0000]/20 dark:ring-[#FF7A1A]/30'
+                      : 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-[#16100C] hover:bg-slate-100 dark:hover:bg-white/5'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-black text-slate-900">⚡ Zero-Payment รับคิวทันที</span>
-                    <span className="text-[10px] font-bold bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full">มาตรฐาน</span>
+                    <span className="text-xs font-black text-slate-900 dark:text-white">⚡ Zero-Payment รับคิวทันที</span>
+                    <span className="text-[10px] font-bold bg-amber-200 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200 px-2 py-0.5 rounded-full">มาตรฐาน</span>
                   </div>
-                  <p className="text-[11px] text-slate-500 mb-0">ออกคิวทันที และชำระเงินตรงกับร้านค้าเมื่อไปรับอาหาร</p>
+                  <p className="text-[11px] text-slate-500 dark:text-[#9CA3AF] mb-0">ออกคิวทันที และชำระเงินตรงกับร้านค้าเมื่อไปรับอาหาร</p>
                 </button>
 
                 <button
@@ -417,24 +417,24 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
                   onClick={() => setPaymentMode('CAMPUS_WALLET')}
                   className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
                     paymentMode === 'CAMPUS_WALLET'
-                      ? 'border-[#8B0000] bg-amber-50/60 ring-2 ring-[#8B0000]/20'
-                      : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
+                      ? 'border-[#8B0000] dark:border-[#FF7A1A] bg-amber-50/60 dark:bg-[#FF7A1A]/10 ring-2 ring-[#8B0000]/20 dark:ring-[#FF7A1A]/30'
+                      : 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-[#16100C] hover:bg-slate-100 dark:hover:bg-white/5'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
-                      <Wallet className="w-4 h-4 text-[#8B0000]" /> กระเป๋าเงินนักเรียน
+                    <span className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1.5">
+                      <Wallet className="w-4 h-4 text-[#8B0000] dark:text-[#FF7A1A]" /> กระเป๋าเงินนักเรียน
                     </span>
-                    <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Digital Wallet</span>
+                    <span className="text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 rounded-full">Digital Wallet</span>
                   </div>
-                  <p className="text-[11px] text-slate-500 mb-0">ตัดยอดอัตโนมัติ พร้อมตรวจเช็ควงเงินและหมวดหมู่ที่ผู้ปกครองอนุญาต</p>
+                  <p className="text-[11px] text-slate-500 dark:text-[#9CA3AF] mb-0">ตัดยอดอัตโนมัติ พร้อมตรวจเช็ควงเงินและหมวดหมู่ที่ผู้ปกครองอนุญาต</p>
                 </button>
               </div>
             </div>
 
             {/* Custom instructions */}
             <div>
-              <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-200 uppercase tracking-wider mb-2">
                 คำสั่งพิเศษถึงร้านค้า (ถ้ามี)
               </label>
               <input
@@ -442,25 +442,24 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
                 value={customInstructions}
                 onChange={(e) => setCustomInstructions(e.target.value)}
                 placeholder="เช่น เผ็ดน้อย, ไม่ใส่ผัก, ขอช้อนส้อม"
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium focus:outline-none focus:border-[#8B0000]"
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-[#16100C] border border-slate-200 dark:border-white/10 rounded-2xl text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#8B0000] dark:focus:border-[#FF7A1A]"
               />
             </div>
 
             <button
               type="submit"
               disabled={cartItems.length === 0 || isSubmitting}
-              className="w-full py-4 bg-gradient-to-r from-[#8B0000] via-[#A50000] to-[#800000] hover:from-[#700000] hover:to-[#8B0000] text-white font-black text-base rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
+              className="w-full py-4 bg-gradient-to-r from-[#8B0000] via-[#A50000] to-[#800000] dark:from-[#FF7A1A] dark:to-[#E6680D] hover:opacity-90 text-white font-black text-base rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
             >
               <ShoppingBag className="w-5 h-5" />
               <span>{isSubmitting ? 'กำลังตรวจสอบโควตาและบันทึกคิว...' : 'ยืนยันสั่งอาหาร'}</span>
             </button>
 
-
             {/* 📱 Mobile-First Sticky Checkout Bar (Fixed at bottom for mobile < 640px) */}
-            <div className="fixed bottom-0 left-0 right-0 z-30 sm:hidden bg-white/95 backdrop-blur-md border-t border-slate-200 p-3 px-4 shadow-2xl flex items-center justify-between gap-3">
+            <div className="fixed bottom-0 left-0 right-0 z-30 sm:hidden bg-white/95 dark:bg-[#241C16]/95 backdrop-blur-md border-t border-slate-200 dark:border-white/10 p-3 px-4 shadow-2xl flex items-center justify-between gap-3">
               <div className="flex flex-col">
-                <span className="text-[10px] font-extrabold text-slate-500 uppercase">ยอดรวมสุทธิ</span>
-                <span className="text-lg font-black text-[#8B0000]">
+                <span className="text-[10px] font-extrabold text-slate-500 dark:text-[#9CA3AF] uppercase">ยอดรวมสุทธิ</span>
+                <span className="text-lg font-black text-[#8B0000] dark:text-[#FF7A1A]">
                   ฿{calculateTotal().toLocaleString()}
                 </span>
               </div>
