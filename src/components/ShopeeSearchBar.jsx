@@ -174,16 +174,14 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
       <div className="shopee-top-nav">
         <div className="shopee-nav-left">
           <span
-            className="shopee-nav-item"
-            style={{ cursor: "pointer" }}
+            className="shopee-nav-item cursor-pointer"
             onClick={handleMerchantLinkClick}
           >
             <i className="bi bi-shop me-1" /> {language === "en" ? "Seller Centre" : "ศูนย์ผู้ขาย"} {user && user.activeRole === "merchant" ? "(Merchant)" : ""}
           </span>
           <span className="shopee-nav-divider" />
           <span
-            className="shopee-nav-item"
-            style={{ cursor: "pointer" }}
+            className="shopee-nav-item cursor-pointer"
             onClick={handleMerchantLinkClick}
           >
             <i className="bi bi-rocket-takeoff me-1" /> สมัครเป็นผู้ขาย / เปิดร้านค้า
@@ -192,8 +190,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
           {/* Combined Campus Services Dropdown Button */}
           <div className={`shopee-campus-dropdown-container ${isCampusOpen ? "open" : ""}`}>
             <span
-              className="shopee-nav-item text-warning fw-bold"
-              style={{ cursor: "pointer" }}
+              className="shopee-nav-item text-warning fw-bold cursor-pointer"
               onClick={(e) => {
                 e.stopPropagation();
                 setIsCampusOpen((prev) => !prev);
@@ -202,7 +199,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
             >
               <i className="bi bi-mortarboard-fill me-1" />
               {language === "en" ? "Campus Services" : "บริการแคมปัส"}
-              <span style={{ fontSize: "10px", marginLeft: "2px" }}>▾</span>
+              <span className="text-[10px] ml-0.5">▾</span>
             </span>
 
             <ul className="shopee-campus-dropdown-menu">
@@ -219,7 +216,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
                   <i className="bi bi-tv me-2 text-warning fs-5" />
                   <div>
                     <div className="text-dark fw-bold">{language === "en" ? "Live Queue Monitor" : "จอคิวโรงอาหาร"}</div>
-                    <div className="text-muted" style={{ fontSize: "11px", fontWeight: "normal" }}>
+                    <div className="text-muted text-[11px] font-normal">
                       {language === "en" ? "Real-time Canteen Screen & Audio" : "จอเรียกคิวสด & แจ้งเตือนเสียง"}
                     </div>
                   </div>
@@ -238,7 +235,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
                   <i className="bi bi-shield-heart text-danger me-2 fs-5" />
                   <div>
                     <div className="text-dark fw-bold">{language === "en" ? "Guardian Portal" : "ผู้ปกครอง"}</div>
-                    <div className="text-muted" style={{ fontSize: "11px", fontWeight: "normal" }}>
+                    <div className="text-muted text-[11px] font-normal">
                       {language === "en" ? "Allergy settings & Pocket money" : "ตั้งค่าแพ้อาหาร & คุมวงเงิน"}
                     </div>
                   </div>
@@ -257,7 +254,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
                   <i className="bi bi-mortarboard text-info me-2 fs-5" />
                   <div>
                     <div className="text-dark fw-bold">{language === "en" ? "Student Stall" : "ร้านค้านักเรียน"}</div>
-                    <div className="text-muted" style={{ fontSize: "11px", fontWeight: "normal" }}>
+                    <div className="text-muted text-[11px] font-normal">
                       {language === "en" ? "Apply for student food stall" : "เปิดร้านค้าหารายได้พิเศษ"}
                     </div>
                   </div>
@@ -281,7 +278,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
                       <i className="bi bi-clipboard-check text-primary me-2 fs-5" />
                       <div>
                         <div className="text-primary fw-bold">{language === "en" ? "Supervisor Approvals" : "ตรวจสอบอนุมัติร้านค้า"}</div>
-                        <div className="text-muted" style={{ fontSize: "11px", fontWeight: "normal" }}>
+                        <div className="text-muted text-[11px] font-normal">
                           {language === "en" ? "Teacher & Staff Supervisor Panel" : "สำหรับอาจารย์ / ผู้ดูแลโรงเรียน"}
                         </div>
                       </div>
@@ -297,8 +294,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
             <>
               <span className="shopee-nav-divider" />
               <span
-                className="shopee-nav-item fw-bold text-warning"
-                style={{ cursor: "pointer" }}
+                className="shopee-nav-item fw-bold text-warning cursor-pointer"
                 onClick={() => navigate("/admin")}
               >
                 <i className="bi bi-shield-lock-fill me-1" /> {language === "en" ? "Admin Portal" : "ระบบหลังบ้าน"}
@@ -316,12 +312,11 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
           {/* Notifications Dropdown Popover */}
           <div className="shopee-notification-dropdown-container">
             <span
-              className="shopee-nav-item"
+              className="shopee-nav-item cursor-pointer"
               onClick={(e) => {
                 e.stopPropagation();
                 navigate("/user/account/profile?tab=bookings");
               }}
-              style={{ cursor: "pointer" }}
               title="คลิกเพื่อไปหน้าการจอง / เลื่อนเมาส์ผ่านเพื่อดูป๊อบอัพการแจ้งเตือน"
             >
               <i className="bi bi-bell" /> {language === "en" ? "Notifications" : "การแจ้งเตือน"}
@@ -428,7 +423,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
                       navigate("/search?keyword=ชาไข่มุก");
                     }}
                   >
-                    <div className="shopee-notif-icon-box" style={{ color: "#7c3aed", background: "#f3e8ff" }}>
+                    <div className="shopee-notif-icon-box text-purple-600 bg-purple-100">
                       <i className="bi bi-award-fill" />
                     </div>
                     <div className="shopee-notif-content">
@@ -441,7 +436,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
                       </div>
                       <div className="d-flex align-items-center justify-content-between mt-1">
                         <span className="shopee-notif-time">1 ชั่วโมงที่แล้ว</span>
-                        <span className="text-purple fw-bold text-xs" style={{ color: "#7c3aed" }}>คลิกดูโปรโมชั่นร้าน <i className="bi bi-arrow-right-short" /></span>
+                        <span className="text-purple-600 font-bold text-xs">คลิกดูโปรโมชั่นร้าน <i className="bi bi-arrow-right-short" /></span>
                       </div>
                     </div>
                   </div>
@@ -461,15 +456,14 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
               </div>
           </div>
           <span
-            className="shopee-nav-item"
+            className="shopee-nav-item cursor-pointer"
             onClick={() => alert("ศูนย์ช่วยเหลือ QueueUp CRM พร้อมให้บริการตลอด 24 ชั่วโมง")}
-            style={{ cursor: "pointer" }}
           >
             <i className="bi bi-question-circle" /> {language === "en" ? "Help" : "ช่วยเหลือ"}
           </span>
 
           {/* Official Bootstrap 5 SVG Symbols Definition (Hidden) */}
-          <svg xmlns="http://www.w3.org/2000/svg" style={{ display: "none" }}>
+          <svg xmlns="http://www.w3.org/2000/svg" className="hidden">
             <symbol id="circle-half" viewBox="0 0 16 16">
               <path d="M8 15A7 7 0 1 0 8 1v14zm0 1A8 8 0 1 1 8 0a8 8 0 0 1 0 16z"></path>
             </symbol>
@@ -491,7 +485,6 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
             onClick={(e) => e.stopPropagation()}
           >
             <button
-              className="btn btn-link nav-link py-1 px-2 dropdown-toggle d-flex align-items-center shopee-bs5-theme-trigger"
               id="bd-theme"
               type="button"
               aria-expanded={isThemeOpen}
@@ -500,10 +493,10 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
                 e.stopPropagation();
                 setIsThemeOpen((prev) => !prev);
               }}
-              style={{ color: "#ffffff", textDecoration: "none", background: "rgba(255, 255, 255, 0.18)", borderRadius: "20px", border: "1px solid rgba(255, 255, 255, 0.4)", fontSize: "13px", cursor: "pointer", padding: "4px 8px" }}
+              className="btn btn-link nav-link py-1 px-2 dropdown-toggle d-flex align-items-center shopee-bs5-theme-trigger text-white no-underline bg-white/20 rounded-full border border-white/40 text-[13px] cursor-pointer"
               title={`Toggle theme (${theme})`}
             >
-              <svg className="bi theme-icon-active" style={{ width: "16px", height: "16px", fill: "currentColor" }}>
+              <svg className="bi theme-icon-active w-4 h-4 fill-current">
                 <use href={`#${theme === "dark" ? "moon-stars-fill" : theme === "auto" ? "circle-half" : "sun-fill"}`}></use>
               </svg>
             </button>
@@ -511,7 +504,6 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
             <ul
               className={`dropdown-menu dropdown-menu-end shopee-bs5-theme-menu ${isThemeOpen ? "show d-block" : ""}`}
               aria-labelledby="bd-theme"
-              style={isThemeOpen ? { display: "block", opacity: 1, visibility: "visible", transform: "translateY(0)" } : {}}
             >
               <li>
                 <button
@@ -523,9 +515,9 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
                     setIsThemeOpen(false);
                   }}
                 >
-                  <svg className="bi me-2 opacity-75 theme-icon" style={{ width: "16px", height: "16px", fill: "currentColor" }}><use href="#sun-fill"></use></svg>
+                  <svg className="bi me-2 opacity-75 theme-icon w-4 h-4 fill-current"><use href="#sun-fill"></use></svg>
                   {getThemeName("light")}
-                  {theme === "light" && <svg className="bi ms-auto" style={{ width: "14px", height: "14px", fill: "currentColor" }}><use href="#check2"></use></svg>}
+                  {theme === "light" && <svg className="bi ms-auto w-3.5 h-3.5 fill-current"><use href="#check2"></use></svg>}
                 </button>
               </li>
               <li>
@@ -538,9 +530,9 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
                     setIsThemeOpen(false);
                   }}
                 >
-                  <svg className="bi me-2 opacity-75 theme-icon" style={{ width: "16px", height: "16px", fill: "currentColor" }}><use href="#moon-stars-fill"></use></svg>
+                  <svg className="bi me-2 opacity-75 theme-icon w-4 h-4 fill-current"><use href="#moon-stars-fill"></use></svg>
                   {getThemeName("dark")}
-                  {theme === "dark" && <svg className="bi ms-auto" style={{ width: "14px", height: "14px", fill: "currentColor" }}><use href="#check2"></use></svg>}
+                  {theme === "dark" && <svg className="bi ms-auto w-3.5 h-3.5 fill-current"><use href="#check2"></use></svg>}
                 </button>
               </li>
               <li>
@@ -553,9 +545,9 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
                     setIsThemeOpen(false);
                   }}
                 >
-                  <svg className="bi me-2 opacity-75 theme-icon" style={{ width: "16px", height: "16px", fill: "currentColor" }}><use href="#circle-half"></use></svg>
+                  <svg className="bi me-2 opacity-75 theme-icon w-4 h-4 fill-current"><use href="#circle-half"></use></svg>
                   {getThemeName("auto")}
-                  {theme === "auto" && <svg className="bi ms-auto" style={{ width: "14px", height: "14px", fill: "currentColor" }}><use href="#check2"></use></svg>}
+                  {theme === "auto" && <svg className="bi ms-auto w-3.5 h-3.5 fill-current"><use href="#check2"></use></svg>}
                 </button>
               </li>
             </ul>
@@ -564,9 +556,9 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
 
           {/* Interactive Hover Language Selector Popover */}
           <div className="shopee-lang-dropdown-container">
-            <span className="shopee-nav-item shopee-lang-trigger" style={{ cursor: "pointer" }}>
+            <span className="shopee-nav-item shopee-lang-trigger cursor-pointer">
               <i className="bi bi-globe me-1" /> {language === "en" ? "English" : "ไทย"}{" "}
-              <i className="bi bi-caret-down-fill ms-1" style={{ fontSize: "10px" }} />
+              <i className="bi bi-caret-down-fill ms-1 text-[10px]" />
             </span>
 
             <ul className="shopee-lang-dropdown-menu">
@@ -609,7 +601,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
                   e.currentTarget.src = "/yeti_mascot.jpg";
                 }}
               />
-              <span style={{ fontSize: "10px", marginLeft: "2px" }}>▾</span>
+              <span className="text-[10px] ml-0.5">▾</span>
             </div>
 
             <ul className="shopee-user-dropdown-menu">
@@ -670,7 +662,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
               <li>
                 <hr className="shopee-dropdown-divider" />
               </li>
-              <li className="dropdown-header text-uppercase text-secondary px-3" style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.5px" }}>
+              <li className="dropdown-header text-uppercase text-secondary px-3 text-[10px] font-bold tracking-[0.5px]">
                 {language === "en" ? "Campus Ecosystem" : "บริการโรงเรียน & สถานศึกษา"}
               </li>
               <li>
@@ -910,7 +902,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
                       handleSelectKeyword(item);
                     }}
                   >
-                    <i className="bi bi-search text-muted me-2" style={{ fontSize: "12px" }} />
+                    <i className="bi bi-search text-muted me-2 text-xs" />
                     <span>{item}</span>
                   </div>
                 ))}
@@ -942,7 +934,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
                       handleSelectKeyword(item);
                     }}
                   >
-                    <i className="bi bi-arrow-right text-muted me-2" style={{ fontSize: "12px" }} />
+                    <i className="bi bi-arrow-right text-muted me-2 text-xs" />
                     <span>{item}</span>
                   </div>
                 ))}

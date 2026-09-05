@@ -24,6 +24,15 @@ const MONTHS_TH = [
   "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."
 ];
 
+function isSameDay(d1, d2) {
+  if (!d1 || !d2) return false;
+  return (
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate()
+  );
+}
+
 function generateUpcomingCalendarDays() {
   const days = [];
   const now = new Date();
@@ -1400,30 +1409,30 @@ function ProductDetail() {
               <div className="col-12 col-md-8">
                 <div className="d-flex flex-column gap-2">
                   <div className="d-flex align-items-center gap-2 small">
-                    <span style={{ width: "90px" }}>รสชาติอาหาร</span>
-                    <div className="progress flex-grow-1" style={{ height: "8px" }}>
-                      <div className="progress-bar bg-danger" style={{ width: "98%" }} />
+                    <span className="w-[90px]">รสชาติอาหาร</span>
+                    <div className="progress flex-grow-1 h-2">
+                      <div className="progress-bar bg-danger w-[98%]" />
                     </div>
                     <span className="fw-bold">4.9</span>
                   </div>
                   <div className="d-flex align-items-center gap-2 small">
-                    <span style={{ width: "90px" }}>ความสะอาด</span>
-                    <div className="progress flex-grow-1" style={{ height: "8px" }}>
-                      <div className="progress-bar bg-success" style={{ width: "98%" }} />
+                    <span className="w-[90px]">ความสะอาด</span>
+                    <div className="progress flex-grow-1 h-2">
+                      <div className="progress-bar bg-success w-[98%]" />
                     </div>
                     <span className="fw-bold">4.9</span>
                   </div>
                   <div className="d-flex align-items-center gap-2 small">
-                    <span style={{ width: "90px" }}>ความรวดเร็ว</span>
-                    <div className="progress flex-grow-1" style={{ height: "8px" }}>
-                      <div className="progress-bar bg-primary" style={{ width: "94%" }} />
+                    <span className="w-[90px]">ความรวดเร็ว</span>
+                    <div className="progress flex-grow-1 h-2">
+                      <div className="progress-bar bg-primary w-[94%]" />
                     </div>
                     <span className="fw-bold">4.7</span>
                   </div>
                   <div className="d-flex align-items-center gap-2 small">
-                    <span style={{ width: "90px" }}>ความคุ้มค่า</span>
-                    <div className="progress flex-grow-1" style={{ height: "8px" }}>
-                      <div className="progress-bar bg-warning" style={{ width: "96%" }} />
+                    <span className="w-[90px]">ความคุ้มค่า</span>
+                    <div className="progress flex-grow-1 h-2">
+                      <div className="progress-bar bg-warning w-[96%]" />
                     </div>
                     <span className="fw-bold">4.8</span>
                   </div>
@@ -1522,8 +1531,7 @@ function ProductDetail() {
                         <span className="text-danger fw-bold">฿{rec.price}</span>
                         <button
                           type="button"
-                          className="btn btn-sm btn-primary rounded-circle d-flex align-items-center justify-content-center"
-                          style={{ width: "28px", height: "28px" }}
+                          className="btn btn-sm btn-primary rounded-circle d-flex align-items-center justify-content-center w-7 h-7"
                         >
                           <i className="bi bi-plus" />
                         </button>
@@ -1537,47 +1545,41 @@ function ProductDetail() {
         )}
       </div>
 
-      {/* 7. CALENDAR FULL MONTH MODAL (Full 28-31 Day Monthly Grid) */}
+      {/* 9. SELECT DAY CALENDAR POPUP MODAL */}
       {isCalendarModalOpen && (() => {
-        const today = new Date();
-        const curYear = today.getFullYear();
-        const curMonth = today.getMonth();
-        const firstDayOfWeek = new Date(curYear, curMonth, 1).getDay();
+        const currentCalendarMonth = new Date();
+        const curYear = currentCalendarMonth.getFullYear();
+        const curMonth = currentCalendarMonth.getMonth();
+        const firstDayOfMonth = new Date(curYear, curMonth, 1).getDay();
         const daysInMonth = new Date(curYear, curMonth + 1, 0).getDate();
-        const todayDateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
         const cells = [];
-        for (let i = 0; i < firstDayOfWeek; i++) {
+        for (let i = 0; i < firstDayOfMonth; i++) {
           cells.push({ type: "empty", key: `empty-${i}` });
         }
         for (let d = 1; d <= daysInMonth; d++) {
-          const targetDate = new Date(curYear, curMonth, d);
-          const dayOfWeek = DAYS_OF_WEEK_TH[targetDate.getDay()];
-          const monthName = MONTHS_TH[curMonth];
-          const fullDateStr = `${d} ${monthName}`;
+          const dateObj = new Date(curYear, curMonth, d);
           const isoDateStr = `${curYear}-${String(curMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-          const isPast = targetDate < todayDateOnly;
-          const isToday = targetDate.getTime() === todayDateOnly.getTime();
-          const isSelected = selectedDay?.isoDateStr === isoDateStr;
+          const isToday = isSameDay(dateObj, new Date());
+          const isSelected = selectedDay.isoDateStr === isoDateStr;
+          const isBookable = dateObj >= new Date(new Date().setHours(0, 0, 0, 0));
 
           cells.push({
             type: "day",
-            key: isoDateStr,
+            key: `day-${d}`,
             dateNum: d,
-            dayOfWeek,
-            fullDateStr,
             isoDateStr,
-            isPast,
+            fullDateStr: `${d} ${MONTHS_TH[curMonth]} ${curYear + 543}`,
+            dayOfWeek: DAYS_OF_WEEK_TH[dateObj.getDay()],
             isToday,
             isSelected,
-            isBookable: !isPast,
+            isBookable,
           });
         }
 
         return (
           <div
-            className="modal fade show d-block"
-            style={{ backgroundColor: "rgba(15, 23, 42, 0.75)", backdropFilter: "blur(6px)", zIndex: 100000 }}
+            className="modal fade show d-block bg-slate-900/75 backdrop-blur-sm z-[100000]"
             tabIndex="-1"
           >
             <div className="modal-dialog modal-dialog-centered modal-md">
@@ -1600,19 +1602,19 @@ function ProductDetail() {
                 </div>
                 <div className="modal-body py-2">
                   {/* Weekday Header */}
-                  <div className="d-grid" style={{ gridTemplateColumns: "repeat(7, 1fr)", gap: "4px", textAlign: "center", marginBottom: "8px" }}>
+                  <div className="grid grid-cols-7 gap-1 text-center mb-2">
                     {DAYS_OF_WEEK_TH.map((dw, idx) => (
-                      <div key={idx} className="small fw-bold text-muted py-1" style={{ fontSize: "0.75rem" }}>
+                      <div key={idx} className="text-xs font-bold text-muted py-1">
                         {dw}
                       </div>
                     ))}
                   </div>
 
                   {/* Day Grid */}
-                  <div className="d-grid" style={{ gridTemplateColumns: "repeat(7, 1fr)", gap: "6px" }}>
+                  <div className="grid grid-cols-7 gap-1.5">
                     {cells.map((cell) => {
                       if (cell.type === "empty") {
-                        return <div key={cell.key} style={{ minHeight: "44px" }} />;
+                        return <div key={cell.key} className="min-h-[44px]" />;
                       }
                       return (
                         <button
@@ -1635,7 +1637,7 @@ function ProductDetail() {
                             });
                             setIsCalendarModalOpen(false);
                           }}
-                          className={`btn p-1 d-flex flex-column align-items-center justify-content-center rounded-3 position-relative ${
+                          className={`btn p-1 d-flex flex-column align-items-center justify-content-center rounded-3 position-relative min-h-[44px] text-[0.85rem] ${
                             cell.isSelected
                               ? "btn-primary shadow-sm text-white fw-bold"
                               : cell.isToday
@@ -1644,11 +1646,10 @@ function ProductDetail() {
                               ? "btn-light border hover-bg-primary-subtle text-dark"
                               : "btn-light border-0 text-muted opacity-25"
                           }`}
-                          style={{ minHeight: "44px", fontSize: "0.85rem" }}
                         >
                           <span>{cell.dateNum}</span>
                           {cell.isToday && (
-                            <span style={{ fontSize: "0.6rem", lineHeight: 1 }} className={cell.isSelected ? "text-white" : "text-primary"}>
+                            <span className={`text-[0.6rem] leading-none ${cell.isSelected ? "text-white" : "text-primary"}`}>
                               วันนี้
                             </span>
                           )}
@@ -1658,7 +1659,7 @@ function ProductDetail() {
                   </div>
                 </div>
                 <div className="modal-footer border-0 pt-2 pb-0 d-flex justify-content-between">
-                  <div className="small text-muted" style={{ fontSize: "0.75rem" }}>
+                  <div className="text-xs text-muted">
                     <span className="badge bg-primary me-1"> </span> วันที่เลือก: {selectedDay.dayOfWeek} {selectedDay.fullDateStr}
                   </div>
                   <button
@@ -1679,8 +1680,7 @@ function ProductDetail() {
       {/* 8. WALKING GUIDE MAP MODAL */}
       {isMapModalOpen && (
         <div
-          className="modal fade show d-block"
-          style={{ backgroundColor: "rgba(15, 23, 42, 0.75)", backdropFilter: "blur(6px)", zIndex: 100000 }}
+          className="modal fade show d-block bg-slate-900/75 backdrop-blur-sm z-[100000]"
           tabIndex="-1"
         >
           <div className="modal-dialog modal-dialog-centered">
@@ -1702,15 +1702,15 @@ function ProductDetail() {
                 </div>
                 <div className="d-flex flex-column gap-2 small">
                   <div className="d-flex gap-2">
-                    <span className="badge bg-primary rounded-circle" style={{ width: "22px", height: "22px" }}>1</span>
+                    <span className="badge bg-primary rounded-circle w-[22px] h-[22px] d-flex align-items-center justify-content-center">1</span>
                     <span>เข้าประตูโรงอาหารทิศเหนือ (ลานกิจกรรม)</span>
                   </div>
                   <div className="d-flex gap-2">
-                    <span className="badge bg-primary rounded-circle" style={{ width: "22px", height: "22px" }}>2</span>
+                    <span className="badge bg-primary rounded-circle w-[22px] h-[22px] d-flex align-items-center justify-content-center">2</span>
                     <span>เดินตรงผ่านเสา C3 และจุดเติมเงินบัตร</span>
                   </div>
                   <div className="d-flex gap-2">
-                    <span className="badge bg-primary rounded-circle" style={{ width: "22px", height: "22px" }}>3</span>
+                    <span className="badge bg-primary rounded-circle w-[22px] h-[22px] d-flex align-items-center justify-content-center">3</span>
                     <span>ร้านป้าแดง (ล็อค 04) อยู่ทางขวามือ ติดกับตู้ QueueUp Locker</span>
                   </div>
                 </div>
@@ -1732,13 +1732,12 @@ function ProductDetail() {
       {/* 9. VIDEO MODAL PLAYER */}
       {activeVideo && (
         <div
-          className="modal fade show d-block"
-          style={{ backgroundColor: "rgba(15, 23, 42, 0.85)", backdropFilter: "blur(10px)", zIndex: 100002 }}
+          className="modal fade show d-block bg-slate-950/85 backdrop-blur-md z-[100002]"
           tabIndex="-1"
         >
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content rounded-4 border-0 shadow-lg p-0 overflow-hidden bg-dark text-white">
-              <div className="position-relative" style={{ height: "360px" }}>
+              <div className="position-relative h-[360px]">
                 <img
                   src={activeVideo.thumbnail}
                   alt={activeVideo.title}
@@ -1758,7 +1757,7 @@ function ProductDetail() {
                     <i className="bi bi-play-fill fs-2 text-danger" />
                   </div>
                 </div>
-                <div className="position-absolute bottom-0 start-0 end-0 p-3" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.85), transparent)" }}>
+                <div className="position-absolute bottom-0 start-0 end-0 p-3 bg-gradient-to-t from-black/85 to-transparent">
                   <div className="fw-bold small text-warning">{activeVideo.author}</div>
                   <div className="fw-bold">{activeVideo.title}</div>
                   <div className="text-xs text-slate-300">{activeVideo.tags}</div>
@@ -1790,30 +1789,14 @@ function ProductDetail() {
       {/* 11. INCOMPLETE PROFILE MODAL */}
       {isIncompleteProfileModalOpen && (
         <div
-          className="modal fade show d-block"
-          style={{
-            backgroundColor: "rgba(15, 23, 42, 0.85)",
-            backdropFilter: "blur(10px)",
-            zIndex: 100005,
-          }}
+          className="modal fade show d-block bg-slate-950/85 backdrop-blur-md z-[100005]"
           tabIndex="-1"
         >
           <div className="modal-dialog modal-dialog-centered">
-            <div
-              className="modal-content text-white p-2"
-              style={{
-                background: "linear-gradient(145deg, #1e293b 0%, #0f172a 100%)",
-                border: "2px solid #f59e0b",
-                borderRadius: "24px",
-                boxShadow: "0 20px 50px rgba(0, 0, 0, 0.6)",
-              }}
-            >
+            <div className="modal-content text-white p-2 bg-gradient-to-br from-slate-800 to-slate-900 border-2 border-amber-500 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
               <div className="modal-header border-bottom border-secondary pb-3">
                 <div className="d-flex align-items-center gap-3">
-                  <div
-                    className="bg-warning text-dark p-3 rounded-circle d-flex align-items-center justify-content-center"
-                    style={{ width: "48px", height: "48px" }}
-                  >
+                  <div className="bg-warning text-dark p-3 rounded-circle d-flex align-items-center justify-content-center w-12 h-12">
                     <i className="bi bi-exclamation-triangle-fill fs-4" />
                   </div>
                   <div>

@@ -161,7 +161,7 @@ function MerchantOnboarding() {
       {/* Top Header Bar */}
       <header className="shopee-onboarding-header">
         <div className="shopee-onboarding-header-container">
-          <div className="shopee-onboarding-brand" onClick={() => navigate("/home")} style={{ cursor: "pointer" }}>
+          <div className="shopee-onboarding-brand cursor-pointer" onClick={() => navigate("/home")}>
             <img src="/logo.png" alt="QueueUp Logo" className="shopee-onboarding-logo" />
             <span className="shopee-onboarding-title">QueueUp Seller Centre</span>
           </div>
@@ -172,10 +172,7 @@ function MerchantOnboarding() {
               className="btn btn-light d-flex align-items-center gap-2 font-weight-bold rounded-pill px-3 shadow-sm border"
               onClick={() => setIsUserDropdownOpen((prev) => !prev)}
             >
-              <div
-                className="rounded-circle bg-secondary-subtle d-flex align-items-center justify-content-center"
-                style={{ width: "28px", height: "28px" }}
-              >
+              <div className="rounded-circle bg-secondary-subtle d-flex align-items-center justify-content-center w-7 h-7">
                 <i className="bi bi-person-fill text-secondary fs-6" />
               </div>
               <span className="text-dark small font-weight-bold">
@@ -185,14 +182,8 @@ function MerchantOnboarding() {
             </button>
 
             {isUserDropdownOpen && (
-              <div
-                className="position-absolute end-0 mt-2 bg-white rounded-3 shadow-lg p-3 text-dark text-center border"
-                style={{ width: "220px", zIndex: 9999 }}
-              >
-                <div
-                  className="rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto mb-2 border"
-                  style={{ width: "64px", height: "64px" }}
-                >
+              <div className="position-absolute end-0 mt-2 bg-white rounded-3 shadow-lg p-3 text-dark text-center border w-[220px] z-[9999]">
+                <div className="rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto mb-2 border w-16 h-16">
                   <i className="bi bi-person-fill text-secondary display-6" />
                 </div>
                 <div className="fw-bold text-dark fs-6 mb-2">
@@ -241,7 +232,7 @@ function MerchantOnboarding() {
           <div className="shopee-onboarding-card form-card fade-in">
             <div className="d-flex align-items-center justify-content-between mb-4 pb-2 border-bottom">
               <div>
-                <h3 className="fw-bold mb-1" style={{ color: "#222" }}>
+                <h3 className="fw-bold mb-1 text-neutral-900">
                   ขั้นตอนที่ 1/2: ข้อมูลร้านค้าและโรงอาหาร
                 </h3>
                 <p className="text-muted small mb-0">กรอกข้อมูลร้านค้าของคุณสำหรับแสดงในระบบจองคิวโรงอาหาร</p>
@@ -318,7 +309,7 @@ function MerchantOnboarding() {
           <div className="shopee-onboarding-card form-card fade-in">
             <div className="d-flex align-items-center justify-content-between mb-4 pb-2 border-bottom">
               <div>
-                <h3 className="fw-bold mb-1" style={{ color: "#222" }}>
+                <h3 className="fw-bold mb-1 text-neutral-900">
                   ขั้นตอนที่ 2/2: ข้อมูลการรับเงิน (PromptPay)
                 </h3>
                 <p className="text-muted small mb-0">กรอกข้อมูล PromptPay สำหรับรับเงินค่าอาหารจากนักเรียนและบุคลากร</p>
@@ -400,16 +391,7 @@ function MerchantOnboarding() {
 
       {/* Seller Assistant Floating Widget Trigger */}
       <button
-        className="btn btn-danger rounded-circle shadow-lg position-fixed d-flex align-items-center justify-content-center"
-        style={{
-          bottom: "30px",
-          right: "30px",
-          width: "62px",
-          height: "62px",
-          zIndex: 9990,
-          background: "linear-gradient(135deg, #ee4d2d 0%, #ff7337 100%)",
-          border: "none",
-        }}
+        className="btn rounded-full shadow-2xl fixed flex items-center justify-center bottom-[30px] right-[30px] w-[62px] h-[62px] z-[9990] bg-gradient-to-br from-[#ee4d2d] to-[#ff7337] border-0 hover:scale-105 transition-transform"
         onClick={() => setIsSellerAssistantOpen(true)}
         title="เปิด Seller Assistant ผู้ช่วยร้านค้า"
       >

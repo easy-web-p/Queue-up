@@ -467,7 +467,7 @@ function UserProfile() {
                     type="file"
                     accept="image/*"
                     onChange={handleAvatarUpload}
-                    style={{ display: "none" }}
+                    className="hidden"
                   />
                 </label>
               </div>
@@ -476,13 +476,11 @@ function UserProfile() {
             
             {/* Membership Tier Badge */}
             <div
-              className="mt-2 px-3 py-1 rounded-pill d-inline-flex align-items-center gap-1 cursor-pointer"
+              className="mt-2 px-3 py-1 rounded-pill d-inline-flex align-items-center gap-1 cursor-pointer text-[11px] font-extrabold"
               style={{
                 backgroundColor: membershipInfo.bg,
                 color: membershipInfo.color,
                 border: `1px solid ${membershipInfo.color}50`,
-                fontSize: "11px",
-                fontWeight: "800",
               }}
               onClick={() => handleTabChange("membership")}
               title="คลิกเพื่อดูสิทธิพิเศษประจำระดับสมาชิก"
@@ -490,7 +488,7 @@ function UserProfile() {
               <i className={`bi ${membershipInfo.icon}`} />
               <span>{membershipInfo.name}</span>
             </div>
-            <div className="small text-muted mt-1" style={{ fontSize: "11px" }}>
+            <div className="small text-muted mt-1 text-[11px]">
               🪙 <b>{userPoints.toLocaleString()}</b> Points
             </div>
           </div>
@@ -551,15 +549,14 @@ function UserProfile() {
             </div>
 
             <div className="pt-3 pb-1 px-3">
-              <span className="text-secondary text-uppercase fw-bold" style={{ fontSize: "10px", letterSpacing: "0.5px" }}>
+              <span className="text-secondary text-uppercase fw-bold text-[10px] tracking-[0.5px]">
                 บริการสถานศึกษา (Campus)
               </span>
             </div>
 
             <div
-              className="shopee-sidebar-nav-item"
+              className="shopee-sidebar-nav-item cursor-pointer"
               onClick={() => navigate("/guardian")}
-              style={{ cursor: "pointer" }}
             >
               <div className="shopee-sidebar-nav-left">
                 <i className="bi bi-shield-heart text-danger shopee-sidebar-nav-icon" />
@@ -569,9 +566,8 @@ function UserProfile() {
             </div>
 
             <div
-              className="shopee-sidebar-nav-item"
+              className="shopee-sidebar-nav-item cursor-pointer"
               onClick={() => navigate("/student-vendor/apply")}
-              style={{ cursor: "pointer" }}
             >
               <div className="shopee-sidebar-nav-left">
                 <i className="bi bi-mortarboard text-warning shopee-sidebar-nav-icon" />
@@ -582,9 +578,8 @@ function UserProfile() {
 
             {(user?.role === "student_vendor" || user?.role === "merchant" || user?.role === "admin") && (
               <div
-                className="shopee-sidebar-nav-item"
+                className="shopee-sidebar-nav-item cursor-pointer"
                 onClick={() => navigate("/student-vendor/earnings")}
-                style={{ cursor: "pointer" }}
               >
                 <div className="shopee-sidebar-nav-left">
                   <i className="bi bi-wallet2 text-success shopee-sidebar-nav-icon" />
@@ -597,9 +592,8 @@ function UserProfile() {
             {(user?.role === "staff_supervisor" || user?.role === "admin") && (
               <>
                 <div
-                  className="shopee-sidebar-nav-item"
+                  className="shopee-sidebar-nav-item cursor-pointer"
                   onClick={() => navigate("/admin/vendor-approvals")}
-                  style={{ cursor: "pointer" }}
                 >
                   <div className="shopee-sidebar-nav-left">
                     <i className="bi bi-person-check text-info shopee-sidebar-nav-icon" />
@@ -609,9 +603,8 @@ function UserProfile() {
                 </div>
 
                 <div
-                  className="shopee-sidebar-nav-item"
+                  className="shopee-sidebar-nav-item cursor-pointer"
                   onClick={() => navigate("/emergency")}
-                  style={{ cursor: "pointer" }}
                 >
                   <div className="shopee-sidebar-nav-left">
                     <i className="bi bi-heart-pulse text-danger shopee-sidebar-nav-icon" />
@@ -623,9 +616,8 @@ function UserProfile() {
             )}
 
             <div
-              className="shopee-sidebar-nav-item"
+              className="shopee-sidebar-nav-item cursor-pointer"
               onClick={() => navigate("/campus/monitor")}
-              style={{ cursor: "pointer" }}
             >
               <div className="shopee-sidebar-nav-left">
                 <i className="bi bi-tv text-primary shopee-sidebar-nav-icon" />
@@ -644,12 +636,12 @@ function UserProfile() {
               <div className="d-flex align-items-center justify-content-between mb-3">
                 <h2 className="shopee-panel-title mb-0">ข้อมูลส่วนบุคคล</h2>
                 {autoSaveStatus === "saving" && (
-                  <span className="badge bg-warning text-dark px-3 py-2" style={{ fontSize: "0.82rem", borderRadius: "20px" }}>
+                  <span className="badge bg-warning text-dark px-3 py-2 text-[0.82rem] rounded-full">
                     ⏳ กำลังบันทึกข้อมูลอัตโนมัติ...
                   </span>
                 )}
                 {autoSaveStatus === "saved" && (
-                  <span className="badge bg-success text-white px-3 py-2" style={{ fontSize: "0.82rem", borderRadius: "20px" }}>
+                  <span className="badge bg-success text-white px-3 py-2 text-[0.82rem] rounded-full">
                     ✓ บันทึกข้อมูลอัตโนมัติเรียบร้อยแล้ว
                   </span>
                 )}
@@ -950,7 +942,7 @@ function UserProfile() {
 
               {/* 🛡️ AI SECURITY SENTINEL STATUS CARD */}
               {securityHealth && (
-                <div className="p-3 rounded-3 mb-3 text-dark border" style={{ background: "#f8fafc", borderColor: "#e2e8f0" }}>
+                <div className="p-3 rounded-3 mb-3 text-dark border bg-slate-50 border-slate-200">
                   <div className="d-flex align-items-center justify-content-between mb-2">
                     <div className="fw-bold text-primary">
                       <i className="bi bi-shield-lock-fill me-2" />
@@ -985,7 +977,7 @@ function UserProfile() {
 
               {/* 🧠 AI USER BEHAVIOR INTELLIGENCE CARD */}
               {aiBehaviorProfile && (
-                <div className="p-3 rounded-3 mb-3 border text-dark" style={{ background: "#f0fdf4", borderColor: "#bbf7d0" }}>
+                <div className="p-3 rounded-3 mb-3 border text-dark bg-emerald-50 border-emerald-200">
                   <div className="fw-bold text-success mb-1">
                     <i className="bi bi-brain me-2" />
                     🧠 AI Behavior Intelligence สรุปพฤติกรรมการใช้งานของคุณ
@@ -1107,14 +1099,7 @@ function UserProfile() {
               </div>
 
               {/* Points Banner Card */}
-              <div
-                className="p-4 rounded-4 mb-4 text-white position-relative overflow-hidden"
-                style={{
-                  background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
-                  border: "1px solid rgba(251, 191, 36, 0.4)",
-                  boxShadow: "0 10px 25px rgba(0, 0, 0, 0.15)",
-                }}
-              >
+              <div className="p-4 rounded-4 mb-4 text-white position-relative overflow-hidden bg-gradient-to-br from-slate-800 to-slate-900 border border-amber-400/40 shadow-lg">
                 <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">
                   <div>
                     <span className="text-warning small fw-bold text-uppercase tracking-wider">
@@ -1145,11 +1130,11 @@ function UserProfile() {
                     <span>ระดับปัจจุบัน: <b>{membershipInfo.name}</b></span>
                     <span>{membershipInfo.progress}% ถึงระดับถัดไป</span>
                   </div>
-                  <div className="progress" style={{ height: "10px", backgroundColor: "#334155", borderRadius: "10px" }}>
+                  <div className="progress h-2.5 bg-slate-700 rounded-[10px]">
                     <div
-                      className="progress-bar bg-warning progress-bar-striped progress-bar-animated"
+                      className="progress-bar bg-warning progress-bar-striped progress-bar-animated rounded-[10px]"
                       role="progressbar"
-                      style={{ width: `${membershipInfo.progress}%`, borderRadius: "10px" }}
+                      style={{ width: `${membershipInfo.progress}%` }}
                     />
                   </div>
                 </div>
@@ -1161,7 +1146,7 @@ function UserProfile() {
                 <div className="col-md-3 col-6">
                   <div className={`p-3 rounded-4 border text-center h-100 ${membershipInfo.name === "Bronze Member" ? "border-warning bg-amber-50" : "border-slate-200 bg-white"}`}>
                     <div className="fs-2 mb-1">🥉</div>
-                    <h6 className="fw-bold mb-1" style={{ color: "#d97706" }}>Bronze Member</h6>
+                    <h6 className="fw-bold mb-1 text-amber-600">Bronze Member</h6>
                     <div className="small text-muted mb-2">0 - 499 แต้ม</div>
                     <span className="badge bg-warning text-dark rounded-pill small">ส่วนลด 5%</span>
                   </div>
@@ -1170,7 +1155,7 @@ function UserProfile() {
                 <div className="col-md-3 col-6">
                   <div className={`p-3 rounded-4 border text-center h-100 ${membershipInfo.name === "Silver Member" ? "border-secondary bg-slate-100" : "border-slate-200 bg-white"}`}>
                     <div className="fs-2 mb-1">🥈</div>
-                    <h6 className="fw-bold mb-1" style={{ color: "#64748b" }}>Silver Member</h6>
+                    <h6 className="fw-bold mb-1 text-slate-500">Silver Member</h6>
                     <div className="small text-muted mb-2">500 - 1,499 แต้ม</div>
                     <span className="badge bg-secondary text-white rounded-pill small">ส่วนลด 10% + จองคิวด่วน</span>
                   </div>
@@ -1179,7 +1164,7 @@ function UserProfile() {
                 <div className="col-md-3 col-6">
                   <div className={`p-3 rounded-4 border text-center h-100 ${membershipInfo.name === "Gold Member" ? "border-warning bg-warning-50" : "border-slate-200 bg-white"}`}>
                     <div className="fs-2 mb-1">🥇</div>
-                    <h6 className="fw-bold mb-1" style={{ color: "#eab308" }}>Gold Member</h6>
+                    <h6 className="fw-bold mb-1 text-yellow-500">Gold Member</h6>
                     <div className="small text-muted mb-2">1,500 - 3,499 แต้ม</div>
                     <span className="badge bg-warning text-dark rounded-pill small">ส่วนลด 15% + สปีดคิว</span>
                   </div>
@@ -1188,7 +1173,7 @@ function UserProfile() {
                 <div className="col-md-3 col-6">
                   <div className={`p-3 rounded-4 border text-center h-100 ${membershipInfo.name === "Platinum Member" ? "border-purple bg-purple-50" : "border-slate-200 bg-white"}`}>
                     <div className="fs-2 mb-1">💎</div>
-                    <h6 className="fw-bold mb-1" style={{ color: "#a855f7" }}>Platinum Member</h6>
+                    <h6 className="fw-bold mb-1 text-purple-500">Platinum Member</h6>
                     <div className="small text-muted mb-2">3,500+ แต้ม</div>
                     <span className="badge bg-purple text-white rounded-pill small">VIP School Executive 20%</span>
                   </div>
@@ -1397,7 +1382,7 @@ function UserProfile() {
                   </button>
                 </div>
                 <div className="shopee-account-id-row">
-                  <span className="shopee-field-value" style={{ letterSpacing: showAccountId ? "normal" : "2px" }}>
+                  <span className={`shopee-field-value ${showAccountId ? "tracking-normal" : "tracking-[2px]"}`}>
                     {showAccountId ? accountId : "••••••••••••••••"}
                   </span>
                   <button
@@ -1439,7 +1424,7 @@ function UserProfile() {
 
                 <div className="mt-2 p-3 rounded-3 bg-white border d-flex align-items-center justify-content-between">
                   <div className="d-flex align-items-center gap-3">
-                    <div className="bg-success text-white rounded-circle p-2 d-flex align-items-center justify-content-center" style={{ width: "42px", height: "42px" }}>
+                    <div className="bg-success text-white rounded-circle p-2 d-flex align-items-center justify-content-center w-[42px] h-[42px]">
                       <i className="bi bi-bell-fill fs-5" />
                     </div>
                     <div>
@@ -1449,7 +1434,7 @@ function UserProfile() {
                       </div>
                     </div>
                   </div>
-                  <span className="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" style={{ fontSize: "0.75rem" }}>
+                  <span className="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 text-xs">
                     <i className="bi bi-shield-check me-1" /> เชื่อมต่อระบบคิวสด
                   </span>
                 </div>
@@ -1619,10 +1604,10 @@ function UserProfile() {
         <div className="security-modal-overlay">
           <div className="security-modal-card text-center py-4">
             <div className="mb-3">
-              <i className="bi bi-exclamation-triangle-fill text-danger" style={{ fontSize: "3rem" }} />
+              <i className="bi bi-exclamation-triangle-fill text-danger text-5xl" />
             </div>
             <h4 className="fw-bold text-dark mb-2">ยืนยันการลบข้อมูลบัญชีถาวร</h4>
-            <p className="text-muted fs-6 mb-4 px-2" style={{ lineHeight: "1.6" }}>
+            <p className="text-muted fs-6 mb-4 px-2 leading-relaxed">
               ระบบจะทำการลบข้อมูลและประวัติต่างๆ ของผู้ใช้ทั้งหมดออกจากระบบอย่างถาวร
             </p>
 

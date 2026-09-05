@@ -194,10 +194,10 @@ export default function Queueup() {
           </p>
 
           <div className="qup-hero-btns">
-            <button className="qup-btn-primary" style={{ padding: "0.9rem 2rem", fontSize: "1rem" }} onClick={handleStartApp}>
+            <button className="qup-btn-primary px-8 py-3.5 text-base" onClick={handleStartApp}>
               <i className="bi bi-rocket-takeoff-fill me-2" /> เริ่มต้นทดลองใช้งานระบบ
             </button>
-            <a href="#about" className="qup-btn-secondary" style={{ padding: "0.9rem 1.8rem", fontSize: "1rem", textDecoration: "none", display: "inline-block" }}>
+            <a href="#about" className="qup-btn-secondary px-7 py-3.5 text-base no-underline inline-block">
               <i className="bi bi-book-fill me-2" /> อ่านเกี่ยวกับเรา
             </a>
           </div>
@@ -209,18 +209,18 @@ export default function Queueup() {
 
             {/* Floating Live Badges */}
             <div className="qup-float-badge qup-float-1">
-              <i className="bi bi-lightning-charge-fill text-warning me-2" style={{ fontSize: "1.2rem" }} />
+              <i className="bi bi-lightning-charge-fill text-warning me-2 text-[1.2rem]" />
               <div>
-                <div style={{ color: "#ffffff" }}>คิวเฉลี่ย &lt; 2 นาที</div>
-                <div style={{ color: "#94a3b8", fontSize: "0.75rem" }}>Real-Time Queue Sync</div>
+                <div className="text-white font-bold">คิวเฉลี่ย &lt; 2 นาที</div>
+                <div className="text-slate-400 text-xs">Real-Time Queue Sync</div>
               </div>
             </div>
 
             <div className="qup-float-badge qup-float-2">
-              <i className="bi bi-shield-check text-success me-2" style={{ fontSize: "1.2rem" }} />
+              <i className="bi bi-shield-check text-success me-2 text-[1.2rem]" />
               <div>
-                <div style={{ color: "#4ade80" }}>Zero-Trust Security</div>
-                <div style={{ color: "#94a3b8", fontSize: "0.75rem" }}>SHA-256 & AES-256</div>
+                <div className="text-emerald-400 font-bold">Zero-Trust Security</div>
+                <div className="text-slate-400 text-xs">SHA-256 & AES-256</div>
               </div>
             </div>
           </div>
@@ -272,7 +272,7 @@ export default function Queueup() {
           </div>
 
           <div className="qup-about-card">
-            <div className="qup-about-icon-wrapper" style={{ background: "rgba(124, 58, 237, 0.15)", color: "#a855f7" }}>
+            <div className="qup-about-icon-wrapper bg-purple-600/15 text-purple-400">
               <i className="bi bi-bullseye" />
             </div>
             <h3 className="qup-about-card-title">พันธกิจของเรา (Our Mission)</h3>
@@ -286,30 +286,30 @@ export default function Queueup() {
         <div className="qup-values-grid">
           <div className="qup-value-item">
             <span className="qup-value-badge">PILLAR 01</span>
-            <h4 style={{ fontSize: "1.2rem", fontWeight: "700", marginBottom: "0.6rem" }}>
+            <h4 className="text-[1.2rem] font-bold mb-2.5">
               <i className="bi bi-lightning-fill text-warning me-2" /> Speed & Precision
             </h4>
-            <p style={{ color: "#94a3b8", fontSize: "0.92rem", lineHeight: "1.6" }}>
+            <p className="text-slate-400 text-[0.92rem] leading-relaxed">
               ระบบซิงค์ข้อมูล Real-Time คำนวณลำดับคิวถูกต้องแม่นยำ รักษาสิทธิ์ของลูกค้าได้ 100%
             </p>
           </div>
 
           <div className="qup-value-item">
-            <span className="qup-value-badge" style={{ background: "rgba(34, 197, 94, 0.2)", color: "#4ade80" }}>PILLAR 02</span>
-            <h4 style={{ fontSize: "1.2rem", fontWeight: "700", marginBottom: "0.6rem" }}>
+            <span className="qup-value-badge bg-emerald-500/20 text-emerald-400">PILLAR 02</span>
+            <h4 className="text-[1.2rem] font-bold mb-2.5">
               <i className="bi bi-shield-lock-fill text-success me-2" /> Enterprise Security
             </h4>
-            <p style={{ color: "#94a3b8", fontSize: "0.92rem", lineHeight: "1.6" }}>
+            <p className="text-slate-400 text-[0.92rem] leading-relaxed">
               ปกป้องข้อมูลผู้ใช้ด้วย Salted SHA-256 Hashing, AES-256 Encryption และ DNS MX Domain Verification
             </p>
           </div>
 
           <div className="qup-value-item">
-            <span className="qup-value-badge" style={{ background: "rgba(238, 77, 45, 0.2)", color: "#ff8c73" }}>PILLAR 03</span>
-            <h4 style={{ fontSize: "1.2rem", fontWeight: "700", marginBottom: "0.6rem" }}>
+            <span className="qup-value-badge bg-orange-500/20 text-orange-400">PILLAR 03</span>
+            <h4 className="text-[1.2rem] font-bold mb-2.5">
               <i className="bi bi-heart-fill text-danger me-2" /> Customer-Centric UX
             </h4>
-            <p style={{ color: "#94a3b8", fontSize: "0.92rem", lineHeight: "1.6" }}>
+            <p className="text-slate-400 text-[0.92rem] leading-relaxed">
               ดีไซน์พรีเมียม สวยงาม ใช้งานง่าย ปรับโปรไฟล์ส่วนตัว และจัดการรหัสบัญชีได้อย่างปลอดภัย
             </p>
           </div>
@@ -336,7 +336,7 @@ export default function Queueup() {
           </div>
 
           <div className="qup-feature-card">
-            <div className="qup-feature-icon" style={{ background: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)" }}><i className="bi bi-egg-fried" /></div>
+            <div className="qup-feature-icon bg-gradient-to-br from-purple-500 to-purple-700"><i className="bi bi-egg-fried" /></div>
             <h3 className="qup-feature-title">Smart Food Ordering</h3>
             <p className="qup-feature-text">
               เลือกชมเมนูอาหาร ปรับแต่งระดับความเผ็ด ท็อปปิ้ง และคำนวณราคาอัตโนมัติได้อย่างรวดเร็ว
@@ -344,7 +344,7 @@ export default function Queueup() {
           </div>
 
           <div className="qup-feature-card">
-            <div className="qup-feature-icon" style={{ background: "linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)" }}><i className="bi bi-qr-code-scan" /></div>
+            <div className="qup-feature-icon bg-gradient-to-br from-sky-500 to-sky-700"><i className="bi bi-qr-code-scan" /></div>
             <h3 className="qup-feature-title">Dynamic PromptPay QR</h3>
             <p className="qup-feature-text">
               สร้าง QR Code สแกนจ่ายเงินอัตโนมัติตามยอดสั่งซื้อ พร้อมระบบแนบและตรวจสอบสลิปโอนเงิน
@@ -352,7 +352,7 @@ export default function Queueup() {
           </div>
 
           <div className="qup-feature-card">
-            <div className="qup-feature-icon" style={{ background: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)" }}><i className="bi bi-lock-fill" /></div>
+            <div className="qup-feature-icon bg-gradient-to-br from-green-500 to-green-700"><i className="bi bi-lock-fill" /></div>
             <h3 className="qup-feature-title">Zero-Trust Cryptography</h3>
             <p className="qup-feature-text">
               ความปลอดภัยระดับสากล แฮชรหัสผ่านด้วย Salted SHA-256 และเข้ารหัสข้อมูลด้วย AES-256-GCM
@@ -360,7 +360,7 @@ export default function Queueup() {
           </div>
 
           <div className="qup-feature-card">
-            <div className="qup-feature-icon" style={{ background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" }}><i className="bi bi-person-badge-fill" /></div>
+            <div className="qup-feature-icon bg-gradient-to-br from-amber-500 to-amber-700"><i className="bi bi-person-badge-fill" /></div>
             <h3 className="qup-feature-title">Account & Profile Auto-Save</h3>
             <p className="qup-feature-text">
               จัดการรหัสบัญชี แก้ไขข้อมูลส่วนตัว พร้อมระบบบันทึกข้อมูลอัตโนมัติ (Real-Time Auto-Save)
@@ -368,7 +368,7 @@ export default function Queueup() {
           </div>
 
           <div className="qup-feature-card">
-            <div className="qup-feature-icon" style={{ background: "linear-gradient(135deg, #ec4899 0%, #be185d 100%)" }}><i className="bi bi-laptop" /></div>
+            <div className="qup-feature-icon bg-gradient-to-br from-pink-500 to-pink-700"><i className="bi bi-laptop" /></div>
             <h3 className="qup-feature-title">Cross-Platform Accessibility</h3>
             <p className="qup-feature-text">
               รองรับการใช้งานบนทุกอุปกรณ์ ทั้งคอมพิวเตอร์ แท็บเล็ต และสมาร์ตโฟน แบบ Responsive 100%
@@ -381,8 +381,8 @@ export default function Queueup() {
       <section id="security" className="qup-section-container">
         <div className="qup-security-banner">
           <div>
-            <span className="qup-section-sub" style={{ color: "#4ade80" }}>SECURITY FIRST</span>
-            <h2 className="qup-section-title" style={{ fontSize: "2rem" }}>ความปลอดภัยระดับสากลเพื่อความมั่นใจ 100%</h2>
+            <span className="qup-section-sub text-emerald-400">SECURITY FIRST</span>
+            <h2 className="qup-section-title text-3xl">ความปลอดภัยระดับสากลเพื่อความมั่นใจ 100%</h2>
             <p className="qup-section-desc">
               QueueUp ใช้สถาปัตยกรรมความปลอดภัยแบบ Zero-Trust ในการปกป้องข้อมูลส่วนบุคคล รหัสผ่าน และธุรกรรมทางการเงินของผู้ใช้ทุกคน
             </p>
@@ -409,8 +409,8 @@ export default function Queueup() {
 
           <div className="qup-sec-graphic">
             <div className="qup-shield-icon"><i className="bi bi-shield-lock-fill text-success" /></div>
-            <div style={{ color: "#ffffff", fontWeight: "700", marginTop: "1rem" }}>Zero-Trust Certified</div>
-            <div style={{ color: "#94a3b8", fontSize: "0.85rem" }}>Encrypted End-to-End</div>
+            <div className="text-white font-bold mt-4">Zero-Trust Certified</div>
+            <div className="text-slate-400 text-sm">Encrypted End-to-End</div>
           </div>
         </div>
       </section>
@@ -448,27 +448,27 @@ export default function Queueup() {
           <div className="col-lg-8">
             <div className="qup-score-bar-item">
               <div className="qup-score-bar-label"><span>🎨 UX/UI Design & Responsiveness</span><span>{scores.ux} / 10</span></div>
-              <div className="qup-score-progress-track"><div className="qup-score-progress-fill" style={{ width: `${(scores.ux / 10) * 100}%`, background: "#ee4d2d" }} /></div>
+              <div className="qup-score-progress-track"><div className="qup-score-progress-fill bg-[#ee4d2d]" style={{ width: `${(scores.ux / 10) * 100}%` }} /></div>
             </div>
 
             <div className="qup-score-bar-item">
               <div className="qup-score-bar-label"><span>👤 "บัญชีเดียว ขยายได้ตามการเติบโต" (One Account Role Switch)</span><span>{scores.account} / 10</span></div>
-              <div className="qup-score-progress-track"><div className="qup-score-progress-fill" style={{ width: `${(scores.account / 10) * 100}%`, background: "#8b5cf6" }} /></div>
+              <div className="qup-score-progress-track"><div className="qup-score-progress-fill bg-[#8b5cf6]" style={{ width: `${(scores.account / 10) * 100}%` }} /></div>
             </div>
 
             <div className="qup-score-bar-item">
               <div className="qup-score-bar-label"><span>📋 Order & Live Queue Flow (Pre-Order / Smart Queue)</span><span>{scores.queue} / 10</span></div>
-              <div className="qup-score-progress-track"><div className="qup-score-progress-fill" style={{ width: `${(scores.queue / 10) * 100}%`, background: "#22c55e" }} /></div>
+              <div className="qup-score-progress-track"><div className="qup-score-progress-fill bg-[#22c55e]" style={{ width: `${(scores.queue / 10) * 100}%` }} /></div>
             </div>
 
             <div className="qup-score-bar-item">
               <div className="qup-score-bar-label"><span>🏪 Merchant Seller Centre CRM & Analytics</span><span>{scores.merchant} / 10</span></div>
-              <div className="qup-score-progress-track"><div className="qup-score-progress-fill" style={{ width: `${(scores.merchant / 10) * 100}%`, background: "#0ea5e9" }} /></div>
+              <div className="qup-score-progress-track"><div className="qup-score-progress-fill bg-[#0ea5e9]" style={{ width: `${(scores.merchant / 10) * 100}%` }} /></div>
             </div>
 
             <div className="qup-score-bar-item">
               <div className="qup-score-bar-label"><span>🛡️ Authentication & Private Finance Isolation</span><span>{scores.security} / 10</span></div>
-              <div className="qup-score-progress-track"><div className="qup-score-progress-fill" style={{ width: `${(scores.security / 10) * 100}%`, background: "#f59e0b" }} /></div>
+              <div className="qup-score-progress-track"><div className="qup-score-progress-fill bg-[#f59e0b]" style={{ width: `${(scores.security / 10) * 100}%` }} /></div>
             </div>
           </div>
         </div>
@@ -481,7 +481,7 @@ export default function Queueup() {
           <div className="row g-3">
             {evaluations.slice(0, 4).map((item, idx) => (
               <div key={item.id || idx} className="col-md-6">
-                <div className="p-3 rounded-3" style={{ background: "rgba(30, 41, 59, 0.6)", border: "1px solid rgba(255, 255, 255, 0.1)" }}>
+                <div className="p-3 rounded-3 bg-slate-800/60 border border-white/10">
                   <div className="d-flex align-items-center justify-content-between mb-2">
                     <div className="fw-bold text-white small">
                       <i className="bi bi-person-circle text-primary me-2" /> {item.userName}
@@ -499,7 +499,7 @@ export default function Queueup() {
         </div>
 
         {/* Future Roadmap Priorities */}
-        <h3 className="qup-section-title text-center mb-4" style={{ fontSize: "1.6rem" }}>
+        <h3 className="qup-section-title text-center mb-4 text-2xl">
           <i className="bi bi-diagram-3-fill text-warning me-2" /> แผนการพัฒนาและต่อยอดระบบในอนาคต (Firestore Schema v3 Roadmap)
         </h3>
 
@@ -543,7 +543,7 @@ export default function Queueup() {
       {/* ==================== 8.5. HIGH-CONVERTING SALES & SOLUTION PACKAGES ==================== */}
       <section id="solution" className="qup-section-container">
         <div className="qup-section-header">
-          <span className="qup-section-sub" style={{ color: "#ee4d2d" }}>QUEUEUP SOLUTION & PACKAGES — โซลูชันยกระดับโรงอาหาร</span>
+          <span className="qup-section-sub text-[#ee4d2d]">QUEUEUP SOLUTION & PACKAGES — โซลูชันยกระดับโรงอาหาร</span>
           <h2 className="qup-section-title">เปลี่ยนโรงอาหารแบบเดิม สู่ Smart Canteen 4.0</h2>
           <p className="qup-section-desc">
             โซลูชันครบวงจรที่ตอบโจทย์ทั้งนักเรียน ครู ผู้ปกครอง ร้านค้า และฝ่ายบริหารสถานศึกษา เพื่อเพิ่มประสิทธิภาพการบริการและสร้างความประทับใจสูงสุด
@@ -620,7 +620,7 @@ export default function Queueup() {
               </p>
             </div>
             <div className="col-lg-4 text-lg-end">
-              <a href="#contact" className="qup-btn-primary" style={{ padding: "0.9rem 2rem", fontSize: "1.05rem", textDecoration: "none", display: "inline-flex" }}>
+              <a href="#contact" className="qup-btn-primary px-8 py-3.5 text-[1.05rem] no-underline inline-flex">
                 <i className="bi bi-telephone-inbound-fill me-2" /> ติดต่อขอรับสิทธิ์ใช้งานฟรี
               </a>
             </div>
@@ -631,7 +631,7 @@ export default function Queueup() {
       {/* ==================== 8.6. PROJECT DEVELOPMENT TEAM SHOWCASE ==================== */}
       <section id="team" className="qup-section-container">
         <div className="qup-section-header">
-          <span className="qup-section-sub" style={{ color: "#38bdf8" }}>PROJECT DEVELOPERS — คณะผู้จัดทำและพัฒนาโครงการ</span>
+          <span className="qup-section-sub text-sky-400">PROJECT DEVELOPERS — คณะผู้จัดทำและพัฒนาโครงการ</span>
           <h2 className="qup-section-title">ทีมผู้พัฒนา QueueUp Smart School Food CRM</h2>
           <p className="qup-section-desc">
             โครงการพัฒนานวัตกรรมดิจิทัล <strong>กลุ่ม 23 (91)</strong> — รายวิชา <strong>GE341511 การคิดเชิงคำนวณและเชิงสถิติสำหรับ ABCD</strong>
@@ -736,8 +736,8 @@ export default function Queueup() {
           <div className="row g-5 align-items-center">
             {/* Left Info Column */}
             <div className="col-lg-5">
-              <span className="qup-section-sub" style={{ color: "#ee4d2d" }}>CONTACT & INQUIRIES — ติดต่อเรา</span>
-              <h2 className="qup-section-title" style={{ fontSize: "2.2rem" }}>
+              <span className="qup-section-sub text-[#ee4d2d]">CONTACT & INQUIRIES — ติดต่อเรา</span>
+              <h2 className="qup-section-title text-4xl">
                 พร้อมยกระดับโรงอาหารของคุณหรือยัง?
               </h2>
               <p className="qup-section-desc mb-4">
@@ -745,7 +745,7 @@ export default function Queueup() {
               </p>
 
               <div className="qup-contact-info-list space-y-3 mb-4">
-                <div className="d-flex align-items-center gap-3 p-3 rounded-3" style={{ background: "rgba(30, 41, 59, 0.6)", border: "1px solid rgba(255, 255, 255, 0.08)" }}>
+                <div className="d-flex align-items-center gap-3 p-3 rounded-3 bg-slate-800/60 border border-white/10">
                   <div className="qup-contact-icon-circle bg-danger-subtle text-danger">
                     <i className="bi bi-geo-alt-fill fs-5" />
                   </div>
@@ -755,7 +755,7 @@ export default function Queueup() {
                   </div>
                 </div>
 
-                <div className="d-flex align-items-center gap-3 p-3 rounded-3" style={{ background: "rgba(30, 41, 59, 0.6)", border: "1px solid rgba(255, 255, 255, 0.08)" }}>
+                <div className="d-flex align-items-center gap-3 p-3 rounded-3 bg-slate-800/60 border border-white/10">
                   <div className="qup-contact-icon-circle bg-success-subtle text-success">
                     <i className="bi bi-telephone-fill fs-5" />
                   </div>
@@ -765,7 +765,7 @@ export default function Queueup() {
                   </div>
                 </div>
 
-                <div className="d-flex align-items-center gap-3 p-3 rounded-3" style={{ background: "rgba(30, 41, 59, 0.6)", border: "1px solid rgba(255, 255, 255, 0.08)" }}>
+                <div className="d-flex align-items-center gap-3 p-3 rounded-3 bg-slate-800/60 border border-white/10">
                   <div className="qup-contact-icon-circle bg-info-subtle text-info">
                     <i className="bi bi-envelope-fill fs-5" />
                   </div>
@@ -775,7 +775,7 @@ export default function Queueup() {
                   </div>
                 </div>
 
-                <div className="d-flex align-items-center gap-3 p-3 rounded-3" style={{ background: "rgba(30, 41, 59, 0.6)", border: "1px solid rgba(255, 255, 255, 0.08)" }}>
+                <div className="d-flex align-items-center gap-3 p-3 rounded-3 bg-slate-800/60 border border-white/10">
                   <div className="qup-contact-icon-circle bg-warning-subtle text-warning">
                     <i className="bi bi-chat-dots-fill fs-5" />
                   </div>
@@ -798,7 +798,7 @@ export default function Queueup() {
                 </p>
 
                 {isContactSuccess ? (
-                  <div className="p-4 rounded-3 text-center" style={{ background: "rgba(34, 197, 94, 0.15)", border: "1px solid #22c55e" }}>
+                  <div className="p-4 rounded-3 text-center bg-emerald-500/15 border border-emerald-500">
                     <div className="display-4 text-success mb-2">
                       <i className="bi bi-check-circle-fill" />
                     </div>
@@ -890,9 +890,8 @@ export default function Queueup() {
 
                     <button
                       type="submit"
-                      className="qup-btn-primary w-100 py-3 fs-6"
+                      className="qup-btn-primary w-100 py-3 fs-6 justify-center"
                       disabled={isContactSending}
-                      style={{ justifyContent: "center" }}
                     >
                       {isContactSending ? (
                         <span>กำลังส่งข้อมูล...</span>
@@ -916,7 +915,7 @@ export default function Queueup() {
               <img src="/logo.png" alt="QueueUp Logo" className="qup-logo-img" />
               <span className="qup-logo-text">QueueUp</span>
             </div>
-            <p style={{ color: "#94a3b8", fontSize: "0.92rem", lineHeight: "1.6", maxWidth: "320px" }}>
+            <p className="text-slate-400 text-[0.92rem] leading-relaxed max-w-[320px]">
               ระบบจองคิวและสั่งอาหารอัจฉริยะ นวัตกรรมยกระดับการบริการและประสบการณ์ใช้งานที่รวดเร็ว ปลอดภัย และเสถียรที่สุด
             </p>
           </div>
@@ -943,10 +942,10 @@ export default function Queueup() {
 
           <div className="qup-footer-col">
             <h4>เริ่มต้นใช้งาน</h4>
-            <p style={{ color: "#94a3b8", fontSize: "0.88rem", marginBottom: "1rem" }}>
+            <p className="text-slate-400 text-[0.88rem] mb-4">
               ทดลองใช้งานระบบ QueueUp Platform ได้ทันทีฟรี
             </p>
-            <button className="qup-btn-primary" style={{ width: "100%", justifyContent: "center" }} onClick={handleStartApp}>
+            <button className="qup-btn-primary w-full justify-center" onClick={handleStartApp}>
               🚀 เข้าสู่ระบบสั่งอาหาร
             </button>
           </div>
@@ -960,9 +959,9 @@ export default function Queueup() {
 
       {/* ==================== 8. INTERACTIVE EVALUATION MODAL FORM ==================== */}
       {isEvalModalOpen && (
-        <div className="modal fade show d-block" style={{ backgroundColor: "rgba(15, 23, 42, 0.8)", backdropFilter: "blur(8px)", zIndex: 10000 }} tabIndex="-1">
+        <div className="modal fade show d-block bg-slate-900/80 backdrop-blur-md z-[10000]" tabIndex="-1">
           <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content text-white" style={{ background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)", border: "1px solid rgba(238, 77, 45, 0.4)", borderRadius: "20px", boxShadow: "0 25px 50px rgba(0,0,0,0.5)" }}>
+            <div className="modal-content text-white bg-gradient-to-br from-slate-800 to-slate-900 border border-[#ee4d2d]/40 rounded-[20px] shadow-2xl">
               <div className="modal-header border-bottom border-secondary">
                 <h5 className="modal-title fw-bold">
                   <i className="bi bi-star-fill text-warning me-2" />
@@ -1083,9 +1082,9 @@ export default function Queueup() {
       )}
       {/* ==================== 9. COOKIE SETTINGS MODAL ==================== */}
       {isCookieModalOpen && (
-        <div className="modal fade show d-block" style={{ backgroundColor: "rgba(15, 23, 42, 0.8)", backdropFilter: "blur(8px)", zIndex: 10001 }} tabIndex="-1">
+        <div className="modal fade show d-block bg-slate-900/80 backdrop-blur-md z-[10001]" tabIndex="-1">
           <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content text-white" style={{ background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)", border: "1px solid rgba(238, 77, 45, 0.4)", borderRadius: "20px" }}>
+            <div className="modal-content text-white bg-gradient-to-br from-slate-800 to-slate-900 border border-[#ee4d2d]/40 rounded-[20px]">
               <div className="modal-header border-bottom border-secondary">
                 <h5 className="modal-title fw-bold">
                   <i className="bi bi-gear-fill text-warning me-2" />

@@ -438,10 +438,7 @@ function MerchantDashboard() {
                 className="btn btn-light d-flex align-items-center gap-2 font-weight-bold rounded-pill px-3 shadow-sm border-0"
                 onClick={() => setIsUserDropdownOpen((prev) => !prev)}
               >
-                <div
-                  className="rounded-circle bg-secondary-subtle d-flex align-items-center justify-content-center"
-                  style={{ width: "32px", height: "32px" }}
-                >
+                <div className="rounded-circle bg-secondary-subtle d-flex align-items-center justify-content-center w-8 h-8">
                   <i className="bi bi-person-fill text-secondary fs-5" />
                 </div>
                 <span className="text-dark small">{cleanOwnerName(user?.name, user?.email)}</span>
@@ -449,14 +446,8 @@ function MerchantDashboard() {
               </button>
 
               {isUserDropdownOpen && (
-                <div
-                  className="position-absolute end-0 mt-2 bg-white rounded-3 shadow-lg p-3 text-dark text-center border"
-                  style={{ width: "230px", zIndex: 9999 }}
-                >
-                  <div
-                    className="rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto mb-2 border"
-                    style={{ width: "68px", height: "68px" }}
-                  >
+                <div className="position-absolute end-0 mt-2 bg-white rounded-3 shadow-lg p-3 text-dark text-center border w-[230px] z-[9999]">
+                  <div className="rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto mb-2 border w-[68px] h-[68px]">
                     <i className="bi bi-person-fill text-secondary display-6" />
                   </div>
                   <div className="fw-bold text-dark fs-6 mb-2">{cleanOwnerName(user?.name, user?.email)}</div>
@@ -920,16 +911,7 @@ function MerchantDashboard() {
 
       {/* Seller Assistant Floating Widget Trigger */}
       <button
-        className="btn btn-danger rounded-circle shadow-lg position-fixed d-flex align-items-center justify-content-center"
-        style={{
-          bottom: "30px",
-          right: "30px",
-          width: "62px",
-          height: "62px",
-          zIndex: 9990,
-          background: "linear-gradient(135deg, #ee4d2d 0%, #ff7337 100%)",
-          border: "none",
-        }}
+        className="btn rounded-full shadow-2xl fixed flex items-center justify-center bottom-[30px] right-[30px] w-[62px] h-[62px] z-[9990] bg-gradient-to-br from-[#ee4d2d] to-[#ff7337] border-0 hover:scale-105 transition-transform"
         onClick={() => setIsSellerAssistantOpen(true)}
         title="เปิด Seller Assistant ผู้ช่วยร้านค้า"
       >

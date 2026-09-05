@@ -449,7 +449,7 @@ function Login() {
                   ))}
 
                   <label htmlFor="avatar-file-input" className="avatar-upload-btn">
-                    <i className="bi bi-camera-fill mb-1" style={{ fontSize: "1.1rem" }} />
+                    <i className="bi bi-camera-fill mb-1 text-[1.1rem]" />
                     <span>{uploadedAvatar ? "Change" : "Upload"}</span>
                   </label>
                   <input
@@ -488,7 +488,7 @@ function Login() {
                   </div>
                 </div>
 
-                <div className="alert alert-info py-2 px-3 my-3" style={{ borderRadius: "10px", fontSize: "0.82rem" }}>
+                <div className="alert alert-info py-2 px-3 my-3 rounded-[10px] text-[0.82rem]">
                   <i className="bi bi-shield-lock-fill text-primary me-1" /> <b>การคุ้มครองข้อมูลส่วนบุคคล (PDPA):</b> บัญชีผู้ใช้ธรรมดาไม่จำเป็นต้องกรอกพิกัด GPS หรือข้อมูลการเงิน เพื่อความปลอดภัยของผู้เยาว์ (สามารถสมัครเปิดร้านค้าเพื่อบันทึกภายหลังได้)
                 </div>
 
@@ -617,8 +617,7 @@ function Login() {
                         ฉันได้อ่าน{" "}
                         <button
                           type="button"
-                          className="btn btn-link p-0 m-0 align-baseline fw-bold text-decoration-underline text-warning"
-                          style={{ fontSize: "0.82rem" }}
+                          className="btn btn-link p-0 m-0 align-baseline fw-bold text-decoration-underline text-warning text-[0.82rem]"
                           onClick={(e) => {
                             e.preventDefault();
                             setPdpaModalTab("terms");
@@ -630,8 +629,7 @@ function Login() {
                         และ{" "}
                         <button
                           type="button"
-                          className="btn btn-link p-0 m-0 align-baseline fw-bold text-decoration-underline text-warning"
-                          style={{ fontSize: "0.82rem" }}
+                          className="btn btn-link p-0 m-0 align-baseline fw-bold text-decoration-underline text-warning text-[0.82rem]"
                           onClick={(e) => {
                             e.preventDefault();
                             setPdpaModalTab("privacy");

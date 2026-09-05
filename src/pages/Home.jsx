@@ -253,7 +253,7 @@ function Home() {
               {currentUpdate.badge}
             </span>
             <span
-              className="queue-notice-text"
+              className="queue-flash-content cursor-pointer"
               onClick={() => {
                 if (currentUpdate.actionType === "claim_coupon") {
                   handleClaimWelcomeCoupon();
@@ -261,7 +261,6 @@ function Home() {
                   navigate(currentUpdate.targetPath);
                 }
               }}
-              style={{ cursor: "pointer" }}
               title="คลิกดูรายละเอียดอัปเดตนี้"
             >
               {currentUpdate.title}
@@ -323,8 +322,7 @@ function Home() {
       )}
 
       <div
-        className="queue-home-wrapper"
-        style={{ marginTop: (showNotice || showWelcomeBanner) ? "0px" : "24px" }}
+        className={`queue-home-wrapper ${(showNotice || showWelcomeBanner) ? "mt-0" : "mt-6"}`}
       >
         {/* 3. Hero Banner Section */}
         <section className="queue-hero-banner">
@@ -734,10 +732,7 @@ function Home() {
               className="queue-ai-shop-card"
               onClick={() => navigate("/search?keyword=ก๋วยเตี๋ยว")}
             >
-              <span
-                className="queue-ai-badge-rank"
-                style={{ background: "#059669" }}
-              >
+              <span className="queue-ai-badge-rank bg-emerald-600">
                 <i className="bi bi-lightning-fill text-warning me-1" /> เสิร์ฟไวอันดับ 1
               </span>
               <div className="queue-ai-shop-name">ร้านก๋วยเตี๋ยวเรือเสือร้องไห้</div>
@@ -751,10 +746,7 @@ function Home() {
               className="queue-ai-shop-card"
               onClick={() => navigate("/search?keyword=สเต็ก")}
             >
-              <span
-                className="queue-ai-badge-rank"
-                style={{ background: "#7c3aed" }}
-              >
+              <span className="queue-ai-badge-rank bg-purple-600">
                 <i className="bi bi-award-fill text-warning me-1" /> ยอดนิยมสูงสุด
               </span>
               <div className="queue-ai-shop-name">ร้านสเต็กพี่ตั้ม School Food</div>
