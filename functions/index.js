@@ -162,15 +162,12 @@ export const createOrderAuthoritative = onCall(
         }
         const shopData = shopSnap.data();
 
-        // Optional Campus Wallet & Student documents
+        // Optional Campus Wallet document
         let walletSnap = null;
         let walletRef = null;
-        let studentSnap = null;
         if (isCampusWallet && effectiveStudentId) {
           walletRef = db.collection("wallets").doc(effectiveStudentId);
           walletSnap = await tx.get(walletRef);
-          const studentRef = db.collection("students").doc(effectiveStudentId);
-          studentSnap = await tx.get(studentRef);
         }
 
         // Read all product documents
@@ -724,10 +721,9 @@ export const topupCampusWallet = onCall(
     return await db.runTransaction(async (tx) => {
       const walletSnap = await tx.get(walletRef);
       let currentBal = 0;
-      let walletData = {};
 
       if (walletSnap.exists) {
-        walletData = walletSnap.data();
+        const walletData = walletSnap.data();
         currentBal = Number(walletData.balanceSatang) || 0;
       }
 

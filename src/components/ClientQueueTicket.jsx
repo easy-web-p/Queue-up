@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config.js';
@@ -36,7 +36,7 @@ export const ClientQueueTicket = ({
   compact = false
 } = {}) => {
   const navigate = useNavigate();
-  const [liveOrder, setLiveOrder] = useState(initialOrder || null);
+  const [liveOrderOverride, setLiveOrderOverride] = useState(null);
   const [showQrModal, setShowQrModal] = useState(false);
   const [showItemsDetail, setShowItemsDetail] = useState(false);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
@@ -46,19 +46,13 @@ export const ClientQueueTicket = ({
 
   // 1. Real-time Firestore Synchronization
   useEffect(() => {
-    if (initialOrder) {
-      setLiveOrder(initialOrder);
-    }
-  }, [initialOrder]);
-
-  useEffect(() => {
     if (!resolvedOrderId || typeof resolvedOrderId !== 'string') return;
 
     const unsub = onSnapshot(
       doc(db, 'orders', resolvedOrderId),
       (snap) => {
         if (snap.exists()) {
-          setLiveOrder({ id: snap.id, ...snap.data() });
+          setLiveOrderOverride({ id: snap.id, ...snap.data() });
         }
       },
       (err) => {
@@ -70,7 +64,7 @@ export const ClientQueueTicket = ({
   }, [resolvedOrderId]);
 
   // 2. Determine Current Phase Index (1 to 5, or -1 for cancelled)
-  const order = liveOrder;
+  const order = liveOrderOverride || initialOrder;
   const statusUpper = (order?.status || '').toUpperCase();
   const queueStatusLower = (order?.queueStatus || '').toLowerCase();
 
@@ -141,7 +135,7 @@ export const ClientQueueTicket = ({
   const items = order.items || [];
 
   return (
-    <div className="bg-gradient-to-br from-[#1A1412] via-[#221B17] to-[#16110F] text-white rounded-3xl p-5 sm:p-6 shadow-2xl border border-amber-500/30 relative overflow-hidden font-['IBM_Plex_Sans_Thai'] space-y-5">
+    <div className={`bg-gradient-to-br from-[#1A1412] via-[#221B17] to-[#16110F] text-white rounded-3xl shadow-2xl border border-amber-500/30 relative overflow-hidden font-['IBM_Plex_Sans_Thai'] ${compact ? 'p-4 space-y-3' : 'p-5 sm:p-6 space-y-5'}`}>
       {/* Decorative Glow */}
       <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
       {isReady && (

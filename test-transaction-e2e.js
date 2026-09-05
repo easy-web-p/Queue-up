@@ -1,4 +1,3 @@
-/* global process */
 /**
  * ============================================================================
  * QueueUp Zero-Payment & Instant Queue Architecture Comprehensive Test Matrix

@@ -6,11 +6,13 @@ import { soundManager } from '../utils/audioNotification.js';
 interface Props {
   orders: Order[];
   onUpdateOrderStatus: (orderId: string, newStatus: QueueStatus) => void;
+  onOpenChat?: (order: Order) => void;
 }
 
 export const MerchantKDS: React.FC<Props> = ({
   orders,
   onUpdateOrderStatus,
+  onOpenChat,
 }) => {
   const [mobileTab, setMobileTab] = React.useState<'pending' | 'confirmed' | 'cooking' | 'ready'>('pending');
   const [audioEnabled, setAudioEnabled] = React.useState(soundManager.isUnlocked());
@@ -93,15 +95,27 @@ export const MerchantKDS: React.FC<Props> = ({
           <div className="text-xs font-black text-slate-900">
             รวม: ฿{(Number(order.totalAmount) || 0).toFixed(2)}
           </div>
-          {order.customerPhone && (
-            <a
-              href={`tel:${order.customerPhone}`}
-              className="text-slate-500 hover:text-slate-800 p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors"
-              title="โทรติดต่อลูกค้า"
-            >
-              <Phone className="w-3.5 h-3.5" />
-            </a>
-          )}
+          <div className="flex items-center gap-1.5">
+            {onOpenChat && (
+              <button
+                type="button"
+                onClick={() => onOpenChat(order)}
+                className="text-amber-600 hover:text-amber-800 p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-xl bg-amber-50 hover:bg-amber-100 transition-colors cursor-pointer"
+                title="แชตคุยกับลูกค้า"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+              </button>
+            )}
+            {order.customerPhone && (
+              <a
+                href={`tel:${order.customerPhone}`}
+                className="text-slate-500 hover:text-slate-800 p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors"
+                title="โทรติดต่อลูกค้า"
+              >
+                <Phone className="w-3.5 h-3.5" />
+              </a>
+            )}
+          </div>
         </div>
 
         <button

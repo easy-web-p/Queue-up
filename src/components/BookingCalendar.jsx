@@ -40,17 +40,6 @@ const MOCK_USER_BOOKINGS = [
   },
 ];
 
-const MOCK_HOURLY_PREP = [
-  { time: "11:00 - 11:15 น.", count: 5, capacity: 20, status: "low" },
-  { time: "11:15 - 11:30 น.", count: 12, capacity: 20, status: "medium" },
-  { time: "11:30 - 11:45 น.", count: 18, capacity: 20, status: "high" },
-  { time: "11:45 - 12:00 น.", count: 20, capacity: 20, status: "full" },
-  { time: "12:00 - 12:15 น.", count: 20, capacity: 20, status: "full" },
-  { time: "12:15 - 12:30 น.", count: 16, capacity: 20, status: "high" },
-  { time: "12:30 - 12:45 น.", count: 9, capacity: 20, status: "medium" },
-  { time: "12:45 - 13:00 น.", count: 4, capacity: 20, status: "low" },
-];
-
 export default function BookingCalendar({ viewMode = "user", storeId = "", orders = [] }) {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [activeTab, setActiveTab] = useState(viewMode);
@@ -68,9 +57,13 @@ export default function BookingCalendar({ viewMode = "user", storeId = "", order
       "12:45 - 13:00 น.",
     ];
 
+    const relevantOrders = storeId
+      ? orders.filter((o) => !o.storeId || o.storeId === storeId)
+      : orders;
+
     // For specific store (new store or real orders), count orders per time slot
     return timeSlots.map((slot) => {
-      const count = orders.filter((o) => o.time === slot || o.timeSlot === slot).length;
+      const count = relevantOrders.filter((o) => o.time === slot || o.timeSlot === slot).length;
       const capacity = 20;
       let status = "low";
       if (count >= capacity) status = "full";

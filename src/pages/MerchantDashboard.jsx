@@ -107,6 +107,9 @@ function MerchantDashboard() {
   const [canteenLocation, setCanteenLocation] = useState(initialStore.location);
   const [storeHours, setStoreHours] = useState("07:00 - 15:00 น.");
   const [isSavedProfile, setIsSavedProfile] = useState(false);
+  const [privateBankName, setPrivateBankName] = useState("");
+  const [privateAccountNo, setPrivateAccountNo] = useState("");
+  const [privateAccountOwner, setPrivateAccountOwner] = useState("");
 
   const [staffList, setStaffList] = useState([
     { uid: "STF01", name: "นางสาวมยุรี ใจดี", role: "พนักงานรับออเดอร์/แคชเชียร์", phone: "082-111-2233" },
@@ -119,6 +122,12 @@ function MerchantDashboard() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatCustomerName, setChatCustomerName] = useState("");
   const [chatOrderContext, setChatOrderContext] = useState(null);
+
+  const handleOpenChatWithCustomer = (order) => {
+    setChatCustomerName(order?.customerName || "ลูกค้า");
+    setChatOrderContext(order);
+    setIsChatOpen(true);
+  };
 
   const [isSellerAssistantOpen, setIsSellerAssistantOpen] = useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
@@ -332,6 +341,20 @@ function MerchantDashboard() {
       // 3. shops/{storeId}
       await setDoc(doc(db, "shops", targetStoreId), publicStoreData, { merge: true });
 
+      // 4. Save private finance data under merchantProfiles/{merchantId}/private/finance
+      if (privateBankName || privateAccountNo || privateAccountOwner) {
+        await setDoc(
+          doc(db, "merchantProfiles", merchantId, "private", "finance"),
+          {
+            bankName: privateBankName,
+            accountNumber: privateAccountNo,
+            accountOwner: privateAccountOwner,
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+      }
+
       // 4. Audit Log
       await recordAuditLog(db, {
         action: "UPDATE_STORE_PROFILE",
@@ -504,10 +527,35 @@ function MerchantDashboard() {
 
         {/* TAB 1: LIVE ORDER QUEUE BOARD (KDS) */}
         {activeTab === "queue" && (
-          <div className="merchant-panel-box">
+          <div className="merchant-panel-box space-y-4">
+            <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 pb-2 border-bottom">
+              <div className="d-flex align-items-center gap-2 flex-wrap">
+                <span className="small text-muted fw-bold">กรองสถานะ:</span>
+                {[
+                  { id: "ALL", label: "ทั้งหมด" },
+                  { id: "PENDING", label: "รอยืนยัน" },
+                  { id: "CONFIRMED", label: "ยืนยันแล้ว" },
+                  { id: "PREPARING", label: "กำลังปรุง" },
+                  { id: "READY", label: "พร้อมรับ" },
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    className={`btn btn-sm ${queueFilter === f.id ? "btn-dark text-white fw-bold" : "btn-outline-secondary"}`}
+                    onClick={() => setQueueFilter(f.id)}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+              <span className="small text-muted font-monospace">
+                แสดง {filteredQueueOrders.length} จาก {merchantOrders.length} ออเดอร์
+              </span>
+            </div>
             <MerchantKDS
-              orders={merchantOrders}
+              orders={filteredQueueOrders}
               onUpdateOrderStatus={handleUpdateOrderStatus}
+              onOpenChat={handleOpenChatWithCustomer}
             />
           </div>
         )}
@@ -612,6 +660,41 @@ function MerchantDashboard() {
                       className="form-control"
                       value={storeHours}
                       onChange={(e) => setStoreHours(e.target.value)}
+                    />
+                  </div>
+
+                  <hr className="my-3" />
+                  <h6 className="fw-bold mb-2 text-primary">
+                    <i className="bi bi-shield-lock-fill me-1" /> ข้อมูลบัญชีรับเงิน (Private Finance)
+                  </h6>
+                  <div className="mb-3">
+                    <label className="form-label font-weight-bold">ชื่อธนาคาร / บริการ:</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={privateBankName}
+                      onChange={(e) => setPrivateBankName(e.target.value)}
+                      placeholder="เช่น ธนาคารกสิกรไทย / พร้อมเพย์"
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label font-weight-bold">เลขที่บัญชี / หมายเลขพร้อมเพย์:</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={privateAccountNo}
+                      onChange={(e) => setPrivateAccountNo(e.target.value)}
+                      placeholder="xxx-x-xxxxx-x"
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label font-weight-bold">ชื่อเจ้าของบัญชี:</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={privateAccountOwner}
+                      onChange={(e) => setPrivateAccountOwner(e.target.value)}
+                      placeholder="ชื่อ-นามสกุล เจ้าของบัญชี"
                     />
                   </div>
 

@@ -505,15 +505,16 @@ function ProductDetail() {
   }, [activeModifierGroups, selectedModifiersMap]);
 
   // 🛡️ Intelligent Allergen Cross-Check (Menu + Category + Desc + Chosen Modifiers)
+  const productDescription = product?.description || "";
   const allergenResult = useMemo(() => {
     return detectMatchedAllergens({
       studentAllergies,
       productTitle,
       productCategory,
-      productDescription: product?.description || "",
+      productDescription,
       selectedModifierNames,
     });
-  }, [studentAllergies, productTitle, productCategory, product?.description, selectedModifierNames]);
+  }, [studentAllergies, productTitle, productCategory, productDescription, selectedModifierNames]);
 
   const matchedAllergens = allergenResult.matchedAllergenNames;
 
