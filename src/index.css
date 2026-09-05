@@ -1,3 +1,13 @@
+@import "tailwindcss";
+
+@theme {
+  --font-kanit: 'Kanit', sans-serif;
+  --font-plex: 'IBM Plex Sans Thai', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --color-brand: #FF7A1A;
+  --color-brand-hover: #E6680D;
+}
+
 html {
   height: 100%;
   background-color: #0f172a;
