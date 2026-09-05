@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { emergencyMedicalLookup } from '../services/campusWalletService';
-import { AlertOctagon, Search, ShieldAlert, ArrowLeft, HeartPulse, User, Phone, FileText } from 'lucide-react';
+import { collection, query, where, getDocs, limit, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../firebase/config.js';
+import { AlertOctagon, Search, ShieldAlert, ArrowLeft, HeartPulse, User, Phone, FileText, Utensils, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { StudentProfile } from '../types/campus';
 
@@ -10,7 +12,9 @@ export default function EmergencyLookup() {
   const [studentCodeInput, setStudentCodeInput] = useState('');
   const [lookupReason, setLookupReason] = useState('อุบัติเหตุ / การปฐมพยาบาลฉุกเฉินในโรงอาหาร');
   const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(null);
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isLoadingOrders, setIsLoadingOrders] = useState(false);
   const [notFound, setNotFound] = useState(false);
 
   const handleLookup = async (e: React.FormEvent) => {
@@ -19,15 +23,53 @@ export default function EmergencyLookup() {
     setIsSearching(true);
     setNotFound(false);
     setStudentProfile(null);
+    setRecentOrders([]);
 
     try {
+      // 1. Direct Audit Log write to /emergency_audit_logs (Append-Only)
+      try {
+        await addDoc(collection(db, 'emergency_audit_logs'), {
+          studentCode: studentCodeInput.trim(),
+          lookupReason: lookupReason.trim(),
+          actorUid: user?.uid || 'supervisor',
+          actorEmail: user?.email || 'N/A',
+          timestamp: serverTimestamp(),
+        });
+      } catch (auditErr) {
+        console.warn('Direct audit log note:', auditErr);
+      }
+
+      // 2. Fetch authoritative student profile
       const profile = await emergencyMedicalLookup(
         studentCodeInput.trim(),
         undefined,
         lookupReason
       );
+
       if (profile) {
         setStudentProfile(profile);
+
+        // 3. Query 24-48h Food Intake / Meal History
+        try {
+          setIsLoadingOrders(true);
+          const qOrders = query(
+            collection(db, 'orders'),
+            where('studentId', '==', studentCodeInput.trim()),
+            limit(15)
+          );
+          const snap = await getDocs(qOrders);
+          const ords = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          ords.sort((a: any, b: any) => {
+            const tA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+            const tB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+            return tB - tA;
+          });
+          setRecentOrders(ords);
+        } catch (ordErr) {
+          console.warn('[EmergencyLookup] Orders fetch warning:', ordErr);
+        } finally {
+          setIsLoadingOrders(false);
+        }
       } else {
         setNotFound(true);
       }
@@ -156,6 +198,67 @@ export default function EmergencyLookup() {
               <p className="text-xs text-[#9CA3AF]">
                 Guardian IDs: {studentProfile.guardianIds?.join(', ') || 'N/A'}
               </p>
+            </div>
+
+            {/* 24-48 Hour Meal History (Acute Anaphylaxis & Food Poisoning Investigation) */}
+            <div className="bg-[#1C1510] border border-amber-500/30 rounded-2xl p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-amber-400 flex items-center gap-2">
+                  <Utensils className="w-4 h-4" /> ประวัติอาหารที่รับประทานในโรงเรียน (24–48 ชม. ล่าสุด):
+                </h3>
+                <span className="text-xs text-[#9CA3AF] flex items-center gap-1 font-['JetBrains_Mono']">
+                  <Clock className="w-3.5 h-3.5" /> {recentOrders.length} ออเดอร์
+                </span>
+              </div>
+
+              {isLoadingOrders ? (
+                <p className="text-xs text-[#9CA3AF] py-2">กำลังดึงประวัติมื้ออาหาร...</p>
+              ) : recentOrders.length === 0 ? (
+                <p className="text-xs text-[#9CA3AF] italic py-2">
+                  ไม่พบประวัติการสั่งซื้ออาหารในระบบในช่วง 48 ชั่วโมงที่ผ่านมา
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {recentOrders.map((ord) => (
+                    <div
+                      key={ord.id}
+                      className="p-3 bg-[#16100C] border border-white/10 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-['JetBrains_Mono'] font-bold text-[#FF7A1A]">
+                            {ord.queueNumber || 'Q---'}
+                          </span>
+                          <span className="font-semibold text-white">
+                            {ord.storeName || `ร้านค้า (${ord.storeId})`}
+                          </span>
+                          <span className="text-[#9CA3AF]">
+                            รอบ {ord.pickupTime} น. ({ord.pickupDate || 'วันนี้'})
+                          </span>
+                        </div>
+                        {/* Dishes & Modifiers */}
+                        <div className="text-[#E5E7EB] mt-1 space-x-2">
+                          {ord.items?.map((item: any, idx: number) => (
+                            <span key={idx} className="inline-block bg-[#241C16] px-2 py-0.5 rounded border border-white/10 text-[11px]">
+                              {item.quantity}x {item.name}
+                              {item.customNotes ? ` [${item.customNotes}]` : ''}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <span className="font-['JetBrains_Mono'] font-bold text-amber-400">
+                          ฿{Number(ord.totalAmount || 0).toFixed(2)}
+                        </span>
+                        <span className="block text-[10px] text-[#9CA3AF]">
+                          {ord.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

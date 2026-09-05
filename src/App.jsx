@@ -23,6 +23,9 @@ import StudentVendorOnboarding from "./pages/StudentVendorOnboarding.tsx";
 import StudentVendorEarnings from "./pages/StudentVendorEarnings.tsx";
 import VendorApprovalPanel from "./pages/VendorApprovalPanel.tsx";
 import GuardianDashboard from "./pages/GuardianDashboard.tsx";
+import SpendingLimitSetting from "./pages/SpendingLimitSetting.tsx";
+import AllergyAlertSetting from "./pages/AllergyAlertSetting.tsx";
+import ChildOrderHistory from "./pages/ChildOrderHistory.tsx";
 import EmergencyLookup from "./pages/EmergencyLookup.tsx";
 import CampusQueueMonitor from "./pages/CampusQueueMonitor.tsx";
 
@@ -108,6 +111,12 @@ function App() {
             <Route path="/student-vendor/earnings" element={<ProtectedRoute allowedRoles={["student_vendor", "merchant", "admin"]}><StudentVendorEarnings /></ProtectedRoute>} />
             <Route path="/guardian" element={<ProtectedRoute><GuardianDashboard /></ProtectedRoute>} />
             <Route path="/guardian/dashboard" element={<ProtectedRoute><GuardianDashboard /></ProtectedRoute>} />
+            <Route path="/guardian/spending-limits" element={<ProtectedRoute><SpendingLimitSetting /></ProtectedRoute>} />
+            <Route path="/guardian/limits" element={<ProtectedRoute><SpendingLimitSetting /></ProtectedRoute>} />
+            <Route path="/guardian/allergy-alert" element={<ProtectedRoute><AllergyAlertSetting /></ProtectedRoute>} />
+            <Route path="/guardian/allergies" element={<ProtectedRoute><AllergyAlertSetting /></ProtectedRoute>} />
+            <Route path="/guardian/order-history" element={<ProtectedRoute><ChildOrderHistory /></ProtectedRoute>} />
+            <Route path="/guardian/history" element={<ProtectedRoute><ChildOrderHistory /></ProtectedRoute>} />
             <Route path="/campus/queue-monitor" element={<CampusQueueMonitor />} />
             <Route path="/admin/vendor-approvals" element={<ProtectedRoute allowedRoles={["staff_supervisor", "admin"]}><VendorApprovalPanel /></ProtectedRoute>} />
             <Route path="/emergency" element={<ProtectedRoute allowedRoles={["staff_supervisor", "admin"]}><EmergencyLookup /></ProtectedRoute>} />

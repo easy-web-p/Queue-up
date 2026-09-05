@@ -24,6 +24,7 @@ import {
   HeartPulse,
   Save,
   Check,
+  Sliders,
 } from 'lucide-react';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase/config.js';
@@ -359,6 +360,69 @@ export default function GuardianDashboard() {
                     <CreditCard className="w-4 h-4" /> เติมเงินให้บุตรหลาน
                   </button>
                 </div>
+              </div>
+
+              {/* Single Responsibility Core Navigation Hub */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Link
+                  to="/guardian/limits"
+                  className="bg-[#1C1510] border border-white/10 hover:border-[#FF7A1A]/50 p-5 rounded-2xl transition-all group shadow-lg flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="w-10 h-10 rounded-xl bg-[#FF7A1A]/10 text-[#FF7A1A] flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                      <Sliders className="w-5 h-5" />
+                    </div>
+                    <h4 className="text-base font-bold font-['Kanit'] text-white group-hover:text-[#FF7A1A] transition-colors">
+                      ตั้งค่าวงเงิน & บล็อกหมวด
+                    </h4>
+                    <p className="text-xs text-[#9CA3AF] mt-1 line-clamp-2">
+                      กำหนดวงเงินรายวัน/สัปดาห์ และบล็อกอาหารต้องห้าม
+                    </p>
+                  </div>
+                  <span className="text-xs font-bold text-[#FF7A1A] mt-4 flex items-center gap-1">
+                    จัดการวงเงิน →
+                  </span>
+                </Link>
+
+                <Link
+                  to="/guardian/allergies"
+                  className="bg-[#1C1510] border border-white/10 hover:border-red-500/50 p-5 rounded-2xl transition-all group shadow-lg flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="w-10 h-10 rounded-xl bg-red-500/10 text-red-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                      <HeartPulse className="w-5 h-5" />
+                    </div>
+                    <h4 className="text-base font-bold font-['Kanit'] text-white group-hover:text-red-400 transition-colors">
+                      ข้อมูลแพ้อาหาร & สุขภาพ
+                    </h4>
+                    <p className="text-xs text-[#9CA3AF] mt-1 line-clamp-2">
+                      บันทึกรายการสารก่อภูมิแพ้และคำแนะนำสำหรับห้องพยาบาล
+                    </p>
+                  </div>
+                  <span className="text-xs font-bold text-red-400 mt-4 flex items-center gap-1">
+                    จัดการข้อมูลแพ้ →
+                  </span>
+                </Link>
+
+                <Link
+                  to="/guardian/history"
+                  className="bg-[#1C1510] border border-white/10 hover:border-amber-400/50 p-5 rounded-2xl transition-all group shadow-lg flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                      <History className="w-5 h-5" />
+                    </div>
+                    <h4 className="text-base font-bold font-['Kanit'] text-white group-hover:text-amber-400 transition-colors">
+                      ประวัติการกินย้อนหลัง
+                    </h4>
+                    <p className="text-xs text-[#9CA3AF] mt-1 line-clamp-2">
+                      แสดงรายการอาหารที่บุตรหลานสั่งจริงแบบเรียลไทม์
+                    </p>
+                  </div>
+                  <span className="text-xs font-bold text-amber-400 mt-4 flex items-center gap-1">
+                    ดูประวัติทั้งหมด →
+                  </span>
+                </Link>
               </div>
 
               {/* Spending Rules & Restrictions Form */}
