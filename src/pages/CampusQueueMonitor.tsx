@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import React, { useState, useEffect, useRef } from 'react';
+import { collection, query, where, onSnapshot, limit } from 'firebase/firestore';
 import { db } from '../firebase/config.js';
-import { Tv, Clock, CheckCircle2, Flame, ArrowLeft, Volume2 } from 'lucide-react';
+import { Tv, CheckCircle2, Flame, ArrowLeft, Volume2, VolumeX } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getBangkokYmd } from '../services/orderCreationService';
+import { soundManager } from '../utils/audioNotification.js';
 
 interface MonitorOrder {
   id: string;
@@ -19,17 +20,29 @@ interface MonitorOrder {
 
 export default function CampusQueueMonitor() {
   const [orders, setOrders] = useState<MonitorOrder[]>([]);
-  const [activeZone, setActiveZone] = useState('ALL');
+  const [audioEnabled, setAudioEnabled] = useState(soundManager.isUnlocked());
+  const prevReadyIdsRef = useRef<Set<string>>(new Set());
   const todayYmd = getBangkokYmd().ymd;
+
+  const handleToggleAudio = async () => {
+    if (!audioEnabled) {
+      await soundManager.unlockAudio();
+      soundManager.playOrderReadyChime();
+      setAudioEnabled(true);
+    } else {
+      setAudioEnabled(false);
+    }
+  };
 
   useEffect(() => {
     // 🛡️ Spark Plan Budget Guard: Strictly scope to today's active canteen orders
     // to prevent fetching past days and prevent exceeding daily 50,000 read limit.
+    const activeStatuses = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'READY_FOR_PICKUP'];
     const q = query(
       collection(db, 'orders'),
       where('pickupDate', '==', todayYmd),
-      where('status', 'in', ['CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP']),
-      limit(50)
+      where('status', 'in', activeStatuses),
+      limit(60)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -43,8 +56,8 @@ export default function CampusQueueMonitor() {
       // Fallback: If compound index is pending, listen with status filter only
       const fallbackQuery = query(
         collection(db, 'orders'),
-        where('status', 'in', ['CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP']),
-        limit(30)
+        where('status', 'in', activeStatuses),
+        limit(40)
       );
       return onSnapshot(fallbackQuery, (fallbackSnap) => {
         const fallbackItems = fallbackSnap.docs
@@ -57,8 +70,31 @@ export default function CampusQueueMonitor() {
     return () => unsubscribe();
   }, [todayYmd]);
 
-  const preparingOrders = orders.filter((o) => o.status === 'PREPARING' || o.queueStatus === 'cooking' || o.status === 'PENDING' || o.status === 'CONFIRMED');
-  const readyOrders = orders.filter((o) => o.status === 'READY_FOR_PICKUP' || o.queueStatus === 'ready');
+  const preparingOrders = orders.filter((o) =>
+    o.status === 'PREPARING' || o.queueStatus === 'cooking' ||
+    o.status === 'PENDING' || o.status === 'CONFIRMED' || o.queueStatus === 'waiting'
+  );
+
+  const readyOrders = orders.filter((o) =>
+    o.status === 'READY' || o.status === 'READY_FOR_PICKUP' || o.queueStatus === 'ready'
+  );
+
+  // 🔔 Automatic Web Audio Chime on New Ready Order
+  useEffect(() => {
+    if (!audioEnabled) return;
+    const currentReadyIds = new Set(readyOrders.map((o) => o.id));
+    let hasNewReady = false;
+    for (const id of currentReadyIds) {
+      if (!prevReadyIdsRef.current.has(id)) {
+        hasNewReady = true;
+        break;
+      }
+    }
+    if (hasNewReady && prevReadyIdsRef.current.size > 0) {
+      soundManager.playOrderReadyChime();
+    }
+    prevReadyIdsRef.current = currentReadyIds;
+  }, [readyOrders, audioEnabled]);
 
   return (
     <div className="min-h-screen bg-[#100B08] text-white font-['IBM_Plex_Sans_Thai']">
@@ -78,6 +114,19 @@ export default function CampusQueueMonitor() {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleToggleAudio}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-bold border transition-colors flex items-center gap-1.5 cursor-pointer ${
+              audioEnabled
+                ? 'bg-amber-500 text-stone-950 border-amber-400 font-black shadow-lg shadow-amber-500/20'
+                : 'bg-stone-800 text-stone-300 border-stone-700 hover:text-white'
+            }`}
+          >
+            {audioEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            <span>{audioEnabled ? 'เปิดเสียงเตือนคิวแล้ว' : 'แตะเพื่อเปิดเสียง'}</span>
+          </button>
+
           <span className="px-3 py-1.5 bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 rounded-full text-xs font-bold flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
             LIVE SYNC

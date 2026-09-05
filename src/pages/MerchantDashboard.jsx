@@ -258,13 +258,13 @@ function MerchantDashboard() {
     }
   }, [currentStoreId]);
 
-  const handleUpdateOrderStatus = async (orderId, newStatus, newText) => {
+  const handleUpdateOrderStatus = async (orderId, newStatus) => {
     let status = 'PENDING';
     let queueStatus = 'waiting';
 
     if (newStatus === 'confirmed' || newStatus === 'CONFIRMED') {
       status = 'CONFIRMED';
-      queueStatus = 'confirmed';
+      queueStatus = 'waiting';
     } else if (newStatus === 'cooking' || newStatus === 'PREPARING') {
       status = 'PREPARING';
       queueStatus = 'cooking';
@@ -283,7 +283,6 @@ function MerchantDashboard() {
       await updateDoc(doc(db, "orders", orderId), {
         status,
         queueStatus,
-        statusText: newText || status,
         updatedAt: serverTimestamp(),
       });
     } catch (err) {
