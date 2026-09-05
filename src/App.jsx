@@ -19,8 +19,8 @@ import PageRouteLoader from "./components/PageRouteLoader.jsx";
 import CookieConsentBanner from "./components/CookieConsentBanner.jsx";
 import CookieSessionTracker from "./components/CookieSessionTracker.jsx";
 
-// QueueUp for Campus Pages
 import StudentVendorOnboarding from "./pages/StudentVendorOnboarding.tsx";
+import StudentVendorEarnings from "./pages/StudentVendorEarnings.tsx";
 import VendorApprovalPanel from "./pages/VendorApprovalPanel.tsx";
 import GuardianDashboard from "./pages/GuardianDashboard.tsx";
 import EmergencyLookup from "./pages/EmergencyLookup.tsx";
@@ -97,6 +97,7 @@ function App() {
 
             {/* QueueUp for Campus Routes */}
             <Route path="/campus/onboarding" element={<ProtectedRoute><StudentVendorOnboarding /></ProtectedRoute>} />
+            <Route path="/campus/earnings" element={<ProtectedRoute allowedRoles={["student_vendor", "merchant", "admin"]}><StudentVendorEarnings /></ProtectedRoute>} />
             <Route path="/campus/approvals" element={<ProtectedRoute allowedRoles={["staff_supervisor", "admin"]}><VendorApprovalPanel /></ProtectedRoute>} />
             <Route path="/campus/guardian" element={<ProtectedRoute><GuardianDashboard /></ProtectedRoute>} />
             <Route path="/campus/emergency" element={<ProtectedRoute allowedRoles={["staff_supervisor", "admin"]}><EmergencyLookup /></ProtectedRoute>} />

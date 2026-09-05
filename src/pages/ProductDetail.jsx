@@ -466,6 +466,32 @@ function ProductDetail() {
   const [isIncompleteProfileModalOpen, setIsIncompleteProfileModalOpen] = useState(false);
   const [missingProfileFields, setMissingProfileFields] = useState([]);
 
+  // 🚨 Student Allergy Safety Profile Loader
+  const [studentAllergies, setStudentAllergies] = useState([]);
+  useEffect(() => {
+    if (!user?.uid) return;
+    async function loadStudentAllergyProfile() {
+      try {
+        const studentDoc = await getDoc(doc(db, "students", user.uid));
+        if (studentDoc.exists() && Array.isArray(studentDoc.data().allergyInfo)) {
+          setStudentAllergies(studentDoc.data().allergyInfo);
+        }
+      } catch (err) {
+        console.warn("[ProductDetail] Could not load allergy profile:", err);
+      }
+    }
+    loadStudentAllergyProfile();
+  }, [user?.uid]);
+
+  const matchedAllergens = useMemo(() => {
+    if (!studentAllergies.length) return [];
+    const prodText = `${productTitle} ${productCategory} ${product?.description || ""}`.toLowerCase();
+    return studentAllergies.filter((all) => {
+      const cleanAll = all.replace(/\s*\(.*?\)\s*/g, "").toLowerCase().trim();
+      return prodText.includes(cleanAll) || prodText.includes(all.toLowerCase().trim());
+    });
+  }, [studentAllergies, productTitle, productCategory, product?.description]);
+
   // Load Product & Store from Firestore database service layer
   useEffect(() => {
     let isMounted = true;
@@ -913,6 +939,17 @@ function ProductDetail() {
                 <div className="text-danger fw-black fs-4">฿{discountedUnitPrice}</div>
               </div>
             </div>
+
+            {/* ⚠️ Student Allergy Safety Warning Banner */}
+            {matchedAllergens.length > 0 && (
+              <div className="p-3 my-2 rounded-3 bg-danger-subtle border border-danger text-danger small font-semibold flex items-center gap-2 shadow-sm">
+                <span className="fs-4">⚠️</span>
+                <div>
+                  <strong className="d-block text-danger fw-bold">แจ้งเตือนสารก่อภูมิแพ้ประจำตัวนักเรียน!</strong>
+                  <span>เมนูนี้อาจมีส่วนผสมของ <b>{matchedAllergens.join(", ")}</b> ซึ่งตรงกับประวัติการแพ้อาหารที่คุณหรือผู้ปกครองได้ระบุไว้</span>
+                </div>
+              </div>
+            )}
 
             {/* 🍜 DYNAMIC CATEGORY-AWARE MODIFIERS SELECTION */}
             <div className="queue-pd-modifiers-container">

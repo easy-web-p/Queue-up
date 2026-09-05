@@ -21,15 +21,21 @@ import {
   DollarSign,
   TrendingDown,
   User,
+  HeartPulse,
+  Save,
+  Check,
 } from 'lucide-react';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../firebase/config.js';
 import { Link } from 'react-router-dom';
-import type { ParentChildLink, StudentWallet, WalletTransaction } from '../types/campus';
+import type { ParentChildLink, StudentWallet, WalletTransaction, StudentProfile } from '../types/campus';
 
 export default function GuardianDashboard() {
   const { user, currentUser } = useAuth();
   const [children, setChildren] = useState<ParentChildLink[]>([]);
   const [selectedChild, setSelectedChild] = useState<ParentChildLink | null>(null);
   const [wallet, setWallet] = useState<StudentWallet | null>(null);
+  const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(null);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -40,6 +46,13 @@ export default function GuardianDashboard() {
   const [isLocked, setIsLocked] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+
+  // Allergy & Health Notes State
+  const [allergies, setAllergies] = useState<string[]>([]);
+  const [newAllergyInput, setNewAllergyInput] = useState('');
+  const [healthNotes, setHealthNotes] = useState('');
+  const [isSavingHealth, setIsSavingHealth] = useState(false);
+  const [healthSaveMessage, setHealthSaveMessage] = useState<string | null>(null);
 
   // Top-up Modal State
   const [isTopupOpen, setIsTopupOpen] = useState(false);
@@ -54,6 +67,15 @@ export default function GuardianDashboard() {
 
   const categoryOptions = [
     'Sugary Drinks', 'Fast Food', 'Snacks', 'Spicy Food', 'Dessert & Bakery', 'Energy Drinks'
+  ];
+
+  const commonAllergenPresets = [
+    'ถั่วลิสง (Peanuts)',
+    'อาหารทะเล / กุ้ง (Seafood)',
+    'นมวัว / แลคโตส (Dairy)',
+    'แป้งสาลี / กลูเตน (Gluten)',
+    'ไข่ไก่ (Eggs)',
+    'ถั่วเหลือง (Soy)'
   ];
 
   const uid = currentUser?.uid || user?.uid;
@@ -81,10 +103,11 @@ export default function GuardianDashboard() {
     if (!selectedChild) {
       setWallet(null);
       setTransactions([]);
+      setStudentProfile(null);
       return;
     }
 
-    async function loadChildWallet() {
+    async function loadChildWalletAndProfile() {
       try {
         const w = await fetchStudentWallet(selectedChild.studentId);
         setWallet(w);
@@ -96,11 +119,23 @@ export default function GuardianDashboard() {
         }
         const txs = await fetchWalletTransactions(selectedChild.studentId);
         setTransactions(txs);
+
+        // Load student medical profile
+        const stuSnap = await getDoc(doc(db, 'students', selectedChild.studentId));
+        if (stuSnap.exists()) {
+          const sData = stuSnap.data() as StudentProfile;
+          setStudentProfile(sData);
+          setAllergies(sData.allergyInfo || []);
+          setHealthNotes(sData.healthNotes || '');
+        } else {
+          setAllergies([]);
+          setHealthNotes('');
+        }
       } catch (err) {
-        console.error('[GuardianDashboard] Error loading student wallet:', err);
+        console.error('[GuardianDashboard] Error loading student data:', err);
       }
     }
-    loadChildWallet();
+    loadChildWalletAndProfile();
   }, [selectedChild]);
 
   const handleSaveLimits = async () => {
@@ -115,7 +150,6 @@ export default function GuardianDashboard() {
         isLocked,
       });
       setSaveStatus('บันทึกการตั้งค่าวงเงินและหมวดหมู่ที่จำกัดสำเร็จ');
-      // Refresh wallet
       const w = await fetchStudentWallet(selectedChild.studentId);
       setWallet(w);
     } catch (err: any) {
@@ -125,13 +159,55 @@ export default function GuardianDashboard() {
     }
   };
 
+  const handleSaveHealthProfile = async () => {
+    if (!selectedChild) return;
+    setIsSavingHealth(true);
+    setHealthSaveMessage(null);
+    try {
+      const studentRef = doc(db, 'students', selectedChild.studentId);
+      await setDoc(
+        studentRef,
+        {
+          studentId: selectedChild.studentId,
+          name: selectedChild.studentName,
+          guardianIds: [uid],
+          allergyInfo: allergies,
+          healthNotes: healthNotes.trim(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+      setHealthSaveMessage('บันทึกข้อมูลภูมิแพ้และสุขภาพสำเร็จ พร้อมเชื่อมโยงกับระบบแจ้งเตือนและระบบฉุกเฉิน');
+    } catch (err: any) {
+      setHealthSaveMessage('เกิดข้อผิดพลาด: ' + (err.message || 'Unknown'));
+    } finally {
+      setIsSavingHealth(false);
+    }
+  };
+
+  const handleToggleAllergyPreset = (preset: string) => {
+    if (allergies.includes(preset)) {
+      setAllergies(allergies.filter((a) => a !== preset));
+    } else {
+      setAllergies([...allergies, preset]);
+    }
+  };
+
+  const handleAddCustomAllergy = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAllergyInput.trim()) return;
+    if (!allergies.includes(newAllergyInput.trim())) {
+      setAllergies([...allergies, newAllergyInput.trim()]);
+    }
+    setNewAllergyInput('');
+  };
+
   const handleTopup = async () => {
     if (!selectedChild || topupAmountBaht <= 0) return;
     setIsTopupProcessing(true);
     try {
       await topupCampusWallet(selectedChild.studentId, Math.round(topupAmountBaht * 100));
       setIsTopupOpen(false);
-      // Refresh
       const w = await fetchStudentWallet(selectedChild.studentId);
       setWallet(w);
       const txs = await fetchWalletTransactions(selectedChild.studentId);
@@ -157,7 +233,6 @@ export default function GuardianDashboard() {
       setIsLinkModalOpen(false);
       setNewStudentId('');
       setNewStudentName('');
-      // Reload links
       const links = await fetchParentChildLinks(uid);
       setChildren(links);
       if (links.length === 1) setSelectedChild(links[0]);
@@ -187,7 +262,7 @@ export default function GuardianDashboard() {
               <Shield className="w-5 h-5 text-[#FF7A1A]" />
               แดชบอร์ดผู้ปกครอง (Guardian Oversight & Campus Wallet)
             </h1>
-            <p className="text-xs text-[#9CA3AF]">ติดตามการใช้จ่าย กำหนดวงเงินรายวัน และจำกัดหมวดอาหารของบุตรหลาน</p>
+            <p className="text-xs text-[#9CA3AF]">ติดตามการใช้จ่าย กำหนดวงเงินรายวัน บล็อกอาหารไม่พึงประสงค์ และบันทึกข้อมูลแพ้อาหาร</p>
           </div>
         </div>
       </header>
@@ -360,6 +435,88 @@ export default function GuardianDashboard() {
                   className="w-full py-3 bg-[#FF7A1A] hover:bg-[#E6680D] disabled:opacity-50 text-white font-bold font-['Kanit'] rounded-xl shadow-lg transition-all"
                 >
                   {isSaving ? 'กำลังบันทึก...' : 'บันทึกการตั้งค่าการควบคุม'}
+                </button>
+              </div>
+
+              {/* Allergy & Medical Notes Card */}
+              <div className="bg-[#241C16] border border-red-500/30 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
+                <div className="border-b border-white/10 pb-4">
+                  <h3 className="text-lg font-bold font-['Kanit'] text-white flex items-center gap-2">
+                    <HeartPulse className="w-5 h-5 text-red-500" />
+                    ประวัติการแพ้อาหารและข้อมูลสุขภาพ (Allergy & Health Notes)
+                  </h3>
+                  <p className="text-xs text-[#9CA3AF]">
+                    ข้อมูลนี้จะแจ้งเตือนเมื่อนักเรียนเลือกเมนูอาหาร และเข้าถึงได้โดยพยาบาลโรงเรียนในกรณีฉุกเฉิน
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[#E5E7EB] mb-2">
+                    เลือกสารก่อภูมิแพ้ที่พบบ่อย (Common Allergens)
+                  </label>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {commonAllergenPresets.map((preset) => {
+                      const isSelected = allergies.includes(preset);
+                      return (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => handleToggleAllergyPreset(preset)}
+                          className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                            isSelected
+                              ? 'bg-red-600 text-white border-red-500 shadow-md'
+                              : 'bg-[#16100C] text-[#9CA3AF] border-white/20 hover:border-red-400'
+                          }`}
+                        >
+                          {isSelected ? '⚠️ ' : '+ '} {preset}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <form onSubmit={handleAddCustomAllergy} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newAllergyInput}
+                      onChange={(e) => setNewAllergyInput(e.target.value)}
+                      placeholder="เพิ่มสารก่อภูมิแพ้อื่นๆ (เช่น ผงชูรส, สีผสมอาหาร)"
+                      className="flex-1 px-4 py-2.5 bg-[#16100C] border border-red-500/30 rounded-xl text-xs text-white"
+                    />
+                    <button
+                      type="submit"
+                      className="px-4 py-2.5 bg-red-600/80 hover:bg-red-600 text-white text-xs font-bold rounded-xl"
+                    >
+                      เพิ่ม
+                    </button>
+                  </form>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[#E5E7EB] mb-2">
+                    ข้อควรระวังสุขภาพ / โรคประจำตัว
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={healthNotes}
+                    onChange={(e) => setHealthNotes(e.target.value)}
+                    placeholder="เช่น แพ้อาหารรุนแรงต้องพกยา EpiPen, ภาวะ G6PD ห้ามทานถั่วปากอ้า, โรคหอบหืด..."
+                    className="w-full px-4 py-3 bg-[#16100C] border border-white/20 rounded-xl text-white text-xs focus:outline-none focus:border-red-500"
+                  />
+                </div>
+
+                {healthSaveMessage && (
+                  <div className="p-3 bg-red-950/40 border border-red-500/30 rounded-xl text-xs text-red-300">
+                    {healthSaveMessage}
+                  </div>
+                )}
+
+                <button
+                  onClick={handleSaveHealthProfile}
+                  disabled={isSavingHealth}
+                  className="w-full py-3 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-bold font-['Kanit'] rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                >
+                  <Save className="w-4 h-4" />
+                  {isSavingHealth ? 'กำลังบันทึก...' : 'บันทึกข้อมูลการแพ้อาหาร'}
                 </button>
               </div>
             </div>
