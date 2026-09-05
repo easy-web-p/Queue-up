@@ -31,11 +31,22 @@ export function ProtectedRoute({ children, allowedRoles = [], requireApprovedVen
   // 🔒 Profile Error Guard: If accessing role-restricted route and profile failed to load
   if (currentUser && currentUser.isProfileError === true && allowedRoles && (allowedRoles.includes("merchant") || allowedRoles.includes("admin"))) {
     return (
-      <div className="d-flex align-items-center justify-content-center min-vh-100 bg-light p-4">
-        <div className="card shadow-sm p-4 text-center" style={{ maxWidth: 450 }}>
-          <h4 className="text-danger mb-3">⚠️ ไม่สามารถโหลดข้อมูลสิทธิ์ได้</h4>
-          <p className="text-muted">เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูลโปรไฟล์ กรุณารีเฟรชหน้าเว็บหรือลองเข้าสู่ระบบใหม่อีกครั้ง</p>
-          <button className="btn btn-primary" onClick={() => window.location.reload()}>ลองใหม่อีกครั้ง</button>
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4 font-['Kanit']">
+        <div className="bg-slate-900 border border-red-500/40 rounded-3xl shadow-2xl p-8 text-center max-w-md w-full space-y-4">
+          <div className="w-14 h-14 bg-red-500/20 text-red-500 rounded-2xl flex items-center justify-center mx-auto text-2xl">
+            ⚠️
+          </div>
+          <h4 className="text-xl font-bold text-white mb-1">ไม่สามารถโหลดข้อมูลสิทธิ์ได้</h4>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูลโปรไฟล์ กรุณารีเฟรชหน้าเว็บหรือลองเข้าสู่ระบบใหม่อีกครั้ง
+          </p>
+          <button
+            type="button"
+            className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 cursor-pointer text-sm"
+            onClick={() => window.location.reload()}
+          >
+            ลองใหม่อีกครั้ง
+          </button>
         </div>
       </div>
     );
@@ -63,50 +74,24 @@ export function ProtectedRoute({ children, allowedRoles = [], requireApprovedVen
       }
       // Access Denied Screen for unauthorized role
       return (
-        <div style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: "#0f172a",
-          color: "#f8fafc",
-          padding: "20px"
-        }}>
-          <div style={{
-            maxWidth: "500px",
-            width: "100%",
-            backgroundColor: "#1e293b",
-            border: "1px solid #334155",
-            borderRadius: "24px",
-            padding: "36px",
-            textAlign: "center",
-            boxShadow: "0 20px 40px rgba(0,0,0,0.5)"
-          }}>
-            <div style={{
-              width: "64px",
-              height: "64px",
-              margin: "0 auto 20px",
-              borderRadius: "50%",
-              backgroundColor: "rgba(239, 68, 68, 0.15)",
-              color: "#ef4444",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "28px"
-            }}>
+        <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-100 p-4 font-['Kanit']">
+          <div className="max-w-lg w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 text-center shadow-2xl space-y-5">
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-red-500/15 border border-red-500/30 text-red-500 flex items-center justify-center text-3xl shadow-inner">
               🛡️
             </div>
-            <h2 style={{ fontSize: "22px", fontWeight: "800", marginBottom: "10px", color: "#f8fafc" }}>
-              สิทธิ์การเข้าถึงไม่เพียงพอ (Access Denied)
-            </h2>
-            <p style={{ fontSize: "14px", color: "#94a3b8", marginBottom: "24px", lineHeight: "1.6" }}>
-              หน้านี้สงวนสิทธิ์เฉพาะผู้ใช้ระดับ{" "}
-              <strong style={{ color: "#38bdf8" }}>
-                {allowedRoles.includes("admin") ? "ผู้ดูแลระบบ (Super Admin)" : "ร้านค้า (Merchant)"}
-              </strong>{" "}
-              เท่านั้น บัญชีปัจจุบันของคุณ ({currentUser.email || currentUser.name || "Customer"}) ไม่มีสิทธิ์เข้าใช้งาน
-            </p>
-            <div style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap" }}>
+            <div>
+              <h2 className="text-xl font-extrabold text-white">
+                สิทธิ์การเข้าถึงไม่เพียงพอ (Access Denied)
+              </h2>
+              <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                หน้านี้สงวนสิทธิ์เฉพาะผู้ใช้ระดับ{" "}
+                <strong className="text-sky-400">
+                  {allowedRoles.includes("admin") ? "ผู้ดูแลระบบ (Super Admin)" : "ร้านค้า (Merchant)"}
+                </strong>{" "}
+                เท่านั้น บัญชีปัจจุบันของคุณ ({currentUser.email || currentUser.name || "Customer"}) ไม่มีสิทธิ์เข้าใช้งาน
+              </p>
+            </div>
+            <div className="flex gap-3 justify-center flex-wrap pt-2">
               {allowedRoles.includes("merchant") && (
                 <button
                   type="button"
@@ -114,16 +99,7 @@ export function ProtectedRoute({ children, allowedRoles = [], requireApprovedVen
                     dispatch(switchRole("merchant"));
                     navigate("/merchant/dashboard");
                   }}
-                  style={{
-                    backgroundColor: "#3b82f6",
-                    color: "#ffffff",
-                    border: "none",
-                    padding: "10px 20px",
-                    borderRadius: "20px",
-                    fontWeight: "700",
-                    fontSize: "14px",
-                    cursor: "pointer"
-                  }}
+                  className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 text-white rounded-xl font-bold text-xs shadow-md transition-all active:scale-95 cursor-pointer"
                 >
                   🏪 สลับเป็นบทบาทร้านค้า
                 </button>
@@ -131,16 +107,7 @@ export function ProtectedRoute({ children, allowedRoles = [], requireApprovedVen
               <button
                 type="button"
                 onClick={() => navigate("/home")}
-                style={{
-                  backgroundColor: "transparent",
-                  color: "#e2e8f0",
-                  border: "1px solid #475569",
-                  padding: "10px 20px",
-                  borderRadius: "20px",
-                  fontWeight: "700",
-                  fontSize: "14px",
-                  cursor: "pointer"
-                }}
+                className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl font-bold text-xs border border-slate-700 transition-all active:scale-95 cursor-pointer"
               >
                 🏠 กลับสู่หน้าหลัก
               </button>
