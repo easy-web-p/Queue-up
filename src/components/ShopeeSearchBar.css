@@ -527,19 +527,22 @@ body.dark-mode .shopee-header-container {
   color: #ffffff;
 }
 
-/* User Profile, Language & BS5 Theme Hover Popovers */
+/* User Profile, Language, BS5 Theme & Campus Hover Popovers */
 .shopee-user-dropdown-container,
 .shopee-lang-dropdown-container,
-.shopee-theme-bs5-dropdown-container {
+.shopee-theme-bs5-dropdown-container,
+.shopee-campus-dropdown-container {
   position: relative;
+  display: inline-block;
+  padding-bottom: 6px;
 }
 
 .shopee-user-dropdown-menu,
 .shopee-lang-dropdown-menu,
-.shopee-bs5-theme-menu {
+.shopee-bs5-theme-menu,
+.shopee-campus-dropdown-menu {
   position: absolute;
   top: 100%;
-  right: 0;
   margin-top: 2px;
   background: #ffffff;
   border-radius: 8px;
@@ -547,7 +550,7 @@ body.dark-mode .shopee-header-container {
   border: 1px solid #e8e8e8;
   list-style: none;
   padding: 6px 0;
-  min-width: 175px;
+  min-width: 220px;
   z-index: 999;
   opacity: 0;
   visibility: hidden;
@@ -556,10 +559,22 @@ body.dark-mode .shopee-header-container {
   pointer-events: none;
 }
 
+.shopee-campus-dropdown-menu {
+  left: 0;
+  right: auto;
+}
+
+.shopee-user-dropdown-menu,
+.shopee-lang-dropdown-menu,
+.shopee-bs5-theme-menu {
+  right: 0;
+}
+
 /* Hover Bridge (สะพานลอยไร้เงา ป้องกันเมนูปิดกะทันหันเมื่อเลื่อนเมาส์ผ่าน) */
 .shopee-user-dropdown-menu::before,
 .shopee-lang-dropdown-menu::before,
-.shopee-bs5-theme-menu::before {
+.shopee-bs5-theme-menu::before,
+.shopee-campus-dropdown-menu::before {
   content: "";
   position: absolute;
   top: -12px;
@@ -568,14 +583,33 @@ body.dark-mode .shopee-header-container {
   height: 12px;
 }
 
-/* Mouse Hover Activation (เอาเมาส์ไปใกล้แล้วแสดงป๊อบอัพทันที) */
+/* Mouse Hover & Click Activation (เอาเมาส์ไปใกล้หรือคลิกแล้วแสดงป๊อบอัพทันที) */
 .shopee-user-dropdown-container:hover .shopee-user-dropdown-menu,
 .shopee-lang-dropdown-container:hover .shopee-lang-dropdown-menu,
-.shopee-theme-bs5-dropdown-container:hover .shopee-bs5-theme-menu {
+.shopee-theme-bs5-dropdown-container:hover .shopee-bs5-theme-menu,
+.shopee-campus-dropdown-container:hover .shopee-campus-dropdown-menu,
+.shopee-campus-dropdown-container.open .shopee-campus-dropdown-menu {
   opacity: 1;
   visibility: visible;
   transform: translateY(0);
   pointer-events: auto;
+}
+
+html[data-theme="dark"] .shopee-campus-dropdown-menu,
+body.dark-mode .shopee-campus-dropdown-menu {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+html[data-theme="dark"] .shopee-campus-dropdown-menu .text-dark,
+body.dark-mode .shopee-campus-dropdown-menu .text-dark {
+  color: #f8fafc !important;
+}
+
+html[data-theme="dark"] .shopee-campus-dropdown-menu .shopee-dropdown-item:hover,
+body.dark-mode .shopee-campus-dropdown-menu .shopee-dropdown-item:hover {
+  background: #334155 !important;
 }
 
 .shopee-dropdown-item {

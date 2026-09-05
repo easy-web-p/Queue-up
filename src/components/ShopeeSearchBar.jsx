@@ -41,11 +41,13 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
   const [isScopeOpen, setIsScopeOpen] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [isThemeOpen, setIsThemeOpen] = useState(false);
+  const [isCampusOpen, setIsCampusOpen] = useState(false);
   const [, setIsNotificationOpen] = useState(false);
 
   useEffect(() => {
     const handleOutsideClick = () => {
       setIsThemeOpen(false);
+      setIsCampusOpen(false);
     };
     document.addEventListener("click", handleOutsideClick);
     return () => document.removeEventListener("click", handleOutsideClick);
@@ -187,29 +189,108 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
             <i className="bi bi-rocket-takeoff me-1" /> สมัครเป็นผู้ขาย / เปิดร้านค้า
           </span>
           <span className="shopee-nav-divider" />
-          <span
-            className="shopee-nav-item text-warning fw-bold"
-            style={{ cursor: "pointer" }}
-            onClick={() => navigate("/campus/monitor")}
-          >
-            <i className="bi bi-tv me-1" /> {language === "en" ? "Live Queue" : "จอคิวโรงอาหาร"}
-          </span>
-          <span className="shopee-nav-divider" />
-          <span
-            className="shopee-nav-item"
-            style={{ cursor: "pointer" }}
-            onClick={() => navigate("/guardian")}
-          >
-            <i className="bi bi-shield-heart text-danger me-1" /> {language === "en" ? "Guardian" : "ผู้ปกครอง"}
-          </span>
-          <span className="shopee-nav-divider" />
-          <span
-            className="shopee-nav-item"
-            style={{ cursor: "pointer" }}
-            onClick={() => navigate("/student-vendor/apply")}
-          >
-            <i className="bi bi-mortarboard text-info me-1" /> {language === "en" ? "Student Stall" : "ร้านค้านักเรียน"}
-          </span>
+          {/* Combined Campus Services Dropdown Button */}
+          <div className={`shopee-campus-dropdown-container ${isCampusOpen ? "open" : ""}`}>
+            <span
+              className="shopee-nav-item text-warning fw-bold"
+              style={{ cursor: "pointer" }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsCampusOpen((prev) => !prev);
+              }}
+              title="บริการแคมปัสและโรงอาหาร (จอคิว, ผู้ปกครอง, ร้านค้านักเรียน)"
+            >
+              <i className="bi bi-mortarboard-fill me-1" />
+              {language === "en" ? "Campus Services" : "บริการแคมปัส"}
+              <span style={{ fontSize: "10px", marginLeft: "2px" }}>▾</span>
+            </span>
+
+            <ul className="shopee-campus-dropdown-menu">
+              <li>
+                <a
+                  className="shopee-dropdown-item"
+                  href="/campus/monitor"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setIsCampusOpen(false);
+                    navigate("/campus/monitor");
+                  }}
+                >
+                  <i className="bi bi-tv me-2 text-warning fs-5" />
+                  <div>
+                    <div className="text-dark fw-bold">{language === "en" ? "Live Queue Monitor" : "จอคิวโรงอาหาร"}</div>
+                    <div className="text-muted" style={{ fontSize: "11px", fontWeight: "normal" }}>
+                      {language === "en" ? "Real-time Canteen Screen & Audio" : "จอเรียกคิวสด & แจ้งเตือนเสียง"}
+                    </div>
+                  </div>
+                </a>
+              </li>
+              <li>
+                <a
+                  className="shopee-dropdown-item"
+                  href="/guardian"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setIsCampusOpen(false);
+                    navigate("/guardian");
+                  }}
+                >
+                  <i className="bi bi-shield-heart text-danger me-2 fs-5" />
+                  <div>
+                    <div className="text-dark fw-bold">{language === "en" ? "Guardian Portal" : "ผู้ปกครอง"}</div>
+                    <div className="text-muted" style={{ fontSize: "11px", fontWeight: "normal" }}>
+                      {language === "en" ? "Allergy settings & Pocket money" : "ตั้งค่าแพ้อาหาร & คุมวงเงิน"}
+                    </div>
+                  </div>
+                </a>
+              </li>
+              <li>
+                <a
+                  className="shopee-dropdown-item"
+                  href="/student-vendor/apply"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setIsCampusOpen(false);
+                    navigate("/student-vendor/apply");
+                  }}
+                >
+                  <i className="bi bi-mortarboard text-info me-2 fs-5" />
+                  <div>
+                    <div className="text-dark fw-bold">{language === "en" ? "Student Stall" : "ร้านค้านักเรียน"}</div>
+                    <div className="text-muted" style={{ fontSize: "11px", fontWeight: "normal" }}>
+                      {language === "en" ? "Apply for student food stall" : "เปิดร้านค้าหารายได้พิเศษ"}
+                    </div>
+                  </div>
+                </a>
+              </li>
+              {(user?.role === "staff_supervisor" || isUserSuperAdmin(user)) && (
+                <>
+                  <li>
+                    <hr className="shopee-dropdown-divider" />
+                  </li>
+                  <li>
+                    <a
+                      className="shopee-dropdown-item text-primary"
+                      href="/supervisor/approvals"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setIsCampusOpen(false);
+                        navigate("/supervisor/approvals");
+                      }}
+                    >
+                      <i className="bi bi-clipboard-check text-primary me-2 fs-5" />
+                      <div>
+                        <div className="text-primary fw-bold">{language === "en" ? "Supervisor Approvals" : "ตรวจสอบอนุมัติร้านค้า"}</div>
+                        <div className="text-muted" style={{ fontSize: "11px", fontWeight: "normal" }}>
+                          {language === "en" ? "Teacher & Staff Supervisor Panel" : "สำหรับอาจารย์ / ผู้ดูแลโรงเรียน"}
+                        </div>
+                      </div>
+                    </a>
+                  </li>
+                </>
+              )}
+            </ul>
+          </div>
           <span className="shopee-nav-divider" />
           <span className="shopee-nav-item">{language === "en" ? "Download" : "ดาวน์โหลด"}</span>
           {isUserSuperAdmin(user) && (
