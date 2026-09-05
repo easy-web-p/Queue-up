@@ -273,53 +273,57 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
   };
 
   return (
-    <div className="queueup-chat-overlay" onClick={onClose}>
-      <div className="queueup-chat-card" onClick={(e) => e.stopPropagation()}>
+    <div className="queueup-chat-overlay fixed inset-0 z-[100000] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+      <div className="queueup-chat-card w-full max-w-4xl h-[620px] max-h-[90vh] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 flex overflow-hidden font-sans" onClick={(e) => e.stopPropagation()}>
         {/* ---------------- 1. LEFT SIDEBAR (STORE CHAT LIST) ---------------- */}
-        <aside className="queueup-chat-sidebar">
-          <div className="queueup-chat-sidebar-header">
-            <div className="queueup-chat-sidebar-title">
-              <i className="bi bi-chat-dots-fill text-danger fs-5" />
+        <aside className="queueup-chat-sidebar w-72 shrink-0 border-r border-slate-200 dark:border-slate-800 flex flex-col bg-slate-50 dark:bg-slate-900/60">
+          <div className="queueup-chat-sidebar-header p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <div className="queueup-chat-sidebar-title flex items-center gap-2 font-bold text-sm text-slate-800 dark:text-slate-100">
+              <i className="bi bi-chat-dots-fill text-[#ee4d2d]" />
               <span>แชทติดต่อร้านค้า</span>
             </div>
-            <span className="badge bg-danger-subtle text-danger rounded-pill px-2 py-1 small">
+            <span className="badge bg-danger-subtle text-danger rounded-pill px-2 py-0.5 text-[11px] font-bold bg-orange-100 text-[#ee4d2d] dark:bg-orange-950/50 dark:text-orange-300">
               {conversations.reduce((sum, c) => sum + (c.unread || 0), 0)} ใหม่
             </span>
           </div>
 
           {conversations.length === 0 ? (
-            <div className="p-4 text-center text-muted small">
-              <i className="bi bi-inbox text-slate-300 fs-3 d-block mb-1" />
+            <div className="p-4 text-center text-muted small text-slate-400 text-xs my-auto">
+              <i className="bi bi-inbox text-slate-300 dark:text-slate-600 text-3xl block mb-2" />
               ยังไม่มีแชทกับร้านค้า
             </div>
           ) : (
-            <ul className="queueup-chat-list">
+            <ul className="queueup-chat-list overflow-y-auto flex-1 p-2 space-y-1 list-none m-0">
               {conversations.map((chat) => (
                 <li
                   key={chat.id}
-                  className={`queueup-chat-item ${activeChatId === chat.id ? "active" : ""}`}
+                  className={`queueup-chat-item p-2.5 rounded-2xl cursor-pointer transition-all flex items-center gap-3 ${
+                    activeChatId === chat.id
+                      ? "active bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-900/40"
+                      : "hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                  }`}
                   onClick={() => handleSelectChat(chat.id)}
                 >
-                  <div className="queueup-chat-item-avatar-wrapper">
+                  <div className="queueup-chat-item-avatar-wrapper relative w-10 h-10 shrink-0">
                     <img
                       src={chat.avatar}
                       alt={chat.storeName}
-                      className="queueup-chat-item-avatar"
+                      className="queueup-chat-item-avatar w-full h-full rounded-full object-cover border border-slate-200 dark:border-slate-700"
                     />
-                    {chat.online && <span className="queueup-chat-online-dot" />}
+                    {chat.online && <span className="queueup-chat-online-dot absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900" />}
                   </div>
 
-                  <div className="queueup-chat-item-info">
-                    <div className="queueup-chat-item-name">{chat.storeName}</div>
-                    <div className="queueup-chat-item-preview">
+                  <div className="queueup-chat-item-info flex-1 min-w-0">
+                    <div className="queueup-chat-item-name font-bold text-xs text-slate-800 dark:text-slate-200 truncate">{chat.storeName}</div>
+                    <div className="queueup-chat-item-preview text-[11px] text-slate-500 dark:text-slate-400 truncate">
                       {chat.messages[chat.messages.length - 1]?.text || "เริ่มการสนทนา"}
                     </div>
                   </div>
 
-                  <div className="queueup-chat-item-meta">
-                    <span className="queueup-chat-item-time">{chat.lastTime}</span>
+                  <div className="queueup-chat-item-meta text-right shrink-0 flex flex-col items-end gap-1">
+                    <span className="queueup-chat-item-time text-[10px] text-slate-400">{chat.lastTime}</span>
                     {chat.unread > 0 && (
-                      <span className="queueup-chat-unread-badge">{chat.unread}</span>
+                      <span className="queueup-chat-unread-badge bg-[#ee4d2d] text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center">{chat.unread}</span>
                     )}
                   </div>
                 </li>
@@ -329,83 +333,89 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
         </aside>
 
         {/* ---------------- 2. RIGHT MAIN CHAT WINDOW ---------------- */}
-        <main className="queueup-chat-main">
+        <main className="queueup-chat-main flex-1 flex flex-col bg-white dark:bg-slate-900 min-w-0">
           {!activeChat ? (
-            <div className="d-flex flex-column align-items-center justify-content-center h-100 p-4 text-center bg-white">
-              <i className="bi bi-chat-square-text text-slate-400 mb-3 text-6xl opacity-40" />
-              <h5 className="fw-bold text-dark mb-2">ยังไม่มีรายการแชทกับร้านค้า</h5>
-              <p className="text-muted small mb-0 px-3 max-w-[340px] leading-relaxed">
+            <div className="d-flex flex-column align-items-center justify-content-center h-100 p-4 text-center bg-white dark:bg-slate-900 flex-1 flex flex-col items-center justify-center relative">
+              <i className="bi bi-chat-square-text text-slate-300 dark:text-slate-700 mb-3 text-5xl" />
+              <h5 className="fw-bold text-dark mb-2 text-slate-800 dark:text-slate-200 font-bold text-base">ยังไม่มีรายการแชทกับร้านค้า</h5>
+              <p className="text-muted small mb-0 px-3 max-w-[340px] leading-relaxed text-xs text-slate-400">
                 คุณสามารถเพิ่มแชทและเริ่มการสนทนากับทางร้านได้ โดยกดปุ่ม{" "}
-                <span className="text-danger fw-bold"><i className="bi bi-chat-dots-fill me-1" />แชทเลย</span> ที่รายการคำสั่งซื้อของคุณ
+                <span className="text-danger fw-bold text-[#ee4d2d] font-bold"><i className="bi bi-chat-dots-fill me-1" />แชทเลย</span> ที่รายการคำสั่งซื้อของคุณ
               </p>
-              <button className="queueup-chat-close-btn position-absolute top-0 end-0 m-3" onClick={onClose}>
-                <i className="bi bi-x-lg" />
+              <button className="queueup-chat-close-btn position-absolute top-0 end-0 m-3 absolute top-3 right-3 p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer border-0" onClick={onClose}>
+                <i className="bi bi-x-lg text-sm" />
               </button>
             </div>
           ) : (
             <>
               {/* Header */}
-              <div className="queueup-chat-main-header">
-                <div className="queueup-chat-header-user">
+              <div className="queueup-chat-main-header p-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900">
+                <div className="queueup-chat-header-user flex items-center gap-2.5">
                   <img
                     src={activeChat.avatar}
                     alt={activeChat.storeName}
-                    className="queueup-chat-item-avatar"
+                    className="queueup-chat-item-avatar w-9 h-9 rounded-full object-cover border border-slate-200 dark:border-slate-700"
                   />
                   <div>
-                    <div className="queueup-chat-header-title">{activeChat.storeName}</div>
-                    <div className="queueup-chat-header-status">
-                      <i className="bi bi-circle-fill text-success me-1 text-[8px]" />
+                    <div className="queueup-chat-header-title font-bold text-xs text-slate-900 dark:text-white">{activeChat.storeName}</div>
+                    <div className="queueup-chat-header-status text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                      <i className="bi bi-circle-fill text-emerald-500 text-[6px]" />
                       {activeChat.statusText}
                     </div>
                   </div>
                 </div>
 
-                <button className="queueup-chat-close-btn" onClick={onClose} title="ปิดแชท">
-                  <i className="bi bi-x-lg" />
+                <button className="queueup-chat-close-btn p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer border-0" onClick={onClose} title="ปิดแชท">
+                  <i className="bi bi-x-lg text-sm" />
                 </button>
               </div>
 
               {/* Attached Order Context Banner */}
               {activeChat.orderContext && (
-                <div className="queueup-chat-order-banner">
-                  <div className="queueup-chat-order-info">
-                    <span className="queueup-chat-order-tag">
+                <div className="queueup-chat-order-banner px-4 py-2 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200/60 dark:border-amber-900/40 flex items-center justify-between text-xs">
+                  <div className="queueup-chat-order-info flex items-center gap-2 truncate">
+                    <span className="queueup-chat-order-tag bg-[#ee4d2d] text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
                       {activeChat.orderContext.queueNo || "ออเดอร์จองคิว"}
                     </span>
-                    <span className="fw-bold text-dark">
+                    <span className="fw-bold text-dark font-bold text-slate-800 dark:text-slate-200 truncate">
                       {activeChat.orderContext.itemTitle || "รายการอาหาร"}
                     </span>
-                    <span className="text-muted">
+                    <span className="text-muted text-slate-500 dark:text-slate-400">
                       (฿{activeChat.orderContext.price?.toFixed(2) || "0.00"})
                     </span>
                   </div>
-                  <span className="small text-danger fw-bold">
+                  <span className="small text-danger fw-bold text-[#ee4d2d] font-mono text-[11px] shrink-0">
                     ID: {activeChat.orderContext.orderId}
                   </span>
                 </div>
               )}
 
               {/* Messages Body */}
-              <div className="queueup-chat-messages-body">
+              <div className="queueup-chat-messages-body flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50 dark:bg-slate-950/30">
                 {activeChat.messages.map((msg) => (
                   <div
                     key={msg.id}
-                    className={`queueup-chat-msg-row ${msg.sender === "user" ? "sent" : "received"}`}
+                    className={`queueup-chat-msg-row flex flex-col ${msg.sender === "user" ? "sent items-end" : "received items-start"}`}
                   >
-                    <div className="queueup-chat-msg-bubble">{msg.text}</div>
-                    <span className="queueup-chat-msg-time">{msg.time}</span>
+                    <div className={`queueup-chat-msg-bubble max-w-[80%] rounded-2xl p-3 text-xs leading-relaxed ${
+                      msg.sender === "user"
+                        ? "bg-[#ee4d2d] text-white rounded-tr-xs shadow-xs"
+                        : "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-tl-xs border border-slate-200 dark:border-slate-700 shadow-xs"
+                    }`}>
+                      {msg.text}
+                    </div>
+                    <span className="queueup-chat-msg-time text-[10px] text-slate-400 mt-1 px-1">{msg.time}</span>
                   </div>
                 ))}
                 <div ref={messagesEndRef} />
               </div>
 
               {/* Quick Suggestions Bar */}
-              <div className="queueup-chat-suggestions">
+              <div className="queueup-chat-suggestions flex items-center gap-1.5 overflow-x-auto p-2 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shrink-0">
                 {QUICK_SUGGESTIONS.map((chip, idx) => (
                   <button
                     key={idx}
-                    className="queueup-chat-suggest-chip"
+                    className="queueup-chat-suggest-chip px-3 py-1 rounded-full text-[11px] font-medium bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-orange-400 hover:text-orange-500 whitespace-nowrap transition-all cursor-pointer shadow-2xs"
                     onClick={() => handleSendMessage(chip)}
                   >
                     {chip}
@@ -415,7 +425,7 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
 
               {/* Footer Input Area */}
               <form
-                className="queueup-chat-input-footer"
+                className="queueup-chat-input-footer p-3 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2 bg-white dark:bg-slate-900 shrink-0"
                 onSubmit={(e) => {
                   e.preventDefault();
                   handleSendMessage();
@@ -423,13 +433,13 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
               >
                 <input
                   type="text"
-                  className="queueup-chat-input-box"
+                  className="queueup-chat-input-box flex-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#ee4d2d]"
                   placeholder="พิมพ์ข้อความตอบกลับร้านค้า..."
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                 />
-                <button type="submit" className="queueup-chat-send-btn" title="ส่งข้อความ">
-                  <i className="bi bi-send-fill" />
+                <button type="submit" className="queueup-chat-send-btn p-2 w-9 h-9 rounded-xl bg-[#ee4d2d] hover:bg-[#d73211] text-white flex items-center justify-center transition-all cursor-pointer border-0 shadow-xs" title="ส่งข้อความ">
+                  <i className="bi bi-send-fill text-xs" />
                 </button>
               </form>
             </>
