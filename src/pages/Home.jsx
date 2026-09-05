@@ -411,12 +411,12 @@ function Home() {
             </div>
           </div>
 
-          <div className="row g-3">
-            <div className="col-12 col-sm-6 col-lg-3">
+          <div className="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-5 g-3">
+            <div className="col">
               <div
                 className="p-3 rounded-4 h-100 d-flex flex-column justify-content-between"
-                style={{ backgroundColor: "#16100C", border: "1px solid rgba(255, 122, 26, 0.2)", cursor: "pointer" }}
-                onClick={() => navigate("/campus/onboarding")}
+                style={{ backgroundColor: "#16100C", border: "1px solid rgba(255, 122, 26, 0.25)", cursor: "pointer" }}
+                onClick={() => navigate("/student-vendor/apply")}
               >
                 <div>
                   <div className="fs-3 mb-2">🧑‍🎓</div>
@@ -429,11 +429,11 @@ function Home() {
               </div>
             </div>
 
-            <div className="col-12 col-sm-6 col-lg-3">
+            <div className="col">
               <div
                 className="p-3 rounded-4 h-100 d-flex flex-column justify-content-between"
-                style={{ backgroundColor: "#16100C", border: "1px solid rgba(255, 122, 26, 0.2)", cursor: "pointer" }}
-                onClick={() => navigate("/campus/guardian")}
+                style={{ backgroundColor: "#16100C", border: "1px solid rgba(255, 122, 26, 0.25)", cursor: "pointer" }}
+                onClick={() => navigate("/guardian")}
               >
                 <div>
                   <div className="fs-3 mb-2">🛡️</div>
@@ -446,15 +446,15 @@ function Home() {
               </div>
             </div>
 
-            <div className="col-12 col-sm-6 col-lg-3">
+            <div className="col">
               <div
                 className="p-3 rounded-4 h-100 d-flex flex-column justify-content-between"
-                style={{ backgroundColor: "#16100C", border: "1px solid rgba(255, 122, 26, 0.2)", cursor: "pointer" }}
-                onClick={() => navigate("/campus/approvals")}
+                style={{ backgroundColor: "#16100C", border: "1px solid rgba(255, 122, 26, 0.25)", cursor: "pointer" }}
+                onClick={() => navigate("/admin/vendor-approvals")}
               >
                 <div>
                   <div className="fs-3 mb-2">👨‍🏫</div>
-                  <h6 className="fw-bold text-white mb-1">อาจารย์ / ผู้ดูแล</h6>
+                  <h6 className="fw-bold text-white mb-1">อาจารย์ / ฝ่ายปกครอง</h6>
                   <p className="text-secondary small mb-0">อนุมัติร้านค้านักเรียน และตรวจสอบสุขอนามัย</p>
                 </div>
                 <button type="button" className="btn btn-sm rounded-pill mt-3 w-100 fw-bold" style={{ border: "1px solid #FF7A1A", color: "#FF7A1A" }}>
@@ -463,10 +463,10 @@ function Home() {
               </div>
             </div>
 
-            <div className="col-12 col-sm-6 col-lg-3">
+            <div className="col">
               <div
                 className="p-3 rounded-4 h-100 d-flex flex-column justify-content-between"
-                style={{ backgroundColor: "#16100C", border: "1px solid rgba(255, 122, 26, 0.2)", cursor: "pointer" }}
+                style={{ backgroundColor: "#16100C", border: "1px solid rgba(255, 122, 26, 0.25)", cursor: "pointer" }}
                 onClick={() => navigate("/campus/monitor")}
               >
                 <div>
@@ -476,6 +476,23 @@ function Home() {
                 </div>
                 <button type="button" className="btn btn-sm rounded-pill mt-3 w-100 fw-bold" style={{ border: "1px solid #FF7A1A", color: "#FF7A1A" }}>
                   เปิดจอคิวสด ›
+                </button>
+              </div>
+            </div>
+
+            <div className="col">
+              <div
+                className="p-3 rounded-4 h-100 d-flex flex-column justify-content-between"
+                style={{ backgroundColor: "#16100C", border: "1px solid rgba(239, 68, 68, 0.35)", cursor: "pointer" }}
+                onClick={() => navigate("/emergency")}
+              >
+                <div>
+                  <div className="fs-3 mb-2">🚨</div>
+                  <h6 className="fw-bold text-white mb-1">พยาบาล & ฉุกเฉิน</h6>
+                  <p className="text-secondary small mb-0">ค้นหาประวัติแพ้อาหาร โรคประจำตัว และบันทึก Audit</p>
+                </div>
+                <button type="button" className="btn btn-sm rounded-pill mt-3 w-100 fw-bold" style={{ border: "1px solid #ef4444", color: "#ef4444" }}>
+                  ข้อมูลฉุกเฉิน ›
                 </button>
               </div>
             </div>

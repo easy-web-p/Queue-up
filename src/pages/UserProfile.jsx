@@ -533,6 +533,90 @@ function UserProfile() {
                 <span>การตั้งค่าบัญชี</span>
               </div>
             </div>
+
+            <div className="pt-3 pb-1 px-3">
+              <span className="text-secondary text-uppercase fw-bold" style={{ fontSize: "10px", letterSpacing: "0.5px" }}>
+                บริการสถานศึกษา (Campus)
+              </span>
+            </div>
+
+            <div
+              className="shopee-sidebar-nav-item"
+              onClick={() => navigate("/guardian")}
+              style={{ cursor: "pointer" }}
+            >
+              <div className="shopee-sidebar-nav-left">
+                <i className="bi bi-shield-heart text-danger shopee-sidebar-nav-icon" />
+                <span>แดชบอร์ดผู้ปกครอง</span>
+              </div>
+              <i className="bi bi-chevron-right small text-secondary ms-auto" />
+            </div>
+
+            <div
+              className="shopee-sidebar-nav-item"
+              onClick={() => navigate("/student-vendor/apply")}
+              style={{ cursor: "pointer" }}
+            >
+              <div className="shopee-sidebar-nav-left">
+                <i className="bi bi-mortarboard text-warning shopee-sidebar-nav-icon" />
+                <span>ร้านค้านักเรียน</span>
+              </div>
+              <i className="bi bi-chevron-right small text-secondary ms-auto" />
+            </div>
+
+            {(user?.role === "student_vendor" || user?.role === "merchant" || user?.role === "admin") && (
+              <div
+                className="shopee-sidebar-nav-item"
+                onClick={() => navigate("/student-vendor/earnings")}
+                style={{ cursor: "pointer" }}
+              >
+                <div className="shopee-sidebar-nav-left">
+                  <i className="bi bi-wallet2 text-success shopee-sidebar-nav-icon" />
+                  <span>รายได้ร้านค้านักเรียน</span>
+                </div>
+                <i className="bi bi-chevron-right small text-secondary ms-auto" />
+              </div>
+            )}
+
+            {(user?.role === "staff_supervisor" || user?.role === "admin") && (
+              <>
+                <div
+                  className="shopee-sidebar-nav-item"
+                  onClick={() => navigate("/admin/vendor-approvals")}
+                  style={{ cursor: "pointer" }}
+                >
+                  <div className="shopee-sidebar-nav-left">
+                    <i className="bi bi-person-check text-info shopee-sidebar-nav-icon" />
+                    <span>อนุมัติร้านค้า (ฝ่ายปกครอง)</span>
+                  </div>
+                  <i className="bi bi-chevron-right small text-secondary ms-auto" />
+                </div>
+
+                <div
+                  className="shopee-sidebar-nav-item"
+                  onClick={() => navigate("/emergency")}
+                  style={{ cursor: "pointer" }}
+                >
+                  <div className="shopee-sidebar-nav-left">
+                    <i className="bi bi-heart-pulse text-danger shopee-sidebar-nav-icon" />
+                    <span>ข้อมูลพยาบาลฉุกเฉิน</span>
+                  </div>
+                  <i className="bi bi-chevron-right small text-secondary ms-auto" />
+                </div>
+              </>
+            )}
+
+            <div
+              className="shopee-sidebar-nav-item"
+              onClick={() => navigate("/campus/monitor")}
+              style={{ cursor: "pointer" }}
+            >
+              <div className="shopee-sidebar-nav-left">
+                <i className="bi bi-tv text-primary shopee-sidebar-nav-icon" />
+                <span>จอแสดงคิวโรงอาหารสด</span>
+              </div>
+              <i className="bi bi-chevron-right small text-secondary ms-auto" />
+            </div>
           </nav>
         </aside>
 

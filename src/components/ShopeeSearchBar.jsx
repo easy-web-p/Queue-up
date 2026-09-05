@@ -187,6 +187,30 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
             <i className="bi bi-rocket-takeoff me-1" /> สมัครเป็นผู้ขาย / เปิดร้านค้า
           </span>
           <span className="shopee-nav-divider" />
+          <span
+            className="shopee-nav-item text-warning fw-bold"
+            style={{ cursor: "pointer" }}
+            onClick={() => navigate("/campus/monitor")}
+          >
+            <i className="bi bi-tv me-1" /> {language === "en" ? "Live Queue" : "จอคิวโรงอาหาร"}
+          </span>
+          <span className="shopee-nav-divider" />
+          <span
+            className="shopee-nav-item"
+            style={{ cursor: "pointer" }}
+            onClick={() => navigate("/guardian")}
+          >
+            <i className="bi bi-shield-heart text-danger me-1" /> {language === "en" ? "Guardian" : "ผู้ปกครอง"}
+          </span>
+          <span className="shopee-nav-divider" />
+          <span
+            className="shopee-nav-item"
+            style={{ cursor: "pointer" }}
+            onClick={() => navigate("/student-vendor/apply")}
+          >
+            <i className="bi bi-mortarboard text-info me-1" /> {language === "en" ? "Student Stall" : "ร้านค้านักเรียน"}
+          </span>
+          <span className="shopee-nav-divider" />
           <span className="shopee-nav-item">{language === "en" ? "Download" : "ดาวน์โหลด"}</span>
           {isUserSuperAdmin(user) && (
             <>
@@ -562,6 +586,99 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
                   </a>
                 </li>
               )}
+              <li>
+                <hr className="shopee-dropdown-divider" />
+              </li>
+              <li className="dropdown-header text-uppercase text-secondary px-3" style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.5px" }}>
+                {language === "en" ? "Campus Ecosystem" : "บริการโรงเรียน & สถานศึกษา"}
+              </li>
+              <li>
+                <a
+                  className="shopee-dropdown-item"
+                  href="/guardian"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate("/guardian");
+                  }}
+                >
+                  <i className="bi bi-shield-heart text-danger me-2" />
+                  {language === "en" ? "Guardian Dashboard" : "แดชบอร์ดผู้ปกครอง (Guardian)"}
+                </a>
+              </li>
+              <li>
+                <a
+                  className="shopee-dropdown-item"
+                  href="/student-vendor/apply"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate("/student-vendor/apply");
+                  }}
+                >
+                  <i className="bi bi-mortarboard text-warning me-2" />
+                  {language === "en" ? "Student Vendor Application" : "ขอเปิดร้านค้านักเรียน"}
+                </a>
+              </li>
+              {(user?.role === "student_vendor" || user?.role === "merchant" || isUserSuperAdmin(user)) && (
+                <li>
+                  <a
+                    className="shopee-dropdown-item text-success"
+                    href="/student-vendor/earnings"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      navigate("/student-vendor/earnings");
+                    }}
+                  >
+                    <i className="bi bi-wallet2 me-2" />
+                    {language === "en" ? "Student Earnings" : "กระเป๋าเงิน & รายได้ร้าน"}
+                  </a>
+                </li>
+              )}
+              {(user?.role === "staff_supervisor" || isUserSuperAdmin(user)) && (
+                <>
+                  <li>
+                    <a
+                      className="shopee-dropdown-item text-info"
+                      href="/admin/vendor-approvals"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        navigate("/admin/vendor-approvals");
+                      }}
+                    >
+                      <i className="bi bi-person-check-fill me-2" />
+                      {language === "en" ? "Staff Vendor Approvals" : "อนุมัติร้านค้า (ฝ่ายปกครอง)"}
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      className="shopee-dropdown-item text-danger fw-bold"
+                      href="/emergency"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        navigate("/emergency");
+                      }}
+                    >
+                      <i className="bi bi-heart-pulse-fill me-2" />
+                      {language === "en" ? "Emergency Medical Lookup" : "สืบค้นข้อมูลพยาบาลฉุกเฉิน"}
+                    </a>
+                  </li>
+                </>
+              )}
+              <li>
+                <a
+                  className="shopee-dropdown-item text-warning"
+                  href="/campus/monitor"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate("/campus/monitor");
+                  }}
+                >
+                  <i className="bi bi-tv me-2" />
+                  {language === "en" ? "Live Canteen Board" : "จอแสดงคิวโรงอาหารสด"}
+                </a>
+              </li>
+              <li>
+                <hr className="shopee-dropdown-divider" />
+              </li>
               <li>
                 <button
                   type="button"

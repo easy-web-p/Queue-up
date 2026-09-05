@@ -72,6 +72,24 @@ export default function Footer() {
                 </Link>
               </li>
               <li className="qup-footer-link-item">
+                <Link to="/guardian" onClick={scrollToTop}>
+                  <i className="bi bi-shield-heart text-danger" />
+                  <span>แดชบอร์ดผู้ปกครอง (Guardian)</span>
+                </Link>
+              </li>
+              <li className="qup-footer-link-item">
+                <Link to="/student-vendor/apply" onClick={scrollToTop}>
+                  <i className="bi bi-mortarboard text-warning" />
+                  <span>ขอเปิดร้านค้านักเรียน</span>
+                </Link>
+              </li>
+              <li className="qup-footer-link-item">
+                <Link to="/campus/monitor" onClick={scrollToTop}>
+                  <i className="bi bi-tv text-primary" />
+                  <span>จอแสดงคิวโรงอาหารสด</span>
+                </Link>
+              </li>
+              <li className="qup-footer-link-item">
                 <Link to="/queueup" onClick={scrollToTop}>
                   <i className="bi bi-award" />
                   <span>เกี่ยวกับโครงการ QueueUp</span>
