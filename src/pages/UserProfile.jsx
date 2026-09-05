@@ -1182,9 +1182,22 @@ function UserProfile() {
                     ))}
 
                     <div className="shopee-order-footer">
-                      <div className="shopee-order-total">
-                        <span>ยอดคำสั่งซื้อทั้งหมด:</span>
-                        <span className="shopee-total-price">฿{(Number(order.totalPrice) || 0).toFixed(2)}</span>
+                      <div className="d-flex flex-column gap-1">
+                        <div className="d-flex align-items-center gap-2 flex-wrap text-xs text-muted">
+                          {order.pickupTime && (
+                            <span className="badge bg-light text-dark border">
+                              <i className="bi bi-clock me-1 text-danger" />
+                              รับ {order.pickupTime} น. ({order.pickupDate || "วันนี้"})
+                            </span>
+                          )}
+                          <span className={`badge ${order.paymentMode === 'CAMPUS_WALLET' ? 'bg-success-subtle text-success border border-success' : 'bg-warning-subtle text-warning-emphasis border border-warning'}`}>
+                            {order.paymentMode === 'CAMPUS_WALLET' ? '💳 ชำระผ่านกระเป๋านักเรียน' : '⚡ Zero-Payment (หน้าร้าน)'}
+                          </span>
+                        </div>
+                        <div className="shopee-order-total mt-1">
+                          <span>ยอดคำสั่งซื้อทั้งหมด:</span>
+                          <span className="shopee-total-price">฿{(Number(order.totalPrice) || 0).toFixed(2)}</span>
+                        </div>
                       </div>
 
                       <div className="shopee-order-actions">

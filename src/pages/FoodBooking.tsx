@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { Utensils, ArrowLeft, Sparkles, AlertCircle, Clock, CheckCircle2, ShoppingBag, Store, MapPin, Calendar, Compass, ChevronRight } from 'lucide-react';
+import { Utensils, ArrowLeft, Sparkles, AlertCircle, Clock, CheckCircle2, ShoppingBag, Store, MapPin, Calendar, Compass, Wallet, CreditCard } from 'lucide-react';
 import { CartItem, Order, CustomerProfile, SelectedModifierOption } from '../types';
 import { db } from '../firebase/config.js';
 import { createAuthoritativeStoreOrder, getBangkokYmd } from '../services/orderCreationService';
@@ -65,6 +65,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
     }
     return getBangkokYmd().ymd;
   });
+  const [paymentMode, setPaymentMode] = useState<'DIRECT_ZERO_PAYMENT' | 'CAMPUS_WALLET'>('DIRECT_ZERO_PAYMENT');
   const [customInstructions, setCustomInstructions] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
@@ -137,6 +138,8 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
         customerPhone: userPhone,
         pickupTime,
         pickupDate: pickupDate || locationState?.bookingDate,
+        paymentMode,
+        studentId: paymentMode === 'CAMPUS_WALLET' ? userId : undefined,
         items: cartItems.map((c) => ({
           productId: c.menuItem.id,
           quantity: c.quantity,
@@ -185,7 +188,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
             )}
             <div>
               <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">ยืนยันรายการและรับคิว (Order & Queue)</h1>
-              <p className="text-xs text-slate-500 font-medium">ระบบ Zero-Payment สั่งปุ๊บรับหมายเลขคิวทันที</p>
+              <p className="text-xs text-slate-500 font-medium">รองรับ Zero-Payment รับคิวทันที หรือชำระด้วยกระเป๋าเงินนักเรียน</p>
             </div>
           </div>
           <div className="hidden sm:flex items-center gap-1.5 bg-amber-50 text-amber-800 px-3 py-1.5 rounded-full text-xs font-bold border border-amber-200">
@@ -250,23 +253,17 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
                 <span className="font-bold text-slate-800">{storeName}</span>
               </div>
               <div className="flex justify-between">
-                <span>ตำแหน่งร้าน:</span>
-                <span className="font-bold text-slate-800">{storeLocation}</span>
+                <span>เวลานัดรับ:</span>
+                <span className="font-bold text-slate-800">{pickupTime} น. ({formatThaiDate(pickupDate)})</span>
               </div>
               <div className="flex justify-between">
-                <span>วันที่นัดรับ:</span>
-                <span className="font-bold text-slate-800">{formatThaiDate(pickupDate)}</span>
+                <span>วิธีชำระเงิน:</span>
+                <span className="font-bold text-slate-800">
+                  {paymentMode === 'CAMPUS_WALLET' ? '💳 กระเป๋าเงินดิจิทัลนักเรียน (ตัดยอดแล้ว)' : '⚡ Zero-Payment (ชำระหน้าร้าน)'}
+                </span>
               </div>
               <div className="flex justify-between">
-                <span>เวลารับอาหาร:</span>
-                <span className="font-bold text-slate-800">{createdOrder.pickupTime} น.</span>
-              </div>
-              <div className="flex justify-between">
-                <span>ชื่อผู้สั่ง:</span>
-                <span className="font-bold text-slate-800">{createdOrder.customerName}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>ยอดรวมสุทธิ:</span>
+                <span>ยอดชำระ:</span>
                 <span className="font-bold text-[#8B0000]">฿{Number(createdOrder.totalAmount).toFixed(2)}</span>
               </div>
               <div className="flex justify-between items-center">
@@ -409,6 +406,49 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
               </div>
             </div>
 
+            {/* Payment Method Selector */}
+            <div>
+              <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <CreditCard className="w-4 h-4 text-[#8B0000]" />
+                เลือกวิธีการชำระเงิน (Payment Option) *
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPaymentMode('DIRECT_ZERO_PAYMENT')}
+                  className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+                    paymentMode === 'DIRECT_ZERO_PAYMENT'
+                      ? 'border-[#8B0000] bg-amber-50/60 ring-2 ring-[#8B0000]/20'
+                      : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-black text-slate-900">⚡ Zero-Payment รับคิวทันที</span>
+                    <span className="text-[10px] font-bold bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full">มาตรฐาน</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mb-0">ออกคิวทันที และชำระเงินตรงกับร้านค้าเมื่อไปรับอาหาร</p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPaymentMode('CAMPUS_WALLET')}
+                  className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+                    paymentMode === 'CAMPUS_WALLET'
+                      ? 'border-[#8B0000] bg-amber-50/60 ring-2 ring-[#8B0000]/20'
+                      : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                      <Wallet className="w-4 h-4 text-[#8B0000]" /> กระเป๋าเงินนักเรียน
+                    </span>
+                    <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Digital Wallet</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mb-0">ตัดยอดอัตโนมัติ พร้อมตรวจเช็ควงเงินและหมวดหมู่ที่ผู้ปกครองอนุญาต</p>
+                </button>
+              </div>
+            </div>
+
             {/* Custom instructions */}
             <div>
               <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2">
@@ -441,4 +481,3 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
 };
 
 export default FoodBooking;
-
