@@ -86,9 +86,16 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
     fetchShopsFromFirestore().then((shops) => {
       if (shops && shops.length > 0) setShopInfo(shops[0]);
     });
-    fetchMenuItemsFromFirestore().then((dbItems) => {
-      if (dbItems && dbItems.length > 0) setLocalMenuItems(dbItems);
-    });
+    // fetchMenuItemsFromFirestore now throws instead of returning a hardcoded
+    // catalogue, so a failure has to be handled rather than silently swallowed.
+    fetchMenuItemsFromFirestore()
+      .then((dbItems) => {
+        if (dbItems && dbItems.length > 0) setLocalMenuItems(dbItems);
+      })
+      .catch((err) => {
+        console.warn('Could not load the menu:', err);
+        setToastMsg('โหลดรายการเมนูไม่สำเร็จ กรุณารีเฟรชหน้าอีกครั้ง');
+      });
     fetchOrdersFromFirestore().then((dbOrders) => {
       if (dbOrders && dbOrders.length > 0) setOrders(dbOrders);
     });
@@ -618,9 +625,18 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                 </button>
                 <button
                   onClick={() => {
-                    fetchMenuItemsFromFirestore().then((dbItems) => setLocalMenuItems(dbItems));
-                    setToastMsg('รีเซ็ตราคากลับสู่มาตรฐานโรงอาหารเรียบร้อย');
-                    setTimeout(() => setToastMsg(null), 2500);
+                    // The confirmation used to appear before the reload had even
+                    // returned, so a failed reload still read as success.
+                    fetchMenuItemsFromFirestore()
+                      .then((dbItems) => {
+                        setLocalMenuItems(dbItems);
+                        setToastMsg('รีเซ็ตราคากลับสู่มาตรฐานโรงอาหารเรียบร้อย');
+                      })
+                      .catch((err) => {
+                        console.warn('Could not reload the menu:', err);
+                        setToastMsg('รีเซ็ตราคาไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+                      })
+                      .finally(() => setTimeout(() => setToastMsg(null), 2500));
                   }}
                   className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1 ml-auto"
                 >
@@ -674,7 +690,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                   {filteredMenuItems.map((item) => (
                     <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="p-3 flex items-center gap-3">
-                        <img
+                        <img loading="lazy" decoding="async"
                           src={item.image}
                           alt={item.name}
                           className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0"

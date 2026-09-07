@@ -22,7 +22,7 @@ export function PageRouteLoaderView({ message = MESSAGES[0], progress = 60, isFa
         <div className="page-loader-ring-wrapper relative w-20 h-20 mb-4 flex items-center justify-center">
           <div className="page-loader-spinner-ring absolute inset-0 rounded-full border-4 border-orange-500/20 border-t-[#ee4d2d] animate-spin" />
           <div className="page-loader-icon-box w-12 h-12 flex items-center justify-center animate-pulse">
-            <img
+            <img loading="lazy" decoding="async"
               src="/logo.png"
               alt="QueueUp Logo"
               className="page-loader-logo-img w-10 h-10 object-contain drop-shadow-md"

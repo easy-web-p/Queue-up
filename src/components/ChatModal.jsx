@@ -307,7 +307,7 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
                   onClick={() => handleSelectChat(chat.id)}
                 >
                   <div className="queueup-chat-item-avatar-wrapper relative w-10 h-10 shrink-0">
-                    <img
+                    <img loading="lazy" decoding="async"
                       src={chat.avatar}
                       alt={chat.storeName}
                       className="queueup-chat-item-avatar w-full h-full rounded-full object-cover border border-slate-200 dark:border-slate-700"
@@ -353,7 +353,7 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
               {/* Header */}
               <div className="queueup-chat-main-header p-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900">
                 <div className="queueup-chat-header-user flex items-center gap-2.5">
-                  <img
+                  <img loading="lazy" decoding="async"
                     src={activeChat.avatar}
                     alt={activeChat.storeName}
                     className="queueup-chat-item-avatar w-9 h-9 rounded-full object-cover border border-slate-200 dark:border-slate-700"
@@ -440,7 +440,7 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                 />
-                <button type="submit" className="queueup-chat-send-btn p-2 w-9 h-9 rounded-xl bg-[#ee4d2d] hover:bg-[#d73211] text-white flex items-center justify-center transition-all cursor-pointer border-0 shadow-xs" title="ส่งข้อความ" aria-label="ส่งข้อความ">
+                <button type="submit" className="queueup-chat-send-btn p-2 w-9 h-9 min-w-[44px] min-h-[44px] rounded-xl bg-[#ee4d2d] hover:bg-[#d73211] text-white flex items-center justify-center transition-all cursor-pointer border-0 shadow-xs" title="ส่งข้อความ" aria-label="ส่งข้อความ">
                   <i className="bi bi-send-fill text-xs" />
                 </button>
               </form>

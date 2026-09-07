@@ -1,21 +1,23 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import FoodCard from "../components/FoodCard.jsx";
 import ShopeeSearchBar from "../components/ShopeeSearchBar.jsx";
 import ChatModal from "../components/ChatModal.jsx";
 import Footer from "../components/Footer.jsx";
-import { SHARED_PRODUCTS } from "../data/mockProducts.js";
 import { fetchProductsFromFirestore } from "../lib/firebase.js";
+import { FoodGridSkeleton, ErrorState } from "../components/LoadingStates.jsx";
 import "./SearchResults.css";
 
-const MOCK_SEARCH_PRODUCTS = SHARED_PRODUCTS;
 
 function SearchResults() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const keyword = searchParams.get("keyword") || "อาหาร";
 
-  const [productsList, setProductsList] = useState(MOCK_SEARCH_PRODUCTS);
+  // Started as MOCK_SEARCH_PRODUCTS, so a search rendered a page of fabricated
+  // results before Firestore answered — and kept them if the read failed.
+  const [productsList, setProductsList] = useState([]);
+  const [status, setStatus] = useState("loading"); // loading | ready | error
   const [sortBy, setSortBy] = useState("related"); // 'related' | 'latest' | 'top_sales' | 'price_low' | 'price_high'
   const [isChatOpen, setIsChatOpen] = useState(false);
   
@@ -27,14 +29,26 @@ function SearchResults() {
   const [appliedMinPrice, setAppliedMinPrice] = useState(null);
   const [appliedMaxPrice, setAppliedMaxPrice] = useState(null);
 
-  // Fetch products from Firestore
-  useEffect(() => {
-    fetchProductsFromFirestore().then((dbProducts) => {
-      if (dbProducts && dbProducts.length > 0) {
-        setProductsList(dbProducts);
-      }
-    });
+  const loadProducts = useCallback(() => {
+    fetchProductsFromFirestore()
+      .then((dbProducts) => {
+        setProductsList(dbProducts || []);
+        setStatus("ready");
+      })
+      .catch((err) => {
+        console.warn("Could not load search results:", err);
+        setStatus("error");
+      });
   }, []);
+
+  const retryProducts = useCallback(() => {
+    setStatus("loading");
+    loadProducts();
+  }, [loadProducts]);
+
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
 
   // Category Toggle Handler
   const toggleCategory = (catKey) => {
@@ -308,8 +322,18 @@ function SearchResults() {
               </div>
             </div>
 
+            {status === "loading" && <FoodGridSkeleton count={10} />}
+
+            {status === "error" && (
+              <ErrorState
+                title="ค้นหาไม่สำเร็จ"
+                message="ไม่สามารถเชื่อมต่อกับระบบเมนูของโรงอาหารได้ในขณะนี้"
+                onRetry={retryProducts}
+              />
+            )}
+
             {/* Condition 1: When products are found */}
-            {!isNoResults && (
+            {status === "ready" && !isNoResults && (
               <div className="shopee-product-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
                 {sortedProducts.map((product) => (
                   <FoodCard
@@ -327,7 +351,7 @@ function SearchResults() {
             )}
 
             {/* Condition 2: When NO products match (Empty Search State) */}
-            {isNoResults && (
+            {status === "ready" && isNoResults && (
               <div>
                 {/* Empty State Banner */}
                 <div className="shopee-empty-search-card bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 sm:p-12 text-center shadow-sm mb-6">

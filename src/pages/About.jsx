@@ -17,7 +17,7 @@ export default function About() {
           className="about-brand flex items-center gap-2 font-black text-xl text-white bg-transparent border-0 cursor-pointer"
           onClick={() => navigate("/queueup")}
         >
-          <img src="/logo.png" alt="QueueUp" className="w-8 h-8 object-contain" /> QueueUp
+          <img decoding="async" src="/logo.png" alt="QueueUp" className="w-8 h-8 object-contain" /> QueueUp
         </button>
         <button
           className="about-back inline-flex items-center gap-2 bg-[#ee4d2d] hover:bg-[#ff7337] text-white px-5 py-2 rounded-full font-bold text-xs shadow-md transition-all cursor-pointer border-0"

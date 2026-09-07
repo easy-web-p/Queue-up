@@ -359,6 +359,9 @@ function Login() {
         {/* Left Hero Banner Section */}
         <div className="yeti-hero">
           <img
+            /* The hero is the LCP element: eager and high priority. */
+            fetchPriority="high"
+            decoding="async"
             src={selectedAvatar}
             alt="Yeti Mascot"
             className="yeti-hero-img"
@@ -402,7 +405,7 @@ function Login() {
         {/* Right Auth Form Section */}
         <div className="yeti-form-container">
           <div className="yeti-logo-wrapper text-center">
-            <img src="/logo.png" alt="QueueUp Logo" className="yeti-logo-img" />
+            <img decoding="async" src="/logo.png" alt="QueueUp Logo" className="yeti-logo-img" />
           </div>
 
           <h1 className="yeti-title">
@@ -441,7 +444,7 @@ function Login() {
                       }`}
                       onClick={() => setSelectedAvatar(item.src)}
                     >
-                      <img src={item.src} alt={item.label} />
+                      <img loading="lazy" decoding="async" src={item.src} alt={item.label} />
                       {selectedAvatar === item.src && (
                         <div className="avatar-badge">
                           <i className="bi bi-check" />

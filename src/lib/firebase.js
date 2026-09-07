@@ -109,24 +109,30 @@ export const fetchShopsFromFirestore = async () => {
 // FIRESTORE PRODUCTS COLLECTION HELPERS
 // ==========================================================================
 
-// ฟังก์ชันดึงรายการอาหารทั้งหมดจาก Firestore
+/**
+ * The canteen's real menu.
+ *
+ * This used to return the hardcoded INITIAL_PRODUCTS catalogue whenever the
+ * collection was empty OR the read failed. Both cases put dishes on the screen
+ * that do not exist: a student could open one, configure it, add it to the cart
+ * and reach the booking page, where the order was refused with
+ * "PRODUCT_NOT_FOUND: ไม่พบสินค้ารหัส ... ในระบบ". A read denied by security rules
+ * looked exactly like a stocked canteen.
+ *
+ * An empty menu is now an empty menu, and a failed read throws so the caller can
+ * say so. INITIAL_PRODUCTS remains the seed for saveProductsToFirestore, which is
+ * how real products get into the collection.
+ *
+ * @returns {Promise<Array>} every product in the collection; [] when there are none
+ * @throws when the collection cannot be read
+ */
 export const fetchProductsFromFirestore = async () => {
-  try {
-    const querySnapshot = await getDocs(collection(db, "products"));
-    const products = [];
-    querySnapshot.forEach((docSnap) => {
-      products.push({ id: docSnap.id, ...docSnap.data() });
-    });
-
-    if (products.length > 0) {
-      return products;
-    }
-
-    return INITIAL_PRODUCTS;
-  } catch (error) {
-    console.warn("Firestore fetchProducts warning, using local catalog:", error);
-    return INITIAL_PRODUCTS;
-  }
+  const querySnapshot = await getDocs(collection(db, "products"));
+  const products = [];
+  querySnapshot.forEach((docSnap) => {
+    products.push({ id: docSnap.id, ...docSnap.data() });
+  });
+  return products;
 };
 
 // ฟังก์ชันดึงข้อมูลอาหารเดี่ยวตาม ID จาก Firestore

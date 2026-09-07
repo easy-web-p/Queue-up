@@ -28,7 +28,7 @@ function FoodCard({
     <div className="shopee-food-card bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-sm hover:shadow-md hover:border-[#ee4d2d]/50 transition-all overflow-hidden flex flex-col cursor-pointer group" onClick={onClick}>
       {/* 1. Image Wrapper with Badges & Floating Heart Button */}
       <div className="shopee-food-img-wrapper relative aspect-[4/3] w-full overflow-hidden bg-slate-100 dark:bg-slate-900">
-        <img
+        <img loading="lazy" decoding="async"
           src={image}
           alt={foodTitle}
           className="shopee-food-img w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -46,12 +46,13 @@ function FoodCard({
 
         {/* Floating Heart Favorite Button */}
         <button
-          className="shopee-food-heart-btn absolute top-2 right-2 w-7 h-7 rounded-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm flex items-center justify-center text-xs shadow-sm hover:scale-110 transition-all z-10 border-0 cursor-pointer"
+          className="shopee-food-heart-btn absolute top-2 right-2 w-7 h-7 min-w-[44px] min-h-[44px] rounded-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm flex items-center justify-center text-xs shadow-sm hover:scale-110 transition-all z-10 border-0 cursor-pointer"
           onClick={(e) => {
             e.stopPropagation();
             if (onToggleFavorite) onToggleFavorite(id);
           }}
           title="บันทึกเป็นเมนูโปรด"
+          aria-label="บันทึกเป็นเมนูโปรด"
         >
           <i
             className={`bi ${
@@ -77,7 +78,7 @@ function FoodCard({
 
         {/* Small Circular Shop Logo & Shop Name */}
         <div className="shopee-food-shop-row flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 mb-1">
-          <img
+          <img loading="lazy" decoding="async"
             src={shopLogo}
             alt={shopName}
             className="shopee-food-shop-logo w-4 h-4 rounded-full object-cover"

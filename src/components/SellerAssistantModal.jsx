@@ -174,7 +174,7 @@ export default function SellerAssistantModal({ isOpen, onClose, userName = "ผ�
                 value={inputMsg}
                 onChange={(e) => setInputMsg(e.target.value)}
               />
-              <button type="submit" className="seller-send-btn bg-[#ee4d2d] text-white w-7 h-7 rounded-full flex items-center justify-center text-xs shadow-sm hover:opacity-90 transition-all cursor-pointer border-0" title="ส่งข้อความ" aria-label="ส่งข้อความ">
+              <button type="submit" className="seller-send-btn bg-[#ee4d2d] text-white w-7 h-7 min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-xs shadow-sm hover:opacity-90 transition-all cursor-pointer border-0" title="ส่งข้อความ" aria-label="ส่งข้อความ">
                 <i className="bi bi-send-fill" />
               </button>
             </div>

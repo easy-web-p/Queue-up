@@ -163,7 +163,7 @@ function MerchantOnboarding() {
       <header className="shopee-onboarding-header">
         <div className="shopee-onboarding-header-container">
           <div className="shopee-onboarding-brand cursor-pointer" onClick={() => navigate("/home")}>
-            <img src="/logo.png" alt="QueueUp Logo" className="shopee-onboarding-logo" />
+            <img decoding="async" src="/logo.png" alt="QueueUp Logo" className="shopee-onboarding-logo" />
             <span className="shopee-onboarding-title">QueueUp Seller Centre</span>
           </div>
 
@@ -209,7 +209,7 @@ function MerchantOnboarding() {
         {step === 0 && (
           <div className="shopee-onboarding-card fade-in">
             <div className="shopee-onboarding-illustration-box">
-              <img
+              <img loading="lazy" decoding="async"
                 src="/logo.png"
                 alt="Welcome Merchant"
                 className="shopee-onboarding-illustration-img"

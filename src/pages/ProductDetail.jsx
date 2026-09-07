@@ -880,7 +880,7 @@ function ProductDetail() {
           {/* LEFT COLUMN: Gallery & Terms */}
           <div className="queue-pd-left-col">
             <div className="queue-pd-main-img-box">
-              <img
+              <img loading="lazy" decoding="async"
                 src={selectedImg}
                 alt={product.name}
                 className="queue-pd-main-img"
@@ -911,7 +911,7 @@ function ProductDetail() {
                   className={`queue-pd-thumb-box ${selectedImg === img ? "active" : ""}`}
                   onClick={() => setSelectedImg(img)}
                 >
-                  <img
+                  <img loading="lazy" decoding="async"
                     src={img}
                     alt={`Thumbnail ${idx}`}
                     className="queue-pd-thumb-img"
@@ -947,7 +947,7 @@ function ProductDetail() {
           <div className="queue-pd-right-card">
             {/* Store Banner & Mini Header */}
             <div className="queue-pd-shop-banner-box">
-              <img
+              <img loading="lazy" decoding="async"
                 src={product.shopBanner || store.banner}
                 alt={store.name || product.shopName}
                 className="queue-pd-shop-banner-img"
@@ -1368,7 +1368,7 @@ function ProductDetail() {
                   className="queue-pd-video-card"
                   onClick={() => setActiveVideo(vid)}
                 >
-                  <img src={vid.thumbnail} alt={vid.title} className="queue-pd-video-thumb" />
+                  <img loading="lazy" decoding="async" src={vid.thumbnail} alt={vid.title} className="queue-pd-video-thumb" />
                   <div className="queue-pd-video-overlay" />
                   <div className="queue-pd-video-top">
                     <span className="badge bg-dark bg-opacity-75 text-white">
@@ -1535,7 +1535,7 @@ function ProductDetail() {
                     }}
                   >
                     <div className="queue-pd-rec-img-box">
-                      <img
+                      <img loading="lazy" decoding="async"
                         src={rec.image || rec.mainImg}
                         alt={rec.name}
                         className="queue-pd-rec-img"
@@ -1552,7 +1552,7 @@ function ProductDetail() {
                         <button
                           type="button"
                           aria-label={`ดูเมนู ${rec.name}`}
-                          className="btn btn-sm btn-primary rounded-circle d-flex align-items-center justify-content-center w-7 h-7"
+                          className="btn btn-sm btn-primary rounded-circle d-flex align-items-center justify-content-center w-7 h-7 min-w-[44px] min-h-[44px]"
                         >
                           <i className="bi bi-plus" />
                         </button>
@@ -1759,7 +1759,7 @@ function ProductDetail() {
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content rounded-4 border-0 shadow-lg p-0 overflow-hidden bg-dark text-white">
               <div className="position-relative h-[360px]">
-                <img
+                <img loading="lazy" decoding="async"
                   src={activeVideo.thumbnail}
                   alt={activeVideo.title}
                   className="w-100 h-100 object-fit-cover opacity-75"

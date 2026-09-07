@@ -80,7 +80,7 @@ export default function LandingPage() {
       <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           <Link to="/" className="flex items-center gap-2 group">
-            <img src="/logo.png" alt="QueueUp Logo" className="w-8 h-8 rounded-lg object-contain shadow-xs" />
+            <img decoding="async" src="/logo.png" alt="QueueUp Logo" className="w-8 h-8 rounded-lg object-contain shadow-xs" />
             <span className="text-2xl font-black tracking-tight text-slate-900 group-hover:text-emerald-700 transition-colors">
               Queue<span className="text-emerald-600">Up</span>
             </span>
@@ -190,7 +190,7 @@ export default function LandingPage() {
               <div className="bg-[#064e3b] px-6 py-4 text-white flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center">
-                    <img src="/logo.png" alt="QueueUp" className="w-5 h-5 object-contain" />
+                    <img decoding="async" src="/logo.png" alt="QueueUp" className="w-5 h-5 object-contain" />
                   </div>
                   <div>
                     <div className="font-bold text-sm leading-tight">QueueUp Express Ticket</div>

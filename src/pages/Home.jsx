@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import {
@@ -14,8 +14,8 @@ import Footer from "../components/Footer.jsx";
 import DailyMenuBoard from "../components/DailyMenuBoard.jsx";
 import ShopReelsFeed from "../components/ShopReelsFeed.jsx";
 import { usePreferences } from "../context/PreferencesContext.jsx";
-import { SHARED_PRODUCTS } from "../data/mockProducts.js";
-import { INITIAL_PRODUCTS } from "../firebase/config.js";
+import { FoodGridSkeleton, EmptyState, ErrorState } from "../components/LoadingStates.jsx";
+import { Utensils } from "lucide-react";
 import { getUserBehaviorInsights, recordUserOrderBehavior } from "../services/aiBehaviorEngine.js";
 import { getActiveMerchantCoupons } from "../services/aiMarketingService.js";
 import { useToast } from "../components/ToastProvider.jsx";
@@ -43,8 +43,6 @@ const DEFAULT_CATEGORIES = [
   { id: "drink", label: "เครื่องดื่ม", image: "https://images.unsplash.com/photo-1558857563-b371033873b8?w=200&auto=format&fit=crop&q=60" },
 ];
 
-const DEFAULT_MENU_ITEMS = INITIAL_PRODUCTS || SHARED_PRODUCTS;
-
 function Home() {
   const toast = useToast();
   const { user } = useSelector((state) => state.auth);
@@ -54,7 +52,12 @@ function Home() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
   const [, setShops] = useState([]);
-  const [menuItems, setMenuItems] = useState(DEFAULT_MENU_ITEMS);
+  // Starts empty and loading rather than pre-filled with INITIAL_PRODUCTS. The
+  // hardcoded catalogue used to be the initial state AND the fetch's fallback, so a
+  // student saw a full menu of dishes that were not in the database — tappable,
+  // configurable, addable to the cart, and refused at ordering with PRODUCT_NOT_FOUND.
+  const [menuItems, setMenuItems] = useState([]);
+  const [menuStatus, setMenuStatus] = useState("loading"); // loading | ready | error
   const [favorites, setFavorites] = useState([]);
   const [showNotice, setShowNotice] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -188,6 +191,28 @@ function Home() {
     );
   };
 
+  // No setState in the body: the initial state is already "loading", and resetting
+  // it synchronously from the effect would trigger a cascading render. Retrying is
+  // where the state genuinely has to move backwards, so that lives in retryMenu.
+  const loadMenu = useCallback(() => {
+    fetchProductsFromFirestore()
+      .then((dbProducts) => {
+        setMenuItems(dbProducts || []);
+        setMenuStatus("ready");
+      })
+      .catch((err) => {
+        // A read refused by security rules used to be indistinguishable from a
+        // stocked canteen. It is now its own state, with a way to retry.
+        console.warn("Could not load the menu:", err);
+        setMenuStatus("error");
+      });
+  }, []);
+
+  const retryMenu = useCallback(() => {
+    setMenuStatus("loading");
+    loadMenu();
+  }, [loadMenu]);
+
   useEffect(() => {
     fetchFoodCategoriesFromFirestore().then((dbCats) => {
       if (dbCats && dbCats.length > 0) {
@@ -203,12 +228,8 @@ function Home() {
       }
     });
 
-    fetchProductsFromFirestore().then((dbProducts) => {
-      if (dbProducts && dbProducts.length > 0) {
-        setMenuItems(dbProducts);
-      }
-    });
-  }, []);
+    loadMenu();
+  }, [loadMenu]);
 
   const toggleFavorite = (itemId) => {
     setFavorites((prev) =>
@@ -361,6 +382,9 @@ function Home() {
           </div>
 
           <img
+            /* Above the fold and the LCP element on this page. */
+            fetchPriority="high"
+            decoding="async"
             src="/crispy_fried_chicken.jpg"
             alt="Crispy Fried Chicken"
             className="queue-hero-right-img"
@@ -565,7 +589,7 @@ function Home() {
                 }}
               >
                 <div className="queue-category-circle">
-                  <img
+                  <img loading="lazy" decoding="async"
                     src={cat.image || "/logo.png"}
                     alt={cat.label}
                     className="queue-category-icon-img"
@@ -837,18 +861,53 @@ function Home() {
           </div>
 
           {/* Food Cards Grid */}
-          <div className="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3">
-            {displayCatalogItems.map((item) => (
-              <div key={item.id} className="col">
-                <FoodCard
-                  item={item}
-                  isFavorite={favorites.includes(item.id)}
-                  onToggleFavorite={toggleFavorite}
-                  onClick={() => navigate(`/product/${item.id}`)}
-                />
-              </div>
-            ))}
-          </div>
+          {menuStatus === "loading" && <FoodGridSkeleton count={8} />}
+
+          {menuStatus === "error" && (
+            <ErrorState
+              title="โหลดรายการอาหารไม่สำเร็จ"
+              message="ไม่สามารถเชื่อมต่อกับระบบเมนูของโรงอาหารได้ในขณะนี้"
+              onRetry={retryMenu}
+            />
+          )}
+
+          {menuStatus === "ready" && displayCatalogItems.length === 0 && (
+            <EmptyState
+              icon={<Utensils className="w-8 h-8" aria-hidden="true" />}
+              title={menuItems.length === 0 ? "ยังไม่มีเมนูอาหารในระบบ" : "ไม่พบเมนูในหมวดนี้"}
+              message={
+                menuItems.length === 0
+                  ? "โรงอาหารยังไม่ได้เพิ่มเมนู กรุณาติดต่อผู้ดูแลระบบ"
+                  : "ลองเลือกหมวดหมู่อื่น หรือดูเมนูทั้งหมด"
+              }
+              action={
+                menuItems.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory("all")}
+                    className="min-h-[44px] px-5 py-3 bg-[#FF7A1A] hover:bg-[#E6680D] text-white font-['Kanit'] font-bold text-xs rounded-xl shadow-md transition-colors cursor-pointer"
+                  >
+                    ดูเมนูทั้งหมด
+                  </button>
+                ) : null
+              }
+            />
+          )}
+
+          {menuStatus === "ready" && displayCatalogItems.length > 0 && (
+            <div className="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3">
+              {displayCatalogItems.map((item) => (
+                <div key={item.id} className="col">
+                  <FoodCard
+                    item={item}
+                    isFavorite={favorites.includes(item.id)}
+                    onToggleFavorite={toggleFavorite}
+                    onClick={() => navigate(`/product/${item.id}`)}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </div>
 

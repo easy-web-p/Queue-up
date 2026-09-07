@@ -77,7 +77,7 @@ export default function ShopReelsFeed({ onOrderFromReel }) {
           return (
             <div key={reel.id} className="reel-card bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all flex flex-col justify-between">
               <div className="reel-video-container relative aspect-[4/3] w-full overflow-hidden bg-slate-900">
-                <img src={reel.videoPoster} alt={reel.title} className="reel-poster-img w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
+                <img loading="lazy" decoding="async" src={reel.videoPoster} alt={reel.title} className="reel-poster-img w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
                 <div className="reel-overlay-play absolute inset-0 flex items-center justify-center bg-black/25 backdrop-blur-[1px] cursor-pointer">
                   <i className="bi bi-play-circle-fill reel-play-icon text-4xl text-white/90 drop-shadow-md" />
                 </div>
@@ -96,7 +96,7 @@ export default function ShopReelsFeed({ onOrderFromReel }) {
 
               <div className="reel-card-content p-4 flex flex-col justify-between flex-1">
                 <div className="reel-author-row flex items-center gap-2 mb-2">
-                  <img src={reel.shopAvatar} alt="" className="reel-avatar w-7 h-7 rounded-full object-cover border border-slate-200 dark:border-slate-700" />
+                  <img loading="lazy" decoding="async" src={reel.shopAvatar} alt="" className="reel-avatar w-7 h-7 rounded-full object-cover border border-slate-200 dark:border-slate-700" />
                   <span className="reel-author-name text-xs font-semibold text-slate-600 dark:text-slate-300">{reel.shopName}</span>
                 </div>
 

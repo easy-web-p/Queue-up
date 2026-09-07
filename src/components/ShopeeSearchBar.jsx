@@ -594,7 +594,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
               onClick={() => navigate("/user/account/profile")}
               title={user ? user.name || user.email : "โปรไฟล์ของฉัน"}
             >
-              <img
+              <img loading="lazy" decoding="async"
                 src={(user && (user.photo || user.photoURL)) || "/yeti_mascot.jpg"}
                 alt="Profile"
                 className="shopee-user-avatar"
@@ -814,7 +814,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
           }}
         >
           <div className="shopee-logo-card">
-            <img src="/logo.png" alt="QueueUp Logo" className="shopee-logo-img" />
+            <img decoding="async" src="/logo.png" alt="QueueUp Logo" className="shopee-logo-img" />
           </div>
           <div className="shopee-logo-text-group">
             <div className="shopee-logo-title">

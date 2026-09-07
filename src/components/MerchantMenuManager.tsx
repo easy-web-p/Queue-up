@@ -142,7 +142,7 @@ export const MerchantMenuManager: React.FC<Props> = ({
                 <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
                   {/* Item Image & Title */}
                   <td className="p-4 flex items-center gap-3">
-                    <img
+                    <img loading="lazy" decoding="async"
                       src={item.image || item.imageUrl || '/crispy_fried_chicken.jpg'}
                       alt={item.name}
                       className="w-12 h-12 rounded-xl object-cover border border-slate-200 shadow-xs"

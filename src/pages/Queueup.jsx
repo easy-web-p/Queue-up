@@ -236,7 +236,7 @@ export default function Queueup() {
       <header className={`qup-navbar ${isScrolled ? "scrolled" : ""}`}>
         <div className="qup-nav-content">
           <div className="qup-logo-group" onClick={() => navigate("/about")}>
-            <img src="/logo.png" alt="QueueUp Logo" className="qup-logo-img" />
+            <img decoding="async" src="/logo.png" alt="QueueUp Logo" className="qup-logo-img" />
             <span className="qup-logo-text">QueueUp</span>
           </div>
 
@@ -295,7 +295,7 @@ export default function Queueup() {
 
         <div className="qup-hero-card-display">
           <div className="qup-mascot-frame">
-            <img src="/yeti_mascot.jpg" alt="QueueUp Yeti Mascot" className="qup-mascot-img" />
+            <img loading="lazy" decoding="async" src="/yeti_mascot.jpg" alt="QueueUp Yeti Mascot" className="qup-mascot-img" />
 
             {/* Floating Live Badges */}
             <div className="qup-float-badge qup-float-1">
@@ -1029,7 +1029,7 @@ export default function Queueup() {
         <div className="qup-footer-grid">
           <div>
             <div className="qup-logo-group mb-3" onClick={() => navigate("/")}>
-              <img src="/logo.png" alt="QueueUp Logo" className="qup-logo-img" />
+              <img decoding="async" src="/logo.png" alt="QueueUp Logo" className="qup-logo-img" />
               <span className="qup-logo-text">QueueUp</span>
             </div>
             <p className="text-slate-400 text-[0.92rem] leading-relaxed max-w-[320px]">
