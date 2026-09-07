@@ -329,7 +329,7 @@ function Login() {
         isMerchantVerified: Boolean(existingData.isMerchantVerified || isAdminAccount),
         isMerchantRegistered: Boolean(existingData.isMerchantRegistered || isAdminAccount),
         isSuperAdmin: isAdminAccount,
-        storeId: existingData.storeId || undefined,
+        ...(existingData.storeId ? { storeId: existingData.storeId } : {}),
         lastLoginAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };

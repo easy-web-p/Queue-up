@@ -224,7 +224,7 @@ service cloud.firestore {
         (
           isOwner(userId) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'name', 'displayName', 'phone', 'school', 'photo', 'photoURL', 'avatar', 'updatedAt'
+            'name', 'displayName', 'fullName', 'lastName', 'gender', 'birthDate', 'phone', 'school', 'photo', 'photoURL', 'avatar', 'accountId', 'updatedAt'
           ])
         )
       );

@@ -354,19 +354,37 @@ function UserProfile() {
   const triggerAutoSave = async (fieldKey, value) => {
     setAutoSaveStatus("saving");
 
-    const updatedProfile = {
-      fullName: fieldKey === "fullName" ? value : fullName,
-      lastName: fieldKey === "lastName" ? value : lastName,
-      gender: fieldKey === "gender" ? value : gender,
-      birthDate: fieldKey === "birthDate" ? value : birthDate,
-      email: fieldKey === "email" ? value : email,
-      phone: fieldKey === "phone" ? value : phone,
+    const payload = {
       updatedAt: new Date().toISOString(),
     };
 
+    if (fieldKey === "fullName") {
+      setFullName(value);
+      payload.fullName = value;
+      payload.displayName = value;
+      payload.name = value;
+    } else if (fieldKey === "lastName") {
+      setLastName(value);
+      payload.lastName = value;
+    } else if (fieldKey === "gender") {
+      setGender(value);
+      payload.gender = value;
+    } else if (fieldKey === "birthDate") {
+      setBirthDate(value);
+      payload.birthDate = value;
+    } else if (fieldKey === "phone") {
+      setPhone(value);
+      payload.phone = value;
+    } else if (fieldKey === "avatar") {
+      setAvatar(value);
+      payload.photo = value;
+      payload.photoURL = value;
+      payload.avatar = value;
+    }
+
     if (user && user.uid) {
       try {
-        await setDoc(doc(db, "users", user.uid), updatedProfile, { merge: true });
+        await setDoc(doc(db, "users", user.uid), payload, { merge: true });
       } catch (err) {
         console.warn("Firestore auto-save error:", err);
       }
@@ -375,9 +393,10 @@ function UserProfile() {
     dispatch(
       setUser({
         uid: user ? user.uid : `user-${Date.now()}`,
-        name: updatedProfile.fullName,
-        email: updatedProfile.email,
-        photo: avatar,
+        name: fieldKey === "fullName" ? value : (fullName || user?.name || "ผู้ใช้งาน"),
+        displayName: fieldKey === "fullName" ? value : (fullName || user?.displayName || "ผู้ใช้งาน"),
+        email: user?.email || email,
+        photo: fieldKey === "avatar" ? value : avatar,
       })
     );
 

@@ -44,7 +44,7 @@ const DEFAULT_AUTH_DOMAIN = "queueup-65e82.firebaseapp.com";
  * A host must ALSO be in Firebase Console → Authentication → Settings → Authorized
  * domains, or sign-in is rejected with auth/unauthorized-domain.
  */
-const SAME_ORIGIN_AUTH_HOSTS = ["queue-up-nu.vercel.app"];
+export const SAME_ORIGIN_AUTH_HOSTS = ["queue-up-nu.vercel.app"];
 
 function resolveAuthDomain() {
   const configured = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN;
@@ -54,11 +54,15 @@ function resolveAuthDomain() {
   const host = window.location.hostname;
   if (
     host.endsWith(".firebaseapp.com") ||
-    host.endsWith(".web.app") ||
-    SAME_ORIGIN_AUTH_HOSTS.includes(host)
+    host.endsWith(".web.app")
   ) {
     return host;
   }
+  // Default to DEFAULT_AUTH_DOMAIN (queueup-65e82.firebaseapp.com) to guarantee
+  // Google OAuth redirect_uri matches the pre-authorized redirect URI in Google Cloud Console.
+  // Custom domains like *.vercel.app require adding https://<host>/__/auth/handler into
+  // Google Cloud Console -> Credentials -> OAuth 2.0 Client IDs, otherwise Google throws
+  // "Error 400: redirect_uri_mismatch". Using DEFAULT_AUTH_DOMAIN avoids this error completely.
   return DEFAULT_AUTH_DOMAIN;
 }
 
