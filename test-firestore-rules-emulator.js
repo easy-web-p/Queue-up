@@ -21,15 +21,16 @@ import {
   assertSucceeds,
 } from '@firebase/rules-unit-testing';
 import {
-  doc,
-  setDoc,
-  getDoc,
-  updateDoc,
-  deleteDoc,
+  addDoc,
   collection,
-  query,
-  where,
+  deleteDoc,
+  doc,
+  getDoc,
   getDocs,
+  query,
+  setDoc,
+  updateDoc,
+  where,
 } from 'firebase/firestore';
 
 let passed = 0;
@@ -445,6 +446,55 @@ await runTest('The guardian, the student and staff can read the link', async () 
 
 await runTest('Staff can list pending requests (the approval panel query)', async () => {
   await assertSucceeds(getDocs(query(collection(asTeacher, 'parent_child_links'))));
+});
+
+// ===========================================================================
+console.log('\n🏫 Pilot programme leads (public form, backend-only storage)');
+// ===========================================================================
+
+await runTest('🚨 An unauthenticated visitor CANNOT write a lead directly', async () => {
+  // The landing page form takes no sign-in, so if the collection were open to the
+  // form it would be open to everyone. It goes through submitPilotLead instead.
+  await assertFails(
+    addDoc(collection(asAnon, 'pilot_leads'), {
+      schoolName: 'โรงเรียนปลอม',
+      contactName: 'x',
+      phone: '0812345678',
+      email: 'x@example.com',
+    })
+  );
+});
+
+await runTest('🚨 Not even a signed-in user can write a lead', async () => {
+  await assertFails(
+    addDoc(collection(asStudent, 'pilot_leads'), { schoolName: 'x', contactName: 'y' })
+  );
+});
+
+await runTest('🚨 A school contact is not readable by the public', async () => {
+  // The form promises PDPA confidentiality over a name, position, phone and email.
+  await assertFails(getDoc(doc(asAnon, 'pilot_leads', 'lead_1')));
+  await assertFails(getDoc(doc(asStudent, 'pilot_leads', 'lead_1')));
+  await assertFails(getDocs(query(collection(asStranger, 'pilot_leads'))));
+});
+
+await runTest('An admin can read the leads the team has to act on', async () => {
+  await assertSucceeds(getDoc(doc(asAdmin, 'pilot_leads', 'lead_1')));
+});
+
+await runTest('🚨 Nobody can edit or delete a stored lead from a client', async () => {
+  await assertFails(updateDoc(doc(asAdmin, 'pilot_leads', 'lead_1'), { status: 'CONVERTED' }));
+  await assertFails(deleteDoc(doc(asAdmin, 'pilot_leads', 'lead_1')));
+});
+
+await runTest('🚨 The rate-limit counter cannot be read or reset from a browser', async () => {
+  // It is the only thing bounding an unauthenticated endpoint. A caller who could
+  // reset their own counter would have no limit at all.
+  await assertFails(getDoc(doc(asAnon, 'pilot_lead_rate_limits', '203_0_113_7')));
+  await assertFails(
+    setDoc(doc(asAnon, 'pilot_lead_rate_limits', '203_0_113_7'), { count: 0, windowStart: 0 })
+  );
+  await assertFails(getDoc(doc(asAdmin, 'pilot_lead_rate_limits', '203_0_113_7')));
 });
 
 await testEnv.cleanup();

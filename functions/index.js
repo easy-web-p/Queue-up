@@ -8,6 +8,7 @@ import { resolveWalletAuthority, isStaffOrAdmin, MAX_TOPUP_SATANG } from "./wall
 import { resolveSpendingCounters } from "./walletLimits.js";
 import { scanOrderForAllergens } from "./allergenGuard.js";
 import { resolveLinkDecision, LINK_DECISIONS } from "./linkReview.js";
+import { validatePilotLead, rateLimitKeyForAddress } from "./pilotLead.js";
 
 // 🔒 Server-only credential. Never expose this through a VITE_* variable: Vite inlines
 // those into the client bundle. Set with: firebase functions:secrets:set OPENAI_API_KEY
@@ -116,6 +117,60 @@ async function consumeRateLimit(uid, { collection, maxCalls, windowMs, message }
     tx.set(ref, { windowStart, count: count + 1, updatedAt: FieldValue.serverTimestamp() });
   });
 }
+
+/**
+ * 🏫 Pilot Programme Lead Capture (public, unauthenticated)
+ *
+ * The landing page form previously did nothing but console.log(): the school was
+ * shown "บันทึกข้อมูลเรียบร้อยแล้ว" and promised a callback within 24 hours, and
+ * every lead was discarded. This is the only inbound channel the product has.
+ *
+ * Deliberately callable without sign-in — a school evaluating the product has no
+ * account yet, and requiring one to ask for a demo is the same as having no form.
+ * That makes it the app's only unauthenticated write path, so:
+ *
+ *  - the payload is validated and re-built field by field, never spread, so an
+ *    unexpected key cannot reach the document;
+ *  - submissions are rate limited per caller address, since there is no uid to
+ *    key a quota on and nothing else stops a script filling the collection;
+ *  - `pilot_leads` is closed to every client in firestore.rules (admin read,
+ *    no client write), so the contact details the page promises to keep
+ *    confidential are never readable or writable from a browser.
+ */
+export const submitPilotLead = onCall(
+  { region: "asia-southeast1", cors: true },
+  async (request) => {
+    const validation = validatePilotLead(request.data);
+    if (!validation.ok) {
+      throw new HttpsError("invalid-argument", `${validation.reason}: ${validation.message}`);
+    }
+
+    // rawRequest.ip is Express's view of the caller; behind a proxy it can be
+    // absent, in which case rateLimitKeyForAddress buckets them together rather
+    // than letting them past the limit.
+    const callerKey = rateLimitKeyForAddress(request.rawRequest?.ip);
+    await consumeRateLimit(callerKey, {
+      collection: "pilot_lead_rate_limits",
+      maxCalls: 5,
+      windowMs: 60 * 60 * 1000,
+      message: "ส่งคำขอบ่อยเกินไป กรุณาติดต่อเราทางโทรศัพท์หรืออีเมลโดยตรง",
+    });
+
+    const ref = await db.collection("pilot_leads").add({
+      ...validation.lead,
+      status: "NEW",
+      source: "landing_page_pilot_form",
+      submittedByUid: request.auth?.uid || null,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+    // No lead content in the log line: this collection exists precisely so the
+    // school's contact details live in one controlled place.
+    console.log(`[QueueUp] Pilot lead recorded: ${ref.id}`);
+
+    return { success: true, leadId: ref.id };
+  }
+);
 
 /**
  * 🔒 Server-Authoritative Order Creation (5-Phase Ordering with Campus Wallet support)

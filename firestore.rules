@@ -482,6 +482,25 @@ service cloud.firestore {
     }
 
     // ==========================================
+    // 18.2 PILOT PROGRAMME LEADS (Backend-Only Write, Admin Read)
+    // ==========================================
+    match /pilot_leads/{leadId} {
+      // Schools submit a name, position, phone and email through the public
+      // landing page. The page promises to keep that confidential under the PDPA,
+      // which rules out a client-writable collection: what a browser can write it
+      // can be tricked into writing, and what a browser can read is not
+      // confidential. The submitPilotLead Cloud Function is the only writer.
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /pilot_lead_rate_limits/{callerKey} {
+      // 🔒 The only thing standing between an unauthenticated form and a filled
+      // collection. Readable or resettable from a client, it would stop one.
+      allow read, write: if false;
+    }
+
+    // ==========================================
     // 19. EMERGENCY AUDIT LOGS (Strict Append-Only Immutable Log)
     // ==========================================
     match /emergency_audit_logs/{auditId} {

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import { submitPilotLead } from "../services/pilotLeadService.js";
 
 export default function LandingPage() {
   // Form State
@@ -13,6 +14,8 @@ export default function LandingPage() {
     notes: "",
   });
   const [submitted, setSubmitted] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   // FAQ Accordion State
   const [openFaq, setOpenFaq] = useState<number | null>(null);
@@ -27,10 +30,27 @@ export default function LandingPage() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Pilot Proposal Lead submitted:", form);
-    setSubmitted(true);
+    if (isSending) return;
+
+    // The success panel promises a callback within 24 hours, so it may only be
+    // shown once the lead is actually stored. This previously called console.log
+    // and then claimed success, which discarded every enquiry the product got.
+    setIsSending(true);
+    setSendError(null);
+    try {
+      await submitPilotLead(form);
+      setSubmitted(true);
+    } catch (err) {
+      setSendError(
+        err instanceof Error && err.message
+          ? err.message
+          : "ส่งข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง หรือติดต่อเราทางโทรศัพท์"
+      );
+    } finally {
+      setIsSending(false);
+    }
   };
 
   return (
@@ -798,12 +818,26 @@ export default function LandingPage() {
                     />
                   </div>
 
+                  {sendError && (
+                    <div
+                      role="alert"
+                      className="bg-red-50 border border-red-200 text-red-800 rounded-xl px-4 py-3 text-xs leading-relaxed space-y-1"
+                    >
+                      <p className="font-bold">ส่งข้อมูลไม่สำเร็จ</p>
+                      <p>{sendError}</p>
+                      <p className="text-red-700">
+                        หากยังไม่สำเร็จ ติดต่อเราได้ที่ 092-197-5525 หรือ hi00000087@gmail.com
+                      </p>
+                    </div>
+                  )}
+
                   <button
                     type="submit"
-                    className="w-full bg-[#064e3b] hover:bg-[#065f46] text-white py-3.5 px-6 rounded-xl font-bold text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                    disabled={isSending}
+                    className="w-full bg-[#064e3b] hover:bg-[#065f46] disabled:opacity-60 disabled:cursor-wait text-white py-3.5 px-6 rounded-xl font-bold text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer active:scale-98"
                   >
-                    <span>ส่งข้อมูลขอรับข้อเสนอโครงการนำร่อง</span>
-                    <span>➜</span>
+                    <span>{isSending ? "กำลังส่งข้อมูล..." : "ส่งข้อมูลขอรับข้อเสนอโครงการนำร่อง"}</span>
+                    <span aria-hidden="true">➜</span>
                   </button>
                 </form>
               )}
