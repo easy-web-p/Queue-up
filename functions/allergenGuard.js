@@ -16,9 +16,17 @@
  * duplication is forced by the deployment boundary rather than chosen —
  * test-allergen-guard.js compares the two and fails if they drift apart.
  *
- * Matching is keyword-based and therefore approximate in both directions: it
- * reads names, not recipes. Treat a hit as a warning worth blocking on, not as
- * proof, and its absence as no guarantee of safety.
+ * Two signals, reported separately because they are not equally trustworthy:
+ *
+ *   DECLARED - the store tagged this dish with the allergen (products.allergens).
+ *              A statement about the recipe, and the only reliable signal here.
+ *   INFERRED - a keyword matched the dish's name, category, description or a chosen
+ *              option. Approximate in both directions: "ข้าวผัดพิเศษ" containing
+ *              shrimp matches nothing, and a dish named for an ingredient it no
+ *              longer has matches anyway.
+ *
+ * So the absence of a hit is not a safety guarantee, and never should be presented
+ * as one. Untagged menus fall back to INFERRED alone, which is where this started.
  */
 
 export const ALLERGEN_PRESET_DICTIONARY = {
@@ -132,11 +140,22 @@ export function detectMatchedAllergens(input) {
     productCategory = '',
     productDescription = '',
     selectedModifierNames = [],
+    declaredAllergens = [],
   } = input || {};
 
   if (!Array.isArray(studentAllergies) || studentAllergies.length === 0) {
     return { hasAllergens: false, matchedAllergenNames: [], details: [] };
   }
+
+  // What the store says this dish actually contains. Unlike the keyword scan below,
+  // this is a statement about the recipe rather than an inference from the dish's
+  // name, so it is checked first and reported at a different confidence.
+  const declaredSet = new Set(
+    (Array.isArray(declaredAllergens) ? declaredAllergens : [])
+      .filter((t) => typeof t === 'string')
+      .map((t) => t.trim().toLowerCase())
+      .filter(Boolean)
+  );
 
   const titleLower = String(productTitle || '').toLowerCase();
   const categoryLower = String(productCategory || '').toLowerCase();
@@ -149,12 +168,31 @@ export function detectMatchedAllergens(input) {
     if (!allergy || typeof allergy !== 'string') continue;
 
     const preset = findPresetDictionaryEntry(allergy);
+    const canonicalName = preset ? preset.label : allergy.trim();
+
+    // A declared ingredient settles it; there is nothing to be gained by also
+    // guessing from the name.
+    const declaredKeys = preset
+      ? [preset.id, preset.label.toLowerCase(), cleanAllergenLabel(preset.label)]
+      : [allergy.trim().toLowerCase(), cleanAllergenLabel(allergy)];
+    const declaredHit = declaredKeys.find((k) => k && declaredSet.has(k));
+    if (declaredHit) {
+      details.push({
+        allergenName: canonicalName,
+        triggerSource: 'DECLARED',
+        triggerWord: declaredHit,
+        confidence: 'DECLARED',
+        details: `ร้านค้าระบุว่าเมนูนี้มี "${canonicalName}" เป็นส่วนผสม`,
+      });
+      matchedSet.add(canonicalName);
+      continue;
+    }
+
     const rawKeywords = preset
       ? preset.keywords
       : [allergy.trim().toLowerCase(), cleanAllergenLabel(allergy)];
     // Longest first so the most specific keyword is the one reported.
     const keywordsToSearch = [...rawKeywords].filter(Boolean).sort((a, b) => b.length - a.length);
-    const canonicalName = preset ? preset.label : allergy.trim();
 
     const scanField = (haystack, source, describe) => {
       for (const kw of keywordsToSearch) {
@@ -163,6 +201,7 @@ export function detectMatchedAllergens(input) {
             allergenName: canonicalName,
             triggerSource: source,
             triggerWord: kw,
+            confidence: 'INFERRED',
             details: describe(kw),
           });
           matchedSet.add(canonicalName);
@@ -191,6 +230,7 @@ export function detectMatchedAllergens(input) {
             allergenName: canonicalName,
             triggerSource: 'MODIFIER',
             triggerWord: kw,
+            confidence: 'INFERRED',
             details: `เลือกตัวเลือกเพิ่มเติม "${modName}" (ตรวจพบ: ${kw})`,
           });
           matchedSet.add(canonicalName);
@@ -229,6 +269,7 @@ export function scanOrderForAllergens(studentAllergies, scanItems) {
       productCategory: item.category,
       productDescription: item.description,
       selectedModifierNames: item.modifierNames || [],
+      declaredAllergens: item.declaredAllergens || [],
     });
 
     if (result.hasAllergens) {
@@ -237,6 +278,11 @@ export function scanOrderForAllergens(studentAllergies, scanItems) {
         productId: item.productId,
         name: item.name,
         matchedAllergenNames: result.matchedAllergenNames,
+        // DECLARED when the store stated the ingredient, INFERRED when it was only
+        // read off the dish's name. The two deserve very different wording.
+        confidence: result.details.some((d) => d.confidence === 'DECLARED')
+          ? 'DECLARED'
+          : 'INFERRED',
         details: result.details,
       });
     }
@@ -245,6 +291,7 @@ export function scanOrderForAllergens(studentAllergies, scanItems) {
   return {
     hasAllergens: allMatched.size > 0,
     matchedAllergenNames: Array.from(allMatched),
+    hasDeclaredMatch: flaggedItems.some((f) => f.confidence === 'DECLARED'),
     flaggedItems,
   };
 }
