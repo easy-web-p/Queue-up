@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectCartItems, clearCart } from '../store/cartSlice';
-import { Utensils, ArrowLeft, Sparkles, AlertCircle, Clock, CheckCircle2, ShoppingBag, Store, MapPin, Calendar, Compass, Wallet, CreditCard } from 'lucide-react';
+import { Utensils, ArrowLeft, Sparkles, AlertCircle, Clock, CheckCircle2, ShoppingBag, Store, MapPin, Calendar, Compass, Wallet, CreditCard, Phone } from 'lucide-react';
 import { CartItem, Order, CustomerProfile, SelectedModifierOption } from '../types';
 import {
   createAuthoritativeStoreOrder,
@@ -77,6 +77,11 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
     }
     return getBangkokYmd().ymd;
   });
+  const [customPhone, setCustomPhone] = useState<string | null>(null);
+  const effectivePhone = customPhone !== null 
+    ? customPhone 
+    : (currentUser?.phone || currentUser?.phoneNumber || '');
+
   const [paymentMode, setPaymentMode] = useState<'DIRECT_ZERO_PAYMENT' | 'CAMPUS_WALLET'>('DIRECT_ZERO_PAYMENT');
   const [customInstructions, setCustomInstructions] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -136,9 +141,9 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
       return;
     }
 
-    const userPhone = currentUser?.phone || currentUser?.phoneNumber || '';
+    const userPhone = effectivePhone.trim();
     if (!userPhone) {
-      setOrderError('กรุณากรอกเบอร์โทรศัพท์ในหน้าโปรไฟล์ก่อนทำการจองคิวอาหาร เพื่อรับการแจ้งเตือนคิว');
+      setOrderError('กรุณาระบุเบอร์โทรศัพท์สำหรับรับการแจ้งเตือนคิวอาหาร');
       return;
     }
 
@@ -519,6 +524,22 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
                   <p className="text-[11px] text-slate-500 dark:text-[#9CA3AF] mb-0">ตัดยอดอัตโนมัติ พร้อมตรวจเช็ควงเงินและหมวดหมู่ที่ผู้ปกครองอนุญาต</p>
                 </button>
               </div>
+            </div>
+
+            {/* Customer Phone for Queue Alert */}
+            <div>
+              <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-200 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <Phone className="w-4 h-4 text-[#8B0000] dark:text-[#FF7A1A]" />
+                เบอร์โทรศัพท์สำหรับรับการแจ้งเตือนคิว *
+              </label>
+              <input
+                type="tel"
+                value={effectivePhone}
+                onChange={(e) => setCustomPhone(e.target.value)}
+                placeholder="เช่น 0812345678"
+                required
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-[#16100C] border border-slate-200 dark:border-white/10 rounded-2xl text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#8B0000] dark:focus:border-[#FF7A1A]"
+              />
             </div>
 
             {/* Custom instructions */}

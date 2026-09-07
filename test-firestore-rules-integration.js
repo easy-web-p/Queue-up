@@ -201,7 +201,7 @@ function evaluateRules({ collection, action, auth, resource, requestResource }) 
       if (isAdmin()) return true;
       if (isOwner(resource?.id)) {
         const mutatedKeys = Object.keys(requestResource.data).filter(k => requestResource.data[k] !== resource?.data?.[k]);
-        const allowedKeys = ['name', 'displayName', 'phone', 'school', 'photo', 'photoURL', 'avatar', 'updatedAt'];
+        const allowedKeys = ['name', 'displayName', 'fullName', 'lastName', 'gender', 'birthDate', 'phone', 'school', 'photo', 'photoURL', 'avatar', 'accountId', 'updatedAt'];
         return mutatedKeys.every(k => allowedKeys.includes(k));
       }
       return false;
