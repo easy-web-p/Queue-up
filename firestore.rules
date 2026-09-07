@@ -260,9 +260,16 @@ service cloud.firestore {
     // 6. ORDERS (Canonical Order Storage & True State Machine Guard)
     // ==========================================
     match /orders/{orderId} {
-      // Customer sees own orders, Merchant sees own store orders, Admin sees all
+      // Customer sees own orders, Merchant sees own store orders, Admin sees all.
+      // Staff supervisors see all orders so the campus-wide queue monitor can run its
+      // aggregate query: a Firestore query is rejected unless the rules authorize it
+      // for every document it could return, so a monitor spanning all stalls cannot
+      // work off the per-owner clauses above. Read-only — the state machine below
+      // still restricts status changes to the owning store and admins, so staff can
+      // observe congestion without acting on another stall's orders.
       allow read: if isAuthenticated() && (
         isAdmin() ||
+        isStaffSupervisor() ||
         resource.data.userId == request.auth.uid ||
         (resource.data.storeId != null && isStoreOwner(resource.data.storeId))
       );

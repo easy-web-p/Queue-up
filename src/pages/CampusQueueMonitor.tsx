@@ -9,7 +9,8 @@ import { soundManager } from '../utils/audioNotification.js';
 interface MonitorOrder {
   id: string;
   queueNumber: string;
-  customerName: string;
+  // Deliberately no customerName/customerPhone: this board is shown on a shared
+  // canteen screen, and a queue number is all a student needs to identify their order.
   status: string;
   queueStatus: string;
   storeId: string;
@@ -38,36 +39,53 @@ export default function CampusQueueMonitor() {
     // 🛡️ Spark Plan Budget Guard: Strictly scope to today's active canteen orders
     // to prevent fetching past days and prevent exceeding daily 50,000 read limit.
     const activeStatuses = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'READY_FOR_PICKUP'];
-    const q = query(
-      collection(db, 'orders'),
-      where('pickupDate', '==', todayYmd),
-      where('status', 'in', activeStatuses),
-      limit(60)
+
+    // Both listeners are tracked so cleanup tears down whichever is live. The
+    // fallback used to be opened from inside the error callback and its unsubscribe
+    // returned there, where nothing could receive it — so it outlived the component
+    // and kept streaming reads after unmount.
+    let primaryUnsub: (() => void) | null = null;
+    let fallbackUnsub: (() => void) | null = null;
+    let cancelled = false;
+
+    const applySnapshot = (docs: any[]) => {
+      if (cancelled) return;
+      setOrders(docs.map((d) => ({ id: d.id, ...d.data() })) as MonitorOrder[]);
+    };
+
+    primaryUnsub = onSnapshot(
+      query(
+        collection(db, 'orders'),
+        where('pickupDate', '==', todayYmd),
+        where('status', 'in', activeStatuses),
+        limit(60)
+      ),
+      (snapshot) => applySnapshot(snapshot.docs),
+      (error) => {
+        console.warn('CampusQueueMonitor query warning:', error);
+        // Fallback for a composite index that is still building. Skipped once the
+        // component is gone, and only ever opened once.
+        if (cancelled || fallbackUnsub) return;
+        fallbackUnsub = onSnapshot(
+          query(collection(db, 'orders'), where('status', 'in', activeStatuses), limit(40)),
+          (fallbackSnap) => {
+            if (cancelled) return;
+            setOrders(
+              fallbackSnap.docs
+                .map((d) => ({ id: d.id, ...d.data() }) as MonitorOrder)
+                .filter((ord) => !ord.pickupDate || ord.pickupDate === todayYmd)
+            );
+          },
+          (fallbackError) => console.warn('CampusQueueMonitor fallback warning:', fallbackError)
+        );
+      }
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const items = snapshot.docs.map((d) => ({
-        id: d.id,
-        ...d.data(),
-      })) as MonitorOrder[];
-      setOrders(items);
-    }, (error) => {
-      console.warn('CampusQueueMonitor query warning:', error);
-      // Fallback: If compound index is pending, listen with status filter only
-      const fallbackQuery = query(
-        collection(db, 'orders'),
-        where('status', 'in', activeStatuses),
-        limit(40)
-      );
-      return onSnapshot(fallbackQuery, (fallbackSnap) => {
-        const fallbackItems = fallbackSnap.docs
-          .map((d) => ({ id: d.id, ...d.data() } as MonitorOrder))
-          .filter((ord) => !ord.pickupDate || ord.pickupDate === todayYmd);
-        setOrders(fallbackItems);
-      });
-    });
-
-    return () => unsubscribe();
+    return () => {
+      cancelled = true;
+      primaryUnsub?.();
+      fallbackUnsub?.();
+    };
   }, [todayYmd]);
 
   const preparingOrders = orders.filter((o) =>
@@ -187,7 +205,7 @@ export default function CampusQueueMonitor() {
                   {ord.queueNumber}
                 </span>
                 <p className="text-xs font-bold text-slate-800 dark:text-emerald-200 mt-2 truncate">
-                  {ord.customerName}
+                  {ord.pickupTime ? `รับเวลา ${ord.pickupTime} น.` : 'พร้อมรับที่เคาน์เตอร์'}
                 </p>
               </div>
             ))}
