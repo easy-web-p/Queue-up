@@ -14,6 +14,7 @@ import ErrorBoundary from "./components/ErrorBoundary.jsx";
 // Route components are code-split: the entry bundle carried every page, so a
 // student opening the queue board also downloaded the merchant dashboard, the
 // admin console and every guardian screen. Each now arrives only when routed to.
+const LandingPage = lazy(() => import("./pages/LandingPage.tsx"));
 const Login = lazy(() => import("./pages/Login.jsx"));
 const Home = lazy(() => import("./pages/Home.jsx"));
 const SearchResults = lazy(() => import("./pages/SearchResults.jsx"));
@@ -53,12 +54,13 @@ function App() {
                 boundary for a chunk that has not arrived yet. */}
             <Suspense fallback={<PageRouteLoaderView message="กำลังโหลดหน้าที่คุณเลือก..." progress={70} />}>
             <Routes>
-            <Route path="/" element={<Queueup />} />
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/landing" element={<LandingPage />} />
             <Route path="/queueup" element={<Queueup />} />
-            <Route path="/about" element={<Queueup />} />
-            <Route path="/contact" element={<Queueup />} />
-            <Route path="/team" element={<Queueup />} />
-            <Route path="/pricing" element={<Queueup />} />
+            <Route path="/about" element={<LandingPage />} />
+            <Route path="/contact" element={<LandingPage />} />
+            <Route path="/team" element={<LandingPage />} />
+            <Route path="/pricing" element={<LandingPage />} />
 
             {/* Standalone Legal & PDPA Policy Routes */}
             <Route path="/pdpa" element={<PdpaPolicy />} />
