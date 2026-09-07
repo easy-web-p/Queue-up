@@ -56,6 +56,42 @@ export interface CreateOrderRequest {
   pickupDate?: string; // e.g. "2026-09-04" (YYYY-MM-DD or YYYYMMDD)
   paymentMode?: 'CAMPUS_WALLET' | 'DIRECT_ZERO_PAYMENT';
   studentId?: string;
+  /** Set only after the customer has confirmed an ALLERGEN_ALERT warning. */
+  acknowledgeAllergenWarning?: boolean;
+}
+
+export interface AllergenTriggerDetail {
+  allergenName: string;
+  triggerSource: 'TITLE' | 'CATEGORY' | 'DESCRIPTION' | 'MODIFIER';
+  triggerWord: string;
+  details?: string;
+}
+
+export interface AllergenFlaggedItem {
+  productId: string;
+  name: string;
+  matchedAllergenNames: string[];
+  details: AllergenTriggerDetail[];
+}
+
+/**
+ * Thrown when the server's allergen guard blocks the order.
+ *
+ * Carries what matched so the UI can explain it and offer to proceed. Retrying with
+ * `acknowledgeAllergenWarning: true` is what the customer's confirmation means; the
+ * server records every such override in audit_logs.
+ */
+export class AllergenAlertError extends Error {
+  readonly code = 'ALLERGEN_ALERT';
+  readonly matchedAllergenNames: string[];
+  readonly flaggedItems: AllergenFlaggedItem[];
+
+  constructor(message: string, matchedAllergenNames: string[], flaggedItems: AllergenFlaggedItem[]) {
+    super(message);
+    this.name = 'AllergenAlertError';
+    this.matchedAllergenNames = matchedAllergenNames;
+    this.flaggedItems = flaggedItems;
+  }
 }
 
 export interface OrderCreationResult {
@@ -191,7 +227,19 @@ export async function createAuthoritativeStoreOrder(
       throw new Error('ORDER_CREATION_FAILED: ไม่สามารถสร้างคำสั่งซื้อได้');
     } catch (callableErr: any) {
       // Direct pass-through of authoritative server error message
-      const serverMessage = callableErr?.message || callableErr?.details || 'เกิดข้อผิดพลาดในการสร้างคำสั่งซื้อ';
+      const serverMessage = callableErr?.message || 'เกิดข้อผิดพลาดในการสร้างคำสั่งซื้อ';
+
+      // Preserve the structured payload of an allergen block so the UI can render
+      // the warning instead of a bare error string.
+      const details = callableErr?.details;
+      if (details && typeof details === 'object' && details.code === 'ALLERGEN_ALERT') {
+        throw new AllergenAlertError(
+          serverMessage,
+          Array.isArray(details.matchedAllergenNames) ? details.matchedAllergenNames : [],
+          Array.isArray(details.flaggedItems) ? details.flaggedItems : []
+        );
+      }
+
       throw new Error(serverMessage);
     }
   }

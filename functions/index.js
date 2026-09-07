@@ -6,6 +6,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
 import { resolveWalletAuthority, MAX_TOPUP_SATANG } from "./walletAuthority.js";
 import { resolveSpendingCounters } from "./walletLimits.js";
+import { scanOrderForAllergens } from "./allergenGuard.js";
 
 // 🔒 Server-only credential. Never expose this through a VITE_* variable: Vite inlines
 // those into the client bundle. Set with: firebase functions:secrets:set OPENAI_API_KEY
@@ -107,6 +108,7 @@ export const createOrderAuthoritative = onCall(
       pickupDate,
       paymentMode, // 'CAMPUS_WALLET' | 'DIRECT_ZERO_PAYMENT'
       studentId,   // Required if paymentMode === 'CAMPUS_WALLET'
+      acknowledgeAllergenWarning, // set after the caller confirms an ALLERGEN_ALERT
     } = request.data || {};
 
     if (userId && userId !== authUid && request.auth.token?.admin !== true) {
@@ -219,6 +221,11 @@ export const createOrderAuthoritative = onCall(
           walletSnap = await tx.get(walletRef);
         }
 
+        // Allergy profile for whoever the food is for. All reads must precede any
+        // write in a transaction, so this is fetched here with the rest of Phase 1.
+        const allergyProfileId = effectiveStudentId || authUid;
+        const studentSnap = await tx.get(db.collection("students").doc(allergyProfileId));
+
         // Read all product documents
         const productSnapMap = new Map();
         const referencedModifierGroupIds = new Set();
@@ -315,6 +322,9 @@ export const createOrderAuthoritative = onCall(
         let calculatedTotalSatang = 0;
         const validatedOrderItems = [];
         const itemCategories = new Set();
+        // Menu text gathered for the allergen scan below. Built from the authoritative
+        // product documents, not from anything the client sent.
+        const allergenScanItems = [];
 
         for (const itemReq of items) {
           const prodData = productSnapMap.get(itemReq.productId).data();
@@ -325,6 +335,7 @@ export const createOrderAuthoritative = onCall(
 
           const selectedModifiers = itemReq.selectedModifiers || [];
           const allowedGroupIds = new Set(prodData.modifierGroupIds || []);
+          const selectedModifierNames = [];
 
           // Validate linked required modifier groups
           if (Array.isArray(prodData.modifierGroupIds)) {
@@ -380,8 +391,17 @@ export const createOrderAuthoritative = onCall(
               }
               const optPriceSatang = opt.priceModifierSatang ?? Math.round((Number(opt.priceModifier) || 0) * 100);
               itemModifierSatang += optPriceSatang;
+              if (opt.name) selectedModifierNames.push(String(opt.name));
             }
           }
+
+          allergenScanItems.push({
+            productId: itemReq.productId,
+            name: prodData.name || "",
+            category: prodData.category || "",
+            description: prodData.description || "",
+            modifierNames: selectedModifierNames,
+          });
 
           const unitPriceSatang = basePriceSatang + itemModifierSatang;
           const subtotalSatang = unitPriceSatang * Number(itemReq.quantity);
@@ -399,6 +419,37 @@ export const createOrderAuthoritative = onCall(
             customNotes: itemReq.customNotes || "",
             selectedModifiers,
           });
+        }
+
+        // 2.2b 🛡️ Allergen Guard
+        //
+        // Enforced here rather than only in the UI: src/utils/allergenMatcher.ts runs
+        // in the browser, so calling the callable directly ordered straight past it.
+        //
+        // A hit blocks the order and reports what matched. The caller may retry with
+        // acknowledgeAllergenWarning to proceed anyway, which the spec's "warn before
+        // confirming" flow requires — matching is keyword-based and will sometimes
+        // flag a dish that is actually safe. Every override is recorded on the order
+        // and in audit_logs so a guardian or the school can see it happened.
+        const studentAllergyProfile = studentSnap.exists ? studentSnap.data() : null;
+        const studentAllergies = Array.isArray(studentAllergyProfile?.allergyInfo)
+          ? studentAllergyProfile.allergyInfo
+          : [];
+
+        const allergenScan = scanOrderForAllergens(studentAllergies, allergenScanItems);
+
+        if (allergenScan.hasAllergens && acknowledgeAllergenWarning !== true) {
+          const allergenList = allergenScan.matchedAllergenNames.join(", ");
+          const dishList = allergenScan.flaggedItems.map((f) => `"${f.name}"`).join(", ");
+          throw new HttpsError(
+            "failed-precondition",
+            `ALLERGEN_ALERT: เมนู ${dishList} อาจมีส่วนผสมที่แพ้ (${allergenList}) กรุณาตรวจสอบกับร้านค้าก่อนยืนยันการสั่งซื้อ`,
+            {
+              code: "ALLERGEN_ALERT",
+              matchedAllergenNames: allergenScan.matchedAllergenNames,
+              flaggedItems: allergenScan.flaggedItems,
+            }
+          );
         }
 
         // 2.3 Campus Wallet Spending Rules Enforcement (Phase 0)
@@ -531,6 +582,8 @@ export const createOrderAuthoritative = onCall(
           discountAppliedSatang: 0,
           pointsEarned: Math.floor(calculatedTotalSatang / 1000),
           items: validatedOrderItems,
+          allergenWarningAcknowledged: allergenScan.hasAllergens,
+          acknowledgedAllergenNames: allergenScan.matchedAllergenNames,
           pickupTime: cleanPickupTime,
           pickupDate: targetYmd,
           slotId: dateScopedSlotId,
@@ -539,6 +592,24 @@ export const createOrderAuthoritative = onCall(
         };
 
         tx.set(orderDocRef, orderPayload);
+
+        // An order placed over an allergen warning is recorded in the same atomic
+        // write as the order itself, so an override can never exist without its
+        // audit entry. Guardians and staff can read what was overridden and why.
+        if (allergenScan.hasAllergens) {
+          const allergenAuditRef = db.collection("audit_logs").doc();
+          tx.set(allergenAuditRef, {
+            id: allergenAuditRef.id,
+            action: "ALLERGEN_WARNING_OVERRIDDEN",
+            actorUid: authUid,
+            targetStudentId: allergyProfileId,
+            orderId,
+            storeId,
+            matchedAllergenNames: allergenScan.matchedAllergenNames,
+            flaggedItems: allergenScan.flaggedItems,
+            timestamp: FieldValue.serverTimestamp(),
+          });
+        }
 
         // Phase 4: Atomic Wallet Deduction & Transaction Log
         if (isCampusWallet && walletRef && walletData && walletCounters) {

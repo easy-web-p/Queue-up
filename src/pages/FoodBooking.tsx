@@ -5,7 +5,12 @@ import { selectCartItems, clearCart } from '../store/cartSlice';
 import { Utensils, ArrowLeft, Sparkles, AlertCircle, Clock, CheckCircle2, ShoppingBag, Store, MapPin, Calendar, Compass, Wallet, CreditCard } from 'lucide-react';
 import { CartItem, Order, CustomerProfile, SelectedModifierOption } from '../types';
 import { db } from '../firebase/config.js';
-import { createAuthoritativeStoreOrder, getBangkokYmd } from '../services/orderCreationService';
+import {
+  createAuthoritativeStoreOrder,
+  getBangkokYmd,
+  AllergenAlertError,
+  type AllergenFlaggedItem,
+} from '../services/orderCreationService';
 import { soundManager } from '../utils/audioNotification.js';
 import { ClientQueueTicket } from '../components/ClientQueueTicket.jsx';
 
@@ -79,6 +84,13 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
   const isSubmittingRef = useRef(false);
   const [orderError, setOrderError] = useState<string | null>(null);
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
+  // Set when the server blocks the order on a recorded allergy. Holds what matched so
+  // the customer can see it and decide, rather than reading a bare error string.
+  const [allergenAlert, setAllergenAlert] = useState<{
+    message: string;
+    matchedAllergenNames: string[];
+    flaggedItems: AllergenFlaggedItem[];
+  } | null>(null);
 
   const storeId = locationState?.storeId || cartItems[0]?.menuItem?.storeId || '';
   const storeName = locationState?.storeName || (cartItems[0]?.menuItem as any)?.storeName || (storeId ? `ร้านค้า (${storeId})` : 'ร้านค้า');
@@ -108,8 +120,11 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
     return cartItems.reduce((sum, item) => sum + calculateItemUnitPrice(item) * item.quantity, 0);
   };
 
-  const handleConfirmOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleConfirmOrder = async (
+    e: React.FormEvent | null,
+    options: { acknowledgeAllergenWarning?: boolean } = {}
+  ) => {
+    e?.preventDefault();
     if (isSubmittingRef.current || isSubmitting || cartItems.length === 0) return;
 
     if (!storeId) {
@@ -138,6 +153,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
     isSubmittingRef.current = true;
     setIsSubmitting(true);
     setOrderError(null);
+    setAllergenAlert(null);
 
     try {
       const result = await createAuthoritativeStoreOrder(db, {
@@ -149,6 +165,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
         pickupDate: pickupDate || locationState?.bookingDate,
         paymentMode,
         studentId: paymentMode === 'CAMPUS_WALLET' ? userId : undefined,
+        acknowledgeAllergenWarning: options.acknowledgeAllergenWarning === true,
         items: cartItems.map((c) => ({
           productId: c.menuItem.id,
           quantity: c.quantity,
@@ -175,7 +192,15 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
       }
     } catch (err: any) {
       console.error('Order creation failed:', err);
-      setOrderError(err?.message || 'เกิดข้อผิดพลาดในการสร้างคำสั่งซื้อ กรุณาลองใหม่อีกครั้ง');
+      if (err instanceof AllergenAlertError) {
+        setAllergenAlert({
+          message: err.message,
+          matchedAllergenNames: err.matchedAllergenNames,
+          flaggedItems: err.flaggedItems,
+        });
+      } else {
+        setOrderError(err?.message || 'เกิดข้อผิดพลาดในการสร้างคำสั่งซื้อ กรุณาลองใหม่อีกครั้ง');
+      }
     } finally {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
@@ -234,6 +259,71 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
           <div className="bg-red-50 dark:bg-red-950/40 border-2 border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 p-4 rounded-2xl flex items-center gap-3 animate-fade-in">
             <AlertCircle className="w-6 h-6 text-red-600 shrink-0" />
             <div className="text-xs font-bold">{orderError}</div>
+          </div>
+        )}
+
+        {/* 🛡️ Allergen warning: the server refused the order because a recorded
+            allergy matched a menu item. Confirming here retries with an explicit
+            acknowledgement, which the server records in its audit log. */}
+        {allergenAlert && !createdOrder && (
+          <div
+            role="alertdialog"
+            aria-labelledby="allergen-alert-title"
+            className="bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-400 dark:border-amber-600 text-amber-900 dark:text-amber-200 p-5 rounded-2xl space-y-4 animate-fade-in"
+          >
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-6 h-6 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <h3 id="allergen-alert-title" className="text-sm font-black font-['Kanit']">
+                  ⚠️ คำเตือน: อาจมีส่วนผสมที่แพ้
+                </h3>
+                <p className="text-xs mt-1 leading-relaxed">
+                  ระบบพบว่าเมนูที่เลือกอาจมีส่วนผสมที่ตรงกับข้อมูลการแพ้อาหารที่บันทึกไว้
+                </p>
+              </div>
+            </div>
+
+            <ul className="space-y-2">
+              {allergenAlert.flaggedItems.map((item) => (
+                <li
+                  key={item.productId}
+                  className="bg-white/70 dark:bg-black/20 border border-amber-300 dark:border-amber-700 rounded-xl px-3 py-2"
+                >
+                  <p className="text-xs font-bold">{item.name}</p>
+                  <ul className="mt-1 space-y-0.5">
+                    {item.details.map((d, idx) => (
+                      <li key={idx} className="text-[11px] opacity-90">
+                        • <strong>{d.allergenName}</strong> — {d.details}
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+
+            <p className="text-[11px] leading-relaxed opacity-90">
+              การตรวจสอบนี้อ้างอิงจากชื่อเมนูและตัวเลือกที่เลือก ไม่ใช่สูตรอาหารจริง
+              จึงอาจแจ้งเตือนเกินจริงหรือตรวจไม่พบในบางกรณี
+              <strong> กรุณาสอบถามร้านค้าโดยตรงก่อนตัดสินใจ</strong>
+            </p>
+
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => setAllergenAlert(null)}
+                className="flex-1 min-w-[140px] py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              >
+                ยกเลิก และแก้ไขรายการ
+              </button>
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => handleConfirmOrder(null, { acknowledgeAllergenWarning: true })}
+                className="flex-1 min-w-[140px] py-3 bg-white dark:bg-transparent border-2 border-amber-500 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 disabled:opacity-50 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              >
+                {isSubmitting ? 'กำลังดำเนินการ...' : 'ฉันตรวจสอบแล้ว ยืนยันสั่งซื้อ'}
+              </button>
+            </div>
           </div>
         )}
 
