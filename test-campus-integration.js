@@ -115,15 +115,23 @@ function validateWalletSpending(wallet, orderAmountSatang, itemCategories = [], 
     throw new Error('INSUFFICIENT_WALLET_BALANCE');
   }
 
-  // Daily limit
-  const dailyLimitSatang = wallet.dailyLimitSatang ?? 20000;
+  // Daily & Weekly limits (Fail-Closed: must be explicitly configured)
+  if (
+    wallet.dailyLimitSatang === undefined ||
+    wallet.dailyLimitSatang === null ||
+    wallet.weeklyLimitSatang === undefined ||
+    wallet.weeklyLimitSatang === null
+  ) {
+    throw new Error('WALLET_LIMITS_NOT_CONFIGURED');
+  }
+
+  const dailyLimitSatang = wallet.dailyLimitSatang;
   const spentToday = wallet.lastSpentDate === targetYmd ? (wallet.spentTodaySatang || 0) : 0;
   if (spentToday + orderAmountSatang > dailyLimitSatang) {
     throw new Error('DAILY_LIMIT_EXCEEDED');
   }
 
-  // Weekly limit
-  const weeklyLimitSatang = wallet.weeklyLimitSatang ?? 100000;
+  const weeklyLimitSatang = wallet.weeklyLimitSatang;
   const spentWeek = wallet.spentThisWeekSatang || 0;
   if (spentWeek + orderAmountSatang > weeklyLimitSatang) {
     throw new Error('WEEKLY_LIMIT_EXCEEDED');
@@ -139,6 +147,18 @@ function validateWalletSpending(wallet, orderAmountSatang, itemCategories = [], 
 
   return true;
 }
+
+runTest('Unconfigured wallet limits throw WALLET_LIMITS_NOT_CONFIGURED (Fail-Closed)', () => {
+  const wallet = {
+    studentId: 'STU1001',
+    balanceSatang: 50000,
+    isLocked: false,
+  };
+
+  assert.throws(() => {
+    validateWalletSpending(wallet, 5000, ['Snacks'], '2026-09-05');
+  }, /WALLET_LIMITS_NOT_CONFIGURED/);
+});
 
 runTest('Wallet spending succeeds when balance and limits are sufficient', () => {
   const wallet = {
@@ -161,6 +181,8 @@ runTest('Locked wallet throws CAMPUS_WALLET_LOCKED', () => {
   const wallet = {
     studentId: 'STU1001',
     balanceSatang: 50000,
+    dailyLimitSatang: 20000,
+    weeklyLimitSatang: 100000,
     isLocked: true,
   };
 
@@ -174,6 +196,7 @@ runTest('Insufficient wallet balance throws INSUFFICIENT_WALLET_BALANCE', () => 
     studentId: 'STU1001',
     balanceSatang: 3000, // 30 THB
     dailyLimitSatang: 20000,
+    weeklyLimitSatang: 100000,
     isLocked: false,
   };
 
@@ -187,6 +210,7 @@ runTest('Exceeding daily spending limit throws DAILY_LIMIT_EXCEEDED', () => {
     studentId: 'STU1001',
     balanceSatang: 50000,
     dailyLimitSatang: 20000, // 200 THB max per day
+    weeklyLimitSatang: 100000,
     spentTodaySatang: 18000, // 180 THB already spent
     lastSpentDate: '2026-09-05',
     isLocked: false,
@@ -202,6 +226,7 @@ runTest('Purchasing food from Guardian-blocked category throws BLOCKED_CATEGORY_
     studentId: 'STU1001',
     balanceSatang: 50000,
     dailyLimitSatang: 20000,
+    weeklyLimitSatang: 100000,
     spentTodaySatang: 0,
     blockedCategories: ['Sugary Drinks', 'Junk Food'],
     isLocked: false,

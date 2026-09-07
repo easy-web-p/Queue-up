@@ -516,6 +516,14 @@ export const createOrderAuthoritative = onCall(
           walletCounters = resolveSpendingCounters(walletData, currentBangkok.ymd);
           const { spentToday, spentThisWeek, dailyLimitSatang, weeklyLimitSatang } = walletCounters;
 
+          // Fail-Closed: Guardian MUST configure limits before a student wallet can be used to purchase food
+          if (dailyLimitSatang === null || weeklyLimitSatang === null) {
+            throw new HttpsError(
+              "failed-precondition",
+              "WALLET_LIMITS_NOT_CONFIGURED: ผู้ปกครองยังไม่ได้ตั้งค่าวงเงินจำกัดการใช้จ่าย กรุณาตั้งค่าผ่าน Guardian Dashboard ก่อนทำรายการ"
+            );
+          }
+
           // Check Daily Limit
           if (spentToday + calculatedTotalSatang > dailyLimitSatang) {
             throw new HttpsError("failed-precondition", `DAILY_LIMIT_EXCEEDED: ยอดการใช้จ่ายเกินวงเงินรายวัน (${dailyLimitSatang / 100} บาท/วัน) วันนี้ใช้ไปแล้ว ${spentToday / 100} บาท`);
@@ -701,6 +709,90 @@ export const createOrderAuthoritative = onCall(
       if (err instanceof HttpsError) throw err;
       throw new HttpsError("internal", err.message || "Failed to create authoritative order");
     }
+  }
+);
+
+/**
+ * 🔒 Record Merchant Audit Log (Server-Authoritative)
+ *
+ * Replaces client-side direct writes to `/audit_logs` which are blocked by
+ * `allow write: if false;` in firestore.rules.
+ *
+ * Verifies caller authentication, whitelists permitted merchant actions,
+ * ensures the caller is the store owner or admin, sanitizes and bounds
+ * metadata, and appends an immutable record into `/audit_logs`.
+ */
+export const recordMerchantAuditLog = onCall(
+  { region: "asia-southeast1", cors: true },
+  async (request) => {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "User must be authenticated to record audit log.");
+    }
+
+    const { action, storeId, metadata = {} } = request.data || {};
+
+    const ALLOWED_ACTIONS = ["REGISTER_MERCHANT", "UPDATE_STORE_PROFILE"];
+    if (!action || typeof action !== "string" || !ALLOWED_ACTIONS.includes(action)) {
+      throw new HttpsError("invalid-argument", `Action '${action}' is not permitted for merchant audit logging.`);
+    }
+
+    if (!storeId || typeof storeId !== "string") {
+      throw new HttpsError("invalid-argument", "Valid storeId is required.");
+    }
+
+    // Verify ownership of the store in shops/{storeId}
+    const shopSnap = await db.collection("shops").doc(storeId).get();
+    if (!shopSnap.exists) {
+      throw new HttpsError("not-found", `Shop document with id '${storeId}' was not found.`);
+    }
+
+    const shopData = shopSnap.data() || {};
+    const isOwner = shopData.ownerUid === request.auth.uid;
+
+    if (!isOwner) {
+      // Check if caller is admin
+      const callerUserSnap = await db.collection("users").doc(request.auth.uid).get();
+      const isAdmin =
+        callerUserSnap.exists &&
+        (callerUserSnap.data().role === "admin" ||
+          callerUserSnap.data().admin === true ||
+          request.auth.token?.role === "admin");
+      if (!isAdmin) {
+        throw new HttpsError("permission-denied", "Only the store owner or admin can record audit logs for this store.");
+      }
+    }
+
+    // Sanitize and bound metadata to prevent spam/abuse
+    const safeMetadata = {};
+    if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
+      for (const [key, val] of Object.entries(metadata)) {
+        if (typeof key === "string" && key.length <= 50) {
+          if (typeof val === "string") {
+            safeMetadata[key] = val.slice(0, 500);
+          } else if (typeof val === "number" || typeof val === "boolean") {
+            safeMetadata[key] = val;
+          }
+        }
+      }
+    }
+
+    const auditEntry = {
+      action,
+      actorUid: request.auth.uid,
+      storeId,
+      merchantId: shopData.merchantId || null,
+      metadata: safeMetadata,
+      createdAt: new Date().toISOString(),
+      timestamp: Date.now(),
+      serverTimestamp: FieldValue.serverTimestamp(),
+    };
+
+    const docRef = await db.collection("audit_logs").add(auditEntry);
+
+    return {
+      success: true,
+      logId: docRef.id,
+    };
   }
 );
 

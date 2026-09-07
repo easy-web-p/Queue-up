@@ -14,8 +14,6 @@
 import {
   getIsoWeekKey,
   resolveSpendingCounters,
-  DEFAULT_DAILY_LIMIT_SATANG,
-  DEFAULT_WEEKLY_LIMIT_SATANG,
 } from './functions/walletLimits.js';
 
 let passed = 0;
@@ -93,16 +91,16 @@ runTest('🚨 A wallet last spent for a FUTURE pickup date still counts today', 
   // The old code stamped lastSpentDate with the pickup date, so a wallet that had
   // just spent for tomorrow presented a clean slate to the next order placed today.
   // Counters are now stamped with the spend date, so this simply does not arise.
-  const wallet = { lastSpentDate: TODAY, spentTodaySatang: 19000 };
+  const wallet = { lastSpentDate: TODAY, spentTodaySatang: 19000, dailyLimitSatang: 20000 };
   const c = resolveSpendingCounters(wallet, TODAY);
   assertEqual(c.spentToday, 19000, 'spending must count against the day it happened');
-  assert(19000 + 5000 > c.dailyLimitSatang, 'a further 50 THB must breach the 200 THB default');
+  assert(19000 + 5000 > c.dailyLimitSatang, 'a further 50 THB must breach the 200 THB daily limit');
 });
 
 runTest('🚨 Alternating pickup dates cannot reset the daily counter', () => {
   // Simulates the reported bypass: order for today, then tomorrow, then today again.
   // Every order is placed on the same real day, so one counter tracks them all.
-  let wallet = { balanceSatang: 1000000 };
+  let wallet = { balanceSatang: 1000000, dailyLimitSatang: 20000, weeklyLimitSatang: 100000 };
   let totalCounted = 0;
   for (const pickupDate of [TODAY, TOMORROW, TODAY, TOMORROW]) {
     const c = resolveSpendingCounters(wallet, TODAY); // TODAY = real date, regardless of pickup
@@ -118,7 +116,7 @@ runTest('🚨 Alternating pickup dates cannot reset the daily counter', () => {
     };
   }
   assertEqual(totalCounted, 24000, 'all four orders must land on one counter');
-  assert(totalCounted > DEFAULT_DAILY_LIMIT_SATANG, 'the 4th order would now be refused');
+  assert(totalCounted > 20000, 'the 4th order would now be refused');
 });
 
 runTest('A new day resets the daily counter', () => {
@@ -147,6 +145,7 @@ runTest('🚨 A wallet already over the weekly limit recovers next week', () => 
   const wallet = {
     lastSpentWeek: getIsoWeekKey('2026-09-07'),
     spentThisWeekSatang: 500000, // far beyond the 1000 THB default
+    weeklyLimitSatang: 100000,
   };
   const c = resolveSpendingCounters(wallet, '2026-09-14');
   assert(c.spentThisWeek + 5000 <= c.weeklyLimitSatang, 'student must be able to spend again');
@@ -170,15 +169,16 @@ runTest('Configured limits are honoured', () => {
   assertEqual(c.weeklyLimitSatang, 30000, 'weekly limit');
 });
 
-runTest('Missing limits fall back to the documented defaults', () => {
+runTest('Missing limits resolve to null (Fail-Closed)', () => {
   const c = resolveSpendingCounters({}, TODAY);
-  assertEqual(c.dailyLimitSatang, DEFAULT_DAILY_LIMIT_SATANG, '200 THB default');
-  assertEqual(c.weeklyLimitSatang, DEFAULT_WEEKLY_LIMIT_SATANG, '1000 THB default');
+  assertEqual(c.dailyLimitSatang, null, 'unset daily limit must be null');
+  assertEqual(c.weeklyLimitSatang, null, 'unset weekly limit must be null');
 });
 
 runTest('A zero limit is respected, not treated as unset', () => {
-  const c = resolveSpendingCounters({ dailyLimitSatang: 0 }, TODAY);
-  assertEqual(c.dailyLimitSatang, 0, 'a parent freezing spending must not get the default');
+  const c = resolveSpendingCounters({ dailyLimitSatang: 0, weeklyLimitSatang: 0 }, TODAY);
+  assertEqual(c.dailyLimitSatang, 0, 'a parent freezing spending must not be null');
+  assertEqual(c.weeklyLimitSatang, 0, 'a parent freezing spending must not be null');
 });
 
 runTest('Corrupt or negative counters clamp to zero', () => {

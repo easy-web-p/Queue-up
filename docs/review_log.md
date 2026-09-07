@@ -18,3 +18,18 @@
   - Design system "Warm Dark Canteen" applied consistently across all 5 pages.
   - Fail-closed security rules honored everywhere.
 - **Verdict:** APPROVED (Score: 100/100).
+
+## Cycle 3: Silent Failure Elimination & Fail-Closed Hardening
+- **Reviewer:** campus_reviewer & campus_auditor
+- **Scope:**
+  - Audit Logs: `recordMerchantAuditLog` Cloud Function (`functions/index.js`), `src/services/storeIsolationEngine.js`, `MerchantOnboarding.jsx`, `MerchantDashboard.jsx`.
+  - Invariant Cleanup: Removed dead `saveOrderToFirestore` in `src/lib/firebase.js`.
+  - Fail-Closed Wallets: `functions/walletLimits.js` and `createOrderAuthoritative` in `functions/index.js`.
+  - Test Suites: `test-merchant-audit-log.js`, `test-campus-wallet-limits.js`, `test-campus-integration.js`.
+- **Findings:**
+  - Client `PERMISSION_DENIED` on `/audit_logs` permanently resolved by migrating writes to authenticated, store-owner-validated Cloud Function with bounded metadata.
+  - Fail-open default limits (200 THB/day) replaced with strict Fail-Closed rejection (`WALLET_LIMITS_NOT_CONFIGURED`); deliberate freeze (`0 THB`) remains operational.
+  - Dead code bypassing 5-phase ordering invariants deleted.
+  - Full type-safety (`npx tsc --noEmit` 0 errors) and zero ESLint errors.
+  - 100% test pass rate across all suites.
+- **Verdict:** APPROVED (Score: 100/100).

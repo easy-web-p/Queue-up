@@ -76,15 +76,18 @@ export function resolveSpendingCounters(walletData, todayYmd) {
   const spentThisWeek =
     wallet.lastSpentWeek === weekKey ? Math.max(0, Number(wallet.spentThisWeekSatang) || 0) : 0;
 
+  // Fail-Closed: unset limits resolve to null. The caller (createOrderAuthoritative)
+  // must reject the transaction with WALLET_LIMITS_NOT_CONFIGURED until a guardian
+  // explicitly sets them. A limit of 0 remains valid as a deliberate spending freeze.
   const dailyLimitSatang =
     typeof wallet.dailyLimitSatang === "number" && wallet.dailyLimitSatang >= 0
       ? wallet.dailyLimitSatang
-      : DEFAULT_DAILY_LIMIT_SATANG;
+      : null;
 
   const weeklyLimitSatang =
     typeof wallet.weeklyLimitSatang === "number" && wallet.weeklyLimitSatang >= 0
       ? wallet.weeklyLimitSatang
-      : DEFAULT_WEEKLY_LIMIT_SATANG;
+      : null;
 
   return { todayYmd, weekKey, spentToday, spentThisWeek, dailyLimitSatang, weeklyLimitSatang };
 }

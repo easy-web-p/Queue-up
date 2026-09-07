@@ -326,37 +326,6 @@ export const fetchRelatedProductsFromFirestore = async (storeId, currentProductI
   }
 };
 
-export const saveOrderToFirestore = async (orderPayload) => {
-  if (!orderPayload) return null;
-  const orderId = orderPayload.orderId || orderPayload.id || `ORD-${Date.now()}`;
-  const storeId = orderPayload.storeId || "";
-  const fullOrder = {
-    ...orderPayload,
-    id: orderId,
-    orderId,
-    storeId,
-    status: orderPayload.status || 'PENDING',
-    queueStatus: orderPayload.queueStatus || 'waiting',
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  };
-
-  try {
-    // Save to global orders
-    await setDoc(doc(db, "orders", orderId), fullOrder, { merge: true });
-    // Also save to store subcollection for shop isolation
-    try {
-      await setDoc(doc(db, "shops", storeId, "orders", orderId), fullOrder, { merge: true });
-    } catch (subErr) {
-      console.warn("Shop subcollection save warning:", subErr);
-    }
-    return fullOrder;
-  } catch (error) {
-    console.error("Firestore saveOrder error:", error);
-    throw error;
-  }
-};
-
 // ฟังก์ชันตรวจสอบและดึงโควตาคิวจริง (Slot Capacity) ตามร้านค้าและวันที่
 export const fetchLiveSlotCapacities = async (storeId, isoDateStr, baseSlots = [], defaultCapacity = 20) => {
   if (!storeId || !isoDateStr || !Array.isArray(baseSlots)) return baseSlots;

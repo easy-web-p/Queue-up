@@ -130,6 +130,7 @@ function MerchantOnboarding() {
         await recordAuditLog(db, {
           action: "REGISTER_MERCHANT",
           actorUid: user.uid,
+          storeId,
           merchantId,
           metadata: { storeId, accountId, storeName },
         });

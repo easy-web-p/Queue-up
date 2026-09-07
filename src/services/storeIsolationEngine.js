@@ -1,7 +1,9 @@
 // QueueUp Merchant Centre Data Architecture v3.0
 // Store Isolation & Cryptographic Engine
 
-import { doc, getDoc, addDoc, collection } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "../firebase/config.js";
 
 /**
  * Generate cryptographically secure random alphanumeric string
@@ -59,24 +61,27 @@ export function generateStoreQueueNo(storeId = "", index = 1) {
 }
 
 /**
- * Record Security Audit Log in Firestore
+ * Record Security Audit Log via Server-Authoritative Cloud Function
  * Collection: audit_logs/{auditId}
  */
-export async function recordAuditLog(db, { action, actorUid, merchantId, metadata = {} }) {
-  if (!db) return null;
+export async function recordAuditLog(dbOrOptions, maybeOptions) {
+  // Support both signatures:
+  // 1. recordAuditLog(db, { action, storeId, merchantId, metadata })
+  // 2. recordAuditLog({ action, storeId, merchantId, metadata })
+  const options = maybeOptions || dbOrOptions || {};
+  const { action, storeId, merchantId, metadata = {} } = options;
+  const targetStoreId = storeId || metadata?.storeId || merchantId;
+
   try {
-    const auditData = {
+    const callable = httpsCallable(functions, "recordMerchantAuditLog");
+    const res = await callable({
       action,
-      actorUid: actorUid || "system",
-      merchantId: merchantId || "N/A",
+      storeId: targetStoreId,
       metadata,
-      createdAt: new Date().toISOString(),
-      timestamp: Date.now(),
-    };
-    const ref = await addDoc(collection(db, "audit_logs"), auditData);
-    return ref.id;
+    });
+    return res?.data?.logId || null;
   } catch (err) {
-    console.warn("Audit Log Warning:", err);
+    console.warn("Audit Log Notice:", err);
     return null;
   }
 }

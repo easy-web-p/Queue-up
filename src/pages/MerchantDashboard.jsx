@@ -486,6 +486,7 @@ function MerchantDashboard() {
       await recordAuditLog(db, {
         action: "UPDATE_STORE_PROFILE",
         actorUid: user.uid,
+        storeId: targetStoreId,
         merchantId,
         metadata: { storeName, canteenLocation, storePhone, storeId: targetStoreId },
       });
