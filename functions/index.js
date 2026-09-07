@@ -432,6 +432,9 @@ export const createOrderAuthoritative = onCall(
             category: prodData.category || "",
             description: prodData.description || "",
             modifierNames: selectedModifierNames,
+            // Ingredients the store declared on the product. Read from Firestore, not
+            // from the request, so a caller cannot clear the tags to dodge the check.
+            declaredAllergens: Array.isArray(prodData.allergens) ? prodData.allergens : [],
           });
 
           const unitPriceSatang = basePriceSatang + itemModifierSatang;
@@ -472,12 +475,18 @@ export const createOrderAuthoritative = onCall(
         if (allergenScan.hasAllergens && acknowledgeAllergenWarning !== true) {
           const allergenList = allergenScan.matchedAllergenNames.join(", ");
           const dishList = allergenScan.flaggedItems.map((f) => `"${f.name}"`).join(", ");
+          // A store-declared ingredient is a fact about the recipe; a keyword match is
+          // a guess from the name. Saying "อาจมี" for the former would understate it.
+          const lead = allergenScan.hasDeclaredMatch
+            ? `ALLERGEN_ALERT: ร้านค้าระบุว่าเมนู ${dishList} มีส่วนผสมที่แพ้ (${allergenList})`
+            : `ALLERGEN_ALERT: เมนู ${dishList} อาจมีส่วนผสมที่แพ้ (${allergenList})`;
           throw new HttpsError(
             "failed-precondition",
-            `ALLERGEN_ALERT: เมนู ${dishList} อาจมีส่วนผสมที่แพ้ (${allergenList}) กรุณาตรวจสอบกับร้านค้าก่อนยืนยันการสั่งซื้อ`,
+            `${lead} กรุณาตรวจสอบกับร้านค้าก่อนยืนยันการสั่งซื้อ`,
             {
               code: "ALLERGEN_ALERT",
               matchedAllergenNames: allergenScan.matchedAllergenNames,
+              hasDeclaredMatch: allergenScan.hasDeclaredMatch,
               flaggedItems: allergenScan.flaggedItems,
             }
           );
@@ -637,6 +646,9 @@ export const createOrderAuthoritative = onCall(
             orderId,
             storeId,
             matchedAllergenNames: allergenScan.matchedAllergenNames,
+            // Overriding an ingredient the store declared is a materially more serious
+            // act than overriding a name match, and the log should say which happened.
+            hasDeclaredMatch: allergenScan.hasDeclaredMatch === true,
             flaggedItems: allergenScan.flaggedItems,
             timestamp: FieldValue.serverTimestamp(),
           });

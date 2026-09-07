@@ -80,6 +80,13 @@ export interface MenuItem {
   storeId?: string;
   shopName?: string;
   modifierGroupIds?: string[]; // 🔒 Normalized Modifier References
+  /**
+   * Allergens the store declares this dish contains, as ALLERGEN_PRESET_DICTIONARY
+   * ids (e.g. 'peanut', 'seafood'). This is the only reliable allergen signal the
+   * system has — everything else is inferred from the dish's name. An empty or
+   * missing list means "not declared", never "contains none".
+   */
+  allergens?: string[];
   rating?: number;
   salesCount?: number;
 }

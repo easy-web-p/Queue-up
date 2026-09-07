@@ -331,6 +331,12 @@ function MerchantDashboard() {
     );
   };
 
+  const handleUpdateAllergens = (productId, allergenIds) => {
+    setMenuItems((prev) =>
+      prev.map((p) => (p.id === productId ? { ...p, allergens: allergenIds } : p))
+    );
+  };
+
   const handleAddNewItem = (item) => {
     setMenuItems((prev) => [
       ...prev,
@@ -704,6 +710,7 @@ function MerchantDashboard() {
               modifierGroups={modifierGroups}
               onToggleAvailability={handleToggleProductStatus}
               onUpdateStock={handleUpdateStock}
+              onUpdateAllergens={handleUpdateAllergens}
               onUpdatePrice={handleUpdatePrice}
               onAddNewItem={handleAddNewItem}
             />

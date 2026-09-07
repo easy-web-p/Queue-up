@@ -94,6 +94,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
     message: string;
     matchedAllergenNames: string[];
     flaggedItems: AllergenFlaggedItem[];
+    hasDeclaredMatch: boolean;
   } | null>(null);
 
   const storeId = locationState?.storeId || cartItems[0]?.menuItem?.storeId || '';
@@ -201,6 +202,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
           message: err.message,
           matchedAllergenNames: err.matchedAllergenNames,
           flaggedItems: err.flaggedItems,
+          hasDeclaredMatch: err.hasDeclaredMatch,
         });
       } else {
         setOrderError(err?.message || 'เกิดข้อผิดพลาดในการสร้างคำสั่งซื้อ กรุณาลองใหม่อีกครั้ง');
@@ -279,10 +281,14 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
               <AlertCircle className="w-6 h-6 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
               <div>
                 <h3 id="allergen-alert-title" className="text-sm font-black font-['Kanit']">
-                  ⚠️ คำเตือน: อาจมีส่วนผสมที่แพ้
+                  {allergenAlert.hasDeclaredMatch
+                    ? '🛑 ร้านค้าระบุว่าเมนูนี้มีส่วนผสมที่แพ้'
+                    : '⚠️ คำเตือน: อาจมีส่วนผสมที่แพ้'}
                 </h3>
                 <p className="text-xs mt-1 leading-relaxed">
-                  ระบบพบว่าเมนูที่เลือกอาจมีส่วนผสมที่ตรงกับข้อมูลการแพ้อาหารที่บันทึกไว้
+                  {allergenAlert.hasDeclaredMatch
+                    ? 'ร้านค้าแจ้งว่าเมนูที่เลือกมีส่วนผสมตรงกับข้อมูลการแพ้อาหารที่บันทึกไว้ ไม่ใช่การคาดเดาจากชื่อเมนู'
+                    : 'ระบบพบว่าเมนูที่เลือกอาจมีส่วนผสมที่ตรงกับข้อมูลการแพ้อาหารที่บันทึกไว้'}
                 </p>
               </div>
             </div>
@@ -306,9 +312,18 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
             </ul>
 
             <p className="text-[11px] leading-relaxed opacity-90">
-              การตรวจสอบนี้อ้างอิงจากชื่อเมนูและตัวเลือกที่เลือก ไม่ใช่สูตรอาหารจริง
-              จึงอาจแจ้งเตือนเกินจริงหรือตรวจไม่พบในบางกรณี
-              <strong> กรุณาสอบถามร้านค้าโดยตรงก่อนตัดสินใจ</strong>
+              {allergenAlert.hasDeclaredMatch ? (
+                <>
+                  ข้อมูลนี้มาจากที่ร้านค้าระบุส่วนผสมไว้เอง
+                  <strong> หากแพ้รุนแรง ไม่ควรสั่งเมนูนี้</strong>
+                </>
+              ) : (
+                <>
+                  การตรวจสอบนี้อ้างอิงจากชื่อเมนูและตัวเลือกที่เลือก ไม่ใช่สูตรอาหารจริง
+                  จึงอาจแจ้งเตือนเกินจริงหรือตรวจไม่พบในบางกรณี
+                  <strong> กรุณาสอบถามร้านค้าโดยตรงก่อนตัดสินใจ</strong>
+                </>
+              )}
             </p>
 
             <div className="flex flex-wrap gap-3">
@@ -325,7 +340,11 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
                 onClick={() => handleConfirmOrder(null, { acknowledgeAllergenWarning: true })}
                 className="flex-1 min-w-[140px] py-3 bg-white dark:bg-transparent border-2 border-amber-500 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 disabled:opacity-50 font-bold text-xs rounded-xl transition-colors cursor-pointer"
               >
-                {isSubmitting ? 'กำลังดำเนินการ...' : 'ฉันตรวจสอบแล้ว ยืนยันสั่งซื้อ'}
+                {isSubmitting
+                  ? 'กำลังดำเนินการ...'
+                  : allergenAlert.hasDeclaredMatch
+                    ? 'ยืนยันสั่งทั้งที่มีส่วนผสมที่แพ้'
+                    : 'ฉันตรวจสอบแล้ว ยืนยันสั่งซื้อ'}
               </button>
             </div>
           </div>

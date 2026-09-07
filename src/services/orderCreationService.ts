@@ -54,8 +54,10 @@ export interface CreateOrderRequest {
 
 export interface AllergenTriggerDetail {
   allergenName: string;
-  triggerSource: 'TITLE' | 'CATEGORY' | 'DESCRIPTION' | 'MODIFIER';
+  triggerSource: 'DECLARED' | 'TITLE' | 'CATEGORY' | 'DESCRIPTION' | 'MODIFIER';
   triggerWord: string;
+  /** DECLARED = the store stated the ingredient; INFERRED = read off the dish name. */
+  confidence?: 'DECLARED' | 'INFERRED';
   details?: string;
 }
 
@@ -63,6 +65,7 @@ export interface AllergenFlaggedItem {
   productId: string;
   name: string;
   matchedAllergenNames: string[];
+  confidence?: 'DECLARED' | 'INFERRED';
   details: AllergenTriggerDetail[];
 }
 
@@ -77,12 +80,20 @@ export class AllergenAlertError extends Error {
   readonly code = 'ALLERGEN_ALERT';
   readonly matchedAllergenNames: string[];
   readonly flaggedItems: AllergenFlaggedItem[];
+  /** True when at least one match came from an ingredient the store declared. */
+  readonly hasDeclaredMatch: boolean;
 
-  constructor(message: string, matchedAllergenNames: string[], flaggedItems: AllergenFlaggedItem[]) {
+  constructor(
+    message: string,
+    matchedAllergenNames: string[],
+    flaggedItems: AllergenFlaggedItem[],
+    hasDeclaredMatch = false
+  ) {
     super(message);
     this.name = 'AllergenAlertError';
     this.matchedAllergenNames = matchedAllergenNames;
     this.flaggedItems = flaggedItems;
+    this.hasDeclaredMatch = hasDeclaredMatch;
   }
 }
 
@@ -228,7 +239,8 @@ export async function createAuthoritativeStoreOrder(
         throw new AllergenAlertError(
           serverMessage,
           Array.isArray(details.matchedAllergenNames) ? details.matchedAllergenNames : [],
-          Array.isArray(details.flaggedItems) ? details.flaggedItems : []
+          Array.isArray(details.flaggedItems) ? details.flaggedItems : [],
+          details.hasDeclaredMatch === true
         );
       }
 

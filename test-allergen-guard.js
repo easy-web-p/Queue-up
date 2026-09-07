@@ -124,6 +124,83 @@ runTest('cleanAllergenLabel strips the English gloss', () => {
 });
 
 // ===========================================================================
+console.log('\n1b. Store-declared ingredients (the reliable signal)');
+// ===========================================================================
+
+runTest('🚨 A declared ingredient is caught even when the name says nothing', () => {
+  // The case keyword matching cannot reach: a dish whose name hides what is in it.
+  const r = detectMatchedAllergens({
+    studentAllergies: ['อาหารทะเล / กุ้ง (Seafood)'],
+    productTitle: 'ข้าวผัดพิเศษสูตรเด็ด',
+    declaredAllergens: ['seafood'],
+  });
+  assert(r.hasAllergens, 'a declared ingredient must be caught');
+  assert(r.details[0].confidence === 'DECLARED', 'must be reported as declared');
+  assert(r.details[0].triggerSource === 'DECLARED', 'trigger source');
+});
+
+runTest('A declared match is reported as DECLARED, a name match as INFERRED', () => {
+  const declared = detectMatchedAllergens({
+    studentAllergies: ['ไข่ไก่ (Eggs)'],
+    productTitle: 'ข้าวผัด',
+    declaredAllergens: ['egg'],
+  });
+  const inferred = detectMatchedAllergens({
+    studentAllergies: ['ไข่ไก่ (Eggs)'],
+    productTitle: 'ข้าวผัดไข่ดาว',
+  });
+  assert(declared.details[0].confidence === 'DECLARED', 'declared');
+  assert(inferred.details[0].confidence === 'INFERRED', 'inferred');
+});
+
+runTest('Tags are matched by preset id or by label', () => {
+  for (const tag of ['peanut', 'ถั่วลิสง (Peanuts)', 'ถั่วลิสง']) {
+    const r = detectMatchedAllergens({
+      studentAllergies: ['ถั่วลิสง (Peanuts)'],
+      productTitle: 'ขนมปังปิ้ง',
+      declaredAllergens: [tag],
+    });
+    assert(r.hasAllergens, `tag "${tag}" must match`);
+  }
+});
+
+runTest('Tags for allergens the student does not have are ignored', () => {
+  const r = detectMatchedAllergens({
+    studentAllergies: ['ถั่วลิสง (Peanuts)'],
+    productTitle: 'ข้าวผัด',
+    declaredAllergens: ['seafood', 'dairy'],
+  });
+  assert(!r.hasAllergens, 'unrelated declarations must not flag');
+});
+
+runTest('🚨 No tags means the check falls back to the name, not to "safe"', () => {
+  // An untagged menu is the state every store starts in. Absence of a tag must never
+  // read as an assurance that the dish is free of the allergen.
+  const hidden = detectMatchedAllergens({
+    studentAllergies: ['อาหารทะเล / กุ้ง (Seafood)'],
+    productTitle: 'ข้าวผัดพิเศษสูตรเด็ด',
+    declaredAllergens: [],
+  });
+  assert(!hidden.hasAllergens, 'nothing to go on, so nothing is flagged');
+
+  const named = detectMatchedAllergens({
+    studentAllergies: ['อาหารทะเล / กุ้ง (Seafood)'],
+    productTitle: 'ข้าวผัดกุ้ง',
+    declaredAllergens: [],
+  });
+  assert(named.hasAllergens && named.details[0].confidence === 'INFERRED', 'name still scanned');
+});
+
+runTest('Malformed tags do not crash the scan', () => {
+  const r = detectMatchedAllergens({
+    studentAllergies: ['ถั่วลิสง (Peanuts)'],
+    productTitle: 'ข้าวผัด',
+    declaredAllergens: [null, 42, '', '  ', 'peanut'],
+  });
+  assert(r.hasAllergens, 'the one valid tag must still work');
+});
+
+// ===========================================================================
 console.log('\n2. Whole-order scan (what createOrderAuthoritative calls)');
 // ===========================================================================
 
@@ -135,6 +212,20 @@ runTest('An order is flagged when any one item matches', () => {
   assert(r.hasAllergens, 'one bad item must flag the order');
   assert(r.flaggedItems.length === 1, 'only the offending item is reported');
   assert(r.flaggedItems[0].productId === 'p2', 'the right item must be named');
+});
+
+runTest('🚨 An order is flagged DECLARED when any item declared the allergen', () => {
+  const tagged = { productId: 'p3', name: 'ข้าวผัดพิเศษ', category: 'ข้าว', description: '', declaredAllergens: ['seafood'] };
+  const r = scanOrderForAllergens(['อาหารทะเล / กุ้ง (Seafood)'], [safeItem, tagged]);
+  assert(r.hasAllergens, 'must flag');
+  assert(r.hasDeclaredMatch === true, 'order-level declared flag');
+  assert(r.flaggedItems[0].confidence === 'DECLARED', 'item-level confidence');
+});
+
+runTest('A name-only match leaves hasDeclaredMatch false', () => {
+  const r = scanOrderForAllergens(['อาหารทะเล / กุ้ง (Seafood)'], [safeItem, shrimpItem]);
+  assert(r.hasAllergens, 'must still flag');
+  assert(r.hasDeclaredMatch === false, 'a guess must not be reported as a declaration');
 });
 
 runTest('A fully safe order passes', () => {
@@ -240,6 +331,22 @@ runTest('The scan reads the authoritative product docs, not client-supplied text
   assert(
     fnSrc.includes('name: prodData.name || ""'),
     'menu text must come from Firestore, not from the request'
+  );
+});
+
+runTest('🚨 Declared tags are read from Firestore, not from the request', () => {
+  // Taking them from the caller would let a client clear the tags to dodge the check.
+  assert(
+    fnSrc.includes('Array.isArray(prodData.allergens) ? prodData.allergens : []'),
+    'tags must come from the product document'
+  );
+});
+
+runTest('The refusal and the audit entry distinguish declared from inferred', () => {
+  assert(fnSrc.includes('allergenScan.hasDeclaredMatch'), 'the refusal must carry the distinction');
+  assert(
+    fnSrc.includes('hasDeclaredMatch: allergenScan.hasDeclaredMatch === true'),
+    'overriding a declared ingredient must be distinguishable in the audit log'
   );
 });
 

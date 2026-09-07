@@ -5,7 +5,8 @@
 
 import React, { useState } from 'react';
 import type { MenuItem, ModifierGroup } from '../types';
-import { ToggleLeft, ToggleRight, Plus, Utensils, Edit2, Check, Layers } from 'lucide-react';
+import { ToggleLeft, ToggleRight, Plus, Utensils, Edit2, Check, Layers, AlertTriangle } from 'lucide-react';
+import { ALLERGEN_PRESET_DICTIONARY } from '../utils/allergenMatcher';
 
 interface Props {
   storeId?: string;
@@ -13,6 +14,11 @@ interface Props {
   modifierGroups?: ModifierGroup[];
   onToggleAvailability: (itemId: string) => void;
   onUpdateStock: (itemId: string, newStock: number) => void;
+  /**
+   * Declared ingredients for the allergen guard. Optional so the manager still
+   * renders where a host has not wired persistence for it yet.
+   */
+  onUpdateAllergens?: (itemId: string, allergenIds: string[]) => void;
   onUpdatePrice: (itemId: string, newPrice: number) => void;
   onAddNewItem: (item: Omit<MenuItem, 'id'>) => void;
 }
@@ -23,6 +29,7 @@ export const MerchantMenuManager: React.FC<Props> = ({
   modifierGroups = [],
   onToggleAvailability,
   onUpdateStock,
+  onUpdateAllergens,
   onUpdatePrice,
   onAddNewItem,
 }) => {
@@ -151,8 +158,8 @@ export const MerchantMenuManager: React.FC<Props> = ({
                     </span>
                   </td>
 
-                  {/* Modifier Groups Badge */}
-                  <td className="p-4">
+                  {/* Modifier Groups Badge + declared allergens */}
+                  <td className="p-4 space-y-2">
                     {item.modifierGroupIds && item.modifierGroupIds.length > 0 ? (
                       <span className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md text-[11px] font-bold">
                         <Layers className="w-3 h-3" />
@@ -160,6 +167,46 @@ export const MerchantMenuManager: React.FC<Props> = ({
                       </span>
                     ) : (
                       <span className="text-slate-400 text-[11px]">- ไม่มี -</span>
+                    )}
+
+                    {/* Declared allergens. The order guard reads a dish's name when
+                        nothing is declared here, which misses anything the name does
+                        not spell out — tagging is what makes the check dependable. */}
+                    {onUpdateAllergens && (
+                      <div className="pt-1 border-t border-slate-100">
+                        <p className="text-[10px] font-bold text-slate-500 mb-1 flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3 text-amber-500" />
+                          ส่วนผสมที่ต้องแจ้งเตือน
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          {Object.values(ALLERGEN_PRESET_DICTIONARY).map((preset) => {
+                            const declared = (item.allergens || []).includes(preset.id);
+                            return (
+                              <button
+                                key={preset.id}
+                                type="button"
+                                title={preset.label}
+                                onClick={() => {
+                                  const current = item.allergens || [];
+                                  onUpdateAllergens(
+                                    item.id,
+                                    declared
+                                      ? current.filter((a) => a !== preset.id)
+                                      : [...current, preset.id]
+                                  );
+                                }}
+                                className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-colors cursor-pointer ${
+                                  declared
+                                    ? 'bg-amber-500 text-white border-amber-500'
+                                    : 'bg-white text-slate-500 border-slate-200 hover:border-amber-400'
+                                }`}
+                              >
+                                {preset.label.replace(/\s*\(.*?\)\s*/g, '')}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     )}
                   </td>
 
