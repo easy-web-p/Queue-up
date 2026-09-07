@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { resolveAuthDomainForHost } from "./authDomain.js";
+import { explainAuthDomainChoice } from "./authDomain.js";
 import {
   getAuth,
   GoogleAuthProvider,
@@ -28,10 +28,18 @@ import {
 // base64-encoded here via atob(), which hid nothing from anyone reading the bundle
 // while implying the value needed protecting. Written plainly so its status is clear.
 function resolveAuthDomain() {
-  return resolveAuthDomainForHost(
+  const choice = explainAuthDomainChoice(
     typeof window === "undefined" ? undefined : window.location.hostname,
-    import.meta.env.VITE_FIREBASE_AUTH_DOMAIN
+    import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    { handlerRegistered: import.meta.env.VITE_FIREBASE_AUTH_HANDLER_REGISTERED }
   );
+
+  // A refused override is the difference between working sign-in and every user
+  // hitting "Error 400: redirect_uri_mismatch", so it must not be silent: the
+  // deployment set a variable and is getting something else.
+  if (choice.warning) console.warn(`[firebase/auth] ${choice.warning}`);
+
+  return choice.authDomain;
 }
 
 const firebaseConfig = {
