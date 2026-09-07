@@ -1,6 +1,12 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useEffect } from 'react'
-import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth'
+import {
+  onAuthStateChanged,
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  signOut,
+} from 'firebase/auth'
 import { useDispatch } from 'react-redux'
 import { auth, googleProvider, db, doc, getDoc } from '../firebase/config.js'
 import { setUser, clearUser } from '../store/authSlice.js'
@@ -11,6 +17,20 @@ export const AuthContext = createContext()
 
 export function AuthProvider({ children }) {
   const dispatch = useDispatch()
+
+  // Completes a Google sign-in that fell back to redirect. The session itself
+  // arrives through onAuthStateChanged below; this is what surfaces a failure
+  // instead of returning the user to a login screen with no explanation.
+  useEffect(() => {
+    getRedirectResult(auth).catch((err) => {
+      if (err?.code === 'auth/no-auth-event') return; // no redirect was in flight
+      console.error('Firebase Google login redirect result error:', err);
+      alert(
+        'การเข้าสู่ระบบด้วย Google ไม่สำเร็จ (' + (err?.code || 'unknown') + ')\n' +
+        'กรุณาลองใหม่ หรือเข้าสู่ระบบด้วยอีเมลและรหัสผ่าน'
+      );
+    });
+  }, []);
 
   useEffect(() => {
     let currentSeq = 0;
@@ -133,21 +153,56 @@ export function AuthProvider({ children }) {
     };
   }, [dispatch])
 
+  /**
+   * Errors that mean the popup route cannot work in this browser at all, as opposed
+   * to the user declining it. Safari and iOS/iPadOS Safari partition storage per
+   * origin, so the popup lands on the auth handler unable to read the state the app
+   * wrote before opening it — reported as auth/missing-initial-state, and previously
+   * left as a bare Firebase error page in an orphaned tab with the app none the wiser.
+   */
+  const POPUP_UNAVAILABLE_CODES = [
+    'auth/popup-blocked',
+    'auth/missing-initial-state',
+    'auth/web-storage-unsupported',
+    'auth/operation-not-supported-in-this-environment',
+  ];
+
   const loginWithGoogle = async () => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       return result.user;
     } catch (err) {
       console.warn('Firebase Google login popup error:', err);
+
       if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
-        // User closed the popup, cancel gracefully
+        // The user dismissed it; nothing is wrong.
         return null;
       }
+
       if (err.code === 'auth/unauthorized-domain') {
         const currentHostname = typeof window !== 'undefined' ? window.location.hostname : 'queue-up-nu.vercel.app';
         alert(`⚠️ โดเมน "${currentHostname}" ยังไม่ถูกเพิ่มใน Authorized Domains ของ Firebase Console\n(กรุณาเพิ่มใน Firebase Console > Authentication > Settings > Authorized domains หรือเข้าสู่ระบบด้วยอีเมล/รหัสผ่าน)`);
         return null;
       }
+
+      if (POPUP_UNAVAILABLE_CODES.includes(err.code)) {
+        // Same-tab redirect instead. It survives storage partitioning provided the
+        // auth handler is same-origin — see resolveAuthDomain in firebase/config.js.
+        // This navigates away, so nothing after it runs; the session is picked up by
+        // getRedirectResult and onAuthStateChanged when the browser comes back.
+        try {
+          await signInWithRedirect(auth, googleProvider);
+          return null;
+        } catch (redirectErr) {
+          console.error('Firebase Google login redirect error:', redirectErr);
+          alert(
+            'ไม่สามารถเข้าสู่ระบบด้วย Google บนเบราว์เซอร์นี้ได้\n' +
+            'กรุณาเข้าสู่ระบบด้วยอีเมลและรหัสผ่านแทน'
+          );
+          return null;
+        }
+      }
+
       throw err;
     }
   }
