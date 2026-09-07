@@ -477,6 +477,26 @@ function Home() {
               </button>
             </div>
 
+            {/* 3.1 Guardian Link Verification */}
+            <div
+              className="p-5 rounded-2xl bg-white dark:bg-[#16100C] border border-orange-200/80 dark:border-[#FF7A1A]/25 hover:border-[#FF7A1A] hover:shadow-lg hover:shadow-orange-500/10 transition-all duration-300 flex flex-col justify-between cursor-pointer group hover:-translate-y-1 shadow-xs"
+              onClick={() => navigate("/campus/guardian-links")}
+            >
+              <div>
+                <div className="text-3xl mb-3 group-hover:scale-110 transition-transform inline-block">👪</div>
+                <h6 className="font-['Kanit'] font-bold text-slate-900 dark:text-white text-base mb-1">ยืนยันบัญชีผู้ปกครอง</h6>
+                <p className="text-slate-600 dark:text-stone-400 text-xs leading-relaxed mb-0">
+                  ตรวจสอบความสัมพันธ์ผู้ปกครอง–นักเรียน ก่อนให้สิทธิ์เข้าถึงกระเป๋าเงินและข้อมูลสุขภาพ
+                </p>
+              </div>
+              <button
+                type="button"
+                className="w-full py-2.5 rounded-xl border border-[#FF7A1A] text-[#FF7A1A] group-hover:bg-[#FF7A1A] group-hover:text-white font-['Kanit'] font-bold text-xs transition-all mt-4 text-center cursor-pointer"
+              >
+                ตรวจสอบคำขอผูกบัญชี ›
+              </button>
+            </div>
+
             {/* 4. Live Canteen Monitor */}
             <div
               className="p-5 rounded-2xl bg-white dark:bg-[#16100C] border border-orange-200/80 dark:border-[#FF7A1A]/25 hover:border-[#FF7A1A] hover:shadow-lg hover:shadow-orange-500/10 transition-all duration-300 flex flex-col justify-between cursor-pointer group hover:-translate-y-1 shadow-xs"

@@ -30,6 +30,12 @@ export interface ParentChildLink {
   relationship: 'FATHER' | 'MOTHER' | 'GUARDIAN';
   createdAt: FirestoreTimestamp;
   verifiedAt?: FirestoreTimestamp;
+  // Written by reviewParentChildLink when staff decide the request.
+  verifiedBy?: string;
+  verifiedByName?: string;
+  reviewNote?: string;
+  revokedBy?: string;
+  revokedAt?: FirestoreTimestamp;
 }
 
 export interface StudentWallet {

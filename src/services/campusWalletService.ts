@@ -199,6 +199,28 @@ export async function createParentChildLink(
 }
 
 /**
+ * Review a guardian ↔ student link (Staff Supervisor / Admin).
+ *
+ * Verifying is what actually grants a guardian access: the Cloud Function writes
+ * guardianIds onto the student and wallet documents, which is the field
+ * firestore.rules reads. A PENDING link proves nothing on its own — anyone signed in
+ * can create one claiming to be a guardian.
+ */
+export async function reviewParentChildLink(
+  linkId: string,
+  decision: 'VERIFIED' | 'REJECTED' | 'REVOKED',
+  note?: string
+): Promise<{ success: boolean; linkId: string; status: string; message: string }> {
+  const callable = httpsCallable<
+    { linkId: string; decision: string; note?: string },
+    { success: boolean; linkId: string; status: string; message: string }
+  >(functions, 'reviewParentChildLink');
+
+  const res = await callable({ linkId, decision, note });
+  return res.data;
+}
+
+/**
  * Submit Vendor Approval Application for Student
  */
 export async function submitVendorApproval(payload: {

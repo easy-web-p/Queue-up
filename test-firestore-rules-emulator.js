@@ -131,6 +131,28 @@ await testEnv.withSecurityRulesDisabled(async (ctx) => {
     pickupDate: '2026-09-07',
   });
 
+  await setDoc(doc(db, 'parent_child_links', 'link_pending'), {
+    guardianId: GUARDIAN,
+    studentId: STUDENT,
+    guardianName: 'สมชาย ใจดี',
+    studentName: 'สมหญิง ใจดี',
+    relationship: 'FATHER',
+    verifiedByGuardian: true,
+    verifiedBySchool: false,
+    status: 'PENDING',
+  });
+
+  await setDoc(doc(db, 'parent_child_links', 'link_verified'), {
+    guardianId: GUARDIAN,
+    studentId: STUDENT,
+    guardianName: 'สมชาย ใจดี',
+    studentName: 'สมหญิง ใจดี',
+    relationship: 'FATHER',
+    verifiedByGuardian: true,
+    verifiedBySchool: true,
+    status: 'VERIFIED',
+  });
+
   await setDoc(doc(db, 'assistant_rate_limits', STRANGER), { windowStart: 1, count: 99 });
 });
 
@@ -344,6 +366,85 @@ await runTest('A merchant can update their own shop hours', async () => {
 
 await runTest('A non-owner cannot touch the shop', async () => {
   await assertFails(updateDoc(doc(asStranger, 'shops', SHOP), { isOpen: false }));
+});
+
+// ===========================================================================
+console.log('\n7. Guardian ↔ student links');
+// ===========================================================================
+
+await runTest('Anyone signed in can REQUEST a link, but only as themselves', async () => {
+  await assertSucceeds(
+    setDoc(doc(asGuardian, 'parent_child_links', 'req_ok'), {
+      guardianId: GUARDIAN,
+      studentId: STUDENT,
+      status: 'PENDING',
+    })
+  );
+  await assertFails(
+    setDoc(doc(asStranger, 'parent_child_links', 'req_impersonation'), {
+      guardianId: GUARDIAN,
+      studentId: STUDENT,
+      status: 'PENDING',
+    })
+  );
+});
+
+await runTest('🚨 A request cannot be created already VERIFIED', async () => {
+  await assertFails(
+    setDoc(doc(asStranger, 'parent_child_links', 'req_selfverified'), {
+      guardianId: STRANGER,
+      studentId: STUDENT,
+      status: 'VERIFIED',
+    })
+  );
+});
+
+await runTest('🚨 A staff supervisor cannot flip a link to VERIFIED from the client', async () => {
+  // Verification also writes guardianIds and an audit entry, so it goes through the
+  // Cloud Function; a direct edit would mark it verified while granting nothing.
+  await assertFails(
+    updateDoc(doc(asTeacher, 'parent_child_links', 'link_pending'), { status: 'VERIFIED' })
+  );
+});
+
+await runTest('🚨 A guardian cannot self-verify their own link', async () => {
+  await assertFails(
+    updateDoc(doc(asGuardian, 'parent_child_links', 'link_pending'), {
+      status: 'VERIFIED',
+      verifiedBySchool: true,
+    })
+  );
+});
+
+await runTest('Not even an admin can edit a link outside the function', async () => {
+  await assertFails(
+    updateDoc(doc(asAdmin, 'parent_child_links', 'link_pending'), { status: 'VERIFIED' })
+  );
+});
+
+await runTest('A guardian may withdraw their own PENDING request', async () => {
+  await assertSucceeds(deleteDoc(doc(asGuardian, 'parent_child_links', 'req_ok')));
+});
+
+await runTest('🚨 A guardian CANNOT delete a VERIFIED link to keep the access it granted', async () => {
+  // Deleting the link does not remove guardianIds from the student and wallet, so
+  // this would leave the access standing with no record of it. Revocation is staff's.
+  await assertFails(deleteDoc(doc(asGuardian, 'parent_child_links', 'link_verified')));
+});
+
+await runTest('An unrelated user cannot read or delete someone else link', async () => {
+  await assertFails(getDoc(doc(asStranger, 'parent_child_links', 'link_verified')));
+  await assertFails(deleteDoc(doc(asStranger, 'parent_child_links', 'link_verified')));
+});
+
+await runTest('The guardian, the student and staff can read the link', async () => {
+  await assertSucceeds(getDoc(doc(asGuardian, 'parent_child_links', 'link_verified')));
+  await assertSucceeds(getDoc(doc(asStudent, 'parent_child_links', 'link_verified')));
+  await assertSucceeds(getDoc(doc(asTeacher, 'parent_child_links', 'link_verified')));
+});
+
+await runTest('Staff can list pending requests (the approval panel query)', async () => {
+  await assertSucceeds(getDocs(query(collection(asTeacher, 'parent_child_links'))));
 });
 
 await testEnv.cleanup();

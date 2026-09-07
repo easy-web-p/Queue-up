@@ -396,8 +396,24 @@ service cloud.firestore {
       allow create: if isAuthenticated() && 
         request.resource.data.guardianId == request.auth.uid &&
         request.resource.data.status == 'PENDING';
-      allow update: if isStaffSupervisor() || isAdmin();
-      allow delete: if isAdmin() || (isAuthenticated() && resource.data.guardianId == request.auth.uid);
+
+      // 🔒 Backend-only: verifying a link is not just a status change. It also writes
+      // guardianIds onto the student and wallet documents, which is what grants a
+      // guardian access, and it records an audit entry. A staff supervisor editing
+      // this document directly would set the status without either, producing a link
+      // that reads as VERIFIED while granting nothing — so reviews go through the
+      // reviewParentChildLink Cloud Function.
+      allow update: if false;
+      // A guardian may withdraw a request that has not been decided yet. They may NOT
+      // delete a VERIFIED link: verification wrote guardianIds onto the student and
+      // wallet, and deleting the link does not remove those, so it would leave the
+      // access standing with no record of why. Withdrawing a granted link is
+      // revocation, which is staff-only and goes through the Cloud Function.
+      allow delete: if isAdmin() || (
+        isAuthenticated() &&
+        resource.data.guardianId == request.auth.uid &&
+        resource.data.status == 'PENDING'
+      );
     }
 
     // ==========================================

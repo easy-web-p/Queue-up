@@ -4,9 +4,10 @@ import { getAuth } from "firebase-admin/auth";
 import { onRequest, onCall, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
-import { resolveWalletAuthority, MAX_TOPUP_SATANG } from "./walletAuthority.js";
+import { resolveWalletAuthority, isStaffOrAdmin, MAX_TOPUP_SATANG } from "./walletAuthority.js";
 import { resolveSpendingCounters } from "./walletLimits.js";
 import { scanOrderForAllergens } from "./allergenGuard.js";
+import { resolveLinkDecision, LINK_DECISIONS } from "./linkReview.js";
 
 // 🔒 Server-only credential. Never expose this through a VITE_* variable: Vite inlines
 // those into the client bundle. Set with: firebase functions:secrets:set OPENAI_API_KEY
@@ -850,6 +851,148 @@ export const reviewVendorApprovalRequest = onCall(
         message: "บันทึกผลการปฏิเสธคำขอเรียบร้อยแล้ว",
       };
     }
+  }
+);
+
+/**
+ * 👪 Review a Guardian ↔ Student Link (Staff Supervisor / Admin)
+ *
+ * The school's half of the two-way verification. A guardian asserts the
+ * relationship by creating a `parent_child_links` row — firestore.rules lets any
+ * signed-in user do that with `guardianId == uid` and status PENDING, and the
+ * `verifiedByGuardian` flag on it is client-supplied — so nothing downstream trusts
+ * a link until a staff supervisor has confirmed it here.
+ *
+ * Verifying also writes `guardianIds` onto the student and wallet documents. That
+ * field is what firestore.rules reads to grant a guardian access, and until now
+ * nothing in the system ever wrote it: a guardian could be linked and still be
+ * unable to see their own child's wallet.
+ *
+ * decision:
+ *   VERIFIED  - approve a PENDING link, granting access
+ *   REJECTED  - decline a PENDING link
+ *   REVOKED   - withdraw a previously VERIFIED link and remove the access it granted
+ */
+export const reviewParentChildLink = onCall(
+  { region: "asia-southeast1", cors: true },
+  async (request) => {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "กรุณาเข้าสู่ระบบก่อนตรวจสอบคำขอผูกบัญชี");
+    }
+
+    if (!(await isStaffOrAdmin(db, request.auth))) {
+      throw new HttpsError(
+        "permission-denied",
+        "LINK_REVIEW_FORBIDDEN: เฉพาะเจ้าหน้าที่ผู้ดูแลหรือผู้ดูแลระบบเท่านั้นที่ยืนยันการผูกบัญชีผู้ปกครองได้"
+      );
+    }
+
+    const { linkId, decision, note } = request.data || {};
+    if (!linkId || typeof linkId !== "string") {
+      throw new HttpsError("invalid-argument", "กรุณาระบุ linkId");
+    }
+    if (!LINK_DECISIONS.includes(decision)) {
+      throw new HttpsError(
+        "invalid-argument",
+        "กรุณาระบุ decision ('VERIFIED', 'REJECTED' หรือ 'REVOKED')"
+      );
+    }
+
+    const linkRef = db.collection("parent_child_links").doc(linkId);
+
+    return await db.runTransaction(async (tx) => {
+      const linkSnap = await tx.get(linkRef);
+      if (!linkSnap.exists) {
+        throw new HttpsError("not-found", "ไม่พบคำขอผูกบัญชีนี้ในระบบ");
+      }
+
+      const link = linkSnap.data();
+      const { guardianId, studentId } = link;
+      if (!guardianId || !studentId) {
+        throw new HttpsError("failed-precondition", "LINK_MALFORMED: คำขอผูกบัญชีไม่มี guardianId หรือ studentId");
+      }
+
+      const currentStatus = link.status || "PENDING";
+      const outcome = resolveLinkDecision(currentStatus, decision);
+      if (!outcome.ok) {
+        const messages = {
+          REVOKE_REQUIRES_VERIFIED: "REVOKE_REQUIRES_VERIFIED: เพิกถอนได้เฉพาะคำขอที่ยืนยันแล้วเท่านั้น",
+          LINK_ALREADY_REVIEWED: `LINK_ALREADY_REVIEWED: คำขอนี้ถูกตรวจสอบไปแล้ว (สถานะปัจจุบัน: ${currentStatus})`,
+        };
+        throw new HttpsError("failed-precondition", messages[outcome.reason] || outcome.reason);
+      }
+
+      const reviewerUid = request.auth.uid;
+      const reviewerName = request.auth.token?.name || request.auth.token?.email || "เจ้าหน้าที่ผู้ดูแล";
+      const studentRef = db.collection("students").doc(studentId);
+      const walletRef = db.collection("wallets").doc(studentId);
+
+      if (outcome.grantsAccess) {
+        tx.update(linkRef, {
+          status: outcome.nextStatus,
+          verifiedBySchool: true,
+          verifiedBy: reviewerUid,
+          verifiedByName: reviewerName,
+          verifiedAt: FieldValue.serverTimestamp(),
+          reviewNote: typeof note === "string" ? note.slice(0, 500) : "",
+        });
+
+        // arrayUnion is idempotent, so a re-link after a revocation is safe.
+        tx.set(studentRef, { guardianIds: FieldValue.arrayUnion(guardianId) }, { merge: true });
+        tx.set(
+          walletRef,
+          { studentId, guardianIds: FieldValue.arrayUnion(guardianId) },
+          { merge: true }
+        );
+      } else if (outcome.revokesAccess) {
+        tx.update(linkRef, {
+          status: outcome.nextStatus,
+          verifiedBySchool: false,
+          revokedBy: reviewerUid,
+          revokedAt: FieldValue.serverTimestamp(),
+          reviewNote: typeof note === "string" ? note.slice(0, 500) : "",
+        });
+
+        // Withdraw the access the approval granted, or revocation is cosmetic.
+        tx.set(studentRef, { guardianIds: FieldValue.arrayRemove(guardianId) }, { merge: true });
+        tx.set(walletRef, { guardianIds: FieldValue.arrayRemove(guardianId) }, { merge: true });
+      } else {
+        tx.update(linkRef, {
+          status: outcome.nextStatus,
+          verifiedBySchool: false,
+          reviewedBy: reviewerUid,
+          reviewedAt: FieldValue.serverTimestamp(),
+          reviewNote: typeof note === "string" ? note.slice(0, 500) : "",
+        });
+      }
+
+      // Who may see a child's wallet and health record is worth an audit trail.
+      const auditRef = db.collection("audit_logs").doc();
+      tx.set(auditRef, {
+        id: auditRef.id,
+        action: `PARENT_CHILD_LINK_${decision}`,
+        actorUid: reviewerUid,
+        actorName: reviewerName,
+        linkId,
+        guardianId,
+        targetStudentId: studentId,
+        previousStatus: currentStatus,
+        note: typeof note === "string" ? note.slice(0, 500) : "",
+        timestamp: FieldValue.serverTimestamp(),
+      });
+
+      return {
+        success: true,
+        linkId,
+        status: outcome.nextStatus,
+        message:
+          decision === "VERIFIED"
+            ? "ยืนยันการผูกบัญชีผู้ปกครองเรียบร้อย ผู้ปกครองเข้าถึงข้อมูลของนักเรียนได้แล้ว"
+            : decision === "REVOKED"
+              ? "เพิกถอนสิทธิ์ผู้ปกครองเรียบร้อย ผู้ปกครองไม่สามารถเข้าถึงข้อมูลของนักเรียนได้อีก"
+              : "บันทึกการปฏิเสธคำขอผูกบัญชีเรียบร้อย",
+      };
+    });
   }
 );
 
