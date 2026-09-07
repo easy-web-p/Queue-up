@@ -17,7 +17,8 @@
     "test:cart": "node test-cart-redux-e2e.js",
     "test:ticket": "node test-ticket-allergy-e2e.js",
     "test:wallet-auth": "node test-campus-wallet-authority.js",
-    "test": "node test-transaction-e2e.js && node test-campus-wallet-authority.js && node test-auth-lifecycle.js && node test-firestore-rules-integration.js && node test-storage-rules-integration.js && node test-campus-security-rules.js && node test-campus-integration.js && node test-cart-redux-e2e.js && node test-ticket-allergy-e2e.js"
+    "test:roles": "node test-auth-roles-escalation.js",
+    "test": "node test-transaction-e2e.js && node test-campus-wallet-authority.js && node test-auth-roles-escalation.js && node test-auth-lifecycle.js && node test-firestore-rules-integration.js && node test-storage-rules-integration.js && node test-campus-security-rules.js && node test-campus-integration.js && node test-cart-redux-e2e.js && node test-ticket-allergy-e2e.js"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.12.0",

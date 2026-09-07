@@ -10,6 +10,22 @@
 export const SUPER_ADMIN_EMAIL = "58140@lomsak.ac.th";
 
 /**
+ * 🔒 Roles that may NEVER be granted by the user's own Firestore profile document.
+ *
+ * A user creates `users/{uid}` themselves, so any field in it is attacker-controlled
+ * on first write. These roles are therefore honoured only from Firebase ID token
+ * custom claims (set by Cloud Functions via the Admin SDK) or the super-admin email.
+ * This mirrors firestore.rules, which authorizes privileged access off
+ * `request.auth.token` and never off the profile document.
+ */
+const PRIVILEGED_ROLES = new Set(["admin", "staff_supervisor"]);
+
+/** Reads verified ID token custom claims, if the session carries them. */
+function getClaims(user) {
+  return (user && user.tokenClaims) || {};
+}
+
+/**
  * Derives the list of effective roles for a user.
  * - If user session is unverified / from cache -> strictly ['customer'].
  * - Super Admin -> ['customer', 'merchant', 'admin'].
@@ -24,18 +40,25 @@ export function getEffectiveRoles(user) {
     return ["customer"];
   }
 
-  // Super Admin privilege (only for verified Firebase Auth sessions)
+  // 🔒 Super Admin privilege comes from verified ID token claims or the super-admin
+  // email only — never from `isSuperAdmin` / `admin` in the user's own profile doc.
   const email = (user.email || "").toLowerCase().trim();
+  const claims = getClaims(user);
   const isSuperAdmin = Boolean(
-    user.isSuperAdmin === true ||
-    user.admin === true ||
-    (user.isTokenVerified === true && email === SUPER_ADMIN_EMAIL)
+    claims.admin === true ||
+    claims.role === "admin" ||
+    email === SUPER_ADMIN_EMAIL
   );
 
   const roles = new Set(["customer"]);
 
   if (isSuperAdmin) {
     return ["customer", "merchant", "admin", "staff_supervisor"];
+  }
+
+  // Staff supervisor is likewise claim-only.
+  if (claims.role === "staff_supervisor" || claims.staffSupervisor === true) {
+    roles.add("staff_supervisor");
   }
 
   // Merchant privilege (only for verified Firebase Auth sessions)
@@ -50,12 +73,16 @@ export function getEffectiveRoles(user) {
     roles.add("merchant");
   }
 
-  if (user.role) {
+  // Non-privileged roles (customer, student_vendor, guardian, ...) may come from the
+  // profile doc; privileged ones are filtered out — see PRIVILEGED_ROLES above.
+  if (user.role && !PRIVILEGED_ROLES.has(user.role)) {
     roles.add(user.role);
   }
 
   if (Array.isArray(user.roles)) {
-    user.roles.forEach((r) => roles.add(r));
+    user.roles.forEach((r) => {
+      if (!PRIVILEGED_ROLES.has(r)) roles.add(r);
+    });
   }
 
   return Array.from(roles);
@@ -76,10 +103,11 @@ export function canAccessRole(user, targetRole) {
 export function isUserSuperAdmin(user) {
   if (!user || user.isFromCache === true || user.isVerifiedAuth !== true) return false;
   const email = (user.email || "").toLowerCase().trim();
+  const claims = getClaims(user);
   return Boolean(
-    user.isSuperAdmin === true ||
-    user.admin === true ||
-    (user.isTokenVerified === true && email === SUPER_ADMIN_EMAIL)
+    claims.admin === true ||
+    claims.role === "admin" ||
+    email === SUPER_ADMIN_EMAIL
   );
 }
 

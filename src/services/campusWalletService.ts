@@ -219,29 +219,49 @@ export async function reviewVendorApproval(
   return res.data;
 }
 
+export interface EmergencyLookupResult {
+  found: boolean;
+  profile: StudentProfile | null;
+  recentOrders: Array<{
+    id: string;
+    queueNumber: string | null;
+    status: string | null;
+    storeId: string | null;
+    pickupDate: string | null;
+    pickupTime: string | null;
+    createdAt: string | null;
+    items: Array<{
+      name: string;
+      quantity: number;
+      customNotes?: string;
+      selectedModifiers?: Array<{ modifierGroupId?: string; optionId?: string; name?: string }>;
+    }>;
+  }>;
+}
+
 /**
- * Emergency Medical & Allergy Lookup with Immutable Audit Logging
+ * Emergency Medical & Allergy Lookup with Immutable Audit Logging.
+ *
+ * 🔒 The profile read and the audit write both happen inside the Cloud Function, so
+ * the access cannot be made without leaving a record. This previously logged from the
+ * client with a warn-only catch and then read `students/{id}` directly, which meant
+ * dropping the log request was enough to read a child's health data untraced.
+ *
+ * @param studentQuery - the student's uid, or the studentCode printed on their card
  */
 export async function emergencyMedicalLookup(
-  studentId: string,
-  studentName?: string,
+  studentQuery: string,
   reason?: string
-): Promise<StudentProfile | null> {
-  // 1. Audit Log Call via Cloud Function
-  try {
-    const callable = httpsCallable<
-      { studentId: string; studentName?: string; reason?: string },
-      { success: boolean; auditId: string }
-    >(functions, 'logEmergencyLookup');
-    await callable({ studentId, studentName, reason });
-  } catch (err) {
-    console.warn('[emergencyMedicalLookup] Audit logging warning:', err);
-  }
+): Promise<EmergencyLookupResult> {
+  const callable = httpsCallable<
+    { studentQuery: string; reason?: string },
+    { success: boolean; auditId: string } & EmergencyLookupResult
+  >(functions, 'emergencyMedicalLookup');
 
-  // 2. Fetch Student Profile
-  const studentDoc = await getDoc(doc(db, 'students', studentId));
-  if (!studentDoc.exists()) {
-    return null;
-  }
-  return studentDoc.data() as StudentProfile;
+  const res = await callable({ studentQuery, reason });
+  return {
+    found: res.data.found,
+    profile: res.data.profile,
+    recentOrders: res.data.recentOrders || [],
+  };
 }

@@ -196,6 +196,11 @@ service cloud.firestore {
         (
           isOwner(userId) &&
           (!('roles' in request.resource.data) || request.resource.data.roles == ['customer'] || request.resource.data.roles == ['user']) &&
+          // 🔒 `role` and `admin` are read by getEffectiveRoles() in the client. Left
+          // unguarded, a user could self-assign role:'admin' / admin:true on their very
+          // first profile write and unlock every admin & staff screen in the UI.
+          (!('role' in request.resource.data) || request.resource.data.role == 'customer' || request.resource.data.role == 'user') &&
+          (!('admin' in request.resource.data) || request.resource.data.admin == false) &&
           (!('isSuperAdmin' in request.resource.data) || request.resource.data.isSuperAdmin == false) &&
           (!('isMerchantVerified' in request.resource.data) || request.resource.data.isMerchantVerified == false) &&
           (!('isMerchantRegistered' in request.resource.data) || request.resource.data.isMerchantRegistered == false) &&
@@ -353,10 +358,14 @@ service cloud.firestore {
     // 13. CAMPUS STUDENTS (Role-Protected Profiles)
     // ==========================================
     match /students/{studentId} {
+      // 🔒 Student records carry allergy and health data. Staff supervisors are
+      // deliberately NOT granted a direct read: their access route is the
+      // `emergencyMedicalLookup` Cloud Function, which writes an immutable audit
+      // entry before returning the profile. Granting a direct read here would let
+      // staff read a child's medical history leaving no trace.
       allow read: if isAuthenticated() && (
         isOwner(studentId) ||
         (resource.data.guardianIds != null && request.auth.uid in resource.data.guardianIds) ||
-        isStaffSupervisor() ||
         isAdmin()
       );
       allow create, update, delete: if isStaffSupervisor() || isAdmin();

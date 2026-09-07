@@ -1,14 +1,10 @@
 import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext.jsx';
 import { emergencyMedicalLookup } from '../services/campusWalletService';
-import { collection, query, where, getDocs, limit, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebase/config.js';
 import { AlertOctagon, Search, ShieldAlert, ArrowLeft, HeartPulse, User, Phone, FileText, Utensils, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { StudentProfile } from '../types/campus';
 
 export default function EmergencyLookup() {
-  const { user } = useAuth();
   const [studentCodeInput, setStudentCodeInput] = useState('');
   const [lookupReason, setLookupReason] = useState('อุบัติเหตุ / การปฐมพยาบาลฉุกเฉินในโรงอาหาร');
   const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(null);
@@ -26,53 +22,19 @@ export default function EmergencyLookup() {
     setRecentOrders([]);
 
     try {
-      // 1. Direct Audit Log write to /emergency_audit_logs (Append-Only)
-      try {
-        await addDoc(collection(db, 'emergency_audit_logs'), {
-          studentCode: studentCodeInput.trim(),
-          lookupReason: lookupReason.trim(),
-          actorUid: user?.uid || 'supervisor',
-          actorEmail: user?.email || 'N/A',
-          timestamp: serverTimestamp(),
-        });
-      } catch (auditErr) {
-        console.warn('Direct audit log note:', auditErr);
-      }
+      // The Cloud Function authorizes the caller, writes the immutable audit entry and
+      // returns the profile plus recent meals in one audited step. Nothing here can
+      // read a student's medical data without that record being written first.
+      setIsLoadingOrders(true);
+      const result = await emergencyMedicalLookup(studentCodeInput.trim(), lookupReason);
 
-      // 2. Fetch authoritative student profile
-      const profile = await emergencyMedicalLookup(
-        studentCodeInput.trim(),
-        undefined,
-        lookupReason
-      );
-
-      if (profile) {
-        setStudentProfile(profile);
-
-        // 3. Query 24-48h Food Intake / Meal History
-        try {
-          setIsLoadingOrders(true);
-          const qOrders = query(
-            collection(db, 'orders'),
-            where('studentId', '==', studentCodeInput.trim()),
-            limit(15)
-          );
-          const snap = await getDocs(qOrders);
-          const ords = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-          ords.sort((a: any, b: any) => {
-            const tA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
-            const tB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
-            return tB - tA;
-          });
-          setRecentOrders(ords);
-        } catch (ordErr) {
-          console.warn('[EmergencyLookup] Orders fetch warning:', ordErr);
-        } finally {
-          setIsLoadingOrders(false);
-        }
+      if (result.found && result.profile) {
+        setStudentProfile(result.profile);
+        setRecentOrders(result.recentOrders);
       } else {
         setNotFound(true);
       }
+      setIsLoadingOrders(false);
     } catch (err: any) {
       console.error('[EmergencyLookup] Error:', err);
       setNotFound(true);

@@ -1,10 +1,15 @@
+import { httpsCallable } from "firebase/functions";
+import { functions } from "../firebase/config.js";
 import { analyzeAndShieldInput } from "./aiSecurityShield.js";
 
-const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY || "";
-const OPENAI_MODEL = import.meta.env.VITE_OPENAI_MODEL || "gpt-3.5-turbo"; // ChatGPT Classic Model
-
 /**
- * Generate smart merchant response via ChatGPT Classic API or smart local fallback
+ * Generate smart merchant response via the server-side assistant or a local fallback.
+ *
+ * 🔒 The OpenAI API key is NOT read here. Vite inlines every VITE_* variable into the
+ * client bundle, so a key referenced from this file would ship to every visitor's
+ * browser. The key lives in Cloud Functions secrets and the call is proxied by the
+ * `generateAssistantReply` function instead.
+ *
  * @param {string} userMessage - Message sent by customer
  * @param {string} storeName - Target Canteen Merchant Name
  * @param {object} orderContext - Attached order information (itemTitle, queueNo, price)
@@ -17,38 +22,16 @@ export async function getChatGPTResponse(userMessage, storeName = "ร้าน�
     return `🛡️ [AI Security Sentinel] ตรวจพบข้อความสุ่มเสี่ยงความปลอดภัย (${shield.threats[0]}) ระบบได้ทำการบล็อกและรีเซ็ตการสนทนาเพื่อความปลอดภัยครับ`;
   }
   const cleanMessage = shield.sanitized;
-  // If OpenAI API key is configured, call ChatGPT Classic API
-  if (OPENAI_API_KEY) {
-    try {
-      const systemPrompt = `คุณคือผู้ช่วย AI ร้านค้าโรงเรียนชื่อ "${storeName}" ในระบบ QueueUp CRM 
-หน้าที่ของคุณคือตอบกลับลูกค้าที่สั่งอาหารด้วยความสุภาพ เป็นกันเอง ภาษาไทย รวดเร็ว และกระชับ (ไม่เกิน 2-3 ประโยค)
-${orderContext ? `บริบทออเดอร์ปัจจุบัน: ${orderContext.itemTitle} | ${orderContext.queueNo} | ฿${orderContext.price}` : ""}`;
 
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: OPENAI_MODEL,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: cleanMessage },
-          ],
-          max_tokens: 150,
-          temperature: 0.7,
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const aiText = data.choices[0]?.message?.content?.trim();
-        if (aiText) return aiText;
-      }
-    } catch (err) {
-      console.warn("ChatGPT Classic API connection notice:", err);
+  try {
+    const callable = httpsCallable(functions, "generateAssistantReply");
+    const res = await callable({ userMessage: cleanMessage, storeName, orderContext });
+    const aiText = res?.data?.text;
+    if (typeof aiText === "string" && aiText.trim()) {
+      return aiText.trim();
     }
+  } catch (err) {
+    console.warn("Assistant reply service notice:", err);
   }
 
   // Smart Context-Aware Local Fallback Response Engine

@@ -25,6 +25,18 @@ export function AuthProvider({ children }) {
       }
 
       try {
+        // 🔒 Verified custom claims are the only trusted source of privileged roles.
+        // The Firestore profile doc below is written by the user themselves and can
+        // never grant admin / staff_supervisor — see utils/authRoles.js.
+        let tokenClaims = {};
+        try {
+          const tokenResult = await firebaseUser.getIdTokenResult();
+          tokenClaims = tokenResult?.claims || {};
+        } catch (tokenErr) {
+          console.warn("Could not read ID token claims:", tokenErr);
+        }
+        if (thisSeq !== currentSeq) return;
+
         let userDocData = null;
         let profileFetchError = false;
         try {
@@ -45,6 +57,7 @@ export function AuthProvider({ children }) {
           ...userDocData,
           uid: firebaseUser.uid,
           email: firebaseUser.email || "",
+          tokenClaims,
           isVerifiedAuth: true,
           isTokenVerified: true,
           isFromCache: false,
@@ -73,6 +86,9 @@ export function AuthProvider({ children }) {
           photoURL: userDocData?.photoURL || firebaseUser.photoURL || "/yeti_mascot.jpg",
           roles: roles,
           activeRole: activeRole,
+          // Carried through so role checks re-derived from the Redux user (e.g. in
+          // ProtectedRoute) resolve identically to the check performed here.
+          tokenClaims,
           isGoogleUser: isGoogle,
           isMerchantVerified: isMerchantVerified,
           isMerchantRegistered: isMerchantRegistered,

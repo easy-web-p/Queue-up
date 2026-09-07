@@ -3,7 +3,15 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { onRequest, onCall, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
+import { defineSecret } from "firebase-functions/params";
 import { resolveWalletAuthority, MAX_TOPUP_SATANG } from "./walletAuthority.js";
+
+// 🔒 Server-only credential. Never expose this through a VITE_* variable: Vite inlines
+// those into the client bundle. Set with: firebase functions:secrets:set OPENAI_API_KEY
+const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
+
+const ASSISTANT_MAX_MESSAGE_CHARS = 500;
+const ASSISTANT_MAX_STORE_NAME_CHARS = 120;
 
 initializeApp();
 const db = getFirestore();
@@ -868,35 +876,201 @@ export const updateCampusWalletLimits = onCall(
 );
 
 /**
- * 🚨 Log Emergency Medical / Allergy Lookup (Immutable Audit Trail)
+ * 🚨 Emergency Medical / Allergy Lookup (Audited, Server-Authoritative)
+ *
+ * Reads the student's medical profile on the caller's behalf and writes the audit
+ * entry before returning. Previously the client logged the access and then read
+ * `students/{id}` itself, so dropping the (non-blocking, warn-only) log call was
+ * enough to read a child's health data leaving no trace. Access and audit are now
+ * inseparable: the log write is awaited on every path, hit or miss.
+ *
+ * Accepts either the student's uid or their studentCode, because the emergency
+ * screen searches by the code printed on a student card.
  */
-export const logEmergencyLookup = onCall(
+export const emergencyMedicalLookup = onCall(
   { region: "asia-southeast1", cors: true },
   async (request) => {
     if (!request.auth || !request.auth.uid) {
       throw new HttpsError("unauthenticated", "กรุณาเข้าสู่ระบบก่อนเข้าถึงข้อมูลฉุกเฉิน");
     }
 
-    const { studentId, studentName, reason } = request.data || {};
-    if (!studentId) {
-      throw new HttpsError("invalid-argument", "กรุณาระบุ studentId");
+    const { studentQuery, reason } = request.data || {};
+    if (!studentQuery || typeof studentQuery !== "string" || !studentQuery.trim()) {
+      throw new HttpsError("invalid-argument", "กรุณาระบุรหัสนักเรียนหรือรหัสประจำตัว");
+    }
+    const lookupKey = studentQuery.trim();
+
+    // 🔒 Medical data: staff supervisors and admins only. When a staff_supervisors
+    // record exists it is authoritative and its canEmergencyLookup flag is honoured.
+    const token = request.auth.token || {};
+    const staffDoc = await db.collection("staff_supervisors").doc(request.auth.uid).get();
+    const staffData = staffDoc.exists ? staffDoc.data() : null;
+
+    let authorized;
+    if (token.admin === true || token.role === "admin") {
+      authorized = true;
+    } else if (staffData) {
+      authorized = staffData.canEmergencyLookup === true;
+    } else {
+      authorized = token.role === "staff_supervisor";
     }
 
+    if (!authorized) {
+      throw new HttpsError(
+        "permission-denied",
+        "EMERGENCY_LOOKUP_FORBIDDEN: เฉพาะเจ้าหน้าที่ผู้ดูแลที่ได้รับสิทธิ์เท่านั้นที่เข้าถึงข้อมูลสุขภาพนักเรียนได้"
+      );
+    }
+
+    // Resolve by document id (uid) first, then by the printed studentCode.
+    let studentSnap = await db.collection("students").doc(lookupKey).get();
+    if (!studentSnap.exists) {
+      const byCode = await db
+        .collection("students")
+        .where("studentCode", "==", lookupKey)
+        .limit(1)
+        .get();
+      studentSnap = byCode.empty ? null : byCode.docs[0];
+    }
+
+    const profile = studentSnap
+      ? { ...studentSnap.data(), studentId: studentSnap.id }
+      : null;
+
+    // 🔒 Audit before returning — awaited, and recorded even when nothing was found,
+    // so an attempt to probe for a student is as traceable as a successful read.
     const auditRef = db.collection("audit_logs").doc();
     await auditRef.set({
       id: auditRef.id,
       action: "EMERGENCY_MEDICAL_LOOKUP",
       actorUid: request.auth.uid,
-      targetStudentId: studentId,
-      targetStudentName: studentName || "N/A",
-      reason: reason || "การรักษาพยาบาลหรืออุบัติเหตุฉุกเฉิน",
+      actorEmail: token.email || "N/A",
+      lookupKey,
+      targetStudentId: profile ? profile.studentId : null,
+      targetStudentName: profile ? profile.name || "N/A" : null,
+      found: Boolean(profile),
+      reason: (typeof reason === "string" && reason.trim()) || "การรักษาพยาบาลหรืออุบัติเหตุฉุกเฉิน",
       timestamp: FieldValue.serverTimestamp(),
     });
 
-    return {
-      success: true,
-      auditId: auditRef.id,
-    };
+    if (!profile) {
+      return { success: true, auditId: auditRef.id, found: false, profile: null, recentOrders: [] };
+    }
+
+    // Recent meals, for allergen tracing. Orders key the student on `studentId` for
+    // wallet orders and on `userId` otherwise, so both are consulted.
+    const orderFields = ["studentId", "userId"];
+    const ordersById = new Map();
+    for (const field of orderFields) {
+      const snap = await db
+        .collection("orders")
+        .where(field, "==", profile.studentId)
+        .limit(15)
+        .get();
+      snap.docs.forEach((d) => {
+        const o = d.data();
+        ordersById.set(d.id, {
+          id: d.id,
+          queueNumber: o.queueNumber || null,
+          status: o.status || null,
+          storeId: o.storeId || null,
+          pickupDate: o.pickupDate || null,
+          pickupTime: o.pickupTime || null,
+          createdAt: o.createdAt?.toDate ? o.createdAt.toDate().toISOString() : null,
+          items: Array.isArray(o.items)
+            ? o.items.map((it) => ({
+                name: it.name,
+                quantity: it.quantity,
+                customNotes: it.customNotes || "",
+                selectedModifiers: Array.isArray(it.selectedModifiers) ? it.selectedModifiers : [],
+              }))
+            : [],
+        });
+      });
+    }
+
+    const recentOrders = Array.from(ordersById.values())
+      .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
+      .slice(0, 15);
+
+    return { success: true, auditId: auditRef.id, found: true, profile, recentOrders };
+  }
+);
+
+/**
+ * 🤖 Merchant Assistant Reply (server-side OpenAI proxy)
+ *
+ * The API key previously lived in VITE_OPENAI_API_KEY, which Vite inlines into the
+ * client bundle — readable by anyone who opens DevTools. It is now a Cloud Functions
+ * secret and never leaves the server. Set it with:
+ *   firebase functions:secrets:set OPENAI_API_KEY
+ *
+ * Returns { text: null } when no key is configured or the upstream call fails, and
+ * the client falls back to its local canned responses.
+ */
+export const generateAssistantReply = onCall(
+  { region: "asia-southeast1", cors: true, secrets: [OPENAI_API_KEY] },
+  async (request) => {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "กรุณาเข้าสู่ระบบก่อนใช้งานผู้ช่วยตอบกลับอัตโนมัติ");
+    }
+
+    const { userMessage, storeName, orderContext } = request.data || {};
+    if (typeof userMessage !== "string" || !userMessage.trim()) {
+      throw new HttpsError("invalid-argument", "ไม่พบข้อความสำหรับสร้างคำตอบ");
+    }
+    if (userMessage.length > ASSISTANT_MAX_MESSAGE_CHARS) {
+      throw new HttpsError(
+        "invalid-argument",
+        `MESSAGE_TOO_LONG: ข้อความต้องไม่เกิน ${ASSISTANT_MAX_MESSAGE_CHARS} ตัวอักษร`
+      );
+    }
+
+    const apiKey = OPENAI_API_KEY.value();
+    if (!apiKey) {
+      return { text: null, source: "NOT_CONFIGURED" };
+    }
+
+    const safeStoreName = String(storeName || "ร้านค้า QueueUp").slice(0, ASSISTANT_MAX_STORE_NAME_CHARS);
+    const contextLine =
+      orderContext && typeof orderContext === "object"
+        ? `บริบทออเดอร์ปัจจุบัน: ${String(orderContext.itemTitle || "").slice(0, 200)} | ${String(orderContext.queueNo || "").slice(0, 40)} | ฿${String(orderContext.price ?? "").slice(0, 20)}`
+        : "";
+
+    const systemPrompt = `คุณคือผู้ช่วย AI ร้านค้าโรงเรียนชื่อ "${safeStoreName}" ในระบบ QueueUp CRM
+หน้าที่ของคุณคือตอบกลับลูกค้าที่สั่งอาหารด้วยความสุภาพ เป็นกันเอง ภาษาไทย รวดเร็ว และกระชับ (ไม่เกิน 2-3 ประโยค)
+${contextLine}`;
+
+    try {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: process.env.OPENAI_MODEL || "gpt-3.5-turbo",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userMessage },
+          ],
+          max_tokens: 150,
+          temperature: 0.7,
+        }),
+      });
+
+      if (!response.ok) {
+        console.warn("[generateAssistantReply] Upstream status:", response.status);
+        return { text: null, source: "UNAVAILABLE" };
+      }
+
+      const data = await response.json();
+      const aiText = data.choices?.[0]?.message?.content?.trim();
+      return aiText ? { text: aiText, source: "OPENAI" } : { text: null, source: "EMPTY" };
+    } catch (err) {
+      console.warn("[generateAssistantReply] Upstream error:", err);
+      return { text: null, source: "UNAVAILABLE" };
+    }
   }
 );
 
