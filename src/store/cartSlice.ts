@@ -1,5 +1,10 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { CartItem, SelectedModifierOption } from '../types';
+import { calculateCartItemUnitPrice } from './cartPricing.js';
+
+// Re-exported so existing importers keep working; the rule itself lives in
+// cartPricing.js, free of Redux and of type imports, so it can be tested directly.
+export { calculateCartItemUnitPrice };
 
 export interface CartState {
   items: CartItem[];
@@ -104,15 +109,6 @@ export const selectCartItems = (state: { cart: CartState }) => state.cart.items;
 
 export const selectCartTotalCount = (state: { cart: CartState }) =>
   state.cart.items.reduce((sum, item) => sum + (item.quantity || 1), 0);
-
-export const calculateCartItemUnitPrice = (item: CartItem): number => {
-  const basePrice = item.menuItem?.price || 0;
-  let modifierTotal = 0;
-  if (Array.isArray(item.selectedModifiers)) {
-    modifierTotal = item.selectedModifiers.reduce((sum, mod) => sum + (mod.priceModifier || 0), 0);
-  }
-  return basePrice + modifierTotal;
-};
 
 export const selectCartTotalAmount = (state: { cart: CartState }) =>
   state.cart.items.reduce((sum, item) => sum + calculateCartItemUnitPrice(item) * (item.quantity || 1), 0);

@@ -988,6 +988,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
           setIsCartOpen(false);
           navigate("/food-booking");
         }}
+        onBrowseMenu={() => navigate("/home")}
       />
     </header>
   );

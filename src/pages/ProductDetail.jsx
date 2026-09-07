@@ -832,12 +832,18 @@ function ProductDetail() {
       return;
     }
 
-    const cartItem = createCurrentCartItem();
+    // This button says "ไปที่ตะกร้า", so it has to put the item IN the cart.
+    //
+    // It used to hand the item to the booking page through router state instead,
+    // and the booking page preferred that state over the real cart — so anything
+    // already added with "เพิ่มลงตะกร้า" simply did not appear, and the order that
+    // followed cleared those items from the cart without ever having ordered them.
+    // One source of truth: the cart.
+    dispatch(addItem(createCurrentCartItem()));
 
     // 6. Seamless Navigation to Authoritative Booking Flow (Strict ISO date format YYYY-MM-DD)
     navigate("/booking", {
       state: {
-        cartItems: [cartItem],
         pickupTime: selectedTimeSlot?.time || "12:00",
         bookingDate: selectedDay.isoDateStr,
         bookingDateLabel: selectedDay.fullDateStr,
