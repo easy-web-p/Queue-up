@@ -11,6 +11,8 @@ import FoodCard from "../components/FoodCard.jsx";
 import ShopeeSearchBar from "../components/ShopeeSearchBar.jsx";
 import ChatModal from "../components/ChatModal.jsx";
 import Footer from "../components/Footer.jsx";
+import DailyMenuBoard from "../components/DailyMenuBoard.jsx";
+import ShopReelsFeed from "../components/ShopReelsFeed.jsx";
 import { usePreferences } from "../context/PreferencesContext.jsx";
 import { SHARED_PRODUCTS } from "../data/mockProducts.js";
 import { INITIAL_PRODUCTS } from "../firebase/config.js";
@@ -758,6 +760,12 @@ function Home() {
             </div>
           </div>
         </section>
+
+        {/* 7.1 Daily Menu Board — per-shop announcements for today */}
+        <DailyMenuBoard />
+
+        {/* 7.2 Shop Reels — short menu videos from shops and student vendors */}
+        <ShopReelsFeed />
 
         {/* 8. Food Catalog Grid with Interactive Filters & Sorting */}
         <section className="bg-white p-4 rounded-4 shadow-sm border mb-4">

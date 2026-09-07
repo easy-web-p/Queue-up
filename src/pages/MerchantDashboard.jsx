@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { switchRole, clearUser } from "../store/authSlice.js";
@@ -9,6 +9,14 @@ import { MerchantKDS } from "../components/MerchantKDS.tsx";
 import ChatModal from "../components/ChatModal.jsx";
 import BookingCalendar from "../components/BookingCalendar.jsx";
 import SellerAssistantModal from "../components/SellerAssistantModal.jsx";
+import { MerchantMenuManager } from "../components/MerchantMenuManager.tsx";
+import { MerchantModifierManager } from "../components/MerchantModifierManager.tsx";
+import { MerchantCRMAnalytics } from "../components/MerchantCRMAnalytics.tsx";
+import {
+  fetchStoreModifierGroups,
+  createStoreModifierGroup,
+  toggleStoreModifierOptionStock,
+} from "../services/catalogService";
 import {
   generateAIMarketingRecommendations,
   getActiveMerchantCoupons,
@@ -83,6 +91,7 @@ function MerchantDashboard() {
   const [currentStoreId] = useState(initialStore.storeId);
 
   const [merchantOrders, setMerchantOrders] = useState([]);
+  const [modifierGroups, setModifierGroups] = useState([]);
 
   const [menuItems, setMenuItems] = useState(() => {
     if (initialStore.storeId) {
@@ -305,6 +314,118 @@ function MerchantDashboard() {
     );
   };
 
+  // Menu edits stay on the same local + localStorage state the menu tab has always
+  // used; MerchantMenuManager replaces a read-only grid whose "add item" button only
+  // raised an alert, so create/price/stock actually work now.
+  const handleUpdateStock = (productId, newStock) => {
+    setMenuItems((prev) =>
+      prev.map((p) => (p.id === productId ? { ...p, stock: Math.max(0, Number(newStock) || 0) } : p))
+    );
+  };
+
+  const handleUpdatePrice = (productId, newPrice) => {
+    const price = Number(newPrice);
+    if (!Number.isFinite(price) || price <= 0) return;
+    setMenuItems((prev) =>
+      prev.map((p) => (p.id === productId ? { ...p, price, priceSatang: Math.round(price * 100) } : p))
+    );
+  };
+
+  const handleAddNewItem = (item) => {
+    setMenuItems((prev) => [
+      ...prev,
+      { ...item, id: `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, storeId: currentStoreId },
+    ]);
+  };
+
+  // Repeat customers, aggregated from this store's own orders. Derived rather than
+  // stored so it cannot drift, and scoped to this store: a merchant sees who buys
+  // from them, never the platform's customer list.
+  const crmCustomers = useMemo(() => {
+    const byCustomer = new Map();
+    for (const order of merchantOrders) {
+      const key = order.userId || order.customerPhone || order.id;
+      if (!key) continue;
+      const existing = byCustomer.get(key) || {
+        id: key,
+        name: order.customerName || "ลูกค้า QueueUp",
+        phone: order.customerPhone || "",
+        points: 0,
+        totalOrders: 0,
+        totalSpent: 0,
+        favoriteItems: [],
+      };
+      existing.totalOrders += 1;
+      existing.totalSpent += Number(order.finalAmount ?? order.totalAmount ?? 0) || 0;
+      existing.points += Number(order.pointsEarned) || 0;
+      for (const item of order.items || []) {
+        if (item?.name && !existing.favoriteItems.includes(item.name)) {
+          existing.favoriteItems.push(item.name);
+        }
+      }
+      byCustomer.set(key, existing);
+    }
+
+    return Array.from(byCustomer.values())
+      .map((c) => ({
+        ...c,
+        tier:
+          c.totalSpent >= 5000 ? "Platinum" : c.totalSpent >= 2000 ? "Gold" : c.totalSpent >= 500 ? "Silver" : "Bronze",
+      }))
+      .sort((a, b) => b.totalSpent - a.totalSpent);
+  }, [merchantOrders]);
+
+  const handleSendBroadcast = (announcementText) => {
+    // No broadcast transport exists yet — recorded locally and surfaced in the tab so
+    // the action is honest about what it did rather than silently doing nothing.
+    console.info("[MerchantDashboard] Broadcast queued:", announcementText);
+    setMarketingSuccessMsg(
+      `บันทึกประกาศถึงลูกค้าประจำ ${crmCustomers.length} รายเรียบร้อยแล้ว (ยังไม่ได้เชื่อมระบบส่งข้อความจริง)`
+    );
+    setTimeout(() => setMarketingSuccessMsg(""), 5000);
+  };
+
+  // Modifier groups are store-isolated in Firestore, so these go through
+  // catalogService rather than local state.
+  const refreshModifierGroups = useCallback(async () => {
+    if (!currentStoreId) return;
+    try {
+      setModifierGroups(await fetchStoreModifierGroups(db, currentStoreId));
+    } catch (err) {
+      console.warn("[MerchantDashboard] Could not load modifier groups:", err);
+    }
+  }, [currentStoreId]);
+
+  useEffect(() => {
+    if (!currentStoreId) return undefined;
+    // Guarded so a response that arrives after the store changed, or after unmount,
+    // does not overwrite newer state.
+    let cancelled = false;
+    (async () => {
+      try {
+        const groups = await fetchStoreModifierGroups(db, currentStoreId);
+        if (!cancelled) setModifierGroups(groups);
+      } catch (err) {
+        console.warn("[MerchantDashboard] Could not load modifier groups:", err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentStoreId]);
+
+  const handleCreateModifierGroup = async (group) => {
+    if (!currentStoreId) throw new Error("STORE_ID_REQUIRED: ไม่พบรหัสร้านค้า");
+    await createStoreModifierGroup(db, currentStoreId, group);
+    await refreshModifierGroups();
+  };
+
+  const handleToggleModifierOptionStock = async (groupId, optionId) => {
+    if (!currentStoreId) return;
+    await toggleStoreModifierOptionStock(db, currentStoreId, groupId, optionId);
+    await refreshModifierGroups();
+  };
+
   const handleSaveStoreProfile = async (e) => {
     if (e) e.preventDefault();
 
@@ -508,6 +629,22 @@ function MerchantDashboard() {
           </button>
 
           <button
+            className={`merchant-tab-btn ${activeTab === "modifiers" ? "active" : ""}`}
+            onClick={() => setActiveTab("modifiers")}
+          >
+            <i className="bi bi-layers-fill fs-5 text-warning" />
+            <span>กลุ่มตัวเลือกอาหาร</span>
+          </button>
+
+          <button
+            className={`merchant-tab-btn ${activeTab === "customers" ? "active" : ""}`}
+            onClick={() => setActiveTab("customers")}
+          >
+            <i className="bi bi-person-hearts fs-5 text-danger" />
+            <span>ลูกค้าประจำ & ประกาศ</span>
+          </button>
+
+          <button
             className={`merchant-tab-btn ${activeTab === "marketing" ? "active" : ""}`}
             onClick={() => setActiveTab("marketing")}
           >
@@ -561,47 +698,35 @@ function MerchantDashboard() {
         {/* TAB 3: MENU MANAGEMENT */}
         {activeTab === "menu" && (
           <div className="merchant-panel-box">
-            <div className="d-flex align-items-center justify-content-between mb-4">
-              <h3 className="merchant-panel-title mb-0">
-                <i className="bi bi-egg-fried text-warning me-2" />
-                จัดการรายการเมนูอาหาร & สถานะสต็อกประจำร้าน
-              </h3>
-              <button
-                className="btn btn-danger font-weight-bold px-3 py-2"
-                onClick={() => alert("ระบบเพิ่มเมนูอาหารใหม่พร้อมใช้งานแล้ว!")}
-              >
-                <i className="bi bi-plus-circle-fill me-1" /> เพิ่มเมนูอาหารใหม่
-              </button>
-            </div>
+            <MerchantMenuManager
+              storeId={currentStoreId}
+              menuItems={menuItems}
+              modifierGroups={modifierGroups}
+              onToggleAvailability={handleToggleProductStatus}
+              onUpdateStock={handleUpdateStock}
+              onUpdatePrice={handleUpdatePrice}
+              onAddNewItem={handleAddNewItem}
+            />
+          </div>
+        )}
 
-            <div className="merchant-menu-grid">
-              {menuItems.map((item) => (
-                <div key={item.id} className="merchant-menu-card">
-                  <div className="merchant-menu-card-img-wrapper">
-                    <img
-                      src={item.image || "/crispy_fried_chicken.jpg"}
-                      alt={item.name}
-                      className="merchant-menu-card-img"
-                    />
-                    <span className={`merchant-menu-stock-badge ${item.isAvailable ? "in-stock" : "out-of-stock"}`}>
-                      {item.isAvailable ? "พร้อมขาย" : "หมดชั่วคราว"}
-                    </span>
-                  </div>
-                  <div className="merchant-menu-card-content">
-                    <h5 className="merchant-menu-card-title">{item.name}</h5>
-                    <div className="text-danger font-weight-bold fs-5 mb-2">฿{item.price}</div>
-                    <div className="d-flex align-items-center justify-content-between">
-                      <button
-                        className={`btn btn-sm ${item.isAvailable ? "btn-outline-secondary" : "btn-success"}`}
-                        onClick={() => handleToggleProductStatus(item.id)}
-                      >
-                        {item.isAvailable ? "ทำเป็นเมนูหมด" : "เปิดขายเมนูนี้"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+        {activeTab === "modifiers" && (
+          <div className="merchant-panel-box">
+            <MerchantModifierManager
+              storeId={currentStoreId}
+              modifierGroups={modifierGroups}
+              onCreateGroup={handleCreateModifierGroup}
+              onToggleOptionStock={handleToggleModifierOptionStock}
+            />
+          </div>
+        )}
+
+        {activeTab === "customers" && (
+          <div className="merchant-panel-box">
+            <MerchantCRMAnalytics
+              customers={crmCustomers}
+              onSendBroadcast={handleSendBroadcast}
+            />
           </div>
         )}
 

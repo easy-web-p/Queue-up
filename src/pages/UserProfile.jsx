@@ -7,6 +7,7 @@ import { collection, query, where, onSnapshot } from "firebase/firestore";
 import ShopeeSearchBar from "../components/ShopeeSearchBar.jsx";
 import ChatModal from "../components/ChatModal.jsx";
 import ClientQueueTicket from "../components/ClientQueueTicket.jsx";
+import { ClientLoyaltyDrawer } from "../components/ClientLoyaltyDrawer.jsx";
 import Footer from "../components/Footer.jsx";
 import { getUserBehaviorInsights } from "../services/aiBehaviorEngine.js";
 import { getSecurityHealthReport } from "../services/aiSecurityShield.js";
@@ -52,6 +53,31 @@ function UserProfile() {
 
   // 🔔 Real-time Booking & Purchase History State (Connected to Firestore /orders)
   const [orders, setOrders] = useState([]);
+  const [isLoyaltyOpen, setIsLoyaltyOpen] = useState(false);
+
+  // Points and tier are derived from this user's own completed orders — the same
+  // pointsEarned the order function stamps on each one — so the drawer cannot show a
+  // balance the order history does not support.
+  const loyaltyProfile = useMemo(() => {
+    const completed = orders.filter((o) => o.status === "COMPLETED");
+    const points = completed.reduce((sum, o) => sum + (Number(o.pointsEarned) || 0), 0);
+    return { points, ordersCount: completed.length };
+  }, [orders]);
+
+  const LOYALTY_REWARDS = [
+    { id: "r50", name: "ส่วนลด 5 บาท", description: "ใช้ได้กับทุกเมนูในโรงอาหาร", pointsRequired: 50 },
+    { id: "r120", name: "ส่วนลด 15 บาท", description: "ใช้ได้กับออเดอร์ตั้งแต่ 50 บาทขึ้นไป", pointsRequired: 120 },
+    { id: "r300", name: "เครื่องดื่มฟรี 1 แก้ว", description: "แลกรับที่เคาน์เตอร์ร้านที่ร่วมรายการ", pointsRequired: 300 },
+  ];
+
+  const handleRedeemReward = (reward) => {
+    // Redemption has no server-side ledger yet, so this only acknowledges the intent
+    // rather than pretending points were spent.
+    alert(
+      `บันทึกคำขอแลก "${reward?.name || "ของรางวัล"}" แล้ว กรุณาแสดงหน้าจอนี้ที่เคาน์เตอร์ ` +
+      `(ยังไม่ได้เชื่อมระบบตัดแต้มอัตโนมัติ)`
+    );
+  };
   const [orderStatusTab, setOrderStatusTab] = useState("ALL");
   const [orderSearchQuery, setOrderSearchQuery] = useState("");
 
@@ -444,6 +470,25 @@ function UserProfile() {
     <div className="shopee-profile-page">
       {/* Shopee Style Header Search Bar */}
       <ShopeeSearchBar />
+
+      {/* Loyalty points drawer */}
+      <ClientLoyaltyDrawer
+        isOpen={isLoyaltyOpen}
+        onClose={() => setIsLoyaltyOpen(false)}
+        profile={loyaltyProfile}
+        rewards={LOYALTY_REWARDS}
+        onRedeemReward={handleRedeemReward}
+      />
+
+      <div className="max-w-4xl mx-auto px-4 pt-4">
+        <button
+          type="button"
+          onClick={() => setIsLoyaltyOpen(true)}
+          className="w-full sm:w-auto px-5 py-3 bg-gradient-to-r from-red-600 via-orange-600 to-amber-500 text-white font-bold text-sm rounded-2xl shadow-lg hover:opacity-90 transition-opacity cursor-pointer flex items-center justify-center gap-2"
+        >
+          🎁 แต้มสะสมและของรางวัล ({loyaltyProfile.points} แต้ม)
+        </button>
+      </div>
 
       <div className="shopee-profile-container">
         {/* ==================== LEFT SIDEBAR MENU ==================== */}
