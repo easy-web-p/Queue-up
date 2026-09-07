@@ -125,15 +125,15 @@ export default function Footer() {
                 </button>
               </li>
               <li className="qup-footer-link-item">
-                <a href="tel:0812345678" className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
+                <a href="tel:0921975525" className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
                   <i className="bi bi-telephone text-sky-400" />
-                  <span>สายด่วนโรงอาหาร 081-234-5678</span>
+                  <span>สายด่วน 092-197-5525</span>
                 </a>
               </li>
               <li className="qup-footer-link-item">
-                <a href="mailto:support@queueup.ac.th" className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
+                <a href="mailto:hi00000087@gmail.com" className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
                   <i className="bi bi-envelope text-orange-400" />
-                  <span>support@queueup.ac.th</span>
+                  <span>hi00000087@gmail.com</span>
                 </a>
               </li>
             </ul>

@@ -330,16 +330,45 @@ export default function LandingPage() {
             </form>
           )}
 
-          <div className="flex justify-center gap-6 mt-8 text-sm opacity-90">
-            <a href="tel:0812345678" className="underline hover:opacity-100">📞 สายด่วนโทรติดต่อ</a>
-            <a href="https://line.me" target="_blank" rel="noreferrer" className="underline hover:opacity-100">💬 Line Official</a>
+          <div className="flex flex-wrap justify-center items-center gap-4 sm:gap-6 mt-8 text-sm">
+            <a
+              href="tel:0921975525"
+              className="bg-white/15 hover:bg-white/25 text-white px-5 py-2.5 rounded-full font-medium transition flex items-center gap-2 shadow-sm"
+            >
+              📞 สายด่วน: 092-197-5525
+            </a>
+            <a
+              href="mailto:hi00000087@gmail.com"
+              className="bg-white/15 hover:bg-white/25 text-white px-5 py-2.5 rounded-full font-medium transition flex items-center gap-2 shadow-sm"
+            >
+              ✉️ อีเมล: hi00000087@gmail.com
+            </a>
+            <a
+              href="https://line.me"
+              target="_blank"
+              rel="noreferrer"
+              className="bg-white/15 hover:bg-white/25 text-white px-5 py-2.5 rounded-full font-medium transition flex items-center gap-2 shadow-sm"
+            >
+              💬 Line Official
+            </a>
           </div>
         </div>
       </section>
 
       {/* ============ FOOTER ============ */}
-      <footer className="py-8 px-6 text-center text-sm text-gray-400 bg-slate-900">
-        © {new Date().getFullYear()} QueueUp for Campus. All rights reserved.
+      <footer className="py-8 px-6 text-center text-sm text-gray-400 bg-slate-900 space-y-3">
+        <div className="flex flex-wrap justify-center items-center gap-4 sm:gap-6 text-xs text-gray-400">
+          <a href="tel:0921975525" className="hover:text-white transition flex items-center gap-1.5">
+            <span>📞</span> 092-197-5525
+          </a>
+          <span>•</span>
+          <a href="mailto:hi00000087@gmail.com" className="hover:text-white transition flex items-center gap-1.5">
+            <span>✉️</span> hi00000087@gmail.com
+          </a>
+        </div>
+        <div className="text-xs text-gray-500">
+          © {new Date().getFullYear()} QueueUp for Campus. All rights reserved.
+        </div>
       </footer>
     </div>
   );
