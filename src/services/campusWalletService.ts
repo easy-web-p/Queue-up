@@ -20,6 +20,29 @@ import type {
   StudentProfile,
 } from '../types/campus';
 
+/** Current Bangkok calendar date as "YYYY-MM-DD" (matches the server's day boundary). */
+function getBangkokToday(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+/**
+ * Today's spending, for display.
+ *
+ * The stored counter resets lazily — it is only rewritten on the next spend — so a
+ * wallet last used yesterday still holds yesterday's total. Reading it raw would
+ * report stale spending as today's. Presentation only; the Cloud Function remains
+ * the authority on whether a limit is actually breached.
+ */
+export function getSpentTodaySatang(wallet: StudentWallet | null | undefined): number {
+  if (!wallet || wallet.lastSpentDate !== getBangkokToday()) return 0;
+  return Math.max(0, Number(wallet.spentTodaySatang) || 0);
+}
+
 /**
  * Fetch Student Wallet balance and spending limits
  */

@@ -7,6 +7,7 @@ import {
   updateCampusWalletLimits,
   topupCampusWallet,
   createParentChildLink,
+  getSpentTodaySatang,
 } from '../services/campusWalletService';
 import {
   Wallet,
@@ -346,7 +347,7 @@ export default function GuardianDashboard() {
                   <div className="bg-white/90 dark:bg-[#16100C]/70 backdrop-blur p-4 rounded-2xl border border-slate-200 dark:border-white/10 shadow-xs">
                     <span className="text-xs text-slate-500 dark:text-[#9CA3AF]">ใช้ไปแล้ววันนี้</span>
                     <p className="text-xl font-bold font-['JetBrains_Mono'] text-amber-600 dark:text-amber-400 mt-1">
-                      {((wallet?.spentTodaySatang || 0) / 100).toFixed(2)} <span className="text-sm font-normal text-slate-400 dark:text-[#9CA3AF]">฿</span>
+                      {(getSpentTodaySatang(wallet) / 100).toFixed(2)} <span className="text-sm font-normal text-slate-400 dark:text-[#9CA3AF]">฿</span>
                     </p>
                   </div>
                   <div className="bg-white/90 dark:bg-[#16100C]/70 backdrop-blur p-4 rounded-2xl border border-slate-200 dark:border-white/10 shadow-xs">

@@ -5,6 +5,7 @@ import { onRequest, onCall, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
 import { resolveWalletAuthority, MAX_TOPUP_SATANG } from "./walletAuthority.js";
+import { resolveSpendingCounters } from "./walletLimits.js";
 
 // 🔒 Server-only credential. Never expose this through a VITE_* variable: Vite inlines
 // those into the client bundle. Set with: firebase functions:secrets:set OPENAI_API_KEY
@@ -402,6 +403,7 @@ export const createOrderAuthoritative = onCall(
 
         // 2.3 Campus Wallet Spending Rules Enforcement (Phase 0)
         let walletData = null;
+        let walletCounters = null;
         if (isCampusWallet) {
           if (!walletSnap || !walletSnap.exists) {
             throw new HttpsError("not-found", "CAMPUS_WALLET_NOT_FOUND: ไม่พบบัญชีกระเป๋าเงินดิจิทัลสำหรับนักเรียน");
@@ -416,19 +418,21 @@ export const createOrderAuthoritative = onCall(
             throw new HttpsError("failed-precondition", `INSUFFICIENT_WALLET_BALANCE: ยอดเงินในกระเป๋าไม่เพียงพอ (คงเหลือ ${currentBalance / 100} บาท, ยอดสั่งซื้อ ${calculatedTotalSatang / 100} บาท)`);
           }
 
+          // Counters are keyed on the server's current Bangkok date, NOT on the
+          // client-supplied pickup date — see walletLimits.js. Resolved once and
+          // reused by the Phase 4 write below so the check and the increment can
+          // never disagree about which period the spend belongs to.
+          walletCounters = resolveSpendingCounters(walletData, currentBangkok.ymd);
+          const { spentToday, spentThisWeek, dailyLimitSatang, weeklyLimitSatang } = walletCounters;
+
           // Check Daily Limit
-          const dailyLimitSatang = typeof walletData.dailyLimitSatang === "number" ? walletData.dailyLimitSatang : 20000; // default 200 THB
-          const lastSpentDate = walletData.lastSpentDate || "";
-          const spentToday = lastSpentDate === targetYmd ? (Number(walletData.spentTodaySatang) || 0) : 0;
           if (spentToday + calculatedTotalSatang > dailyLimitSatang) {
             throw new HttpsError("failed-precondition", `DAILY_LIMIT_EXCEEDED: ยอดการใช้จ่ายเกินวงเงินรายวัน (${dailyLimitSatang / 100} บาท/วัน) วันนี้ใช้ไปแล้ว ${spentToday / 100} บาท`);
           }
 
           // Check Weekly Limit
-          const weeklyLimitSatang = typeof walletData.weeklyLimitSatang === "number" ? walletData.weeklyLimitSatang : 100000; // default 1000 THB
-          const spentThisWeek = Number(walletData.spentThisWeekSatang) || 0;
           if (spentThisWeek + calculatedTotalSatang > weeklyLimitSatang) {
-            throw new HttpsError("failed-precondition", `WEEKLY_LIMIT_EXCEEDED: ยอดการใช้จ่ายเกินวงเงินรายสัปดาห์ (${weeklyLimitSatang / 100} บาท/สัปดาห์)`);
+            throw new HttpsError("failed-precondition", `WEEKLY_LIMIT_EXCEEDED: ยอดการใช้จ่ายเกินวงเงินรายสัปดาห์ (${weeklyLimitSatang / 100} บาท/สัปดาห์) สัปดาห์นี้ใช้ไปแล้ว ${spentThisWeek / 100} บาท`);
           }
 
           // Check Blocked Categories
@@ -537,17 +541,17 @@ export const createOrderAuthoritative = onCall(
         tx.set(orderDocRef, orderPayload);
 
         // Phase 4: Atomic Wallet Deduction & Transaction Log
-        if (isCampusWallet && walletRef && walletData) {
+        if (isCampusWallet && walletRef && walletData && walletCounters) {
           const currentBal = Number(walletData.balanceSatang) || 0;
-          const lastSpentDate = walletData.lastSpentDate || "";
-          const spentToday = lastSpentDate === targetYmd ? (Number(walletData.spentTodaySatang) || 0) : 0;
-          const spentThisWeek = Number(walletData.spentThisWeekSatang) || 0;
 
+          // Same counters the limit check above ran on, stamped with the period keys
+          // they belong to so the next order knows whether they are still current.
           tx.update(walletRef, {
             balanceSatang: currentBal - calculatedTotalSatang,
-            spentTodaySatang: spentToday + calculatedTotalSatang,
-            spentThisWeekSatang: spentThisWeek + calculatedTotalSatang,
-            lastSpentDate: targetYmd,
+            spentTodaySatang: walletCounters.spentToday + calculatedTotalSatang,
+            spentThisWeekSatang: walletCounters.spentThisWeek + calculatedTotalSatang,
+            lastSpentDate: walletCounters.todayYmd,
+            lastSpentWeek: walletCounters.weekKey,
             updatedAt: FieldValue.serverTimestamp(),
           });
 
@@ -1094,7 +1098,13 @@ export const getSystemHealth = onRequest(
 );
 
 /**
- * Scheduled Daily Capacity & Counters Cleanup / Reset (Maintenance routine)
+ * Scheduled Daily Maintenance (heartbeat)
+ *
+ * NOTE: wallet spending counters are NOT reset here. They reset lazily on the next
+ * spend, by comparing the stored period key against the current one — see
+ * walletLimits.js. That keeps limits correct even if this job never runs, which
+ * matters because it previously did nothing at all while the weekly counter was
+ * relying on it, leaving `spentThisWeekSatang` to accumulate without bound.
  */
 export const scheduledDailyMaintenance = onSchedule(
   { schedule: "0 0 * * *", timeZone: "Asia/Bangkok", region: "asia-southeast1" },
