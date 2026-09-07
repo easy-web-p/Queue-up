@@ -27,7 +27,8 @@
     "test:audit": "node test-merchant-audit-log.js",
     "test:ux": "node test-ux-accessibility.js",
     "test:pilot": "node test-pilot-lead.js",
-    "test": "node test-transaction-e2e.js && node test-campus-wallet-authority.js && node test-auth-roles-escalation.js && node test-campus-wallet-limits.js && node test-campus-monitor-access.js && node test-allergen-guard.js && node test-guardian-link-review.js && node test-auth-domain-config.js && node test-merchant-audit-log.js && node test-ux-accessibility.js && node test-pilot-lead.js && node test-auth-lifecycle.js && node test-firestore-rules-integration.js && node test-storage-rules-integration.js && node test-campus-security-rules.js && node test-campus-integration.js && node test-cart-redux-e2e.js && node test-ticket-allergy-e2e.js"
+    "test:evaluation": "node test-system-evaluation.js",
+    "test": "node test-transaction-e2e.js && node test-campus-wallet-authority.js && node test-auth-roles-escalation.js && node test-campus-wallet-limits.js && node test-campus-monitor-access.js && node test-allergen-guard.js && node test-guardian-link-review.js && node test-auth-domain-config.js && node test-merchant-audit-log.js && node test-ux-accessibility.js && node test-pilot-lead.js && node test-system-evaluation.js && node test-auth-lifecycle.js && node test-firestore-rules-integration.js && node test-storage-rules-integration.js && node test-campus-security-rules.js && node test-campus-integration.js && node test-cart-redux-e2e.js && node test-ticket-allergy-e2e.js"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.12.0",

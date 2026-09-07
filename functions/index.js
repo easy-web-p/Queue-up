@@ -9,6 +9,7 @@ import { resolveSpendingCounters } from "./walletLimits.js";
 import { scanOrderForAllergens } from "./allergenGuard.js";
 import { resolveLinkDecision, LINK_DECISIONS } from "./linkReview.js";
 import { validatePilotLead, rateLimitKeyForAddress } from "./pilotLead.js";
+import { validateEvaluation } from "./systemEvaluation.js";
 
 // 🔒 Server-only credential. Never expose this through a VITE_* variable: Vite inlines
 // those into the client bundle. Set with: firebase functions:secrets:set OPENAI_API_KEY
@@ -169,6 +170,47 @@ export const submitPilotLead = onCall(
     console.log(`[QueueUp] Pilot lead recorded: ${ref.id}`);
 
     return { success: true, leadId: ref.id };
+  }
+);
+
+/**
+ * 📊 System Evaluation Submission (public, unauthenticated)
+ *
+ * The evaluation wall is public so the project's supervisor and reviewers can read
+ * and add scores without an account. Writes still go through here rather than
+ * Firestore directly, for the same reason as the pilot form: a collection open to
+ * an unauthenticated page is open to everyone, so the shape, the bounds and the
+ * rate limit have to live somewhere the client cannot skip.
+ *
+ * This replaces a client write that never once succeeded — it wrote five scores
+ * under a timestamp id while the rules demanded a uid-keyed document with a single
+ * `rating` field — and whose failure was swallowed into localStorage while the page
+ * said thank you.
+ */
+export const submitSystemEvaluation = onCall(
+  { region: "asia-southeast1", cors: true },
+  async (request) => {
+    const validation = validateEvaluation(request.data);
+    if (!validation.ok) {
+      throw new HttpsError("invalid-argument", `${validation.reason}: ${validation.message}`);
+    }
+
+    const callerKey = rateLimitKeyForAddress(request.rawRequest?.ip);
+    await consumeRateLimit(callerKey, {
+      collection: "evaluation_rate_limits",
+      maxCalls: 3,
+      windowMs: 60 * 60 * 1000,
+      message: "ส่งผลประเมินบ่อยเกินไป กรุณารอสักครู่",
+    });
+
+    const ref = await db.collection("systemEvaluations").add({
+      ...validation.evaluation,
+      submittedByUid: request.auth?.uid || null,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+    console.log(`[QueueUp] System evaluation recorded: ${ref.id}`);
+    return { success: true, evaluationId: ref.id, evaluation: validation.evaluation };
   }
 );
 

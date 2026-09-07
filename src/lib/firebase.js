@@ -9,8 +9,10 @@ import {
   serverTimestamp,
   INITIAL_PRODUCTS,
   INITIAL_CATEGORIES,
+  functions,
 } from "../firebase/config.js";
 import { collection, getDocs, query, where } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 
 export {
   db,
@@ -156,74 +158,43 @@ export const saveProductsToFirestore = async (productsArray) => {
   }
 };
 
-// Initial Default Evaluations Seed
-export const INITIAL_EVALUATIONS = [
-  { id: "eval_1", userName: "อาจารย์ผู้ประเมินรายวิชา CRM", uxScore: 9.5, accountScore: 9.5, queueScore: 10.0, merchantScore: 10.0, securityScore: 9.0, comment: "สถาปัตยกรรมระบบสมบูรณ์มาก สอดคล้องกับ Persona และ App Blueprint" },
-  { id: "eval_2", userName: "นักศึกษาร้านค้าพันธมิตร (ครัวโรงเรียน)", uxScore: 9.5, accountScore: 10.0, queueScore: 10.0, merchantScore: 10.0, securityScore: 9.5, comment: "บอร์ดจัดการคิวอาหาร Real-Time สะดวกมาก ทำให้ทำอาหารทันคิว" },
-  { id: "eval_3", userName: "ผู้ใช้งานทั่วไป (นักเรียน ม.1/6)", uxScore: 9.0, accountScore: 9.0, queueScore: 10.0, merchantScore: 9.5, securityScore: 9.0, comment: "จองคิวอาหารล่วงหน้าสะดวก สแกนจ่าย PromptPay รวดเร็วมาก" }
-];
-
-// Save user evaluation rating
+// Save user evaluation rating.
+//
+// Goes through a Cloud Function: the wall is public and the form takes no sign-in,
+// so `systemEvaluations` is closed to client writes. The previous version wrote
+// Firestore directly with a shape the rules rejected, caught the rejection, saved
+// to localStorage and returned as if it had worked — so every evaluation ever
+// submitted existed only in the browser that submitted it, while the page said
+// thank you.
+//
+// It now throws on failure. A caller that cannot store an evaluation must say so
+// rather than pretend.
 export const submitEvaluationToFirestore = async (evalData) => {
-  try {
-    const evalId = `eval_${Date.now()}`;
-    const newEval = {
-      id: evalId,
-      ...evalData,
-      createdAt: new Date().toISOString(),
-    };
-
-    // Save to Firestore
-    await setDoc(doc(db, "systemEvaluations", evalId), newEval);
-
-    // Also update LocalStorage
-    const existing = JSON.parse(localStorage.getItem("queueup_user_evaluations") || "[]");
-    const updated = [newEval, ...existing];
-    localStorage.setItem("queueup_user_evaluations", JSON.stringify(updated));
-
-    return newEval;
-  } catch (err) {
-    console.warn("Firestore evaluation save fallback to local:", err);
-    const evalId = `eval_${Date.now()}`;
-    const newEval = {
-      id: evalId,
-      ...evalData,
-      createdAt: new Date().toISOString(),
-    };
-    const existing = JSON.parse(localStorage.getItem("queueup_user_evaluations") || "[]");
-    const updated = [newEval, ...existing];
-    localStorage.setItem("queueup_user_evaluations", JSON.stringify(updated));
-    return newEval;
-  }
+  const callable = httpsCallable(functions, "submitSystemEvaluation");
+  const result = await callable({
+    userName: evalData.userName,
+    uxScore: evalData.uxScore,
+    accountScore: evalData.accountScore,
+    queueScore: evalData.queueScore,
+    merchantScore: evalData.merchantScore,
+    securityScore: evalData.securityScore,
+    comment: evalData.comment,
+  });
+  return { id: result?.data?.evaluationId, ...(result?.data?.evaluation || {}) };
 };
 
-// Fetch all evaluations
+// Fetch all evaluations.
+//
+// An empty collection is an honest empty wall, not a cue to substitute the seed
+// samples: the page reports the count as "ผลประเมินจริง", and three hardcoded
+// entries presented under that heading are the reason this was worth fixing.
 export const fetchEvaluationsFromFirestore = async () => {
-  try {
-    const querySnapshot = await getDocs(collection(db, "systemEvaluations"));
-    const list = [];
-    querySnapshot.forEach((docItem) => {
-      list.push(docItem.data());
-    });
-    if (list.length > 0) return list;
-  } catch (err) {
-    console.warn("Firestore fetch evaluations fallback:", err);
-  }
-
-  // Fallback to local storage or initial values
-  const stored = localStorage.getItem("queueup_user_evaluations");
-  if (stored) {
-    try {
-      const parsed = JSON.parse(stored);
-      if (parsed && parsed.length > 0) return parsed;
-    } catch {
-      // ignore
-    }
-  }
-
-  // Initialize initial evaluations in LocalStorage
-  localStorage.setItem("queueup_user_evaluations", JSON.stringify(INITIAL_EVALUATIONS));
-  return INITIAL_EVALUATIONS;
+  const querySnapshot = await getDocs(collection(db, "systemEvaluations"));
+  const list = [];
+  querySnapshot.forEach((docItem) => {
+    list.push({ id: docItem.id, ...docItem.data() });
+  });
+  return list;
 };
 
 // Aliases & Admin Helpers

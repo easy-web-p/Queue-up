@@ -497,6 +497,41 @@ await runTest('🚨 The rate-limit counter cannot be read or reset from a browse
   await assertFails(getDoc(doc(asAdmin, 'pilot_lead_rate_limits', '203_0_113_7')));
 });
 
+// ===========================================================================
+console.log('\n📊 System evaluations (public wall, backend-only writes)');
+// ===========================================================================
+
+await runTest('🚨 Anyone can read the wall without an account', async () => {
+  // The whole point of the wall: a supervisor or reviewer opens /queueup and reads
+  // the scores. Reads were admin-only, so it fell back to hardcoded samples.
+  await assertSucceeds(getDoc(doc(asAnon, 'systemEvaluations', 'eval_1')));
+  await assertSucceeds(getDocs(query(collection(asAnon, 'systemEvaluations'))));
+});
+
+await runTest('🚨 No client can write an evaluation, signed in or not', async () => {
+  // The form takes no sign-in, so a collection open to it is open to everyone.
+  const evaluation = {
+    userName: 'ปลอม',
+    uxScore: 10, accountScore: 10, queueScore: 10, merchantScore: 10, securityScore: 10,
+    comment: 'x',
+  };
+  await assertFails(addDoc(collection(asAnon, 'systemEvaluations'), evaluation));
+  await assertFails(addDoc(collection(asStudent, 'systemEvaluations'), evaluation));
+  await assertFails(setDoc(doc(asStudent, 'systemEvaluations', STUDENT), evaluation));
+});
+
+await runTest('🚨 A stored evaluation cannot be edited or deleted from a client', async () => {
+  await assertFails(updateDoc(doc(asAdmin, 'systemEvaluations', 'eval_1'), { uxScore: 10 }));
+  await assertFails(deleteDoc(doc(asAdmin, 'systemEvaluations', 'eval_1')));
+});
+
+await runTest('🚨 The evaluation rate-limit counter is closed to clients', async () => {
+  await assertFails(getDoc(doc(asAnon, 'evaluation_rate_limits', '203_0_113_7')));
+  await assertFails(
+    setDoc(doc(asAnon, 'evaluation_rate_limits', '203_0_113_7'), { count: 0, windowStart: 0 })
+  );
+});
+
 await testEnv.cleanup();
 
 console.log(`\n${'='.repeat(60)}`);

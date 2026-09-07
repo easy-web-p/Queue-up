@@ -328,16 +328,26 @@ service cloud.firestore {
     // 8. SYSTEM EVALUATIONS / SURVEYS (One per User Anti-Spam)
     // ==========================================
     match /systemEvaluations/{evalId} {
-      allow read: if isAdmin();
-      // 🔒 Anti-Spam: One evaluation per user doc ID convention (evalId == request.auth.uid)
-      allow create: if isAuthenticated() && 
-        evalId == request.auth.uid &&
-        request.resource.data.userId == request.auth.uid &&
-        isValidNumber(request.resource.data.rating) && 
-        request.resource.data.rating >= 1 && 
-        request.resource.data.rating <= 5 &&
-        (!('comment' in request.resource.data) || isValidString(request.resource.data.comment, 0, 500));
-      allow update, delete: if false; // Immutable evaluation records
+      // 📖 Public read: the wall exists so the project's supervisor and reviewers
+      // can see the scores without holding an account. Evaluators are told on the
+      // form that their name and comment are shown publicly.
+      allow read: if true;
+
+      // ✍️ Backend-only write. The form takes no sign-in, so a collection open to
+      // it would be open to everyone; submitSystemEvaluation validates the shape,
+      // bounds every field and rate limits the caller.
+      //
+      // The previous rule required a uid-keyed document with a single `rating`
+      // field, while the client wrote five scores under a timestamp id — so every
+      // submission was rejected, the rejection was swallowed into localStorage, and
+      // the page still said thank you. The shape now lives in one tested place
+      // (functions/systemEvaluation.js) rather than in two that disagreed.
+      allow write: if false;
+    }
+
+    match /evaluation_rate_limits/{callerKey} {
+      // 🔒 The only bound on an unauthenticated endpoint.
+      allow read, write: if false;
     }
 
     // ==========================================
