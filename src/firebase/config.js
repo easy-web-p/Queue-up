@@ -44,7 +44,7 @@ const DEFAULT_AUTH_DOMAIN = "queueup-65e82.firebaseapp.com";
  * A host must ALSO be in Firebase Console → Authentication → Settings → Authorized
  * domains, or sign-in is rejected with auth/unauthorized-domain.
  */
-const SAME_ORIGIN_AUTH_HOSTS = ["queue-up-nu.vercel.app"];
+export const SAME_ORIGIN_AUTH_HOSTS = ["queue-up-nu.vercel.app"];
 
 function resolveAuthDomain() {
   const configured = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN;
