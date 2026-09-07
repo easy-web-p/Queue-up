@@ -21,6 +21,7 @@
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 let passed = 0;
 let failed = 0;
@@ -40,7 +41,7 @@ function assert(cond, message) {
   if (!cond) throw new Error(message);
 }
 
-const ROOT = new URL('.', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('.', import.meta.url));
 const SRC = join(ROOT, 'src');
 
 function collectSources(dir) {
