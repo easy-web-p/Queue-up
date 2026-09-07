@@ -13,6 +13,11 @@ import { scanOrderForAllergens } from "./allergenGuard.js";
 const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
 
 const ASSISTANT_MAX_MESSAGE_CHARS = 500;
+// Server-side quota for the OpenAI proxy. The client-side limiter in
+// aiSecurityShield.js lives in localStorage and the user can simply clear it, so it
+// cannot protect a credential that bills per call. This one is authoritative.
+const ASSISTANT_MAX_CALLS_PER_WINDOW = 15;
+const ASSISTANT_RATE_WINDOW_MS = 60000;
 const ASSISTANT_MAX_STORE_NAME_CHARS = 120;
 
 initializeApp();
@@ -84,6 +89,31 @@ async function assertWalletAuthority(auth, studentId, { allowSelf, action }) {
     "permission-denied",
     `WALLET_AUTHORITY_REQUIRED: คุณไม่มีสิทธิ์${action}สำหรับนักเรียนรายนี้ (ต้องเป็นผู้ปกครองที่โรงเรียนยืนยันแล้ว หรือเจ้าหน้าที่)`
   );
+}
+
+/**
+ * Fixed-window per-user quota, applied atomically so parallel calls cannot both read
+ * the same count and each decide they are under the limit.
+ */
+async function consumeRateLimit(uid, { collection, maxCalls, windowMs, message }) {
+  const ref = db.collection(collection).doc(uid);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const now = Date.now();
+    const data = snap.exists ? snap.data() : {};
+
+    const windowIsCurrent =
+      typeof data.windowStart === "number" && now - data.windowStart < windowMs;
+    const windowStart = windowIsCurrent ? data.windowStart : now;
+    const count = windowIsCurrent ? Number(data.count) || 0 : 0;
+
+    if (count >= maxCalls) {
+      const retryInSec = Math.ceil((windowStart + windowMs - now) / 1000);
+      throw new HttpsError("resource-exhausted", `${message} (ลองใหม่ในอีก ${retryInSec} วินาที)`);
+    }
+
+    tx.set(ref, { windowStart, count: count + 1, updatedAt: FieldValue.serverTimestamp() });
+  });
 }
 
 /**
@@ -1105,6 +1135,14 @@ export const generateAssistantReply = onCall(
     if (!apiKey) {
       return { text: null, source: "NOT_CONFIGURED" };
     }
+
+    // Charged per call, so the quota is enforced before the upstream request.
+    await consumeRateLimit(request.auth.uid, {
+      collection: "assistant_rate_limits",
+      maxCalls: ASSISTANT_MAX_CALLS_PER_WINDOW,
+      windowMs: ASSISTANT_RATE_WINDOW_MS,
+      message: "ASSISTANT_RATE_LIMITED: ใช้งานผู้ช่วยตอบกลับบ่อยเกินไป",
+    });
 
     const safeStoreName = String(storeName || "ร้านค้า QueueUp").slice(0, ASSISTANT_MAX_STORE_NAME_CHARS);
     const contextLine =

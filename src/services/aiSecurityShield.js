@@ -75,14 +75,20 @@ export function analyzeAndShieldInput(input) {
     }
   });
 
-  // Perform Rigorous HTML Sanitization
+  // Strip markup, keep text.
+  //
+  // This used to HTML-entity-encode the input, and callers write the result to
+  // Firestore — so a menu note like "ไก่ทอด/ต้มยำ" was stored as
+  // "ไก่ทอด&#x2F;ต้มยำ" and a name like O'Brien as "O&#x27;Brien", corrupting the
+  // data at rest. Encoding is a rendering concern, and React already escapes
+  // everything it interpolates; escapeHtml() below is here for the rare caller
+  // that really is building raw HTML.
   cleanText = cleanText
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#x27;")
-    .replace(/\//g, "&#x2F;")
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+    .replace(/<[^>]*>/g, "")
+    .replace(/\bjavascript:/gi, "")
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
     .trim();
 
   // Log to Audit Logger if threat detected
@@ -104,8 +110,30 @@ export function analyzeAndShieldInput(input) {
 }
 
 /**
- * 2. Rate Limiting Protection (Anti-Spam & DDoS Protection)
- * Prevents rapid-fire order submission or message spamming
+ * Escapes text for interpolation into raw HTML.
+ *
+ * Use at the point of rendering, never before storing. JSX does this for you —
+ * reach for this only when assigning to innerHTML or building an HTML string.
+ */
+export function escapeHtml(input) {
+  if (typeof input !== "string") return input;
+  return input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
+}
+
+/**
+ * 2. Client-side UX throttle (NOT a security control)
+ *
+ * State lives in localStorage, which the user owns: clearing site data or opening a
+ * private window resets it, and it is trivially editable. It exists to stop honest
+ * double-taps and runaway retries, nothing more. Anything that must actually be
+ * limited — spend, writes, paid API calls — has to be enforced server-side; see the
+ * per-user limiter on generateAssistantReply in functions/index.js.
+ *
  * @param {string} actionType - 'ORDER_SUBMIT' | 'CHAT_MESSAGE' | 'LOGIN_ATTEMPT'
  * @param {number} maxAllowed - Max attempts allowed in window
  * @param {number} windowMs - Time window in milliseconds

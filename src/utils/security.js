@@ -170,89 +170,13 @@ export const validateEmailSyntaxAndDomain = async (email) => {
 };
 
 /**
- * ==========================================================================
- * WORLD-CLASS ZERO-TRUST CRYPTOGRAPHIC SECURITY SUITE (WEB CRYPTO API)
- * Industry Standard SHA-256 Salted Hashing & AES-GCM 256-Bit Symmetric Encryption
- * ==========================================================================
+ * NOTE: A hand-rolled "crypto suite" used to live here — SHA-256 password hashing
+ * with one hard-coded salt shared by every user, and AES-GCM helpers with the key
+ * literal in the client bundle that silently returned plaintext on any error.
+ * Nothing imported them. They were removed rather than left as a trap: password
+ * hashing belongs to Firebase Auth, and a browser cannot keep a secret from its
+ * own user, so payload encryption has to happen server-side.
  */
-
-// 7. Cryptographically Hash Password using Salted SHA-256 (Web Crypto SubtleCrypto API)
-export const hashPassword = async (password, salt = "QUEUEUP_SECURE_SALT_v1") => {
-  if (!password) return "";
-  const encoder = new TextEncoder();
-  const data = encoder.encode(`${salt}:${password}`);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-};
-
-// 8. Verify Input Password against Salted SHA-256 Cryptographic Hash
-export const verifyPasswordHash = async (inputPassword, storedHash, salt = "QUEUEUP_SECURE_SALT_v1") => {
-  if (!inputPassword || !storedHash) return false;
-  const inputHash = await hashPassword(inputPassword, salt);
-  return inputHash === storedHash;
-};
-
-// 9. AES-256-GCM Encrypt Sensitive Payload String (Web Crypto API)
-export const encryptPayload = async (plainText, secretKeyStr = "QUEUEUP_AES256_SECRET_KEY_2026") => {
-  if (!plainText) return "";
-  try {
-    const encoder = new TextEncoder();
-    const keyData = encoder.encode(secretKeyStr.padStart(32, "0").slice(0, 32));
-    const cryptoKey = await crypto.subtle.importKey(
-      "raw",
-      keyData,
-      { name: "AES-GCM" },
-      false,
-      ["encrypt"]
-    );
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const encryptedBuffer = await crypto.subtle.encrypt(
-      { name: "AES-GCM", iv },
-      cryptoKey,
-      encoder.encode(plainText)
-    );
-    const encryptedArray = Array.from(new Uint8Array(encryptedBuffer));
-    const ivHex = Array.from(iv).map((b) => b.toString(16).padStart(2, "0")).join("");
-    const encryptedHex = encryptedArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-    return `enc_v1:${ivHex}:${encryptedHex}`;
-  } catch (err) {
-    console.warn("Encryption fallback:", err);
-    return plainText;
-  }
-};
-
-// 10. AES-256-GCM Decrypt Encrypted Payload String (Web Crypto API)
-export const decryptPayload = async (cipherText, secretKeyStr = "QUEUEUP_AES256_SECRET_KEY_2026") => {
-  if (!cipherText || !cipherText.startsWith("enc_v1:")) return cipherText;
-  try {
-    const parts = cipherText.split(":");
-    if (parts.length !== 3) return cipherText;
-    const ivHex = parts[1];
-    const encryptedHex = parts[2];
-    const iv = new Uint8Array(ivHex.match(/.{1,2}/g).map((byte) => parseInt(byte, 16)));
-    const encryptedData = new Uint8Array(encryptedHex.match(/.{1,2}/g).map((byte) => parseInt(byte, 16)));
-
-    const encoder = new TextEncoder();
-    const keyData = encoder.encode(secretKeyStr.padStart(32, "0").slice(0, 32));
-    const cryptoKey = await crypto.subtle.importKey(
-      "raw",
-      keyData,
-      { name: "AES-GCM" },
-      false,
-      ["decrypt"]
-    );
-    const decryptedBuffer = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv },
-      cryptoKey,
-      encryptedData
-    );
-    return new TextDecoder().decode(decryptedBuffer);
-  } catch (err) {
-    console.warn("Decryption fallback:", err);
-    return cipherText;
-  }
-};
 
 // 11. Sanitize Log Data to eliminate PII (Personal Identifiable Information) leaks
 const PII_PATTERNS = {

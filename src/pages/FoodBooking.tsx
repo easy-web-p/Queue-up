@@ -156,7 +156,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
     setAllergenAlert(null);
 
     try {
-      const result = await createAuthoritativeStoreOrder(db, {
+      const result = await createAuthoritativeStoreOrder({
         storeId,
         userId,
         customerName: currentUser?.name || currentUser?.displayName || currentUser?.fullName || 'ลูกค้า QueueUp',

@@ -439,8 +439,21 @@ service cloud.firestore {
     // 18. STAFF SUPERVISORS (Role-Restricted Directory)
     // ==========================================
     match /staff_supervisors/{staffId} {
-      allow read: if isAuthenticated();
+      // 🔒 A directory of who supervises what, including their permission flags, is
+      // reconnaissance material and was readable by every signed-in user. No client
+      // code reads it — the Cloud Functions that consult it use the Admin SDK and
+      // bypass these rules — so it is closed to staff reading their own record and
+      // to admins.
+      allow read: if isAuthenticated() && (isOwner(staffId) || isAdmin());
       allow write: if isAdmin();
+    }
+
+    // ==========================================
+    // 18.1 ASSISTANT RATE LIMITS (Backend-Only Quota Counters)
+    // ==========================================
+    match /assistant_rate_limits/{uid} {
+      // 🔒 A quota the client could read or reset would not be a quota.
+      allow read, write: if false;
     }
 
     // ==========================================

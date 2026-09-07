@@ -21,7 +21,6 @@
     "noFallthroughCasesInSwitch": true,
     "allowJs": true
   },
-  "include": ["src"],
-  "exclude": ["src/components/ClientAuthWizard.tsx"]
+  "include": ["src"]
 }
 

@@ -19,17 +19,15 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 
-// Firebase App Credentials Configuration (Environment Variable Protected)
-const getFallbackKey = () => {
-  try {
-    return atob("QUl6YVN5Q1dDcGRTa3NIWV9tVTVycVpXSG9iMXJMUndzN1JCOG5B");
-  } catch {
-    return "";
-  }
-};
-
+// Firebase App Credentials Configuration.
+//
+// A Firebase Web API key is a public project identifier, not a secret: it ships in
+// every client bundle by design, and access is controlled by Security Rules and the
+// authorized-domain list, not by keeping this string hidden. It was previously
+// base64-encoded here via atob(), which hid nothing from anyone reading the bundle
+// while implying the value needed protecting. Written plainly so its status is clear.
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || getFallbackKey(),
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyCWCpdSksHY_mU5rqZWHob1rLRws7RB8nA",
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "queueup-65e82.firebaseapp.com",
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "queueup-65e82",
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "queueup-65e82.firebasestorage.app",
