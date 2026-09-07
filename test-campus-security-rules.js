@@ -27,7 +27,15 @@ const rulesContent = fs.readFileSync('firestore.rules', 'utf8');
 // 1. Helper function isStaffSupervisor check
 runTest('firestore.rules contains isStaffSupervisor helper checking role claims', () => {
   assert(rulesContent.includes('function isStaffSupervisor()'), 'Missing isStaffSupervisor function');
-  assert(rulesContent.includes("request.auth.token.role == 'staff_supervisor'"), 'Missing role claim check for staff_supervisor');
+  // Matches the claim being checked, not one spelling of it. Claims are now read via
+  // request.auth.token.get('role', ''), because addressing a claim directly raises
+  // "Property is undefined" for every user who does not carry it. What matters is
+  // that the staff_supervisor role claim gates the helper; the live behaviour is
+  // covered by test-firestore-rules-emulator.js.
+  assert(
+    /request\.auth\.token(?:\.get\(\s*'role'[^)]*\)|\.role)\s*==\s*'staff_supervisor'/.test(rulesContent),
+    'Missing role claim check for staff_supervisor'
+  );
 });
 
 // 2. /wallets collection security check

@@ -21,6 +21,7 @@
     "test:limits": "node test-campus-wallet-limits.js",
     "test:monitor": "node test-campus-monitor-access.js",
     "test:allergen": "node test-allergen-guard.js",
+    "test:rules:emulator": "firebase emulators:exec --only firestore --project demo-queueup-rules \"node test-firestore-rules-emulator.js\"",
     "test": "node test-transaction-e2e.js && node test-campus-wallet-authority.js && node test-auth-roles-escalation.js && node test-campus-wallet-limits.js && node test-campus-monitor-access.js && node test-allergen-guard.js && node test-auth-lifecycle.js && node test-firestore-rules-integration.js && node test-storage-rules-integration.js && node test-campus-security-rules.js && node test-campus-integration.js && node test-cart-redux-e2e.js && node test-ticket-allergy-e2e.js"
   },
   "dependencies": {
@@ -37,6 +38,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@tailwindcss/vite": "^4.3.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
@@ -44,6 +46,7 @@
     "eslint": "^10.8.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
+    "firebase-tools": "^15.29.0",
     "globals": "^17.7.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",

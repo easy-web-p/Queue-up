@@ -3,14 +3,21 @@
     {
       "source": "functions",
       "codebase": "queueup-backend",
-      "ignore": ["node_modules", ".git", "firebase-debug.log", "firebase-debug.*.log"]
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log"
+      ]
     }
   ],
   "firestore": {
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
-  "storage": { "rules": "storage.rules" },
+  "storage": {
+    "rules": "storage.rules"
+  },
   "auth": {
     "authorizedDomains": [
       "localhost",
@@ -19,5 +26,14 @@
       "queueup-65e82.web.app",
       "queue-up-nu.vercel.app"
     ]
+  },
+  "emulators": {
+    "firestore": {
+      "port": 8080
+    },
+    "ui": {
+      "enabled": false
+    },
+    "singleProjectMode": true
   }
 }

@@ -13,18 +13,23 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    // Claims are read with get(key, default): a token without the claim simply reads
+    // as the default. Addressing them directly (request.auth.token.admin) raises
+    // "Property admin is undefined" for every user who is not an admin — which is
+    // most of them. The result happened to stay correct because an error inside an
+    // || is tolerated, but that is a property of the evaluator, not of these rules.
     function isAdmin() {
       return isAuthenticated() && (
-        request.auth.token.admin == true ||
-        request.auth.token.role == 'admin'
+        request.auth.token.get('admin', false) == true ||
+        request.auth.token.get('role', '') == 'admin'
       );
     }
 
     function isStaffSupervisor() {
       return isAuthenticated() && (
         isAdmin() ||
-        request.auth.token.role == 'staff_supervisor' ||
-        request.auth.token.staffSupervisor == true
+        request.auth.token.get('role', '') == 'staff_supervisor' ||
+        request.auth.token.get('staffSupervisor', false) == true
       );
     }
 
