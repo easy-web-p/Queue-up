@@ -55,6 +55,7 @@ function resolveAuthDomain() {
   if (
     host.endsWith(".firebaseapp.com") ||
     host.endsWith(".web.app") ||
+    host.endsWith(".vercel.app") ||
     SAME_ORIGIN_AUTH_HOSTS.includes(host)
   ) {
     return host;
