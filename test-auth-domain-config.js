@@ -9,16 +9,21 @@
  * app had written before opening it. The user was left looking at a bare Firebase
  * error page in an orphaned tab.
  *
- * The fix keeps the auth handler on the app's own origin. Two pieces have to hold
- * together for that, and both fail silently if disturbed:
+ * Claiming a custom origin instead turned out to trade that for a worse failure:
+ * Google rejects a redirect_uri it has not been told about, with
+ * "Error 400: redirect_uri_mismatch" and no fallback. So authDomain now only takes
+ * the app's own origin on *.firebaseapp.com and *.web.app, which are same-origin AND
+ * already registered with Google, and falls back to the project's Firebase domain
+ * everywhere else — where the redirect fallback in AuthContext carries sign-in
+ * through instead.
  *
- *   - vercel.json must proxy /__/auth/* BEFORE the SPA catch-all, or the catch-all
- *     swallows the handler and serves index.html to it;
- *   - firebase/config.js must only claim an origin as its authDomain where that
- *     proxy actually exists.
+ * The rule lives in firebase/authDomain.js so these tests can call it. They used to
+ * assert the text of config.js, which let a change that stopped consulting a constant
+ * pass unnoticed: the declaration survived, the behaviour did not.
  */
 
 import fs from 'node:fs';
+import { resolveAuthDomainForHost, DEFAULT_AUTH_DOMAIN } from './src/firebase/authDomain.js';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -40,6 +45,12 @@ function assert(cond, message) {
   if (!cond) throw new Error(message);
 }
 
+function assertEqual(actual, expected, message = '') {
+  if (actual !== expected) {
+    throw new Error(`${message}\n       expected: ${expected}\n       actual:   ${actual}`);
+  }
+}
+
 const read = (f) => fs.readFileSync(path.resolve(process.cwd(), f), 'utf8');
 const vercel = JSON.parse(read('vercel.json'));
 const config = read('src/firebase/config.js');
@@ -50,7 +61,11 @@ console.log('\n🔑 AUTH HANDLER ORIGIN TEST SUITE\n');
 console.log('1. The auth handler is proxied onto the app origin');
 // ===========================================================================
 
-runTest('vercel.json proxies /__/auth/* to the Firebase auth handler', () => {
+// The proxy is not currently load-bearing: authDomain resolves to the Firebase
+// domain everywhere except firebaseapp.com/web.app, which serve the handler
+// themselves. It is kept because it is one of the two things a custom authDomain
+// needs — the other being the redirect URI registered in Google Cloud Console.
+runTest('vercel.json still carries the /__/auth proxy a custom domain would need', () => {
   const rule = (vercel.rewrites || []).find((r) => r.source.startsWith('/__/auth'));
   assert(rule, '/__/auth rewrite is missing — Google sign-in breaks on Safari');
   assert(
@@ -79,39 +94,65 @@ runTest('The SPA catch-all still serves the app', () => {
 });
 
 // ===========================================================================
-console.log('\n2. authDomain only claims an origin that serves the handler');
+console.log('\n2. authDomain resolution (exercised, not read off the source)');
 // ===========================================================================
+//
+// These used to assert the text of config.js — that a constant was declared and a
+// proxy existed. That let a change which stopped consulting the constant pass
+// unnoticed: the declaration survived, the behaviour did not. They now call the
+// rule.
 
-runTest('config.js resolves authDomain rather than hard-coding it', () => {
-  assert(config.includes('resolveAuthDomain()'), 'authDomain must be resolved per host');
-  assert(!/authDomain:\s*import\.meta\.env/.test(config), 'the old static authDomain is gone');
-});
-
-runTest('firebaseapp.com and web.app are treated as same-origin', () => {
-  // There the app and the handler share a domain, so no proxy is needed.
-  assert(config.includes('.firebaseapp.com'), 'firebaseapp.com host check');
-  assert(config.includes('.web.app'), 'web.app host check');
-});
-
-runTest('🚨 Every host claiming same-origin auth is proxied in vercel.json', () => {
-  // Claiming an origin whose /__/auth is not proxied breaks sign-in outright: the
-  // handler would 404 into the SPA instead of loading.
-  const listed = [...config.matchAll(/SAME_ORIGIN_AUTH_HOSTS\s*=\s*\[([^\]]*)\]/g)]
-    .flatMap((m) => [...m[1].matchAll(/"([^"]+)"/g)].map((h) => h[1]));
-  assert(listed.length > 0, 'no same-origin hosts declared');
-  const hasProxy = (vercel.rewrites || []).some((r) => r.source.startsWith('/__/auth'));
-  assert(hasProxy, `hosts ${listed.join(', ')} claim same-origin auth but nothing proxies /__/auth`);
-});
-
-runTest('An unknown host falls back to the Firebase auth domain', () => {
-  assert(config.includes('return DEFAULT_AUTH_DOMAIN'), 'unrecognised hosts need a fallback');
-});
-
-runTest('An explicit VITE_FIREBASE_AUTH_DOMAIN still wins', () => {
-  assert(
-    config.includes('import.meta.env.VITE_FIREBASE_AUTH_DOMAIN'),
-    'the env override must remain available for other deployments'
+runTest('An app served from firebaseapp.com uses its own origin', () => {
+  assertEqual(
+    resolveAuthDomainForHost('queueup-65e82.firebaseapp.com', undefined),
+    'queueup-65e82.firebaseapp.com',
+    'same-origin and pre-registered with Google'
   );
+});
+
+runTest('An app served from web.app uses its own origin', () => {
+  assertEqual(resolveAuthDomainForHost('queueup-65e82.web.app', undefined), 'queueup-65e82.web.app');
+});
+
+runTest('🚨 A custom host falls back to the Firebase domain', () => {
+  // Claiming a custom origin without registering it in Google Cloud Console fails
+  // with redirect_uri_mismatch, which — unlike the Safari popup problem — has no
+  // fallback path at all.
+  for (const host of ['queue-up-nu.vercel.app', 'queueup.example.ac.th', 'localhost']) {
+    assertEqual(resolveAuthDomainForHost(host, undefined), DEFAULT_AUTH_DOMAIN, host);
+  }
+});
+
+runTest('An explicit VITE_FIREBASE_AUTH_DOMAIN overrides everything', () => {
+  assertEqual(
+    resolveAuthDomainForHost('queueup-65e82.firebaseapp.com', 'auth.example.ac.th'),
+    'auth.example.ac.th',
+    'a deliberate setting wins'
+  );
+  assertEqual(resolveAuthDomainForHost('anything', '  spaced.example.com  '), 'spaced.example.com');
+});
+
+runTest('A blank or missing override is ignored rather than used', () => {
+  for (const configured of ['', '   ', undefined, null]) {
+    assertEqual(resolveAuthDomainForHost('example.com', configured), DEFAULT_AUTH_DOMAIN);
+  }
+});
+
+runTest('Off-browser (no host) resolves to the Firebase domain', () => {
+  assertEqual(resolveAuthDomainForHost(undefined, undefined), DEFAULT_AUTH_DOMAIN);
+});
+
+runTest('🚨 A lookalike host does not pass as a Firebase domain', () => {
+  // endsWith on a bare string would accept an attacker-controlled lookalike.
+  assertEqual(
+    resolveAuthDomainForHost('evil-firebaseapp.com', undefined),
+    DEFAULT_AUTH_DOMAIN,
+    'must require the dot-prefixed suffix'
+  );
+});
+
+runTest('config.js delegates rather than re-implementing the rule', () => {
+  assert(config.includes('resolveAuthDomainForHost('), 'config must use the shared rule');
 });
 
 // ===========================================================================

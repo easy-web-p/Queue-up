@@ -1,4 +1,5 @@
 import { initializeApp } from "firebase/app";
+import { resolveAuthDomainForHost } from "./authDomain.js";
 import {
   getAuth,
   GoogleAuthProvider,
@@ -26,44 +27,11 @@ import {
 // authorized-domain list, not by keeping this string hidden. It was previously
 // base64-encoded here via atob(), which hid nothing from anyone reading the bundle
 // while implying the value needed protecting. Written plainly so its status is clear.
-const DEFAULT_AUTH_DOMAIN = "queueup-65e82.firebaseapp.com";
-
-/**
- * Hosts that serve the Firebase auth handler from their own origin.
- *
- * Safari — and iOS/iPadOS Safari in particular — partitions storage per origin. When
- * authDomain is a different origin from the app, the sign-in popup lands on
- * <authDomain>/__/auth/handler and cannot read the state the app wrote before opening
- * it, so sign-in dies with auth/missing-initial-state and leaves the popup showing a
- * bare Firebase error page.
- *
- * The fix is to keep the handler same-origin. *.firebaseapp.com and *.web.app already
- * are, because the app and the handler share that domain. Anywhere else needs a proxy
- * for /__/auth/* — see the rewrite in vercel.json — and the host listed here.
- *
- * A host must ALSO be in Firebase Console → Authentication → Settings → Authorized
- * domains, or sign-in is rejected with auth/unauthorized-domain.
- */
-export const SAME_ORIGIN_AUTH_HOSTS = ["queue-up-nu.vercel.app"];
-
 function resolveAuthDomain() {
-  const configured = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN;
-  if (configured) return configured;
-  if (typeof window === "undefined") return DEFAULT_AUTH_DOMAIN;
-
-  const host = window.location.hostname;
-  if (
-    host.endsWith(".firebaseapp.com") ||
-    host.endsWith(".web.app")
-  ) {
-    return host;
-  }
-  // Default to DEFAULT_AUTH_DOMAIN (queueup-65e82.firebaseapp.com) to guarantee
-  // Google OAuth redirect_uri matches the pre-authorized redirect URI in Google Cloud Console.
-  // Custom domains like *.vercel.app require adding https://<host>/__/auth/handler into
-  // Google Cloud Console -> Credentials -> OAuth 2.0 Client IDs, otherwise Google throws
-  // "Error 400: redirect_uri_mismatch". Using DEFAULT_AUTH_DOMAIN avoids this error completely.
-  return DEFAULT_AUTH_DOMAIN;
+  return resolveAuthDomainForHost(
+    typeof window === "undefined" ? undefined : window.location.hostname,
+    import.meta.env.VITE_FIREBASE_AUTH_DOMAIN
+  );
 }
 
 const firebaseConfig = {
