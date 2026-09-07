@@ -3,6 +3,7 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { onRequest, onCall, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
+import { resolveWalletAuthority, MAX_TOPUP_SATANG } from "./walletAuthority.js";
 
 initializeApp();
 const db = getFirestore();
@@ -48,6 +49,31 @@ function getBangkokYmd(date = new Date()) {
   const dayOfWeekIndex = weekdayMap[weekdayShort] ?? 0;
 
   return { ymd, ymdClean, dayOfWeekIndex };
+}
+
+/**
+ * Guards any operation acting on `studentId`'s wallet on behalf of the caller.
+ * Throws HttpsError unless the caller is staff/admin or a school-verified guardian.
+ * See walletAuthority.js for the rules themselves.
+ */
+async function assertWalletAuthority(auth, studentId, { allowSelf, action }) {
+  const decision = await resolveWalletAuthority(db, auth, studentId, { allowSelf });
+
+  if (decision.allowed) {
+    return decision.role;
+  }
+
+  if (decision.reason === "SELF_SERVICE_FORBIDDEN") {
+    throw new HttpsError(
+      "permission-denied",
+      `SELF_SERVICE_FORBIDDEN: นักเรียนไม่สามารถ${action}ให้ตนเองได้ กรุณาติดต่อผู้ปกครองหรือเจ้าหน้าที่โรงเรียน`
+    );
+  }
+
+  throw new HttpsError(
+    "permission-denied",
+    `WALLET_AUTHORITY_REQUIRED: คุณไม่มีสิทธิ์${action}สำหรับนักเรียนรายนี้ (ต้องเป็นผู้ปกครองที่โรงเรียนยืนยันแล้ว หรือเจ้าหน้าที่)`
+  );
 }
 
 /**
@@ -148,7 +174,21 @@ export const createOrderAuthoritative = onCall(
     }
 
     const isCampusWallet = paymentMode === "CAMPUS_WALLET";
-    const effectiveStudentId = isCampusWallet ? (studentId || authUid) : null;
+
+    // 🔒 `studentId` is caller-supplied: without this check any signed-in user could
+    // charge their own order to another student's wallet. Spending from a wallet that
+    // is not your own requires a verified guardian link or a staff role.
+    let effectiveStudentId = null;
+    if (isCampusWallet) {
+      effectiveStudentId =
+        typeof studentId === "string" && studentId.trim() ? studentId.trim() : authUid;
+      if (effectiveStudentId !== authUid) {
+        await assertWalletAuthority(request.auth, effectiveStudentId, {
+          allowSelf: true,
+          action: "สั่งซื้อโดยใช้กระเป๋าเงิน",
+        });
+      }
+    }
 
     try {
       return await db.runTransaction(async (tx) => {
@@ -712,9 +752,21 @@ export const topupCampusWallet = onCall(
 
     const { studentId, amountSatang, note, paymentMethod } = request.data || {};
     const amt = Number(amountSatang);
-    if (!studentId || !Number.isInteger(amt) || amt <= 0) {
+    if (!studentId || typeof studentId !== "string" || !Number.isInteger(amt) || amt <= 0) {
       throw new HttpsError("invalid-argument", "กรุณาระบุ studentId และจำนวนเงิน (Satang) ที่ถูกต้อง");
     }
+    if (amt > MAX_TOPUP_SATANG) {
+      throw new HttpsError(
+        "invalid-argument",
+        `TOPUP_AMOUNT_TOO_LARGE: เติมเงินได้สูงสุด ${MAX_TOPUP_SATANG / 100} บาทต่อรายการ`
+      );
+    }
+
+    // 🔒 Credits balance with no payment capture, so it must never be self-service.
+    const actorRole = await assertWalletAuthority(request.auth, studentId, {
+      allowSelf: false,
+      action: "เติมเงิน",
+    });
 
     const walletRef = db.collection("wallets").doc(studentId);
 
@@ -747,6 +799,7 @@ export const topupCampusWallet = onCall(
         amountSatang: amt,
         type: "TOPUP",
         actorUid: request.auth.uid,
+        actorRole,
         paymentMethod: paymentMethod || "PROMPTPAY",
         note: note || "เติมเงินเข้ากระเป๋านักเรียน",
         timestamp: FieldValue.serverTimestamp(),
@@ -774,12 +827,20 @@ export const updateCampusWalletLimits = onCall(
     }
 
     const { studentId, dailyLimitSatang, weeklyLimitSatang, blockedCategories, isLocked } = request.data || {};
-    if (!studentId) {
+    if (!studentId || typeof studentId !== "string") {
       throw new HttpsError("invalid-argument", "กรุณาระบุ studentId");
     }
 
+    // 🔒 These are the parental controls themselves: a student must never be able to
+    // raise their own limits, clear blocked categories, or unlock their own wallet.
+    await assertWalletAuthority(request.auth, studentId, {
+      allowSelf: false,
+      action: "ตั้งค่าวงเงินหรือปลดล็อกกระเป๋าเงิน",
+    });
+
     const walletRef = db.collection("wallets").doc(studentId);
     const updatePayload = {
+      studentId,
       updatedAt: FieldValue.serverTimestamp(),
     };
 
