@@ -1,5 +1,7 @@
 // QueueUp for Campus Core Types & Interfaces
 
+import type { FirestoreTimestamp } from '../types';
+
 export type CampusRole = 'customer' | 'student_vendor' | 'staff_supervisor' | 'guardian' | 'admin';
 
 export interface StudentProfile {
@@ -12,8 +14,8 @@ export interface StudentProfile {
   allergyInfo?: string[];
   healthNotes?: string;
   schoolId: string;
-  createdAt: any;
-  updatedAt: any;
+  createdAt: FirestoreTimestamp;
+  updatedAt: FirestoreTimestamp;
 }
 
 export interface ParentChildLink {
@@ -26,8 +28,8 @@ export interface ParentChildLink {
   verifiedBySchool: boolean;
   status: 'PENDING' | 'VERIFIED' | 'REJECTED';
   relationship: 'FATHER' | 'MOTHER' | 'GUARDIAN';
-  createdAt: any;
-  verifiedAt?: any;
+  createdAt: FirestoreTimestamp;
+  verifiedAt?: FirestoreTimestamp;
 }
 
 export interface StudentWallet {
@@ -44,7 +46,7 @@ export interface StudentWallet {
   blockedCategories: string[];
   guardianIds: string[];
   isLocked: boolean;
-  updatedAt: any;
+  updatedAt: FirestoreTimestamp;
 }
 
 export interface WalletTransaction {
@@ -59,7 +61,7 @@ export interface WalletTransaction {
   storeName?: string;
   actorUid: string;
   note?: string;
-  timestamp: any;
+  timestamp: FirestoreTimestamp;
 }
 
 export interface VendorApprovalRequest {
@@ -75,9 +77,9 @@ export interface VendorApprovalRequest {
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   approvedBy?: string;
   approvedByName?: string;
-  approvedAt?: any;
+  approvedAt?: FirestoreTimestamp;
   rejectionReason?: string;
-  submittedAt: any;
+  submittedAt: FirestoreTimestamp;
 }
 
 export interface StaffSupervisor {
@@ -88,5 +90,5 @@ export interface StaffSupervisor {
   schoolId: string;
   canApproveVendors: boolean;
   canEmergencyLookup: boolean;
-  createdAt: any;
+  createdAt: FirestoreTimestamp;
 }

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Order, QueueStatus } from '../types';
-import { ChefHat, CheckCircle2, Phone, Sparkles, Flame, Clock, Wallet, DollarSign, MessageSquare } from 'lucide-react';
+import { ChefHat, CheckCircle2, Phone, Sparkles, Flame, Clock, MessageSquare } from 'lucide-react';
 import { soundManager } from '../utils/audioNotification.js';
 
 interface Props {

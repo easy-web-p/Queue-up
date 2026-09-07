@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
-import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config.js';
-import { DollarSign, TrendingUp, Users, ShieldCheck, ArrowLeft, PieChart, Award, Calculator, Calendar } from 'lucide-react';
+import { TrendingUp, Users, ShieldCheck, ArrowLeft, Calculator } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface TeamMember {
@@ -16,7 +16,6 @@ export default function StudentVendorEarnings() {
   const uid = currentUser?.uid || user?.uid;
 
   const [orders, setOrders] = useState<any[]>([]);
-  const [estimatedCostSatang, setEstimatedCostSatang] = useState(0);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([
     { name: user?.displayName || 'หัวหน้าร้าน (ตัวคุณ)', role: 'จัดเตรียม & ปรุงอาหาร', sharePercent: 60 },
     { name: 'เพื่อนร่วมทีม 1', role: 'จัดคิว & บัญชี', sharePercent: 40 }
@@ -147,6 +146,13 @@ export default function StudentVendorEarnings() {
                     <div>
                       <h4 className="text-sm font-bold text-slate-900 dark:text-white">{member.name}</h4>
                       <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">{member.role} • สัดส่วน {member.sharePercent}%</p>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTeamMember(idx)}
+                        className="mt-1 text-[11px] font-bold text-red-600 dark:text-red-400 hover:underline cursor-pointer"
+                      >
+                        นำออกจากทีม
+                      </button>
                     </div>
                     <div className="text-right">
                       <div className="text-base font-black font-['JetBrains_Mono'] text-emerald-600 dark:text-emerald-400">

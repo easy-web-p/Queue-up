@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { fetchParentChildLinks } from '../services/campusWalletService';
-import { collection, query, where, orderBy, getDocs, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { db } from '../firebase/config.js';
-import { History, ArrowLeft, Clock, Utensils, AlertCircle, ShoppingBag, ShieldCheck } from 'lucide-react';
+import { History, ArrowLeft, Utensils, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { ParentChildLink } from '../types/campus';
 

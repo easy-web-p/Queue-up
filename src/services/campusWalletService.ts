@@ -16,7 +16,6 @@ import type {
   StudentWallet,
   WalletTransaction,
   ParentChildLink,
-  VendorApprovalRequest,
   StudentProfile,
 } from '../types/campus';
 

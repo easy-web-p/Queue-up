@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import type { ModifierGroup, ModifierOption } from '../types';
-import { Plus, Trash2, Edit2, Check, Layers, AlertCircle, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Plus, Trash2, Layers, AlertCircle, ToggleLeft, ToggleRight } from 'lucide-react';
 
 interface Props {
   storeId: string;
@@ -16,7 +16,6 @@ interface Props {
 }
 
 export const MerchantModifierManager: React.FC<Props> = ({
-  storeId,
   modifierGroups,
   onCreateGroup,
   onToggleOptionStock,

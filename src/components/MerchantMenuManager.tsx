@@ -4,8 +4,8 @@
  */
 
 import React, { useState } from 'react';
-import type { MenuItem, MenuCategory, ModifierGroup } from '../types';
-import { ToggleLeft, ToggleRight, Plus, Utensils, AlertTriangle, Edit2, Check, Layers } from 'lucide-react';
+import type { MenuItem, ModifierGroup } from '../types';
+import { ToggleLeft, ToggleRight, Plus, Utensils, Edit2, Check, Layers } from 'lucide-react';
 
 interface Props {
   storeId?: string;

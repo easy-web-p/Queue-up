@@ -84,15 +84,12 @@ export function evaluateStoreAvailability(
       const currentTimeStr = `${currentHours}:${currentMinutes}`;
 
       const { open, close } = todaySchedule;
-      let isWithinHours = false;
-
-      if (open <= close) {
-        // Standard daytime schedule (e.g. 08:00 - 17:00)
-        isWithinHours = currentTimeStr >= open && currentTimeStr <= close;
-      } else {
-        // Overnight schedule (e.g. 22:00 - 02:00)
-        isWithinHours = currentTimeStr >= open || currentTimeStr <= close;
-      }
+      const isWithinHours =
+        open <= close
+          ? // Standard daytime schedule (e.g. 08:00 - 17:00)
+            currentTimeStr >= open && currentTimeStr <= close
+          : // Overnight schedule (e.g. 22:00 - 02:00)
+            currentTimeStr >= open || currentTimeStr <= close;
 
       if (!isWithinHours) {
         return {

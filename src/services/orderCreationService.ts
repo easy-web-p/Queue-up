@@ -9,7 +9,7 @@
 
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase/config.js';
-import type { Order, OrderStatus, QueueStatus } from '../types';
+import type { Order, OrderStatus } from '../types';
 
 export interface SelectedModifierOption {
   modifierGroupId: string;
@@ -145,7 +145,7 @@ export function getBangkokYmd(date: Date = new Date()): { ymd: string; ymdClean:
 export async function createAuthoritativeStoreOrder(
   request: CreateOrderRequest
 ): Promise<OrderCreationResult> {
-  const { storeId, userId, customerName, customerPhone, items, pickupTime } = request;
+  const { storeId, userId, customerPhone, items, pickupTime } = request;
 
   // 1. Strict Fail-Fast Validation (Zero fake defaults)
   if (!userId || userId === 'guest_user') {
@@ -194,9 +194,6 @@ export async function createAuthoritativeStoreOrder(
   if (!isValidCalendarDate(pYear, pMonth, pDay)) {
     throw new Error('INVALID_CALENDAR_DATE: วันที่ระบุไม่มีอยู่จริงในปฏิทิน');
   }
-  const targetPickupDateObj = new Date(Date.UTC(pYear, pMonth - 1, pDay, 12, 0, 0));
-  const targetBangkok = getBangkokYmd(targetPickupDateObj);
-
   // Strict same-day past pickup time validation
   if (targetYmdClean === currentBangkok.ymdClean) {
     const currentBangkokTime = getBangkokCurrentTime(now);
@@ -235,7 +232,7 @@ export async function createAuthoritativeStoreOrder(
         );
       }
 
-      throw new Error(serverMessage);
+      throw new Error(serverMessage, { cause: callableErr });
     }
   }
 

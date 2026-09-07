@@ -204,7 +204,6 @@ export function detectMatchedAllergens(input: DetectAllergensInput): AllergenDet
             triggerWord: kw,
             details: `พบคำว่า "${kw}" ในคำอธิบายเมนูอาหาร`
           });
-          matched = true;
           matchedSet.add(canonicalName);
           break;
         }
@@ -222,7 +221,6 @@ export function detectMatchedAllergens(input: DetectAllergensInput): AllergenDet
             triggerWord: kw,
             details: `เลือกตัวเลือกเพิ่มเติม "${modName}" (ตรวจพบ: ${kw})`
           });
-          matched = true;
           matchedSet.add(canonicalName);
           break;
         }

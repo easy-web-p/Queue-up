@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { MessageCircle, Send, ArrowLeft, Store, Image as ImageIcon, CheckCheck, ShieldCheck } from 'lucide-react';
-import { ChatMessage, MerchantShop, CustomerProfile } from '../types';
+import { Send, ArrowLeft, Store, Image as ImageIcon, CheckCheck, ShieldCheck } from 'lucide-react';
+import { ChatMessage, MerchantShop, CustomerProfile, formatTimestamp } from '../types';
 import { fetchShopsFromFirestore } from '../lib/firebase';
 
 interface ChatPageProps {
@@ -10,7 +10,6 @@ interface ChatPageProps {
 }
 
 export const Chat: React.FC<ChatPageProps> = ({
-  currentUser,
   activeShop: propShop,
   onBack
 }) => {
@@ -27,12 +26,18 @@ export const Chat: React.FC<ChatPageProps> = ({
   const [inputMsg, setInputMsg] = useState('');
 
   useEffect(() => {
+    let cancelled = false;
     fetchShopsFromFirestore().then((remoteShops) => {
-      if (remoteShops && remoteShops.length > 0) {
-        setShops(remoteShops);
-        if (!selectedShop) setSelectedShop(remoteShops[0]);
-      }
+      if (cancelled || !remoteShops || remoteShops.length === 0) return;
+      setShops(remoteShops);
+      // Defaults to the first shop only when nothing is selected yet. Uses the
+      // updater form so the effect does not have to depend on selectedShop, which
+      // would re-run the fetch every time the user picked a different shop.
+      setSelectedShop((current) => current ?? remoteShops[0]);
     });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleSend = (e: React.FormEvent) => {
@@ -139,7 +144,7 @@ export const Chat: React.FC<ChatPageProps> = ({
                   {m.text}
                 </div>
                 <span className="text-[10px] font-bold text-slate-400 mt-1 flex items-center gap-1 px-1">
-                  {m.timestamp}
+                  {formatTimestamp(m.timestamp)}
                   {isMe && <CheckCheck className="w-3.5 h-3.5 text-emerald-500" />}
                 </span>
               </div>

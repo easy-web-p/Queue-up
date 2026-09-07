@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext.jsx';
 import { reviewVendorApproval } from '../services/campusWalletService';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config.js';
-import { ShieldCheck, Check, X, Clock, AlertCircle, ArrowLeft, Store, UserCheck, Utensils } from 'lucide-react';
+import { ShieldCheck, Check, X, Clock, AlertCircle, ArrowLeft, UserCheck, Utensils } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { VendorApprovalRequest } from '../types/campus';
 
 export default function VendorApprovalPanel() {
-  const { user, profile } = useAuth();
   const [requests, setRequests] = useState<VendorApprovalRequest[]>([]);
   const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING');
   const [selectedRequest, setSelectedRequest] = useState<VendorApprovalRequest | null>(null);

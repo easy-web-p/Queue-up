@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { fetchParentChildLinks, fetchStudentWallet, updateCampusWalletLimits } from '../services/campusWalletService';
-import { Shield, Lock, Unlock, ArrowLeft, Save, Check, AlertTriangle, Sliders, DollarSign } from 'lucide-react';
+import { Shield, Lock, Unlock, ArrowLeft, Save, Check, Sliders } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { ParentChildLink, StudentWallet } from '../types/campus';
 
@@ -93,6 +93,13 @@ export default function SpendingLimitSetting() {
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-[#16100C] text-slate-800 dark:text-slate-100 font-['IBM_Plex_Sans_Thai'] pb-20 transition-colors">
+        {isLoading && (
+          <div className="max-w-4xl mx-auto px-4 pt-4">
+            <div className="bg-white/80 dark:bg-[#241C16]/80 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-xs font-bold text-slate-500 dark:text-[#9CA3AF] animate-pulse">
+              กำลังโหลดข้อมูล...
+            </div>
+          </div>
+        )}
       {/* Header */}
       <header className="sticky top-0 z-30 bg-white/95 dark:bg-[#241C16]/95 backdrop-blur border-b border-slate-200 dark:border-white/10 px-6 py-4 flex items-center justify-between shadow-xs">
         <div className="flex items-center space-x-3">

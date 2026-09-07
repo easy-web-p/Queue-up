@@ -4,7 +4,6 @@ import { useSelector, useDispatch } from 'react-redux';
 import { selectCartItems, clearCart } from '../store/cartSlice';
 import { Utensils, ArrowLeft, Sparkles, AlertCircle, Clock, CheckCircle2, ShoppingBag, Store, MapPin, Calendar, Compass, Wallet, CreditCard } from 'lucide-react';
 import { CartItem, Order, CustomerProfile, SelectedModifierOption } from '../types';
-import { db } from '../firebase/config.js';
 import {
   createAuthoritativeStoreOrder,
   getBangkokYmd,

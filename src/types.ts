@@ -1,3 +1,34 @@
+/**
+ * A Firestore timestamp as it arrives on the client.
+ *
+ * Reads return a Timestamp instance, writes send serverTimestamp() (a sentinel), and
+ * a document echoed straight back from a Cloud Function may carry neither yet — so
+ * this is deliberately a union rather than Timestamp. Previously every one of these
+ * fields was `any`.
+ */
+export type FirestoreTimestamp =
+  | { toDate: () => Date; toMillis: () => number }
+  | { seconds: number; nanoseconds: number }
+  | Date
+  | string
+  | null;
+
+/** Renders a FirestoreTimestamp as a short local time string. */
+export function formatTimestamp(ts: FirestoreTimestamp, locale = 'th-TH'): string {
+  if (!ts) return '';
+  if (typeof ts === 'string') return ts;
+  const date =
+    ts instanceof Date
+      ? ts
+      : 'toDate' in ts
+        ? ts.toDate()
+        : 'seconds' in ts
+          ? new Date(ts.seconds * 1000)
+          : null;
+  if (!date || Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }) + ' น.';
+}
+
 export type QueueStatus = 'waiting' | 'confirmed' | 'cooking' | 'ready' | 'completed' | 'cancelled';
 
 export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED';
@@ -110,8 +141,8 @@ export interface Order {
   pickupDate?: string;
   slotId?: string;
   slipUrl?: string;
-  createdAt: any;
-  updatedAt?: any;
+  createdAt: FirestoreTimestamp;
+  updatedAt?: FirestoreTimestamp;
   estimatedReadyTime?: string;
   shopName?: string;
   storeName?: string;
@@ -164,7 +195,7 @@ export interface ChatMessage {
   sender: 'user' | 'store' | 'system' | 'client' | 'merchant';
   senderName?: string;
   text: string;
-  timestamp: any;
+  timestamp: FirestoreTimestamp;
   isRead?: boolean;
 }
 

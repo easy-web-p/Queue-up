@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { fetchParentChildLinks } from '../services/campusWalletService';
-import { HeartPulse, ArrowLeft, Plus, X, Save, Check, FileText, AlertCircle } from 'lucide-react';
+import { HeartPulse, ArrowLeft, Plus, X, Save, Check } from 'lucide-react';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase/config.js';
 import { Link } from 'react-router-dom';
@@ -11,7 +11,6 @@ export default function AllergyAlertSetting() {
   const { user, currentUser } = useAuth();
   const [children, setChildren] = useState<ParentChildLink[]>([]);
   const [selectedChild, setSelectedChild] = useState<ParentChildLink | null>(null);
-  const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const [allergies, setAllergies] = useState<string[]>([]);
@@ -59,7 +58,6 @@ export default function AllergyAlertSetting() {
         const snap = await getDoc(doc(db, 'students', selectedChild.studentId));
         if (snap.exists()) {
           const data = snap.data() as StudentProfile;
-          setStudentProfile(data);
           setAllergies(data.allergyInfo || []);
           setHealthNotes(data.healthNotes || '');
         } else {
@@ -122,6 +120,13 @@ export default function AllergyAlertSetting() {
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-[#16100C] text-slate-800 dark:text-slate-100 font-['IBM_Plex_Sans_Thai'] pb-20 transition-colors">
+        {isLoading && (
+          <div className="max-w-4xl mx-auto px-4 pt-4">
+            <div className="bg-white/80 dark:bg-[#241C16]/80 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-xs font-bold text-slate-500 dark:text-[#9CA3AF] animate-pulse">
+              กำลังโหลดข้อมูล...
+            </div>
+          </div>
+        )}
       {/* Header */}
       <header className="sticky top-0 z-30 bg-white/95 dark:bg-[#241C16]/95 backdrop-blur border-b border-slate-200 dark:border-white/10 px-6 py-4 flex items-center justify-between shadow-xs">
         <div className="flex items-center space-x-3">

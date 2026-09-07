@@ -172,11 +172,13 @@ export function detectMatchedAllergens(input) {
       return false;
     };
 
-    const matched =
+    // First hit among title, category and description wins for the base item;
+    // evaluated for its side effects, so the combined result is discarded.
+    void (
       scanField(titleLower, 'TITLE', (kw) => `พบคำว่า "${kw}" ในชื่อเมนูอาหาร`) ||
       scanField(categoryLower, 'CATEGORY', (kw) => `พบคำว่า "${kw}" ในหมวดหมู่อาหาร`) ||
-      scanField(descLower, 'DESCRIPTION', (kw) => `พบคำว่า "${kw}" ในคำอธิบายเมนูอาหาร`);
-    void matched;
+      scanField(descLower, 'DESCRIPTION', (kw) => `พบคำว่า "${kw}" ในคำอธิบายเมนูอาหาร`)
+    );
 
     // Modifiers are always scanned, even when the base item already matched: a
     // topping can introduce a different allergen than the dish itself.

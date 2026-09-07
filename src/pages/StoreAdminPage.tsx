@@ -7,36 +7,28 @@ import {
   Users,
   Utensils,
   DollarSign,
-  QrCode,
   ShieldCheck,
-  Bell,
   Clock,
   Sparkles,
   ToggleLeft,
   ToggleRight,
   Plus,
   Trash2,
-  Edit,
-  Save,
   CheckCircle2,
-  AlertTriangle,
   RefreshCw,
   LogOut,
   ArrowLeft,
   ChefHat,
   Search,
-  Filter,
   BarChart3,
-  KeyRound,
   FileText,
   UserPlus,
   Download
 } from 'lucide-react';
-import { MenuItem, Order, CustomerProfile, MerchantShop } from '../types';
-import { fetchMenuItemsFromFirestore, fetchOrdersFromFirestore, fetchShopsFromFirestore, fetchUsersFromFirestore } from '../lib/firebase';
-import { db, doc, setDoc, deleteDoc, functions } from '../firebase/config.js';
+import { MenuItem, Order, MerchantShop } from '../types';
+import { fetchMenuItemsFromFirestore, fetchOrdersFromFirestore, fetchShopsFromFirestore } from '../lib/firebase';
+import { db, doc, setDoc } from '../firebase/config.js';
 import { writeBatch } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
 
 interface StoreAdminPageProps {
   menuItems?: MenuItem[];
@@ -52,7 +44,6 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
   menuItems: propsMenuItems,
   onUpdatePrice,
   onToggleStock: propsOnToggleStock,
-  onUpdateStock: propsOnUpdateStock,
   onAddNewItem,
   onNavigateToStore,
   onNavigateToLogin,
