@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import type { MenuItem, ModifierGroup } from '../types';
 import { ToggleLeft, ToggleRight, Plus, Utensils, Edit2, Check, Layers, AlertTriangle } from 'lucide-react';
 import { ALLERGEN_PRESET_DICTIONARY } from '../utils/allergenMatcher';
+import { useToast } from './ToastProvider.jsx';
 
 interface Props {
   storeId?: string;
@@ -33,6 +34,7 @@ export const MerchantMenuManager: React.FC<Props> = ({
   onUpdatePrice,
   onAddNewItem,
 }) => {
+  const toast = useToast();
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [tempPrice, setTempPrice] = useState<number>(0);
@@ -57,7 +59,7 @@ export const MerchantMenuManager: React.FC<Props> = ({
     e.preventDefault();
     if (!newName.trim()) return;
     if (!storeId) {
-      alert('ข้อผิดพลาด: ไม่พบรหัสร้านค้า (Store ID) กรุณาตรวจสอบสิทธิ์การเข้าใช้งาน');
+      toast.error('ไม่พบรหัสร้านค้า (Store ID) กรุณาตรวจสอบสิทธิ์การเข้าใช้งาน');
       return;
     }
 

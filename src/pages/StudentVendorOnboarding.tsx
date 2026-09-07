@@ -133,6 +133,7 @@ export default function StudentVendorOnboarding() {
           <Link
             to="/home"
             className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#16100C] dark:hover:bg-[#FF7A1A]/10 border border-slate-200 dark:border-[#FF7A1A]/30 rounded-xl text-[#FF7A1A] transition-colors"
+            aria-label="ย้อนกลับ"
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>

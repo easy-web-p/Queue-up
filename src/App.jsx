@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { PreferencesProvider } from "./context/PreferencesContext.jsx";
+import { ToastProvider } from "./components/ToastProvider.jsx";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import PageRouteLoader, { PageRouteLoaderView } from "./components/PageRouteLoader.jsx";
@@ -41,8 +42,13 @@ const CampusQueueMonitor = lazy(() => import("./pages/CampusQueueMonitor.tsx"));
 function App() {
   return (
     <PreferencesProvider>
-      <AuthProvider>
+      <ToastProvider>
+        <AuthProvider>
         <BrowserRouter>
+          {/* First tab stop on every page: lets keyboard and switch users reach the
+              page content without tabbing through the whole navigation. Invisible
+              until focused. */}
+          <a href="#main-content" className="skip-to-content">ข้ามไปยังเนื้อหาหลัก</a>
           {/* Global Page Route Transition Loading Animation Overlay */}
           <PageRouteLoader />
           {/* Global Cookie Session Tracker on Every Page */}
@@ -53,6 +59,9 @@ function App() {
             {/* PageRouteLoader already renders a transition overlay; this is the
                 boundary for a chunk that has not arrived yet. */}
             <Suspense fallback={<PageRouteLoaderView message="กำลังโหลดหน้าที่คุณเลือก..." progress={70} />}>
+            {/* Skip-link target. Mirrors #root's own flex column so pages keep the
+                exact box they had before this wrapper existed. */}
+            <div id="main-content" tabIndex={-1} className="flex flex-col flex-1 min-w-0">
             <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/landing" element={<LandingPage />} />
@@ -125,10 +134,12 @@ function App() {
             {/* Wildcard 404 Page Not Found Route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+            </div>
             </Suspense>
           </ErrorBoundary>
         </BrowserRouter>
-      </AuthProvider>
+        </AuthProvider>
+      </ToastProvider>
     </PreferencesProvider>
   );
 }

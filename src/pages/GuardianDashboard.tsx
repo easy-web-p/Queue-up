@@ -27,8 +27,10 @@ import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase/config.js';
 import { Link } from 'react-router-dom';
 import type { ParentChildLink, StudentWallet, WalletTransaction, StudentProfile } from '../types/campus';
+import { useToast } from '../components/ToastProvider.jsx';
 
 export default function GuardianDashboard() {
+  const toast = useToast();
   const { user, currentUser } = useAuth();
   const [children, setChildren] = useState<ParentChildLink[]>([]);
   const [selectedChild, setSelectedChild] = useState<ParentChildLink | null>(null);
@@ -212,7 +214,7 @@ export default function GuardianDashboard() {
       const txs = await fetchWalletTransactions(selectedChild.studentId);
       setTransactions(txs);
     } catch (err: any) {
-      alert('เติมเงินไม่สำเร็จ: ' + (err.message || 'Unknown'));
+      toast.error('เติมเงินไม่สำเร็จ: ' + (err.message || 'Unknown'));
     } finally {
       setIsTopupProcessing(false);
     }
@@ -236,7 +238,7 @@ export default function GuardianDashboard() {
       setChildren(links);
       if (links.length === 1) setSelectedChild(links[0]);
     } catch (err: any) {
-      alert('ผูกบัญชีไม่สำเร็จ: ' + (err.message || 'Unknown'));
+      toast.error('ผูกบัญชีไม่สำเร็จ: ' + (err.message || 'Unknown'));
     }
   };
 
@@ -263,6 +265,7 @@ export default function GuardianDashboard() {
           <Link
             to="/home"
             className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#16100C] dark:hover:bg-[#FF7A1A]/10 border border-slate-200 dark:border-[#FF7A1A]/30 rounded-xl text-[#FF7A1A] transition-colors"
+            aria-label="ย้อนกลับ"
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>

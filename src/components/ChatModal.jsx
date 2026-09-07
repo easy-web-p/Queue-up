@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { getChatGPTResponse } from "../services/aiChatService.js";
 import { analyzeAndShieldInput, checkRateLimit } from "../services/aiSecurityShield.js";
+import { useToast } from "./ToastProvider.jsx";
 import "./ChatModal.css";
 
 const INITIAL_CONVERSATIONS = [
@@ -91,6 +92,7 @@ const QUICK_SUGGESTIONS = [
 ];
 
 function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
+  const toast = useToast();
   const [conversations, setConversations] = useState(() => {
     const saved = localStorage.getItem("queueup_chat_conversations");
     return saved ? JSON.parse(saved) : INITIAL_CONVERSATIONS;
@@ -188,14 +190,14 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
     // Check Rate Limiting
     const rateCheck = checkRateLimit("CHAT_MESSAGE", 10, 60000);
     if (!rateCheck.allowed) {
-      alert(`🛡️ [AI Security Sentinel] ${rateCheck.message}`);
+      toast.warning(`🛡️ [AI Security Sentinel] ${rateCheck.message}`);
       return;
     }
 
     // Shield & Sanitize Input Text
     const shieldResult = analyzeAndShieldInput(rawText);
     if (!shieldResult.safe) {
-      alert(`🛡️ [AI Security Sentinel] ตรวจพบแพทเทิร์นสุ่มเสี่ยง: ${shieldResult.threats[0]} ระบบได้บล็อกข้อความนี้เรียบร้อยแล้ว`);
+      toast.warning(`🛡️ [AI Security Sentinel] ตรวจพบแพทเทิร์นสุ่มเสี่ยง: ${shieldResult.threats[0]} ระบบได้บล็อกข้อความนี้เรียบร้อยแล้ว`);
       setInputText("");
       return;
     }
@@ -342,7 +344,7 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
                 คุณสามารถเพิ่มแชทและเริ่มการสนทนากับทางร้านได้ โดยกดปุ่ม{" "}
                 <span className="text-danger fw-bold text-[#ee4d2d] font-bold"><i className="bi bi-chat-dots-fill me-1" />แชทเลย</span> ที่รายการคำสั่งซื้อของคุณ
               </p>
-              <button className="queueup-chat-close-btn position-absolute top-0 end-0 m-3 absolute top-3 right-3 p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer border-0" onClick={onClose}>
+              <button aria-label="ปิดหน้าต่างแชท" className="queueup-chat-close-btn position-absolute top-0 end-0 m-3 absolute top-3 right-3 p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer border-0" onClick={onClose}>
                 <i className="bi bi-x-lg text-sm" />
               </button>
             </div>
@@ -365,7 +367,7 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
                   </div>
                 </div>
 
-                <button className="queueup-chat-close-btn p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer border-0" onClick={onClose} title="ปิดแชท">
+                <button className="queueup-chat-close-btn p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer border-0" onClick={onClose} title="ปิดแชท" aria-label="ปิดแชท">
                   <i className="bi bi-x-lg text-sm" />
                 </button>
               </div>
@@ -438,7 +440,7 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                 />
-                <button type="submit" className="queueup-chat-send-btn p-2 w-9 h-9 rounded-xl bg-[#ee4d2d] hover:bg-[#d73211] text-white flex items-center justify-center transition-all cursor-pointer border-0 shadow-xs" title="ส่งข้อความ">
+                <button type="submit" className="queueup-chat-send-btn p-2 w-9 h-9 rounded-xl bg-[#ee4d2d] hover:bg-[#d73211] text-white flex items-center justify-center transition-all cursor-pointer border-0 shadow-xs" title="ส่งข้อความ" aria-label="ส่งข้อความ">
                   <i className="bi bi-send-fill text-xs" />
                 </button>
               </form>

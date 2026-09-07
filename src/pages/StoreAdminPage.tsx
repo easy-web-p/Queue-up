@@ -29,6 +29,7 @@ import { MenuItem, Order, MerchantShop } from '../types';
 import { fetchMenuItemsFromFirestore, fetchOrdersFromFirestore, fetchShopsFromFirestore } from '../lib/firebase';
 import { db, doc, setDoc } from '../firebase/config.js';
 import { writeBatch } from 'firebase/firestore';
+import { useToast } from '../components/ToastProvider.jsx';
 
 interface StoreAdminPageProps {
   menuItems?: MenuItem[];
@@ -48,6 +49,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
   onNavigateToStore,
   onNavigateToLogin,
 }) => {
+  const toast = useToast();
   const navigate = useNavigate();
   const { user } = useSelector((state: any) => state.auth);
 
@@ -946,12 +948,17 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                       </td>
                       <td className="p-3 text-right">
                         <button
-                          onClick={() => {
-                            if (window.confirm(`ต้องการลบพนักงาน ${st.name} ออกจากระบบหรือไม่?`)) {
-                              setStaffList((prev) => prev.filter((s) => s.id !== st.id));
-                              setToastMsg(`ลบพนักงาน ${st.name} เรียบร้อยแล้ว`);
-                              setTimeout(() => setToastMsg(null), 2500);
-                            }
+                          onClick={async () => {
+                            const ok = await toast.confirm({
+                              title: 'ลบพนักงาน',
+                              message: `ต้องการลบพนักงาน ${st.name} ออกจากระบบหรือไม่?`,
+                              confirmLabel: 'ลบพนักงาน',
+                              tone: 'error',
+                            });
+                            if (!ok) return;
+                            setStaffList((prev) => prev.filter((s) => s.id !== st.id));
+                            setToastMsg(`ลบพนักงาน ${st.name} เรียบร้อยแล้ว`);
+                            setTimeout(() => setToastMsg(null), 2500);
                           }}
                           className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
                           title="ลบพนักงาน"

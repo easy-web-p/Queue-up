@@ -22,9 +22,11 @@ import {
 } from "../utils/security.js";
 import { getEffectiveRoles, isUserSuperAdmin } from "../utils/authRoles.js";
 import PdpaPolicyModal from "../components/PdpaPolicyModal.jsx";
+import { useToast } from "../components/ToastProvider.jsx";
 import "./Login.css";
 
 function Login() {
+  const toast = useToast();
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
@@ -105,18 +107,18 @@ function Login() {
         setLoading(true);
         await sendPasswordResetEmail(auth, sanitized);
         setLoading(false);
-        alert(`📧 ระบบได้ส่งลิงก์สำหรับตั้งรหัสผ่านใหม่ไปยังอีเมล "${sanitized}" เรียบร้อยแล้ว!\nกรุณาตรวจสอบกล่องจดหมายของคุณ`);
+        toast.success(`ระบบได้ส่งลิงก์สำหรับตั้งรหัสผ่านใหม่ไปยังอีเมล "${sanitized}" เรียบร้อยแล้ว!\nกรุณาตรวจสอบกล่องจดหมายของคุณ`);
       } catch (err) {
         setLoading(false);
         console.warn("sendPasswordResetEmail error:", err);
         if (err.code === "auth/user-not-found") {
-          alert("⚠️ ไม่พบบัญชีผู้ใช้ที่ลงทะเบียนด้วยอีเมลนี้");
+          toast.warning("ไม่พบบัญชีผู้ใช้ที่ลงทะเบียนด้วยอีเมลนี้");
         } else if (err.code === "auth/invalid-email") {
-          alert("⚠️ รูปแบบอีเมลไม่ถูกต้อง");
+          toast.warning("รูปแบบอีเมลไม่ถูกต้อง");
         } else if (err.code === "auth/too-many-requests") {
-          alert("⚠️ มีการส่งคำขอบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่อีกครั้ง");
+          toast.warning("มีการส่งคำขอบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่อีกครั้ง");
         } else {
-          alert(`⚠️ เกิดข้อผิดพลาดในการส่งลิงก์รีเซ็ตรหัสผ่าน: ${err.message}`);
+          toast.error(`เกิดข้อผิดพลาดในการส่งลิงก์รีเซ็ตรหัสผ่าน: ${err.message}`);
         }
       }
     }
@@ -151,7 +153,7 @@ function Login() {
       } catch (err) {
         console.error("Firestore setDoc failed during profile creation:", err);
         setLoading(false);
-        alert(`⚠️ ไม่สามารถบันทึกข้อมูลโปรไฟล์ได้: ${err.message}\nกรุณาลองใหม่อีกครั้ง`);
+        toast.error(`ไม่สามารถบันทึกข้อมูลโปรไฟล์ได้: ${err.message}\nกรุณาลองใหม่อีกครั้ง`);
         return;
       }
 
@@ -172,7 +174,7 @@ function Login() {
 
     if (isSignUp) {
       if (!pdpaAccepted) {
-        alert("⚠️ กรุณาติ๊กยอมรับเงื่อนไขการใช้งานและนโยบายความเป็นส่วนตัว (PDPA) ก่อนสมัครสมาชิก");
+        toast.warning("กรุณาติ๊กยอมรับเงื่อนไขการใช้งานและนโยบายความเป็นส่วนตัว (PDPA) ก่อนสมัครสมาชิก");
         return;
       }
 
@@ -180,14 +182,14 @@ function Login() {
       const domainCheck = await validateEmailSyntaxAndDomain(email);
       if (!domainCheck.valid) {
         setLoading(false);
-        alert(`⚠️ [ตรวจสอบอีเมล]: ${domainCheck.message}`);
+        toast.warning(`[ตรวจสอบอีเมล]: ${domainCheck.message}`);
         return;
       }
 
       const { hasLength, hasUpper, hasLower, hasNumber, hasSpecial } = pwdValidation;
       if (!hasLength || !hasUpper || !hasLower || !hasNumber || !hasSpecial) {
         setLoading(false);
-        alert(
+        toast.warning(
           "รหัสผ่านไม่ผ่านเกณฑ์ความปลอดภัย!\nกรุณากรอกรหัสผ่านให้มีความยาวอย่างน้อย 8 ตัวอักษร และผสมผสานตัวพิมพ์ใหญ่ (A-Z), ตัวพิมพ์เล็ก (a-z), ตัวเลข (0-9), และสัญลักษณ์พิเศษ (!@#$%^&*_-)"
         );
         return;
@@ -195,7 +197,7 @@ function Login() {
 
       if (password !== confirmPassword) {
         setLoading(false);
-        alert("รหัสผ่านไม่ตรงกัน กรุณาตรวจสอบอีกครั้ง");
+        toast.warning("รหัสผ่านไม่ตรงกัน กรุณาตรวจสอบอีกครั้ง");
         return;
       }
 
@@ -205,7 +207,7 @@ function Login() {
         
         try {
           await sendEmailVerification(userCred.user);
-          alert(`📧 ระบบได้ส่งลิงก์ยืนยันตัวตนไปยังอีเมล "${email}" เรียบร้อยแล้ว!\nกรุณาตรวจสอบกล่องจดหมายเพื่อยืนยันอีเมลของคุณ`);
+          toast.success(`ระบบได้ส่งลิงก์ยืนยันตัวตนไปยังอีเมล "${email}" เรียบร้อยแล้ว!\nกรุณาตรวจสอบกล่องจดหมายเพื่อยืนยันอีเมลของคุณ`);
         } catch (verifyErr) {
           console.warn("sendEmailVerification warning:", verifyErr);
         }
@@ -217,9 +219,9 @@ function Login() {
       } catch (err) {
         setLoading(false);
         if (err.code === "auth/email-already-in-use") {
-          alert("⚠️ อีเมลนี้ถูกสมัครใช้งานในระบบแล้ว!\nกรุณาใช้อีเมลอื่น หรือคลิก 'Sign in' เพื่อเข้าสู่ระบบ");
+          toast.warning("อีเมลนี้ถูกสมัครใช้งานในระบบแล้ว!\nกรุณาใช้อีเมลอื่น หรือคลิก 'Sign in' เพื่อเข้าสู่ระบบ");
         } else {
-          alert(`⚠️ ไม่สามารถสร้างบัญชีผู้ใช้ได้: ${err.message}`);
+          toast.error(`ไม่สามารถสร้างบัญชีผู้ใช้ได้: ${err.message}`);
         }
         return;
       }
@@ -231,7 +233,7 @@ function Login() {
       const domainCheck = await validateEmailSyntaxAndDomain(email);
       if (!domainCheck.valid) {
         setLoading(false);
-        alert(`⚠️ [ตรวจสอบอีเมล]: ${domainCheck.message}`);
+        toast.warning(`[ตรวจสอบอีเมล]: ${domainCheck.message}`);
         return;
       }
 
@@ -269,7 +271,7 @@ function Login() {
       } catch (err) {
         console.warn("Firebase Auth sign-in error:", err);
         setLoading(false);
-        alert("⚠️ อีเมลหรือรหัสผ่านไม่ถูกต้อง! กรุณาตรวจสอบและลองใหม่อีกครั้ง");
+        toast.error("อีเมลหรือรหัสผ่านไม่ถูกต้อง! กรุณาตรวจสอบและลองใหม่อีกครั้ง");
         return;
       }
     }
@@ -286,7 +288,7 @@ function Login() {
       }
     } catch (error) {
       console.warn("Google Sign-In error:", error);
-      alert(`⚠️ เกิดข้อผิดพลาดในการเข้าสู่ระบบด้วย Google: ${error.message || error}`);
+      toast.error(`เกิดข้อผิดพลาดในการเข้าสู่ระบบด้วย Google: ${error.message || error}`);
     }
 
     if (!gUser) {
@@ -347,7 +349,7 @@ function Login() {
     } catch (err) {
       console.error("Firestore sync error on Google Login:", err);
       setLoading(false);
-      alert(`⚠️ เข้าสู่ระบบด้วย Google สำเร็จ แต่ไม่สามารถเชื่อมต่อฐานข้อมูลโปรไฟล์ได้: ${err.message}`);
+      toast.error(`เข้าสู่ระบบด้วย Google สำเร็จ แต่ไม่สามารถเชื่อมต่อฐานข้อมูลโปรไฟล์ได้: ${err.message}`);
     }
   };
 

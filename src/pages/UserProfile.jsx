@@ -12,10 +12,12 @@ import Footer from "../components/Footer.jsx";
 import { getUserBehaviorInsights } from "../services/aiBehaviorEngine.js";
 import { getSecurityHealthReport } from "../services/aiSecurityShield.js";
 import { calculateUserTrustScore } from "../services/aiUserVerificationEngine.js";
+import { useToast } from "../components/ToastProvider.jsx";
 import "./UserProfile.css";
 import "./UserPurchase.css";
 
 function UserProfile() {
+  const toast = useToast();
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -73,9 +75,10 @@ function UserProfile() {
   const handleRedeemReward = (reward) => {
     // Redemption has no server-side ledger yet, so this only acknowledges the intent
     // rather than pretending points were spent.
-    alert(
+    toast.info(
       `บันทึกคำขอแลก "${reward?.name || "ของรางวัล"}" แล้ว กรุณาแสดงหน้าจอนี้ที่เคาน์เตอร์ ` +
-      `(ยังไม่ได้เชื่อมระบบตัดแต้มอัตโนมัติ)`
+      `(ยังไม่ได้เชื่อมระบบตัดแต้มอัตโนมัติ)`,
+      { duration: 10000 }
     );
   };
   const [orderStatusTab, setOrderStatusTab] = useState("ALL");
@@ -293,12 +296,12 @@ function UserProfile() {
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      alert("⚠️ กรุณาเลือกไฟล์รูปภาพเท่านั้น (JPG, PNG, WEBP)");
+      toast.warning("กรุณาเลือกไฟล์รูปภาพเท่านั้น (JPG, PNG, WEBP)");
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      alert("⚠️ ขนาดไฟล์รูปภาพใหญ่เกินไป (สูงสุด 5MB)");
+      toast.warning("ขนาดไฟล์รูปภาพใหญ่เกินไป (สูงสุด 5MB)");
       return;
     }
 
@@ -423,12 +426,12 @@ function UserProfile() {
   const handleConfirmAccountEdit = async (e) => {
     e.preventDefault();
     if (!verifyPasswordInput.trim()) {
-      alert("⚠️ กรุณากรอกรหัสผ่านเพื่อยืนยันตัวตนก่อนแก้ไขรหัสบัญชี");
+      toast.warning("กรุณากรอกรหัสผ่านเพื่อยืนยันตัวตนก่อนแก้ไขรหัสบัญชี");
       return;
     }
 
     if (!newAccountIdInput.trim()) {
-      alert("⚠️ กรุณากรอกรหัสบัญชีใหม่");
+      toast.warning("กรุณากรอกรหัสบัญชีใหม่");
       return;
     }
 
@@ -446,14 +449,14 @@ function UserProfile() {
 
     setIsPasswordVerifyModalOpen(false);
     setVerifyPasswordInput("");
-    alert(`✨ ยืนยันรหัสผ่านสำเร็จ! เปลี่ยนรหัสบัญชีเป็น "${cleanNewAccountId}" เรียบร้อยแล้ว`);
+    toast.success(`ยืนยันรหัสผ่านสำเร็จ! เปลี่ยนรหัสบัญชีเป็น "${cleanNewAccountId}" เรียบร้อยแล้ว`);
   };
 
   // Step 1 Delete Account Verification Handler
   const handleStep1DeleteSubmit = (e) => {
     e.preventDefault();
     if (!deleteUsername.trim() || !deleteEmail.trim() || !deletePassword.trim()) {
-      alert("⚠️ กรุณากรอก ชื่อผู้ใช้, Email และ รหัสผ่าน ให้ครบถ้วน");
+      toast.warning("กรุณากรอก ชื่อผู้ใช้, Email และ รหัสผ่าน ให้ครบถ้วน");
       return;
     }
     setIsDeleteModalOpen(false);
@@ -472,14 +475,14 @@ function UserProfile() {
 
     dispatch(clearUser());
     setIsFinalConfirmModalOpen(false);
-    alert("🗑️ ระบบได้ทำการลบข้อมูลบัญชีและประวัติต่างๆ ของคุณทั้งหมดออกจากระบบเรียบร้อยแล้ว");
+    toast.success("ระบบได้ทำการลบข้อมูลบัญชีและประวัติต่างๆ ของคุณทั้งหมดออกจากระบบเรียบร้อยแล้ว", { duration: 10000 });
     navigate("/login", { replace: true });
   };
 
   // Copy Account ID to Clipboard
   const handleCopyAccountId = () => {
     navigator.clipboard.writeText(accountId);
-    alert(`📋 คัดลอกรหัสบัญชี "${accountId}" สำเร็จ!`);
+    toast.success(`คัดลอกรหัสบัญชี "${accountId}" สำเร็จ`);
   };
 
   // Check Profile Completeness
@@ -749,10 +752,11 @@ function UserProfile() {
                   <button
                     className="btn btn-sm btn-outline-warning rounded-pill px-3"
                     onClick={() => {
-                      alert(
+                      toast.info(
                         `🛡️ รายงานคะแนนความน่าเชื่อถือ (Trust Score Breakdown):\n\n` +
                           userTrustReport.breakdown.map((b) => `• ${b.label}`).join("\n") +
-                          `\n\nสิทธิ์การใช้งานของคุณ:\n• สั่งจองอาหาร: ${userTrustReport.privileges.canOrder ? "อนุมัติ ✅" : "ไม่อนุมัติ ❌"}\n• เขียนรีวิวร้านค้า: ${userTrustReport.privileges.canReview ? "อนุมัติ ✅" : "ต้องใช้ Level 2+ ⚠️"}\n• รายงานร้านค้า: ${userTrustReport.privileges.canReportStore ? "อนุมัติ ✅" : "ต้องใช้ Trust Score 70+ ⚠️"}`
+                          `\n\nสิทธิ์การใช้งานของคุณ:\n• สั่งจองอาหาร: ${userTrustReport.privileges.canOrder ? "อนุมัติ ✅" : "ไม่อนุมัติ ❌"}\n• เขียนรีวิวร้านค้า: ${userTrustReport.privileges.canReview ? "อนุมัติ ✅" : "ต้องใช้ Level 2+ ⚠️"}\n• รายงานร้านค้า: ${userTrustReport.privileges.canReportStore ? "อนุมัติ ✅" : "ต้องใช้ Trust Score 70+ ⚠️"}`,
+                        { duration: 15000 }
                       );
                     }}
                   >
@@ -1090,7 +1094,7 @@ function UserProfile() {
                     className={`shopee-coupon-btn-claim ${promoCodeInput.trim() ? "active" : ""}`}
                     onClick={() => {
                       if (promoCodeInput.trim()) {
-                        alert(`🎉 รับคูปองส่วนลด "${promoCodeInput}" สำเร็จ!`);
+                        toast.success(`รับคูปองส่วนลด "${promoCodeInput}" สำเร็จ`);
                         setPromoCodeInput("");
                       }
                     }}
@@ -1180,7 +1184,7 @@ function UserProfile() {
                   <button
                     className="btn btn-warning text-dark font-weight-bold px-4 py-2 rounded-pill shadow-sm"
                     onClick={() => {
-                      alert("🎉 คุณแลกคูปองส่วนลดอาหาร 20 บาท ด้วย 200 แต้มสำเร็จ!");
+                      toast.success("คุณแลกคูปองส่วนลดอาหาร 20 บาท ด้วย 200 แต้มสำเร็จ");
                       setUserPoints((prev) => Math.max(0, prev - 200));
                     }}
                   >
@@ -1380,7 +1384,7 @@ function UserProfile() {
                         {order.status === "TO_RECEIVE" && (
                           <button
                             className="shopee-btn-action-primary"
-                            onClick={() => alert("กรุณาแสดงหน้าจอนี้ให้เจ้าหน้าที่เคาน์เตอร์เพื่อรับอาหาร")}
+                            onClick={() => toast.info("กรุณาแสดงหน้าจอนี้ให้เจ้าหน้าที่เคาน์เตอร์เพื่อรับอาหาร")}
                           >
                             รับอาหารที่เคาน์เตอร์
                           </button>
@@ -1460,6 +1464,7 @@ function UserProfile() {
                     className="shopee-copy-icon-btn"
                     onClick={handleCopyAccountId}
                     title="คัดลอกรหัสบัญชี"
+                    aria-label="คัดลอกรหัสบัญชี"
                   >
                     <i className="bi bi-files" />
                   </button>

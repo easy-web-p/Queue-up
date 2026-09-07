@@ -223,6 +223,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
             {onBack && (
               <button
                 onClick={onBack}
+                aria-label="ย้อนกลับ"
                 className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#16100C] dark:hover:bg-white/10 rounded-full transition-colors cursor-pointer text-slate-700 dark:text-white"
               >
                 <ArrowLeft className="w-5 h-5" />

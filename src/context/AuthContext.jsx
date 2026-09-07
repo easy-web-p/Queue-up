@@ -12,11 +12,13 @@ import { auth, googleProvider, db, doc, getDoc } from '../firebase/config.js'
 import { setUser, clearUser } from '../store/authSlice.js'
 
 import { getEffectiveRoles } from '../utils/authRoles.js'
+import { useToast } from '../components/ToastProvider.jsx'
 
 export const AuthContext = createContext()
 
 export function AuthProvider({ children }) {
   const dispatch = useDispatch()
+  const toast = useToast()
 
   // Completes a Google sign-in that fell back to redirect. The session itself
   // arrives through onAuthStateChanged below; this is what surfaces a failure
@@ -25,11 +27,13 @@ export function AuthProvider({ children }) {
     getRedirectResult(auth).catch((err) => {
       if (err?.code === 'auth/no-auth-event') return; // no redirect was in flight
       console.error('Firebase Google login redirect result error:', err);
-      alert(
+      toast.error(
         'การเข้าสู่ระบบด้วย Google ไม่สำเร็จ (' + (err?.code || 'unknown') + ')\n' +
         'กรุณาลองใหม่ หรือเข้าสู่ระบบด้วยอีเมลและรหัสผ่าน'
       );
     });
+    // toast is stable for the life of the provider; this must run once per mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -181,7 +185,7 @@ export function AuthProvider({ children }) {
 
       if (err.code === 'auth/unauthorized-domain') {
         const currentHostname = typeof window !== 'undefined' ? window.location.hostname : 'queue-up-nu.vercel.app';
-        alert(`⚠️ โดเมน "${currentHostname}" ยังไม่ถูกเพิ่มใน Authorized Domains ของ Firebase Console\n(กรุณาเพิ่มใน Firebase Console > Authentication > Settings > Authorized domains หรือเข้าสู่ระบบด้วยอีเมล/รหัสผ่าน)`);
+        toast.error(`⚠️ โดเมน "${currentHostname}" ยังไม่ถูกเพิ่มใน Authorized Domains ของ Firebase Console\n(กรุณาเพิ่มใน Firebase Console > Authentication > Settings > Authorized domains หรือเข้าสู่ระบบด้วยอีเมล/รหัสผ่าน)`);
         return null;
       }
 
@@ -195,7 +199,7 @@ export function AuthProvider({ children }) {
           return null;
         } catch (redirectErr) {
           console.error('Firebase Google login redirect error:', redirectErr);
-          alert(
+          toast.error(
             'ไม่สามารถเข้าสู่ระบบด้วย Google บนเบราว์เซอร์นี้ได้\n' +
             'กรุณาเข้าสู่ระบบด้วยอีเมลและรหัสผ่านแทน'
           );

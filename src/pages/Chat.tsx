@@ -78,6 +78,7 @@ export const Chat: React.FC<ChatPageProps> = ({
             {onBack && (
               <button
                 onClick={onBack}
+                aria-label="ย้อนกลับ"
                 className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-all cursor-pointer text-white"
               >
                 <ArrowLeft className="w-5 h-5" />
@@ -158,6 +159,7 @@ export const Chat: React.FC<ChatPageProps> = ({
             type="button"
             className="p-2.5 text-slate-400 hover:text-amber-600 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
             title="แนบรูปภาพ"
+            aria-label="แนบรูปภาพ"
           >
             <ImageIcon className="w-5 h-5" />
           </button>

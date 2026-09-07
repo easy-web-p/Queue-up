@@ -35,6 +35,64 @@ body {
   overflow-x: hidden;
 }
 
+/* ---------------------------------------------------------------------------
+   Accessibility baseline
+   ---------------------------------------------------------------------------
+   The app has ~384 clickable elements and had focus styling on roughly an
+   eighth of them, so a keyboard or switch user lost track of where they were on
+   most screens. :focus-visible only paints for keyboard and assistive input, so
+   this costs mouse users nothing.
+
+   Uses the brand accent from the design system (#FF7A1A) with a contrasting
+   outer ring, so it stays visible on both the warm dark surfaces and the light
+   theme.
+--------------------------------------------------------------------------- */
+:where(a, button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 3px solid var(--color-brand, #FF7A1A);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* A mouse press should not leave a ring behind. */
+:where(a, button, input, select, textarea, summary):focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Skip past the header straight to the page content. Visible only when focused. */
+.skip-to-content {
+  /* Fixed rather than absolute: the link has to be reachable as the first tab
+     stop even when the page is already scrolled. */
+  position: fixed;
+  left: 0.5rem;
+  top: -100%;
+  z-index: 99999999;
+  padding: 0.75rem 1.25rem;
+  border-radius: 0.75rem;
+  background: var(--color-brand, #FF7A1A);
+  color: #16100C;
+  font-family: 'Kanit', sans-serif;
+  font-weight: 700;
+  font-size: 0.875rem;
+  transition: top 0.15s ease-in-out;
+}
+.skip-to-content:focus {
+  top: 0.5rem;
+}
+
+/* Honour a stated preference for less motion. The app leans on animate-pulse,
+   animate-ping, animate-spin and slide transitions throughout; for a user who
+   has asked the OS to reduce motion, those are not decoration but a problem. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* App-level Light & Dark design system. */
 html[data-theme="light"] { color-scheme: light; }
 html[data-theme="light"] body,

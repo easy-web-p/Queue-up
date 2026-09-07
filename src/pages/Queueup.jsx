@@ -4,6 +4,7 @@ import { useSelector } from "react-redux";
 import { fetchEvaluationsFromFirestore, submitEvaluationToFirestore } from "../lib/firebase.js";
 import PdpaPolicyModal from "../components/PdpaPolicyModal.jsx";
 import Footer from "../components/Footer.jsx";
+import { useToast } from "../components/ToastProvider.jsx";
 import "./Queueup.css";
 
 /**
@@ -11,6 +12,7 @@ import "./Queueup.css";
  * Presentation showcase page for the QueueUp Smart Queue & Food Ordering Application.
  */
 export default function Queueup() {
+  const toast = useToast();
   const navigate = useNavigate();
   const { user } = useSelector((state) => state.auth);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -35,7 +37,7 @@ export default function Queueup() {
   const handleContactSubmit = (e) => {
     e.preventDefault();
     if (!contactName.trim() || !contactPhone.trim()) {
-      alert("กรุณากรอกชื่อและเบอร์โทรศัพท์สำหรับติดต่อกลับ");
+      toast.warning("กรุณากรอกชื่อและเบอร์โทรศัพท์สำหรับติดต่อกลับ");
       return;
     }
     setIsContactSending(true);
@@ -92,7 +94,7 @@ export default function Queueup() {
   const handleEvalSubmit = async (e) => {
     e.preventDefault();
     if (!evalName.trim()) {
-      alert("กรุณากรอกชื่อผู้ประเมิน");
+      toast.warning("กรุณากรอกชื่อผู้ประเมิน");
       return;
     }
     setIsSubmitting(true);
@@ -111,7 +113,7 @@ export default function Queueup() {
     setIsSubmitting(false);
     setIsEvalModalOpen(false);
     setEvalComment("");
-    alert("ขอบคุณสำหรับผลประเมินสถาปัตยกรรมระบบ QueueUp CRM ครับ!");
+    toast.success("ขอบคุณสำหรับผลประเมินสถาปัตยกรรมระบบ QueueUp CRM ครับ!");
   };
 
   // Scroll listener for sticky glass navbar

@@ -15,6 +15,7 @@ import {
   toggleUserFavoriteInFirestore,
   fetchLiveSlotCapacities,
 } from "../lib/firebase.js";
+import { useToast } from "../components/ToastProvider.jsx";
 import "./ProductDetail.css";
 
 // 📅 CALENDAR DAYS GENERATOR (Generates 7 upcoming days with availability status)
@@ -434,6 +435,7 @@ function resolveStoreByStoreId(storeId) {
 }
 
 function ProductDetail() {
+  const toast = useToast();
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -749,51 +751,56 @@ function ProductDetail() {
     };
   };
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     const missing = validateRequiredModifiers();
     if (missing.length > 0) {
-      alert(`⚠️ กรุณาเลือกรายละเอียดอาหารให้ครบถ้วนก่อนใส่ตะกร้า:\n• ${missing.join("\n• ")}`);
+      toast.warning(`กรุณาเลือกรายละเอียดอาหารให้ครบถ้วนก่อนใส่ตะกร้า:\n• ${missing.join("\n• ")}`);
       return;
     }
 
     // 🚨 Allergen Safety Confirmation Guard
     if (allergenResult.hasAllergens) {
       const warningDetails = allergenResult.details.map((d) => `• ${d.allergenName}: ${d.details}`).join("\n");
-      const confirmProceed = window.confirm(
-        `🚨 คำเตือนความปลอดภัยด้านสุขภาพ (Health & Allergy Alert)!\n\nเมนูหรือตัวเลือกที่คุณเลือก มีส่วนผสมที่ตรงกับประวัติการแพ้อาหารของคุณ:\n${warningDetails}\n\nคุณแน่ใจหรือไม่ว่าต้องการเพิ่มลงในตะกร้า?`
-      );
+      const confirmProceed = await toast.confirm({
+        title: '🚨 คำเตือนความปลอดภัยด้านสุขภาพ',
+        message:
+          `เมนูหรือตัวเลือกที่คุณเลือก มีส่วนผสมที่ตรงกับประวัติการแพ้อาหารของคุณ:\n${warningDetails}\n\n` +
+          'คุณแน่ใจหรือไม่ว่าต้องการเพิ่มลงในตะกร้า?',
+        confirmLabel: 'ยืนยัน เพิ่มลงตะกร้า',
+        tone: 'error',
+      });
       if (!confirmProceed) return;
     }
 
     const newItem = createCurrentCartItem();
     dispatch(addItem(newItem));
-    alert(`🛒 เพิ่ม "${newItem.menuItem.name}" (จำนวน ${newItem.quantity} ชาม) พร้อมตัวเลือกที่ระบุ ลงในตะกร้าเรียบร้อยแล้ว!`);
+    toast.success(`เพิ่ม "${newItem.menuItem.name}" (จำนวน ${newItem.quantity} ชาม) พร้อมตัวเลือกที่ระบุ ลงในตะกร้าเรียบร้อยแล้ว`);
   };
 
   // 8. ORDER VALIDATION BEFORE CHECKOUT
   const handleNextBooking = async () => {
     // 1. Store Open Guard
     if (store?.isOpen === false || store?.status === "closed") {
-      alert("⚠️ ขออภัย ร้านค้าปิดบริการชั่วคราว ไม่สามารถทำการสั่งซื้อคิวอาหารได้ในขณะนี้");
+      toast.warning("ขออภัย ร้านค้าปิดบริการชั่วคราว ไม่สามารถทำการสั่งซื้อคิวอาหารได้ในขณะนี้");
       return;
     }
 
     // 2. Product Availability & Stock Guard
     if (product?.availability === false || product?.stockStatus === "out_of_stock") {
-      alert("⚠️ ขออภัย เมนูอาหารนี้หมดชั่วคราว ไม่สามารถทำการสั่งซื้อได้ในขณะนี้");
+      toast.warning("ขออภัย เมนูอาหารนี้หมดชั่วคราว ไม่สามารถทำการสั่งซื้อได้ในขณะนี้");
       return;
     }
 
     // 3. Time Slot Full Guard
     if (selectedTimeSlot?.status === "FULL" || selectedTimeSlot?.status === "CLOSED") {
-      alert("⚠️ ขออภัย คิวรับอาหารช่วงเวลานี้เต็มแล้ว กรุณาเลือกช่วงเวลาอื่น");
+      toast.warning("ขออภัย คิวรับอาหารช่วงเวลานี้เต็มแล้ว กรุณาเลือกช่วงเวลาอื่น");
       return;
     }
 
     // 4. Required Modifier Validation
     const missingMods = validateRequiredModifiers();
     if (missingMods.length > 0) {
-      alert(`⚠️ กรุณาเลือกรายละเอียดอาหารให้ครบถ้วน:\n• ${missingMods.join("\n• ")}`);
+      toast.warning(`กรุณาเลือกรายละเอียดอาหารให้ครบถ้วน:\n• ${missingMods.join("\n• ")}`);
       return;
     }
 
@@ -808,15 +815,20 @@ function ProductDetail() {
     // 5.5 Allergen Safety Confirmation Guard
     if (allergenResult.hasAllergens) {
       const warningDetails = allergenResult.details.map((d) => `• ${d.allergenName}: ${d.details}`).join("\n");
-      const confirmProceed = window.confirm(
-        `🚨 คำเตือนความปลอดภัยด้านสุขภาพ (Health & Allergy Alert)!\n\nเมนูหรือตัวเลือกที่คุณเลือก มีส่วนผสมที่ตรงกับประวัติการแพ้อาหารของคุณ:\n${warningDetails}\n\nคุณแน่ใจหรือไม่ว่าต้องการดำเนินการสั่งซื้อต่อไป?`
-      );
+      const confirmProceed = await toast.confirm({
+        title: '🚨 คำเตือนความปลอดภัยด้านสุขภาพ',
+        message:
+          `เมนูหรือตัวเลือกที่คุณเลือก มีส่วนผสมที่ตรงกับประวัติการแพ้อาหารของคุณ:\n${warningDetails}\n\n` +
+          'คุณแน่ใจหรือไม่ว่าต้องการดำเนินการสั่งซื้อต่อไป?',
+        confirmLabel: 'ยืนยัน สั่งซื้อต่อ',
+        tone: 'error',
+      });
       if (!confirmProceed) return;
     }
 
     const resolvedStoreId = product?.storeId || store?.id || store?.storeId;
     if (!resolvedStoreId) {
-      alert("⚠️ ไม่พบรหัสร้านค้าของเมนูนี้ กรุณาเลือกร้านค้าใหม่อีกครั้ง");
+      toast.error("ไม่พบรหัสร้านค้าของเมนูนี้ กรุณาเลือกร้านค้าใหม่อีกครั้ง");
       return;
     }
 
@@ -954,6 +966,8 @@ function ProductDetail() {
                     <button
                       className="btn btn-sm btn-light py-0 px-2 text-dark"
                       onClick={handleToggleFavorite}
+                      aria-pressed={isFavorite}
+                      aria-label={isFavorite ? "นำออกจากรายการโปรด" : "เพิ่มลงรายการโปรด"}
                     >
                       <i className={`bi ${isFavorite ? "bi-heart-fill text-danger" : "bi-heart"}`} />
                     </button>
@@ -1384,7 +1398,7 @@ function ProductDetail() {
             <button
               type="button"
               className="btn btn-primary btn-sm rounded-pill fw-bold"
-              onClick={() => alert("ระบบจะเปิดให้เขียนรีวิวหลังท่านรับอาหารเสร็จสิ้นเรียบร้อยแล้ว")}
+              onClick={() => toast.info("ระบบจะเปิดให้เขียนรีวิวหลังท่านรับอาหารเสร็จสิ้นเรียบร้อยแล้ว")}
             >
               <i className="bi bi-pencil-square me-1" /> เขียนรีวิวอาหาร / ให้คะแนน
             </button>
@@ -1531,6 +1545,7 @@ function ProductDetail() {
                         <span className="text-danger fw-bold">฿{rec.price}</span>
                         <button
                           type="button"
+                          aria-label={`ดูเมนู ${rec.name}`}
                           className="btn btn-sm btn-primary rounded-circle d-flex align-items-center justify-content-center w-7 h-7"
                         >
                           <i className="bi bi-plus" />

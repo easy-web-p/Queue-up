@@ -9,6 +9,7 @@ import { isUserSuperAdmin } from "../utils/authRoles.js";
 import { usePreferences } from "../context/PreferencesContext.jsx";
 import { selectCartTotalCount, selectCartItems, updateQuantity, removeItem } from "../store/cartSlice";
 import ClientCartModal from "./ClientCartModal.jsx";
+import { useToast } from "./ToastProvider.jsx";
 import "./ShopeeSearchBar.css";
 
 const MOCK_PRODUCTS = [
@@ -25,6 +26,7 @@ const MOCK_PRODUCTS = [
 ];
 
 function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) {
+  const toast = useToast();
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { logout } = useAuth();
@@ -457,7 +459,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
           </div>
           <span
             className="shopee-nav-item cursor-pointer"
-            onClick={() => alert("ศูนย์ช่วยเหลือ QueueUp CRM พร้อมให้บริการตลอด 24 ชั่วโมง")}
+            onClick={() => toast.info("ศูนย์ช่วยเหลือ QueueUp CRM พร้อมให้บริการตลอด 24 ชั่วโมง")}
           >
             <i className="bi bi-question-circle" /> {language === "en" ? "Help" : "ช่วยเหลือ"}
           </span>
@@ -871,7 +873,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
             </div>
 
             {/* Search Orange Button */}
-            <button type="submit" className="shopee-search-button">
+            <button type="submit" className="shopee-search-button" aria-label="ค้นหา">
               <svg
                 width="18"
                 height="18"

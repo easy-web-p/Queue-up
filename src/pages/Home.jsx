@@ -18,6 +18,7 @@ import { SHARED_PRODUCTS } from "../data/mockProducts.js";
 import { INITIAL_PRODUCTS } from "../firebase/config.js";
 import { getUserBehaviorInsights, recordUserOrderBehavior } from "../services/aiBehaviorEngine.js";
 import { getActiveMerchantCoupons } from "../services/aiMarketingService.js";
+import { useToast } from "../components/ToastProvider.jsx";
 import "./Home.css";
 
 const DEFAULT_CATEGORIES = [
@@ -45,6 +46,7 @@ const DEFAULT_CATEGORIES = [
 const DEFAULT_MENU_ITEMS = INITIAL_PRODUCTS || SHARED_PRODUCTS;
 
 function Home() {
+  const toast = useToast();
   const { user } = useSelector((state) => state.auth);
   const navigate = useNavigate();
   const { language } = usePreferences();
@@ -178,10 +180,11 @@ function Home() {
     }
     setShowWelcomeBanner(false);
 
-    alert(
+    toast.success(
       language === "en"
         ? `Congratulations ${userName}!\nCoupon code "${couponCode}" (฿50 OFF) saved & copied to clipboard!\nUse it on your first checkout.`
-        : `ยินดีด้วยคุณ ${userName}!\nคัดลอกรหัสคูปอง "${couponCode}" (ส่วนลด 50 บาท) เรียบร้อยแล้ว!\nสามารถนำไปกรอกใช้เป็นส่วนลดในหน้าชำระเงินได้ทันที`
+        : `ยินดีด้วยคุณ ${userName}!\nคัดลอกรหัสคูปอง "${couponCode}" (ส่วนลด 50 บาท) เรียบร้อยแล้ว!\nสามารถนำไปกรอกใช้เป็นส่วนลดในหน้าชำระเงินได้ทันที`,
+      { duration: 12000 }
     );
   };
 
@@ -702,9 +705,9 @@ function Home() {
                       onClick={() => {
                         try {
                           navigator.clipboard.writeText(liveCoupons[0].code);
-                          alert(`คัดลอกโค้ดส่วนลด "${liveCoupons[0].code}" เรียบร้อยแล้ว!`);
+                          toast.success(`คัดลอกโค้ดส่วนลด "${liveCoupons[0].code}" เรียบร้อยแล้ว!`);
                         } catch {
-                          alert(`รหัสคูปอง: ${liveCoupons[0].code}`);
+                          toast.info(`รหัสคูปอง: ${liveCoupons[0].code}`);
                         }
                       }}
                     >

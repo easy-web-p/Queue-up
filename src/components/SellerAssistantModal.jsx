@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { useToast } from "./ToastProvider.jsx";
 import "./SellerAssistantModal.css";
 
 export default function SellerAssistantModal({ isOpen, onClose, userName = "ผู้ขาย" }) {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState("recommended");
   const [inputMsg, setInputMsg] = useState("");
   const [chatLogs, setChatLogs] = useState([]);
@@ -47,7 +49,7 @@ export default function SellerAssistantModal({ isOpen, onClose, userName = "ผ�
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <button className="seller-btn-icon text-white/90 hover:text-white p-1.5 rounded-lg hover:bg-white/20 transition-all cursor-pointer border-0 bg-transparent" title="ขยาย" onClick={() => alert("ระบบกำลังทำงานแบบเต็มหน้าจอ")}>
+            <button className="seller-btn-icon text-white/90 hover:text-white p-1.5 rounded-lg hover:bg-white/20 transition-all cursor-pointer border-0 bg-transparent" title="ขยาย" onClick={() => toast.info("ระบบกำลังทำงานแบบเต็มหน้าจอ")}>
               <i className="bi bi-arrows-angle-expand" />
             </button>
             <button className="seller-btn-icon text-white/90 hover:text-white p-1.5 rounded-lg hover:bg-white/20 transition-all cursor-pointer border-0 bg-transparent" onClick={onClose} aria-label="ปิด">
@@ -172,7 +174,7 @@ export default function SellerAssistantModal({ isOpen, onClose, userName = "ผ�
                 value={inputMsg}
                 onChange={(e) => setInputMsg(e.target.value)}
               />
-              <button type="submit" className="seller-send-btn bg-[#ee4d2d] text-white w-7 h-7 rounded-full flex items-center justify-center text-xs shadow-sm hover:opacity-90 transition-all cursor-pointer border-0" title="ส่งข้อความ">
+              <button type="submit" className="seller-send-btn bg-[#ee4d2d] text-white w-7 h-7 rounded-full flex items-center justify-center text-xs shadow-sm hover:opacity-90 transition-all cursor-pointer border-0" title="ส่งข้อความ" aria-label="ส่งข้อความ">
                 <i className="bi bi-send-fill" />
               </button>
             </div>

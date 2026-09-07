@@ -51,6 +51,7 @@ export default function EmergencyLookup() {
           <Link
             to="/home"
             className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#16100C] border border-red-200 dark:border-red-500/30 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+            aria-label="ย้อนกลับ"
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>

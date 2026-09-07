@@ -26,9 +26,11 @@ import {
 import { getSecurityHealthReport } from "../services/aiSecurityShield.js";
 import { recordAuditLog } from "../services/storeIsolationEngine.js";
 import Footer from "../components/Footer.jsx";
+import { useToast } from "../components/ToastProvider.jsx";
 import "./MerchantDashboard.css";
 
 function MerchantDashboard() {
+  const toast = useToast();
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { user } = useSelector((state) => state.auth);
@@ -439,7 +441,7 @@ function MerchantDashboard() {
 
     const targetStoreId = user.storeId || currentStoreId;
     if (!targetStoreId) {
-      alert("ไม่พบรหัสร้านค้า (Store ID Required) ไม่สามารถบันทึกข้อมูลร้านค้าได้");
+      toast.error("ไม่พบรหัสร้านค้า (Store ID Required) ไม่สามารถบันทึกข้อมูลร้านค้าได้");
       return;
     }
 
@@ -495,7 +497,7 @@ function MerchantDashboard() {
       setTimeout(() => setIsSavedProfile(false), 3000);
     } catch (err) {
       console.error("Save store profile error:", err);
-      alert(`เกิดข้อผิดพลาดในการบันทึกข้อมูลร้านค้า: ${err.message || err}`);
+      toast.error(`เกิดข้อผิดพลาดในการบันทึกข้อมูลร้านค้า: ${err.message || err}`);
     }
   };
 

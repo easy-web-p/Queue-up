@@ -144,16 +144,16 @@ export default function Footer() {
             <h4 className="qup-footer-heading font-black text-sm text-white mb-4">ติดตามเรา & ดาวน์โหลด</h4>
             <p className="small text-slate-400 text-xs mb-3">ติดตามข่าวสารโปรโมชั่นอาหารโรงเรียน</p>
             <div className="qup-footer-social-row flex items-center gap-2 mb-5">
-              <a href="#facebook" className="qup-footer-social-btn w-8 h-8 rounded-xl bg-slate-900 hover:bg-[#1877f2] border border-slate-800 flex items-center justify-center text-slate-300 hover:text-white transition-all shadow-xs" title="Facebook Page">
+              <a href="#facebook" className="qup-footer-social-btn w-8 h-8 rounded-xl bg-slate-900 hover:bg-[#1877f2] border border-slate-800 flex items-center justify-center text-slate-300 hover:text-white transition-all shadow-xs" title="Facebook Page" aria-label="Facebook Page">
                 <i className="bi bi-facebook text-sm" />
               </a>
-              <a href="#line" className="qup-footer-social-btn w-8 h-8 rounded-xl bg-slate-900 hover:bg-[#00c300] border border-slate-800 flex items-center justify-center text-slate-300 hover:text-white transition-all shadow-xs" title="Line Official Account">
+              <a href="#line" className="qup-footer-social-btn w-8 h-8 rounded-xl bg-slate-900 hover:bg-[#00c300] border border-slate-800 flex items-center justify-center text-slate-300 hover:text-white transition-all shadow-xs" title="Line Official Account" aria-label="Line Official Account">
                 <i className="bi bi-line text-sm" />
               </a>
-              <a href="#instagram" className="qup-footer-social-btn w-8 h-8 rounded-xl bg-slate-900 hover:bg-gradient-to-tr hover:from-amber-500 hover:via-rose-500 hover:to-purple-600 border border-slate-800 flex items-center justify-center text-slate-300 hover:text-white transition-all shadow-xs" title="Instagram">
+              <a href="#instagram" className="qup-footer-social-btn w-8 h-8 rounded-xl bg-slate-900 hover:bg-gradient-to-tr hover:from-amber-500 hover:via-rose-500 hover:to-purple-600 border border-slate-800 flex items-center justify-center text-slate-300 hover:text-white transition-all shadow-xs" title="Instagram" aria-label="Instagram">
                 <i className="bi bi-instagram text-sm" />
               </a>
-              <a href="#youtube" className="qup-footer-social-btn w-8 h-8 rounded-xl bg-slate-900 hover:bg-[#ff0000] border border-slate-800 flex items-center justify-center text-slate-300 hover:text-white transition-all shadow-xs" title="Youtube">
+              <a href="#youtube" className="qup-footer-social-btn w-8 h-8 rounded-xl bg-slate-900 hover:bg-[#ff0000] border border-slate-800 flex items-center justify-center text-slate-300 hover:text-white transition-all shadow-xs" title="Youtube" aria-label="Youtube">
                 <i className="bi bi-youtube text-sm" />
               </a>
             </div>

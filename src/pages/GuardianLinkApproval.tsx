@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { ParentChildLink } from '../types/campus';
+import { useToast } from '../components/ToastProvider.jsx';
 
 type Filter = 'PENDING' | 'VERIFIED' | 'REJECTED' | 'ALL';
 
@@ -37,6 +38,7 @@ const RELATIONSHIP_LABEL: Record<string, string> = {
 };
 
 export default function GuardianLinkApproval() {
+  const toast = useToast();
   const [links, setLinks] = useState<ParentChildLink[]>([]);
   const [filter, setFilter] = useState<Filter>('PENDING');
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -83,10 +85,14 @@ export default function GuardianLinkApproval() {
     decision: 'VERIFIED' | 'REJECTED' | 'REVOKED'
   ) => {
     if (decision === 'REVOKED') {
-      const ok = window.confirm(
-        `เพิกถอนสิทธิ์ของ "${link.guardianName}" ต่อข้อมูลของ "${link.studentName}" ใช่หรือไม่?\n\n` +
-          'ผู้ปกครองจะไม่สามารถดูยอดเงิน ประวัติการสั่งซื้อ หรือข้อมูลสุขภาพของนักเรียนได้อีก'
-      );
+      const ok = await toast.confirm({
+        title: 'เพิกถอนสิทธิ์ผู้ปกครอง',
+        message:
+          `เพิกถอนสิทธิ์ของ "${link.guardianName}" ต่อข้อมูลของ "${link.studentName}" ใช่หรือไม่?\n\n` +
+          'ผู้ปกครองจะไม่สามารถดูยอดเงิน ประวัติการสั่งซื้อ หรือข้อมูลสุขภาพของนักเรียนได้อีก',
+        confirmLabel: 'เพิกถอนสิทธิ์',
+        tone: 'error',
+      });
       if (!ok) return;
     }
 
@@ -111,6 +117,7 @@ export default function GuardianLinkApproval() {
           <Link
             to="/home"
             className="p-2 bg-slate-100 dark:bg-[#16100C] border border-slate-200 dark:border-white/10 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/5 transition-colors"
+            aria-label="ย้อนกลับ"
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>

@@ -119,7 +119,7 @@ export default function CampusQueueMonitor() {
       {/* TV Header */}
       <header className="bg-white dark:bg-[#1D140F] border-b border-slate-200 dark:border-[#FF7A1A]/30 px-8 py-5 flex items-center justify-between shadow-xs">
         <div className="flex items-center space-x-4">
-          <Link to="/home" className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#16100C] dark:hover:bg-[#FF7A1A]/10 border border-slate-200 dark:border-[#FF7A1A]/30 rounded-xl text-[#FF7A1A] transition-colors">
+          <Link to="/home" className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#16100C] dark:hover:bg-[#FF7A1A]/10 border border-slate-200 dark:border-[#FF7A1A]/30 rounded-xl text-[#FF7A1A] transition-colors" aria-label="ย้อนกลับ">
             <ArrowLeft className="w-6 h-6" />
           </Link>
           <div>

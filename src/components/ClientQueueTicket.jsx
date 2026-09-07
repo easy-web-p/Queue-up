@@ -161,6 +161,7 @@ export const ClientQueueTicket = ({
             type="button"
             onClick={handleTestSound}
             title="ทดสอบและเปิดการแจ้งเตือนด้วยเสียง (Web Audio)"
+            aria-label="ทดสอบและเปิดการแจ้งเตือนด้วยเสียง"
             className="p-1.5 rounded-lg bg-stone-800/80 hover:bg-stone-700 text-amber-400 hover:text-amber-300 border border-stone-700 text-xs transition-colors flex items-center gap-1 cursor-pointer"
           >
             <Volume2 className="w-3.5 h-3.5" />
@@ -170,6 +171,7 @@ export const ClientQueueTicket = ({
           {onClose && (
             <button
               onClick={onClose}
+              aria-label="ปิดบัตรคิว"
               className="p-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-400 hover:text-white transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />

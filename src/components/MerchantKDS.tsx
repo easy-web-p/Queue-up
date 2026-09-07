@@ -111,6 +111,7 @@ export const MerchantKDS: React.FC<Props> = ({
                 href={`tel:${order.customerPhone}`}
                 className="text-slate-500 hover:text-slate-800 p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors"
                 title="โทรติดต่อลูกค้า"
+                aria-label="โทรติดต่อลูกค้า"
               >
                 <Phone className="w-3.5 h-3.5" />
               </a>
