@@ -121,7 +121,7 @@ export function AuthProvider({ children }) {
           isTokenVerified: true,
           isFromCache: false,
           isProfileLoaded: Boolean(userDocData),
-          isProfileError: profileFetchError,
+          isProfileError: isAdminUser ? false : profileFetchError,
           storeId: userDocData?.storeId || undefined,
         }));
       } catch (fatalErr) {

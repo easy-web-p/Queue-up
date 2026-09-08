@@ -77,8 +77,16 @@ function MerchantOnboarding() {
     // Save to Firestore Structure v3.0
     if (user && user.uid) {
       try {
-        // 1. users/{uid}
-        await setDoc(doc(db, "users", user.uid), userProfileUpdate, { merge: true });
+        // 1. users/{uid} - Safe profile fields
+        try {
+          await setDoc(doc(db, "users", user.uid), {
+            accountId,
+            phone,
+            updatedAt: new Date().toISOString(),
+          }, { merge: true });
+        } catch (uErr) {
+          console.warn("Could not update users profile doc:", uErr);
+        }
 
         // 2. merchantProfiles/{merchantId}
         await setDoc(

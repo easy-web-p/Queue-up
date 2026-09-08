@@ -17,19 +17,33 @@ export function ProtectedRoute({ children, allowedRoles = [], requireApprovedVen
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
+  const isSuperAdmin = isUserSuperAdmin(user);
+  const requiresElevatedRole = Boolean(
+    allowedRoles &&
+    allowedRoles.length > 0 &&
+    !allowedRoles.includes("customer")
+  );
+
   // 🔒 Wait for Firebase Auth verification and Profile loading before evaluating role-restricted routes
   if (
     isLoading || 
-    (user && user.isVerifiedAuth !== true && allowedRoles && allowedRoles.length > 0) ||
-    (user && !user.isProfileLoaded && !user.isProfileError && allowedRoles && allowedRoles.length > 0)
+    (user && user.isVerifiedAuth !== true && requiresElevatedRole) ||
+    (user && !isSuperAdmin && !user.isProfileLoaded && !user.isProfileError && requiresElevatedRole)
   ) {
     return <Loading />;
   }
 
   const currentUser = user;
 
-  // 🔒 Profile Error Guard: If accessing role-restricted route and profile failed to load
-  if (currentUser && currentUser.isProfileError === true && allowedRoles && (allowedRoles.includes("merchant") || allowedRoles.includes("admin"))) {
+  // 🔒 Profile Error Guard: Only for strictly elevated routes (e.g. merchant dashboard, admin panel)
+  // where normal customers are NOT allowed and user is not superadmin.
+  if (
+    !isSuperAdmin &&
+    currentUser &&
+    currentUser.isProfileError === true &&
+    requiresElevatedRole &&
+    (allowedRoles.includes("merchant") || allowedRoles.includes("admin"))
+  ) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4 font-['Kanit']">
         <div className="bg-slate-900 border border-red-500/40 rounded-3xl shadow-2xl p-8 text-center max-w-md w-full space-y-4">
