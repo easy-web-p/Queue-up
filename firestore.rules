@@ -569,6 +569,13 @@ service cloud.firestore {
       }
     }
 
+    // ==========================================
+    // 23. QUEUE COUNTERS (Cloud Functions Backend Only)
+    // ==========================================
+    match /queue_counters/{counterId} {
+      allow read, write: if false;
+    }
+
   }
 }
 
