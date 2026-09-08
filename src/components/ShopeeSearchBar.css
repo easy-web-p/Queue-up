@@ -4,7 +4,7 @@
 
 .shopee-header-container {
   width: 100%;
-  background: linear-gradient(-180deg, #f53d2d, #f63);
+  background: linear-gradient(-180deg, var(--qu-accent), #f63);
   color: #ffffff;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
@@ -92,12 +92,12 @@ body.dark-mode .shopee-header-container {
   margin-top: 0;
   width: 480px;
   max-width: 92vw;
-  background: #ffffff;
+  background: var(--qu-surface);
   border-radius: 10px;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.25);
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--qu-border);
   z-index: 9999;
-  color: #1e293b;
+  color: var(--qu-text);
   overflow: hidden;
   display: none;
   animation: notifSlideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -114,11 +114,11 @@ body.dark-mode .shopee-header-container {
 
 .shopee-notif-header {
   padding: 12px 16px;
-  background: #fafafa;
-  border-bottom: 1px solid #f1f5f9;
+  background: var(--qu-surface-alt);
+  border-bottom: 1px solid var(--qu-border);
   font-size: 13px;
   font-weight: 700;
-  color: #475569;
+  color: var(--qu-text-secondary);
 }
 
 .shopee-notif-body {
@@ -130,10 +130,10 @@ body.dark-mode .shopee-header-container {
   display: flex;
   gap: 12px;
   padding: 12px 16px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--qu-border);
   cursor: pointer;
   transition: background 0.15s ease;
-  background: #ffffff;
+  background: var(--qu-surface);
   text-align: left;
 }
 
@@ -164,19 +164,19 @@ body.dark-mode .shopee-header-container {
 .shopee-notif-store {
   font-weight: 700;
   font-size: 13.5px;
-  color: #0f172a;
+  color: var(--qu-text);
 }
 
 .shopee-notif-food {
   font-size: 12.5px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--qu-text);
   margin-top: 3px;
 }
 
 .shopee-notif-details {
   font-size: 11.5px;
-  color: #475569;
+  color: var(--qu-text-secondary);
   margin-top: 3px;
   display: flex;
   flex-wrap: wrap;
@@ -185,28 +185,28 @@ body.dark-mode .shopee-header-container {
 
 .shopee-notif-promo {
   font-size: 12px;
-  color: #475569;
+  color: var(--qu-text-secondary);
   margin-top: 3px;
   line-height: 1.4;
 }
 
 .shopee-notif-time {
   font-size: 10.5px;
-  color: #94a3b8;
+  color: var(--qu-text-muted);
   margin-top: 4px;
 }
 
 .shopee-notif-footer {
   padding: 10px 16px;
-  background: #ffffff;
-  border-top: 1px solid #f1f5f9;
+  background: var(--qu-surface);
+  border-top: 1px solid var(--qu-border);
   text-align: center;
 }
 
 .shopee-notif-view-all-btn {
   background: transparent;
   border: none;
-  color: #ff4500;
+  color: var(--qu-accent);
   font-weight: 700;
   font-size: 13px;
   cursor: pointer;
@@ -240,7 +240,7 @@ body.dark-mode .shopee-header-container {
 }
 
 .shopee-logo-card {
-  background: #ffffff;
+  background: var(--qu-surface);
   border-radius: 14px;
   padding: 6px;
   width: 52px;
@@ -276,7 +276,7 @@ body.dark-mode .shopee-header-container {
 }
 
 .shopee-logo-title .up-text {
-  color: #ff6b00; /* Vibrant Orange */
+  color: var(--qu-accent); /* Vibrant Orange */
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 }
 
@@ -301,7 +301,7 @@ body.dark-mode .shopee-header-container {
 .shopee-search-box {
   display: flex;
   align-items: center;
-  background: #ffffff;
+  background: var(--qu-surface);
   border-radius: 3px;
   padding: 3px 3px 3px 12px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -313,7 +313,7 @@ body.dark-mode .shopee-header-container {
   border: none;
   outline: none;
   font-size: 14px;
-  color: #222222;
+  color: var(--qu-text);
   padding: 8px 4px;
 }
 
@@ -328,8 +328,8 @@ body.dark-mode .shopee-header-container {
   gap: 6px;
   padding: 0 12px;
   font-size: 13px;
-  color: #222222;
-  border-left: 1px solid #e8e8e8;
+  color: var(--qu-text);
+  border-left: 1px solid var(--qu-border);
   cursor: pointer;
   user-select: none;
   position: relative;
@@ -337,7 +337,7 @@ body.dark-mode .shopee-header-container {
 }
 
 .shopee-search-scope-select:hover {
-  color: #ee4d2d;
+  color: var(--qu-accent);
 }
 
 .shopee-scope-dropdown-menu {
@@ -345,10 +345,10 @@ body.dark-mode .shopee-header-container {
   top: 100%;
   right: 0;
   margin-top: 6px;
-  background: #ffffff;
+  background: var(--qu-surface);
   border-radius: 2px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  border: 1px solid #eee;
+  border: 1px solid var(--qu-border);
   z-index: 100;
   min-width: 110px;
 }
@@ -356,18 +356,18 @@ body.dark-mode .shopee-header-container {
 .shopee-scope-option {
   padding: 10px 14px;
   font-size: 13px;
-  color: #222;
+  color: var(--qu-text);
   cursor: pointer;
 }
 
 .shopee-scope-option:hover {
   background: #f8f8f8;
-  color: #ee4d2d;
+  color: var(--qu-accent);
 }
 
 /* Orange Search Action Button */
 .shopee-search-button {
-  background: #fb5533;
+  background: var(--qu-accent);
   border: none;
   outline: none;
   width: 60px;
@@ -382,7 +382,7 @@ body.dark-mode .shopee-header-container {
 }
 
 .shopee-search-button:hover {
-  background: #f53d2d;
+  background: var(--qu-accent);
 }
 
 /* Debounced Typeahead Suggestions Dropdown */
@@ -392,17 +392,17 @@ body.dark-mode .shopee-header-container {
   left: 0;
   right: 0;
   margin-top: 4px;
-  background: #ffffff;
+  background: var(--qu-surface);
   border-radius: 2px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   z-index: 99;
-  border: 1px solid #e8e8e8;
+  border: 1px solid var(--qu-border);
 }
 
 .shopee-suggestion-row {
   padding: 10px 16px;
   font-size: 14px;
-  color: #222222;
+  color: var(--qu-text);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -410,8 +410,8 @@ body.dark-mode .shopee-header-container {
 }
 
 .shopee-suggestion-row:hover {
-  background: #fafafa;
-  color: #ee4d2d;
+  background: var(--qu-surface-alt);
+  color: var(--qu-accent);
 }
 
 .shopee-history-header {
@@ -486,13 +486,13 @@ body.dark-mode .shopee-header-container {
   position: absolute;
   top: 2px;
   right: 4px;
-  background: #ffffff;
-  color: #ee4d2d;
+  background: var(--qu-surface);
+  color: var(--qu-accent);
   font-size: 11px;
   font-weight: 800;
   border-radius: 10px;
   padding: 1px 6px;
-  border: 2px solid #ee4d2d;
+  border: 2px solid var(--qu-accent);
 }
 
 /* User Profile Dropdown Styles */
@@ -544,10 +544,10 @@ body.dark-mode .shopee-header-container {
   position: absolute;
   top: 100%;
   margin-top: 2px;
-  background: #ffffff;
+  background: var(--qu-surface);
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-  border: 1px solid #e8e8e8;
+  border: 1px solid var(--qu-border);
   list-style: none;
   padding: 6px 0;
   min-width: 220px;
@@ -618,7 +618,7 @@ body.dark-mode .shopee-campus-dropdown-menu .shopee-dropdown-item:hover {
   width: 100%;
   padding: 8px 14px;
   font-size: 13px;
-  color: #222222;
+  color: var(--qu-text);
   text-decoration: none;
   background: transparent;
   border: none;
@@ -629,7 +629,7 @@ body.dark-mode .shopee-campus-dropdown-menu .shopee-dropdown-item:hover {
 
 .shopee-dropdown-item:hover {
   background: #fff8f5;
-  color: #ee4d2d;
+  color: var(--qu-accent);
 }
 
 .shopee-dropdown-item.text-danger {
@@ -644,7 +644,7 @@ body.dark-mode .shopee-campus-dropdown-menu .shopee-dropdown-item:hover {
 .shopee-dropdown-divider {
   margin: 4px 0;
   border: 0;
-  border-top: 1px solid #eeeeee;
+  border-top: 1px solid var(--qu-border);
 }
 
 /* ==========================================================================
@@ -838,8 +838,8 @@ body.dark-mode .shopee-campus-dropdown-menu .shopee-dropdown-item:hover {
 }
 
 .shopee-bs5-theme-btn.theme-light:hover {
-  background: #ffffff;
-  color: #ee4d2d;
+  background: var(--qu-surface);
+  color: var(--qu-accent);
   border-color: #ffffff;
   box-shadow: 0 4px 14px rgba(255, 255, 255, 0.3);
   transform: translateY(-1px);

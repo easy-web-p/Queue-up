@@ -3,7 +3,7 @@
    ========================================================================== */
 
 .shopee-food-card {
-  background: #ffffff;
+  background: var(--qu-surface);
   border-radius: 6px;
   border: 1px solid #efefef;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
@@ -19,7 +19,7 @@
 .shopee-food-card:hover {
   transform: translateY(-3px);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
-  border-color: #ee4d2d;
+  border-color: var(--qu-accent);
 }
 
 /* 1. Image Container & Overlay Badges */
@@ -114,7 +114,7 @@
   gap: 4px;
   font-size: 11px;
   font-weight: 600;
-  color: #ee4d2d;
+  color: var(--qu-accent);
   background: #fff8f5;
   border: 1px solid #ffe3d5;
   padding: 2px 8px;
@@ -126,7 +126,7 @@
 .shopee-food-title {
   font-size: 14px;
   font-weight: 700;
-  color: #222222;
+  color: var(--qu-text);
   line-height: 1.35;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -149,13 +149,13 @@
   height: 20px;
   border-radius: 50%;
   object-fit: cover;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--qu-border);
   flex-shrink: 0;
 }
 
 .shopee-food-shop-name {
   font-weight: 600;
-  color: #334155;
+  color: var(--qu-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -167,7 +167,7 @@
   align-items: center;
   gap: 4px;
   font-size: 11px;
-  color: #64748b;
+  color: var(--qu-text-muted);
 }
 
 /* Promo Tags Row (e.g., ลด 45%, ส่งฟรี) */
@@ -178,8 +178,8 @@
 }
 
 .shopee-food-tag-promo {
-  border: 1px solid #ee4d2d;
-  color: #ee4d2d;
+  border: 1px solid var(--qu-accent);
+  color: var(--qu-accent);
   font-size: 10px;
   font-weight: 700;
   padding: 1px 4px;
@@ -194,7 +194,7 @@
   justify-content: space-between;
   margin-top: 4px;
   padding-top: 6px;
-  border-top: 1px dashed #f1f5f9;
+  border-top: 1px dashed var(--qu-border);
 }
 
 .shopee-food-price-box {
@@ -205,14 +205,14 @@
 
 .shopee-food-price-old {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--qu-text-muted);
   text-decoration: line-through;
 }
 
 .shopee-food-price-current {
   font-size: 1.15rem;
   font-weight: 800;
-  color: #ee4d2d;
+  color: var(--qu-accent);
 }
 
 /* Rating & Sales Row */
@@ -221,7 +221,7 @@
   align-items: center;
   justify-content: space-between;
   font-size: 11px;
-  color: #64748b;
+  color: var(--qu-text-muted);
 }
 
 .shopee-food-rating {
@@ -252,7 +252,7 @@
 }
 
 .shopee-food-add-btn:hover {
-  background: #ee4d2d;
+  background: var(--qu-accent);
   transform: scale(1.1);
   box-shadow: 0 4px 10px rgba(238, 77, 45, 0.4);
 }

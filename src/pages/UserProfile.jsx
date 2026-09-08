@@ -157,7 +157,7 @@ function UserProfile() {
       return {
         name: "Bronze Member",
         icon: "bi-award",
-        color: "#d97706",
+        color: "#E6680D",
         bg: "rgba(217, 119, 6, 0.15)",
         nextInfo: `สะสมอีก ${(500 - pts).toLocaleString()} แต้ม เพื่อเลื่อนเป็น Silver Member`,
         progress: Math.min(100, Math.round((pts / 500) * 100)),

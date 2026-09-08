@@ -172,7 +172,7 @@ function SearchResults() {
           <i className="bi bi-lightbulb text-warning" />
           <span>
             ผลการค้นหาสำหรับคำว่า{" "}
-            <span className="shopee-search-keyword-highlight text-[#ee4d2d] font-bold">
+            <span className="shopee-search-keyword-highlight text-[#FF7A1A] font-bold">
               "{keyword}"
             </span>
           </span>
@@ -183,7 +183,7 @@ function SearchResults() {
           {/* 1. Left Filter Sidebar */}
           <aside className="shopee-filter-sidebar w-full lg:w-56 shrink-0 bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm h-fit">
             <div className="shopee-filter-header text-sm font-black text-slate-900 dark:text-white flex items-center gap-2 pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
-              <i className="bi bi-funnel text-[#ee4d2d]" /> ตัวกรองการค้นหา
+              <i className="bi bi-funnel text-[#FF7A1A]" /> ตัวกรองการค้นหา
             </div>
 
             {/* หมวดหมู่อาหาร */}
@@ -197,10 +197,10 @@ function SearchResults() {
                 { key: "japanese", label: "อาหารญี่ปุ่น & ชาบู" },
                 { key: "streetfood", label: "ไก่ป็อบ & ทานเล่น" },
               ].map((cat) => (
-                <label key={cat.key} className="shopee-filter-item flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 mb-2 cursor-pointer hover:text-[#ee4d2d] select-none">
+                <label key={cat.key} className="shopee-filter-item flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 mb-2 cursor-pointer hover:text-[#FF7A1A] select-none">
                   <input
                     type="checkbox"
-                    className="rounded border-slate-300 text-[#ee4d2d] focus:ring-[#ee4d2d]"
+                    className="rounded border-slate-300 text-[#FF7A1A] focus:ring-[#FF7A1A]"
                     checked={selectedCategories.includes(cat.key)}
                     onChange={() => toggleCategory(cat.key)}
                   />
@@ -217,10 +217,10 @@ function SearchResults() {
                 { key: "โรงอาหารกลาง", label: "โรงอาหารกลาง ชั้น 1" },
                 { key: "โรงอาหาร 2", label: "โรงอาหาร 2 (อาคารกิจกรรม)" },
               ].map((loc) => (
-                <label key={loc.key} className="shopee-filter-item flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 mb-2 cursor-pointer hover:text-[#ee4d2d] select-none">
+                <label key={loc.key} className="shopee-filter-item flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 mb-2 cursor-pointer hover:text-[#FF7A1A] select-none">
                   <input
                     type="checkbox"
-                    className="rounded border-slate-300 text-[#ee4d2d] focus:ring-[#ee4d2d]"
+                    className="rounded border-slate-300 text-[#FF7A1A] focus:ring-[#FF7A1A]"
                     checked={selectedLocations.includes(loc.key)}
                     onChange={() => toggleLocation(loc.key)}
                   />
@@ -236,7 +236,7 @@ function SearchResults() {
                 <div className="shopee-price-range-inputs flex items-center gap-2 mb-2.5">
                   <input
                     type="number"
-                    className="shopee-price-input w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#ee4d2d]"
+                    className="shopee-price-input w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#FF7A1A]"
                     placeholder="ขั้นต่ำ ฿"
                     value={inputMinPrice}
                     onChange={(e) => setInputMinPrice(e.target.value)}
@@ -244,13 +244,13 @@ function SearchResults() {
                   <span className="text-slate-400">-</span>
                   <input
                     type="number"
-                    className="shopee-price-input w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#ee4d2d]"
+                    className="shopee-price-input w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#FF7A1A]"
                     placeholder="สูงสุด ฿"
                     value={inputMaxPrice}
                     onChange={(e) => setInputMaxPrice(e.target.value)}
                   />
                 </div>
-                <button type="submit" className="shopee-price-btn w-full bg-[#ee4d2d] hover:bg-[#d73211] text-white py-1.5 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer border-0">
+                <button type="submit" className="shopee-price-btn w-full bg-[#FF7A1A] hover:bg-[#E6680D] text-white py-1.5 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer border-0">
                   นำไปใช้
                 </button>
               </form>
@@ -279,7 +279,7 @@ function SearchResults() {
                 <button
                   className={`shopee-sort-btn px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border-0 ${
                     sortBy === "related"
-                      ? "active bg-[#ee4d2d] text-white shadow-sm font-black"
+                      ? "active bg-[#FF7A1A] text-white shadow-sm font-black"
                       : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
                   }`}
                   onClick={() => setSortBy("related")}
@@ -289,7 +289,7 @@ function SearchResults() {
                 <button
                   className={`shopee-sort-btn px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border-0 ${
                     sortBy === "latest"
-                      ? "active bg-[#ee4d2d] text-white shadow-sm font-black"
+                      ? "active bg-[#FF7A1A] text-white shadow-sm font-black"
                       : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
                   }`}
                   onClick={() => setSortBy("latest")}
@@ -299,7 +299,7 @@ function SearchResults() {
                 <button
                   className={`shopee-sort-btn px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border-0 ${
                     sortBy === "top_sales"
-                      ? "active bg-[#ee4d2d] text-white shadow-sm font-black"
+                      ? "active bg-[#FF7A1A] text-white shadow-sm font-black"
                       : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
                   }`}
                   onClick={() => setSortBy("top_sales")}
@@ -307,7 +307,7 @@ function SearchResults() {
                   ขายดี
                 </button>
                 <select
-                  className="shopee-sort-select bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs font-bold cursor-pointer focus:outline-none focus:border-[#ee4d2d]"
+                  className="shopee-sort-select bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs font-bold cursor-pointer focus:outline-none focus:border-[#FF7A1A]"
                   value={
                     sortBy.startsWith("price") ? sortBy : "price_default"
                   }
@@ -379,7 +379,7 @@ function SearchResults() {
 
                   <div className="mt-4">
                     <button
-                      className="shopee-clear-filter-btn px-5 py-2.5 bg-[#ee4d2d] hover:bg-[#d73211] text-white font-black text-xs rounded-full shadow-md shadow-orange-500/20 transition-all cursor-pointer border-0"
+                      className="shopee-clear-filter-btn px-5 py-2.5 bg-[#FF7A1A] hover:bg-[#E6680D] text-white font-black text-xs rounded-full shadow-md shadow-orange-500/20 transition-all cursor-pointer border-0"
                       onClick={() => {
                         handleResetFilters();
                         navigate("/search?keyword=ทั้งหมด");

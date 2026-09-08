@@ -41,7 +41,7 @@ export default function SellerAssistantModal({ isOpen, onClose, userName = "ผ�
     <div className="seller-assistant-backdrop fixed inset-0 z-[99999] bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-end sm:p-6 transition-all" onClick={onClose}>
       <div className="seller-assistant-card w-full sm:w-[420px] max-h-[90vh] sm:h-[640px] bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden transition-all font-sans" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="seller-assistant-header bg-gradient-to-r from-[#ee4d2d] to-[#ff7337] text-white p-4 flex items-center justify-between shadow-sm">
+        <div className="seller-assistant-header bg-gradient-to-r from-[#FF7A1A] to-[#FF7A1A] text-white p-4 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-2">
             <span className="seller-assistant-title font-bold text-base flex items-center gap-2">
               <i className="bi bi-robot text-lg" />
@@ -72,7 +72,7 @@ export default function SellerAssistantModal({ isOpen, onClose, userName = "ผ�
           {/* Greeting */}
           <div className="seller-greeting-box bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-2xl border border-slate-200/60 dark:border-slate-700/60">
             <h5 className="seller-greeting-title text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">
-              สวัสดีค่ะคุณผู้ขาย 😊 <span className="text-[#ee4d2d] font-black">{userName}</span>
+              สวัสดีค่ะคุณผู้ขาย 😊 <span className="text-[#FF7A1A] font-black">{userName}</span>
             </h5>
             <p className="seller-greeting-sub text-xs text-slate-500 dark:text-slate-400 mb-0">คุณสามารถเลือกหัวข้อที่ต้องการสอบถามจากรายการด้านล่างนี้ได้เลยค่ะ</p>
           </div>
@@ -80,19 +80,19 @@ export default function SellerAssistantModal({ isOpen, onClose, userName = "ผ�
           {/* Navigation Tabs */}
           <div className="seller-tabs flex items-center gap-1.5 border-b border-slate-200 dark:border-slate-800 pb-2 overflow-x-auto">
             <button
-              className={`seller-tab-btn px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap border-0 ${activeTab === "recommended" ? "active bg-[#ee4d2d] text-white shadow-sm" : "bg-transparent text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"}`}
+              className={`seller-tab-btn px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap border-0 ${activeTab === "recommended" ? "active bg-[#FF7A1A] text-white shadow-sm" : "bg-transparent text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"}`}
               onClick={() => setActiveTab("recommended")}
             >
               Recommended
             </button>
             <button
-              className={`seller-tab-btn px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap border-0 ${activeTab === "promo" ? "active bg-[#ee4d2d] text-white shadow-sm" : "bg-transparent text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"}`}
+              className={`seller-tab-btn px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap border-0 ${activeTab === "promo" ? "active bg-[#FF7A1A] text-white shadow-sm" : "bg-transparent text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"}`}
               onClick={() => setActiveTab("promo")}
             >
               เครื่องมือส่งเสริมการขาย
             </button>
             <button
-              className={`seller-tab-btn px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap border-0 ${activeTab === "refund" ? "active bg-[#ee4d2d] text-white shadow-sm" : "bg-transparent text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"}`}
+              className={`seller-tab-btn px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap border-0 ${activeTab === "refund" ? "active bg-[#FF7A1A] text-white shadow-sm" : "bg-transparent text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"}`}
               onClick={() => setActiveTab("refund")}
             >
               การคืน / ยกเลิก
@@ -136,10 +136,10 @@ export default function SellerAssistantModal({ isOpen, onClose, userName = "ผ�
 
           {/* Quick Pill Action Badges */}
           <div className="seller-pill-row flex items-center gap-2 flex-wrap pt-1">
-            <button className="seller-pill-btn text-xs px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-[#ee4d2d]/10 hover:text-[#ee4d2d] border border-slate-200 dark:border-slate-700 font-medium transition-all cursor-pointer text-slate-700 dark:text-slate-300" onClick={() => handleQuickQuestion("ยืนยันตัวตนสำหรับผู้ขาย")}>
+            <button className="seller-pill-btn text-xs px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-[#FF7A1A]/10 hover:text-[#FF7A1A] border border-slate-200 dark:border-slate-700 font-medium transition-all cursor-pointer text-slate-700 dark:text-slate-300" onClick={() => handleQuickQuestion("ยืนยันตัวตนสำหรับผู้ขาย")}>
               ยืนยันตัวตนสำหรับผู้ขาย
             </button>
-            <button className="seller-pill-btn text-xs px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-[#ee4d2d]/10 hover:text-[#ee4d2d] border border-slate-200 dark:border-slate-700 font-medium transition-all cursor-pointer text-slate-700 dark:text-slate-300" onClick={() => handleQuickQuestion("ตั้งค่าช่องทางการชำระเงิน")}>
+            <button className="seller-pill-btn text-xs px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-[#FF7A1A]/10 hover:text-[#FF7A1A] border border-slate-200 dark:border-slate-700 font-medium transition-all cursor-pointer text-slate-700 dark:text-slate-300" onClick={() => handleQuickQuestion("ตั้งค่าช่องทางการชำระเงิน")}>
               ตั้งค่าช่องทางการชำระเงิน
             </button>
           </div>
@@ -152,7 +152,7 @@ export default function SellerAssistantModal({ isOpen, onClose, userName = "ผ�
                   key={index}
                   className={`seller-chat-bubble text-xs p-3 max-w-[85%] leading-relaxed ${
                     log.sender === "user"
-                      ? "seller-chat-user bg-[#ee4d2d] text-white ml-auto rounded-2xl rounded-br-none"
+                      ? "seller-chat-user bg-[#FF7A1A] text-white ml-auto rounded-2xl rounded-br-none"
                       : "seller-chat-bot bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 mr-auto rounded-2xl rounded-bl-none border border-slate-200 dark:border-slate-700"
                   }`}
                 >
@@ -166,7 +166,7 @@ export default function SellerAssistantModal({ isOpen, onClose, userName = "ผ�
         {/* Input Chat Footer */}
         <div className="seller-assistant-footer p-3 bg-slate-50 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800">
           <form onSubmit={handleSendMsg} className="seller-chat-form mb-2">
-            <div className="seller-input-wrapper flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-full px-3 py-1.5 shadow-sm focus-within:border-[#ee4d2d]">
+            <div className="seller-input-wrapper flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-full px-3 py-1.5 shadow-sm focus-within:border-[#FF7A1A]">
               <input
                 type="text"
                 className="seller-chat-input flex-1 bg-transparent border-0 text-xs text-slate-900 dark:text-white focus:outline-none"
@@ -174,7 +174,7 @@ export default function SellerAssistantModal({ isOpen, onClose, userName = "ผ�
                 value={inputMsg}
                 onChange={(e) => setInputMsg(e.target.value)}
               />
-              <button type="submit" className="seller-send-btn bg-[#ee4d2d] text-white w-7 h-7 min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-xs shadow-sm hover:opacity-90 transition-all cursor-pointer border-0" title="ส่งข้อความ" aria-label="ส่งข้อความ">
+              <button type="submit" className="seller-send-btn bg-[#FF7A1A] text-white w-7 h-7 min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-xs shadow-sm hover:opacity-90 transition-all cursor-pointer border-0" title="ส่งข้อความ" aria-label="ส่งข้อความ">
                 <i className="bi bi-send-fill" />
               </button>
             </div>
@@ -182,14 +182,14 @@ export default function SellerAssistantModal({ isOpen, onClose, userName = "ผ�
 
           <div className="seller-footer-quick-actions flex items-center gap-2 mb-1">
             <button
-              className="seller-quick-tag text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:text-[#ee4d2d] flex items-center gap-1 bg-transparent border-0 cursor-pointer"
+              className="seller-quick-tag text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:text-[#FF7A1A] flex items-center gap-1 bg-transparent border-0 cursor-pointer"
               onClick={() => handleQuickQuestion("เช็คคำสั่งซื้อทั้งหมด")}
             >
               <i className="bi bi-card-checklist" /> คำสั่งซื้อ
             </button>
             <span className="text-slate-300 dark:text-slate-700">•</span>
             <button
-              className="seller-quick-tag text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:text-[#ee4d2d] flex items-center gap-1 bg-transparent border-0 cursor-pointer"
+              className="seller-quick-tag text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:text-[#FF7A1A] flex items-center gap-1 bg-transparent border-0 cursor-pointer"
               onClick={() => handleQuickQuestion("เปิดเครื่องมือการตลาด AI")}
             >
               <i className="bi bi-grid" /> เครื่องมือ

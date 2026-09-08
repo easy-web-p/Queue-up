@@ -538,7 +538,7 @@ export default function Queueup() {
           <div className="col-lg-8">
             <div className="qup-score-bar-item">
               <div className="qup-score-bar-label"><span>🎨 UX/UI Design & Responsiveness</span><span>{showScore(scores.ux)} / 10</span></div>
-              <div className="qup-score-progress-track"><div className="qup-score-progress-fill bg-[#ee4d2d]" style={{ width: scoreWidth(scores.ux) }} /></div>
+              <div className="qup-score-progress-track"><div className="qup-score-progress-fill bg-[#FF7A1A]" style={{ width: scoreWidth(scores.ux) }} /></div>
             </div>
 
             <div className="qup-score-bar-item">
@@ -659,7 +659,7 @@ export default function Queueup() {
       {/* ==================== 8.5. HIGH-CONVERTING SALES & SOLUTION PACKAGES ==================== */}
       <section id="solution" className="qup-section-container">
         <div className="qup-section-header">
-          <span className="qup-section-sub text-[#ee4d2d]">QUEUEUP SOLUTION & PACKAGES — โซลูชันยกระดับโรงอาหาร</span>
+          <span className="qup-section-sub text-[#FF7A1A]">QUEUEUP SOLUTION & PACKAGES — โซลูชันยกระดับโรงอาหาร</span>
           <h2 className="qup-section-title">เปลี่ยนโรงอาหารแบบเดิม สู่ Smart Canteen 4.0</h2>
           <p className="qup-section-desc">
             โซลูชันครบวงจรที่ตอบโจทย์ทั้งนักเรียน ครู ผู้ปกครอง ร้านค้า และฝ่ายบริหารสถานศึกษา เพื่อเพิ่มประสิทธิภาพการบริการและสร้างความประทับใจสูงสุด
@@ -762,7 +762,7 @@ export default function Queueup() {
               role: "UX/UI Lead & Super Admin",
               desc: "ออกแบบประสบการณ์ผู้ใช้ สถาปัตยกรรมหน้าจอ Responsive และระบบจัดการสิทธิ์สูงสุด",
               icon: "bi-palette-fill",
-              color: "#ee4d2d",
+              color: "#FF7A1A",
               bg: "rgba(238, 77, 45, 0.15)",
             },
             {
@@ -852,7 +852,7 @@ export default function Queueup() {
           <div className="row g-5 align-items-center">
             {/* Left Info Column */}
             <div className="col-lg-5">
-              <span className="qup-section-sub text-[#ee4d2d]">CONTACT & INQUIRIES — ติดต่อเรา</span>
+              <span className="qup-section-sub text-[#FF7A1A]">CONTACT & INQUIRIES — ติดต่อเรา</span>
               <h2 className="qup-section-title text-4xl">
                 พร้อมยกระดับโรงอาหารของคุณหรือยัง?
               </h2>
@@ -1078,7 +1078,7 @@ export default function Queueup() {
       {isEvalModalOpen && (
         <div className="modal fade show d-block bg-slate-900/80 backdrop-blur-md z-[10000]" tabIndex="-1">
           <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content text-white bg-gradient-to-br from-slate-800 to-slate-900 border border-[#ee4d2d]/40 rounded-[20px] shadow-2xl">
+            <div className="modal-content text-white bg-gradient-to-br from-slate-800 to-slate-900 border border-[#FF7A1A]/40 rounded-[20px] shadow-2xl">
               <div className="modal-header border-bottom border-secondary">
                 <h5 className="modal-title fw-bold">
                   <i className="bi bi-star-fill text-warning me-2" />
@@ -1213,7 +1213,7 @@ export default function Queueup() {
       {isCookieModalOpen && (
         <div className="modal fade show d-block bg-slate-900/80 backdrop-blur-md z-[10001]" tabIndex="-1">
           <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content text-white bg-gradient-to-br from-slate-800 to-slate-900 border border-[#ee4d2d]/40 rounded-[20px]">
+            <div className="modal-content text-white bg-gradient-to-br from-slate-800 to-slate-900 border border-[#FF7A1A]/40 rounded-[20px]">
               <div className="modal-header border-bottom border-secondary">
                 <h5 className="modal-title fw-bold">
                   <i className="bi bi-gear-fill text-warning me-2" />

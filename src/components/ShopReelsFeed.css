@@ -1,8 +1,8 @@
 .reels-feed-wrapper {
-  background: #ffffff;
+  background: var(--qu-surface);
   border-radius: 16px;
   padding: 24px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--qu-border);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
   margin-bottom: 24px;
 }
@@ -10,7 +10,7 @@
 .reels-feed-header {
   margin-bottom: 20px;
   padding-bottom: 16px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--qu-border);
 }
 
 .reels-icon-box {
@@ -29,13 +29,13 @@
 .reels-title {
   margin: 0;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--qu-text);
 }
 
 .reels-subtitle {
   margin: 0;
   font-size: 0.875rem;
-  color: #64748b;
+  color: var(--qu-text-muted);
 }
 
 .reels-cards-grid {
@@ -45,8 +45,8 @@
 }
 
 .reel-card {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--qu-surface-alt);
+  border: 1px solid var(--qu-border);
   border-radius: 14px;
   overflow: hidden;
   display: flex;
@@ -121,12 +121,12 @@
 .reel-author-name {
   font-size: 0.85rem;
   font-weight: 700;
-  color: #334155;
+  color: var(--qu-text-secondary);
 }
 
 .reel-title-text {
   font-size: 0.88rem;
-  color: #1e293b;
+  color: var(--qu-text);
   margin: 0 0 12px 0;
   line-height: 1.4;
   font-weight: 500;
@@ -143,7 +143,7 @@
   border: none;
   background: transparent;
   font-size: 0.85rem;
-  color: #64748b;
+  color: var(--qu-text-muted);
   cursor: pointer;
   padding: 0;
   display: inline-flex;
@@ -158,12 +158,12 @@
 
 .reel-meta-stat {
   font-size: 0.85rem;
-  color: #64748b;
+  color: var(--qu-text-muted);
 }
 
 .reel-direct-order-box {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--qu-surface);
+  border: 1px solid var(--qu-border);
   border-radius: 10px;
   padding: 10px 12px;
   display: flex;
@@ -174,12 +174,12 @@
 .reel-menu-name {
   font-size: 0.82rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--qu-text);
   display: block;
 }
 
 .reel-menu-price {
   font-size: 0.85rem;
   font-weight: 700;
-  color: #ff6b35;
+  color: var(--qu-accent);
 }

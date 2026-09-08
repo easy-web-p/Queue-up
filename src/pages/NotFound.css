@@ -4,8 +4,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #f8fafc;
-  color: #0f172a;
+  background-color: var(--qu-surface-alt);
+  color: var(--qu-text);
 }
 
 .queue-notfound-container {
@@ -20,8 +20,8 @@
   max-width: 580px;
   width: 100%;
   text-align: center;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--qu-surface);
+  border: 1px solid var(--qu-border);
   border-radius: 28px;
   padding: 48px 36px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
@@ -31,7 +31,7 @@
   font-size: 6.5rem;
   font-weight: 900;
   line-height: 1;
-  background: linear-gradient(135deg, #ff5a36 0%, #ff8a65 100%);
+  background: linear-gradient(135deg, var(--qu-accent) 0%, #ff8a65 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   margin-bottom: 16px;
@@ -41,13 +41,13 @@
 .queue-notfound-title {
   font-size: 1.75rem;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--qu-text);
   margin-bottom: 12px;
 }
 
 .queue-notfound-desc {
   font-size: 0.95rem;
-  color: #64748b;
+  color: var(--qu-text-muted);
   margin-bottom: 32px;
   line-height: 1.6;
 }
@@ -62,9 +62,9 @@
 }
 
 .queue-btn-back {
-  background: #ffffff;
-  color: #334155;
-  border: 1.5px solid #cbd5e1;
+  background: var(--qu-surface);
+  color: var(--qu-text-secondary);
+  border: 1.5px solid var(--qu-border);
   padding: 12px 24px;
   border-radius: 30px;
   font-size: 14px;
@@ -76,14 +76,14 @@
 }
 
 .queue-btn-back:hover {
-  background: #f1f5f9;
+  background: var(--qu-surface-alt);
   border-color: #94a3b8;
-  color: #0f172a;
+  color: var(--qu-text);
   transform: translateY(-2px);
 }
 
 .queue-btn-home {
-  background: #ff5a36;
+  background: var(--qu-accent);
   color: #ffffff;
   border: none;
   padding: 12px 28px;
@@ -98,14 +98,14 @@
 }
 
 .queue-btn-home:hover {
-  background: #ff704d;
+  background: var(--qu-accent);
   color: #ffffff;
   transform: translateY(-2px);
   box-shadow: 0 6px 18px rgba(255, 90, 54, 0.45);
 }
 
 .queue-notfound-footer {
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--qu-border);
   padding-top: 20px;
 }
 
@@ -121,13 +121,13 @@
 }
 
 .queue-notfound-links a {
-  color: #ff5a36;
+  color: var(--qu-accent);
   text-decoration: none;
   transition: color 0.15s ease;
 }
 
 .queue-notfound-links a:hover {
-  color: #ff704d;
+  color: var(--qu-accent);
   text-decoration: underline;
 }
 

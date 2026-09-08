@@ -38,7 +38,7 @@
   width: 48px;
   height: 48px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #ff6b4a 0%, #ee4d2d 100%);
+  background: linear-gradient(135deg, var(--qu-accent) 0%, var(--qu-accent) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -75,7 +75,7 @@
 }
 
 .qup-btn-cookie-accept {
-  background: linear-gradient(135deg, #ee4d2d 0%, #ff6b4a 100%);
+  background: linear-gradient(135deg, var(--qu-accent) 0%, var(--qu-accent) 100%);
   color: #ffffff;
   border: none;
   padding: 10px 20px;

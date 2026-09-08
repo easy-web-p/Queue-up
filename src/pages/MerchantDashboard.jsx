@@ -1046,7 +1046,7 @@ function MerchantDashboard() {
 
       {/* Seller Assistant Floating Widget Trigger */}
       <button
-        className="btn rounded-full shadow-2xl fixed flex items-center justify-center bottom-[30px] right-[30px] w-[62px] h-[62px] z-[9990] bg-gradient-to-br from-[#ee4d2d] to-[#ff7337] border-0 hover:scale-105 transition-transform"
+        className="btn rounded-full shadow-2xl fixed flex items-center justify-center bottom-[30px] right-[30px] w-[62px] h-[62px] z-[9990] bg-gradient-to-br from-[#FF7A1A] to-[#FF7A1A] border-0 hover:scale-105 transition-transform"
         onClick={() => setIsSellerAssistantOpen(true)}
         title="เปิด Seller Assistant ผู้ช่วยร้านค้า"
       >

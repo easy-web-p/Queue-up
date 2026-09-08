@@ -370,7 +370,7 @@ const CUSTOMER_REVIEWS = [
     id: "r2",
     author: "พรรณวษา (เจ้าหน้าที่คณะพาณิชย์ฯ)",
     avatarLetter: "PW",
-    avatarBg: "#fd5837",
+    avatarBg: "#FF7A1A",
     role: "ผู้สั่งจริงผ่านแอป",
     date: "15 ส.ค. 2026",
     dishInfo: "สั่ง: เกาเหลาน้ำตก + ไข่ต้มยางมะตูม",

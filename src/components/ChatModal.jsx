@@ -281,10 +281,10 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
         <aside className="queueup-chat-sidebar w-72 shrink-0 border-r border-slate-200 dark:border-slate-800 flex flex-col bg-slate-50 dark:bg-slate-900/60">
           <div className="queueup-chat-sidebar-header p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
             <div className="queueup-chat-sidebar-title flex items-center gap-2 font-bold text-sm text-slate-800 dark:text-slate-100">
-              <i className="bi bi-chat-dots-fill text-[#ee4d2d]" />
+              <i className="bi bi-chat-dots-fill text-[#FF7A1A]" />
               <span>แชทติดต่อร้านค้า</span>
             </div>
-            <span className="badge bg-danger-subtle text-danger rounded-pill px-2 py-0.5 text-[11px] font-bold bg-orange-100 text-[#ee4d2d] dark:bg-orange-950/50 dark:text-orange-300">
+            <span className="badge bg-danger-subtle text-danger rounded-pill px-2 py-0.5 text-[11px] font-bold bg-orange-100 text-[#FF7A1A] dark:bg-orange-950/50 dark:text-orange-300">
               {conversations.reduce((sum, c) => sum + (c.unread || 0), 0)} ใหม่
             </span>
           </div>
@@ -325,7 +325,7 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
                   <div className="queueup-chat-item-meta text-right shrink-0 flex flex-col items-end gap-1">
                     <span className="queueup-chat-item-time text-[10px] text-slate-400">{chat.lastTime}</span>
                     {chat.unread > 0 && (
-                      <span className="queueup-chat-unread-badge bg-[#ee4d2d] text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center">{chat.unread}</span>
+                      <span className="queueup-chat-unread-badge bg-[#FF7A1A] text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center">{chat.unread}</span>
                     )}
                   </div>
                 </li>
@@ -342,7 +342,7 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
               <h5 className="fw-bold text-dark mb-2 text-slate-800 dark:text-slate-200 font-bold text-base">ยังไม่มีรายการแชทกับร้านค้า</h5>
               <p className="text-muted small mb-0 px-3 max-w-[340px] leading-relaxed text-xs text-slate-400">
                 คุณสามารถเพิ่มแชทและเริ่มการสนทนากับทางร้านได้ โดยกดปุ่ม{" "}
-                <span className="text-danger fw-bold text-[#ee4d2d] font-bold"><i className="bi bi-chat-dots-fill me-1" />แชทเลย</span> ที่รายการคำสั่งซื้อของคุณ
+                <span className="text-danger fw-bold text-[#FF7A1A] font-bold"><i className="bi bi-chat-dots-fill me-1" />แชทเลย</span> ที่รายการคำสั่งซื้อของคุณ
               </p>
               <button aria-label="ปิดหน้าต่างแชท" className="queueup-chat-close-btn position-absolute top-0 end-0 m-3 absolute top-3 right-3 p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer border-0" onClick={onClose}>
                 <i className="bi bi-x-lg text-sm" />
@@ -376,7 +376,7 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
               {activeChat.orderContext && (
                 <div className="queueup-chat-order-banner px-4 py-2 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200/60 dark:border-amber-900/40 flex items-center justify-between text-xs">
                   <div className="queueup-chat-order-info flex items-center gap-2 truncate">
-                    <span className="queueup-chat-order-tag bg-[#ee4d2d] text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
+                    <span className="queueup-chat-order-tag bg-[#FF7A1A] text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
                       {activeChat.orderContext.queueNo || "ออเดอร์จองคิว"}
                     </span>
                     <span className="fw-bold text-dark font-bold text-slate-800 dark:text-slate-200 truncate">
@@ -386,7 +386,7 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
                       (฿{activeChat.orderContext.price?.toFixed(2) || "0.00"})
                     </span>
                   </div>
-                  <span className="small text-danger fw-bold text-[#ee4d2d] font-mono text-[11px] shrink-0">
+                  <span className="small text-danger fw-bold text-[#FF7A1A] font-mono text-[11px] shrink-0">
                     ID: {activeChat.orderContext.orderId}
                   </span>
                 </div>
@@ -401,7 +401,7 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
                   >
                     <div className={`queueup-chat-msg-bubble max-w-[80%] rounded-2xl p-3 text-xs leading-relaxed ${
                       msg.sender === "user"
-                        ? "bg-[#ee4d2d] text-white rounded-tr-xs shadow-xs"
+                        ? "bg-[#FF7A1A] text-white rounded-tr-xs shadow-xs"
                         : "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-tl-xs border border-slate-200 dark:border-slate-700 shadow-xs"
                     }`}>
                       {msg.text}
@@ -435,12 +435,12 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
               >
                 <input
                   type="text"
-                  className="queueup-chat-input-box flex-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#ee4d2d]"
+                  className="queueup-chat-input-box flex-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#FF7A1A]"
                   placeholder="พิมพ์ข้อความตอบกลับร้านค้า..."
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                 />
-                <button type="submit" className="queueup-chat-send-btn p-2 w-9 h-9 min-w-[44px] min-h-[44px] rounded-xl bg-[#ee4d2d] hover:bg-[#d73211] text-white flex items-center justify-center transition-all cursor-pointer border-0 shadow-xs" title="ส่งข้อความ" aria-label="ส่งข้อความ">
+                <button type="submit" className="queueup-chat-send-btn p-2 w-9 h-9 min-w-[44px] min-h-[44px] rounded-xl bg-[#FF7A1A] hover:bg-[#E6680D] text-white flex items-center justify-center transition-all cursor-pointer border-0 shadow-xs" title="ส่งข้อความ" aria-label="ส่งข้อความ">
                   <i className="bi bi-send-fill text-xs" />
                 </button>
               </form>

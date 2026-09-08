@@ -37,7 +37,7 @@ function NotFound() {
               {language === "en" ? "Go Back" : "ย้อนกลับหน้าก่อนหน้า"}
             </button>
 
-            <Link to="/home" className="queue-btn-home inline-flex items-center gap-2 bg-gradient-to-r from-[#ee4d2d] to-[#ff7337] text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-orange-500/30 hover:opacity-95 hover:scale-105 transition-all">
+            <Link to="/home" className="queue-btn-home inline-flex items-center gap-2 bg-gradient-to-r from-[#FF7A1A] to-[#FF7A1A] text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-orange-500/30 hover:opacity-95 hover:scale-105 transition-all">
               <i className="bi bi-house-door-fill" />
               {language === "en" ? "Back to Home" : "กลับสู่หน้าหลัก"}
             </Link>

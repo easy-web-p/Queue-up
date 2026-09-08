@@ -8,7 +8,7 @@
   flex-direction: column;
   justify-content: space-between;
   background-color: #f5f5f5;
-  color: #222222;
+  color: var(--qu-text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   padding-bottom: 0;
   width: 100%;
@@ -34,7 +34,7 @@
 }
 
 .shopee-search-keyword-highlight {
-  color: #ee4d2d;
+  color: var(--qu-accent);
   font-weight: 700;
 }
 
@@ -58,20 +58,20 @@
   align-items: center;
   gap: 8px;
   padding-bottom: 12px;
-  border-bottom: 1px solid #e8e8e8;
+  border-bottom: 1px solid var(--qu-border);
   margin-bottom: 16px;
 }
 
 .shopee-filter-group {
   margin-bottom: 24px;
-  border-bottom: 1px solid #e8e8e8;
+  border-bottom: 1px solid var(--qu-border);
   padding-bottom: 16px;
 }
 
 .shopee-filter-title {
   font-size: 14px;
   font-weight: 700;
-  color: #222222;
+  color: var(--qu-text);
   margin-bottom: 12px;
 }
 
@@ -87,7 +87,7 @@
 }
 
 .shopee-filter-item:hover {
-  color: #ee4d2d;
+  color: var(--qu-accent);
 }
 
 .shopee-price-range-inputs {
@@ -108,13 +108,13 @@
 }
 
 .shopee-price-input:focus {
-  border-color: #ee4d2d;
+  border-color: var(--qu-accent);
 }
 
 .shopee-price-btn {
   width: 100%;
   height: 30px;
-  background-color: #ee4d2d;
+  background-color: var(--qu-accent);
   color: #ffffff;
   border: none;
   border-radius: 2px;
@@ -125,7 +125,7 @@
 }
 
 .shopee-price-btn:hover {
-  background-color: #d73211;
+  background-color: var(--qu-accent-hover);
 }
 
 /* 3. Right Products Area */
@@ -158,35 +158,35 @@
 .shopee-sort-btn {
   height: 34px;
   padding: 0 15px;
-  background-color: #ffffff;
+  background-color: var(--qu-surface);
   border: none;
   border-radius: 2px;
   font-size: 14px;
-  color: #000000;
+  color: var(--qu-text);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .shopee-sort-btn.active {
-  background-color: #ee4d2d;
+  background-color: var(--qu-accent);
   color: #ffffff;
 }
 
 .shopee-sort-select {
   height: 34px;
   padding: 0 10px;
-  background-color: #ffffff;
+  background-color: var(--qu-surface);
   border: none;
   border-radius: 2px;
   font-size: 14px;
-  color: #000000;
+  color: var(--qu-text);
   outline: none;
   cursor: pointer;
 }
 
 /* Empty Search State Card */
 .shopee-empty-search-card {
-  background: #ffffff;
+  background: var(--qu-surface);
   border-radius: 12px;
   padding: 40px 24px;
   text-align: center;
@@ -217,12 +217,12 @@
 
 .shopee-empty-sub {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--qu-text-muted);
   margin-bottom: 16px;
 }
 
 .shopee-clear-filter-btn {
-  background: #ee4d2d;
+  background: var(--qu-accent);
   color: #ffffff;
   border: none;
   padding: 8px 18px;
@@ -234,7 +234,7 @@
 }
 
 .shopee-clear-filter-btn:hover {
-  background: #d73211;
+  background: var(--qu-accent-hover);
 }
 
 .shopee-recommendation-header {
@@ -243,7 +243,7 @@
   justify-content: space-between;
   margin-bottom: 16px;
   padding-bottom: 8px;
-  border-bottom: 2px solid #ee4d2d;
+  border-bottom: 2px solid var(--qu-accent);
 }
 
 .shopee-recommendation-title {
@@ -263,7 +263,7 @@
 }
 
 .shopee-card-item {
-  background-color: #ffffff;
+  background-color: var(--qu-surface);
   border-radius: 2px;
   overflow: hidden;
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
@@ -303,7 +303,7 @@
 .shopee-card-title {
   font-size: 12px;
   line-height: 1.35;
-  color: #222222;
+  color: var(--qu-text);
   margin-bottom: 8px;
   display: -webkit-box;
   -webkit-line-clamp: 2;

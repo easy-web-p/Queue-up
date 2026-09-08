@@ -167,7 +167,7 @@ export default function BookingCalendar({ viewMode = "user", storeId = "", order
               key={d}
               className={`booking-date-chip px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer border ${
                 selectedDate === d
-                  ? "selected bg-[#ee4d2d] text-white border-[#ee4d2d] shadow-sm shadow-orange-500/30"
+                  ? "selected bg-[#FF7A1A] text-white border-[#FF7A1A] shadow-sm shadow-orange-500/30"
                   : "bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-orange-500/50"
               }`}
               onClick={() => setSelectedDate(d)}

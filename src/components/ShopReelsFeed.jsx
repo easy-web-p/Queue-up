@@ -83,7 +83,7 @@ export default function ShopReelsFeed({ onOrderFromReel }) {
                 </div>
                 <div className="reel-author-badge absolute top-3 left-3">
                   {reel.authorType === "MERCHANT" ? (
-                    <span className="badge bg-[#ee4d2d] text-white px-2.5 py-1 rounded-full text-[11px] font-bold shadow-md flex items-center gap-1">
+                    <span className="badge bg-[#FF7A1A] text-white px-2.5 py-1 rounded-full text-[11px] font-bold shadow-md flex items-center gap-1">
                       <i className="bi bi-shop" /> คลิปโปรโมตร้าน
                     </span>
                   ) : (
@@ -119,10 +119,10 @@ export default function ShopReelsFeed({ onOrderFromReel }) {
                 <div className="reel-direct-order-box flex items-center justify-between pt-3 border-t border-slate-200/60 dark:border-slate-700/60 mt-auto">
                   <div>
                     <span className="reel-menu-name text-xs font-bold text-slate-700 dark:text-slate-200 block truncate max-w-[140px]">{reel.menuLinked}</span>
-                    <div className="reel-menu-price text-sm font-black text-[#ee4d2d]">฿{reel.menuPrice}</div>
+                    <div className="reel-menu-price text-sm font-black text-[#FF7A1A]">฿{reel.menuPrice}</div>
                   </div>
                   <button
-                    className="btn btn-sm btn-primary fw-bold rounded-full px-3 py-1 text-xs bg-[#ee4d2d] hover:bg-[#ff7337] border-0 text-white shadow-sm flex items-center gap-1 cursor-pointer"
+                    className="btn btn-sm btn-primary fw-bold rounded-full px-3 py-1 text-xs bg-[#FF7A1A] hover:bg-[#FF7A1A] border-0 text-white shadow-sm flex items-center gap-1 cursor-pointer"
                     onClick={() => onOrderFromReel && onOrderFromReel(reel.productId)}
                   >
                     <i className="bi bi-bag-plus-fill" />

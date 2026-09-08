@@ -20,7 +20,7 @@ export function PageRouteLoaderView({ message = MESSAGES[0], progress = 60, isFa
       <div className="page-loader-card bg-slate-900/90 border border-slate-800 p-8 rounded-3xl shadow-2xl flex flex-col items-center text-center max-w-xs w-full mx-4">
         {/* Pulsing Ring & Bouncing Logo */}
         <div className="page-loader-ring-wrapper relative w-20 h-20 mb-4 flex items-center justify-center">
-          <div className="page-loader-spinner-ring absolute inset-0 rounded-full border-4 border-orange-500/20 border-t-[#ee4d2d] animate-spin" />
+          <div className="page-loader-spinner-ring absolute inset-0 rounded-full border-4 border-orange-500/20 border-t-[#FF7A1A] animate-spin" />
           <div className="page-loader-icon-box w-12 h-12 flex items-center justify-center animate-pulse">
             <img loading="lazy" decoding="async"
               src="/logo.png"
@@ -33,7 +33,7 @@ export function PageRouteLoaderView({ message = MESSAGES[0], progress = 60, isFa
         {/* Brand Title */}
         <div className="page-loader-title text-xl font-black tracking-tight mb-0.5">
           <span className="queue text-white">Queue</span>
-          <span className="up text-[#ee4d2d]">Up</span>
+          <span className="up text-[#FF7A1A]">Up</span>
         </div>
         <div className="page-loader-sub text-[10px] font-bold text-slate-400 tracking-widest mb-3">SCHOOL FOOD CRM</div>
 
@@ -43,7 +43,7 @@ export function PageRouteLoaderView({ message = MESSAGES[0], progress = 60, isFa
         {/* Progress Bar */}
         <div className="page-loader-progress-track w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
           <div
-            className="page-loader-progress-bar h-full bg-gradient-to-r from-[#ee4d2d] to-amber-500 transition-all duration-150"
+            className="page-loader-progress-bar h-full bg-gradient-to-r from-[#FF7A1A] to-amber-500 transition-all duration-150"
             style={{ width: `${progress}%` }}
           />
         </div>
