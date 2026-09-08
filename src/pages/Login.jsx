@@ -356,23 +356,63 @@ function Login() {
       const isMerchant = userRoles.includes("merchant");
       const activeRole = existingData.activeRole || (isAdminAccount ? "admin" : (isMerchant ? "merchant" : "customer"));
 
-      localStorage.setItem("queueup_secure_account_id", accountId);
-      dispatch(setUser({
-        ...existingData,
-        uid: gUser.uid,
-        accountId: accountId,
-        roles: userRoles,
-        activeRole: activeRole,
-        provider: "google.com",
-        isGoogleUser: true,
-        email: defaultEmail,
+      // What the CLIENT is allowed to write, and what it must only ever read.
+      //
+      // This used to write roles, activeRole, isSuperAdmin, isMerchantVerified,
+      // isMerchantRegistered, storeId and email back on every sign-in. The rules
+      // let an owner change safe profile keys and none of those are among
+      // them — deliberately, because they are exactly the fields that decide what
+      // a user can reach.
+      //
+      // Privilege is derived from the ID token's claims and the stored document
+      // (see getEffectiveRoles) and handed to Redux below. It is never written
+      // back from here: a client that cannot write a role cannot forge one.
+      const displayFields = {
         displayName: defaultName,
         fullName: defaultName,
         photo: defaultPhoto,
         photoURL: defaultPhoto,
+        accountId: accountId,
+        lastLoginAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+
+      if (userSnap.exists()) {
+        await setDoc(userDocRef, displayFields, { merge: true });
+      } else {
+        // First sign-in. The rules cap a self-created profile at non-privileged
+        // defaults, so these are written once and never by the client again.
+        await setDoc(userDocRef, {
+          ...displayFields,
+          uid: gUser.uid,
+          roles: ["customer"],
+          activeRole: "customer",
+          provider: "google.com",
+          isGoogleUser: true,
+          email: defaultEmail,
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      localStorage.setItem("queueup_secure_account_id", accountId);
+      dispatch(setUser({
+        uid: gUser.uid,
+        accountId,
+        email: defaultEmail,
+        displayName: defaultName,
+        fullName: defaultName,
+        name: defaultName,
+        photo: defaultPhoto,
+        photoURL: defaultPhoto,
+        provider: "google.com",
+        isGoogleUser: true,
+        // Derived, not written — an admin signing in for the first time still
+        // gets their claims even though the stored document says "customer".
+        roles: userRoles,
+        activeRole,
+        isSuperAdmin: isAdminAccount,
         isMerchantVerified: Boolean(existingData.isMerchantVerified || isAdminAccount),
         isMerchantRegistered: Boolean(existingData.isMerchantRegistered || isAdminAccount),
-        isSuperAdmin: isAdminAccount,
         ...(existingData.storeId ? { storeId: existingData.storeId } : {}),
         lastLoginAt: new Date().toISOString(),
       }));
@@ -382,7 +422,14 @@ function Login() {
     } catch (err) {
       console.error("Firestore sync error on Google Login:", err);
       setLoading(false);
-      toast.error(`เข้าสู่ระบบด้วย Google สำเร็จ แต่ไม่สามารถเชื่อมต่อฐานข้อมูลโปรไฟล์ได้: ${err.message}`);
+      // The sign-in itself succeeded, so the session is valid and stranding the
+      // user on the login screen helps nobody. Warn and carry on; onAuthStateChanged
+      // loads the profile independently.
+      toast.warning(
+        "เข้าสู่ระบบสำเร็จ แต่ยังบันทึกข้อมูลโปรไฟล์ล่าสุดไม่ได้ " +
+        "คุณใช้งานได้ตามปกติ ระบบจะลองใหม่ในการเข้าสู่ระบบครั้งถัดไป"
+      );
+      navigate(fromDestination, { replace: true });
     }
   };
 
@@ -392,6 +439,9 @@ function Login() {
         {/* Left Hero Banner Section */}
         <div className="yeti-hero">
           <img
+            /* The hero is the LCP element: eager and high priority. */
+            fetchPriority="high"
+            decoding="async"
             src={selectedAvatar}
             alt="Yeti Mascot"
             className="yeti-hero-img"
@@ -435,7 +485,7 @@ function Login() {
         {/* Right Auth Form Section */}
         <div className="yeti-form-container">
           <div className="yeti-logo-wrapper text-center">
-            <img src="/logo.png" alt="QueueUp Logo" className="yeti-logo-img" />
+            <img decoding="async" src="/logo.png" alt="QueueUp Logo" className="yeti-logo-img" />
           </div>
 
           <h1 className="yeti-title">
@@ -474,7 +524,7 @@ function Login() {
                       }`}
                       onClick={() => setSelectedAvatar(item.src)}
                     >
-                      <img src={item.src} alt={item.label} />
+                      <img loading="lazy" decoding="async" src={item.src} alt={item.label} />
                       {selectedAvatar === item.src && (
                         <div className="avatar-badge">
                           <i className="bi bi-check" />

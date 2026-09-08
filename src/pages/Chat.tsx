@@ -161,7 +161,7 @@ export const Chat: React.FC<ChatPageProps> = ({
             )}
             <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center overflow-hidden shrink-0">
               {targetShop?.logoUrl ? (
-                <img src={targetShop.logoUrl} alt={targetShop.shopName} className="w-full h-full object-cover" />
+                <img loading="lazy" decoding="async" src={targetShop.logoUrl} alt={targetShop.shopName} className="w-full h-full object-cover" />
               ) : (
                 <Store className="w-6 h-6 text-amber-300" />
               )}

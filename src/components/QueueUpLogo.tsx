@@ -21,18 +21,18 @@ export const QueueUpLogoIcon: React.FC<{ className?: string }> = ({ className = 
     {/* Bowl Foot */}
     <path
       d="M86 162 C86 168, 114 168, 114 162 L110 156 L90 156 Z"
-      fill="#DE2E1B"
+      fill="#E6680D"
     />
     
     {/* Main Bowl Body */}
     <path
       d="M48 100 C48 160, 152 160, 152 100 Z"
-      fill="#F6402E"
+      fill="#FF7A1A"
     />
     {/* Bowl Right Shadow Gradient */}
     <path
       d="M100 100 C100 158, 152 158, 152 100 Z"
-      fill="#D02E1E"
+      fill="#E6680D"
       opacity="0.3"
     />
 
@@ -44,9 +44,9 @@ export const QueueUpLogoIcon: React.FC<{ className?: string }> = ({ className = 
     />
 
     {/* Golden Sesame/Rice Grains */}
-    <ellipse cx="88" cy="100" rx="4" ry="2" fill="#E67E22" transform="rotate(-20 88 100)" />
-    <ellipse cx="100" cy="103" rx="4.5" ry="2.2" fill="#E67E22" transform="rotate(15 100 103)" />
-    <ellipse cx="112" cy="99" rx="4" ry="2" fill="#E67E22" transform="rotate(-25 112 99)" />
+    <ellipse cx="88" cy="100" rx="4" ry="2" fill="#E6680D" transform="rotate(-20 88 100)" />
+    <ellipse cx="100" cy="103" rx="4.5" ry="2.2" fill="#E6680D" transform="rotate(15 100 103)" />
+    <ellipse cx="112" cy="99" rx="4" ry="2" fill="#E6680D" transform="rotate(-25 112 99)" />
 
     {/* Floating Queue Ticket */}
     <g>
@@ -56,7 +56,7 @@ export const QueueUpLogoIcon: React.FC<{ className?: string }> = ({ className = 
       {/* Ticket Body with notches */}
       <path
         d="M74 38 C74 32, 78 28, 84 28 H116 C122 28, 126 32, 126 38 V50 C121 50, 118 53, 118 57 C118 61, 121 64, 126 64 V82 C126 88, 122 92, 116 92 H84 C78 92, 74 88, 74 82 V64 C79 64, 82 61, 82 57 C82 53, 79 50, 74 50 Z"
-        fill="#F6402E"
+        fill="#FF7A1A"
       />
       
       {/* Ticket Top Semi-circle Notch */}
@@ -70,14 +70,14 @@ export const QueueUpLogoIcon: React.FC<{ className?: string }> = ({ className = 
     {/* Upward Curved Arrow */}
     <path
       d="M106 122 C132 118, 162 92, 168 54"
-      stroke="#FF7A00"
+      stroke="#FF7A1A"
       strokeWidth="14"
       strokeLinecap="round"
       fill="none"
     />
     <path
       d="M144 58 L170 50 L176 76"
-      stroke="#FF7A00"
+      stroke="#FF7A1A"
       strokeWidth="14"
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -119,8 +119,8 @@ export const QueueUpLogo: React.FC<QueueUpLogoProps> = ({
       {showText && (
         <div className="flex flex-col justify-center">
           <div className={`font-black tracking-tight leading-none ${textClasses}`}>
-            <span className={lightText ? "text-white drop-shadow-xs" : "text-[#F6402E]"}>Queue</span>
-            <span className="text-[#FF7A00] drop-shadow-xs">Up</span>
+            <span className={lightText ? "text-white drop-shadow-xs" : "text-[#FF7A1A]"}>Queue</span>
+            <span className="text-[#FF7A1A] drop-shadow-xs">Up</span>
           </div>
           <span
             className={`font-extrabold tracking-widest uppercase opacity-95 ${

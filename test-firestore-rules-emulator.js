@@ -15,21 +15,24 @@
 
 import fs from 'node:fs';
 import process from 'node:process';
+import { buildSeedProducts } from './src/lib/seedCatalog.js';
 import {
   initializeTestEnvironment,
   assertFails,
   assertSucceeds,
 } from '@firebase/rules-unit-testing';
 import {
-  doc,
-  setDoc,
-  getDoc,
-  updateDoc,
-  deleteDoc,
+  addDoc,
   collection,
-  query,
-  where,
+  deleteDoc,
+  doc,
+  getDoc,
   getDocs,
+  query,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+  where,
 } from 'firebase/firestore';
 
 let passed = 0;
@@ -445,6 +448,177 @@ await runTest('The guardian, the student and staff can read the link', async () 
 
 await runTest('Staff can list pending requests (the approval panel query)', async () => {
   await assertSucceeds(getDocs(query(collection(asTeacher, 'parent_child_links'))));
+});
+
+// ===========================================================================
+console.log('\n🏫 Pilot programme leads (public form, backend-only storage)');
+// ===========================================================================
+
+await runTest('🚨 An unauthenticated visitor CANNOT write a lead directly', async () => {
+  // The landing page form takes no sign-in, so if the collection were open to the
+  // form it would be open to everyone. It goes through submitPilotLead instead.
+  await assertFails(
+    addDoc(collection(asAnon, 'pilot_leads'), {
+      schoolName: 'โรงเรียนปลอม',
+      contactName: 'x',
+      phone: '0812345678',
+      email: 'x@example.com',
+    })
+  );
+});
+
+await runTest('🚨 Not even a signed-in user can write a lead', async () => {
+  await assertFails(
+    addDoc(collection(asStudent, 'pilot_leads'), { schoolName: 'x', contactName: 'y' })
+  );
+});
+
+await runTest('🚨 A school contact is not readable by the public', async () => {
+  // The form promises PDPA confidentiality over a name, position, phone and email.
+  await assertFails(getDoc(doc(asAnon, 'pilot_leads', 'lead_1')));
+  await assertFails(getDoc(doc(asStudent, 'pilot_leads', 'lead_1')));
+  await assertFails(getDocs(query(collection(asStranger, 'pilot_leads'))));
+});
+
+await runTest('An admin can read the leads the team has to act on', async () => {
+  await assertSucceeds(getDoc(doc(asAdmin, 'pilot_leads', 'lead_1')));
+});
+
+await runTest('🚨 Nobody can edit or delete a stored lead from a client', async () => {
+  await assertFails(updateDoc(doc(asAdmin, 'pilot_leads', 'lead_1'), { status: 'CONVERTED' }));
+  await assertFails(deleteDoc(doc(asAdmin, 'pilot_leads', 'lead_1')));
+});
+
+await runTest('🚨 The rate-limit counter cannot be read or reset from a browser', async () => {
+  // It is the only thing bounding an unauthenticated endpoint. A caller who could
+  // reset their own counter would have no limit at all.
+  await assertFails(getDoc(doc(asAnon, 'pilot_lead_rate_limits', '203_0_113_7')));
+  await assertFails(
+    setDoc(doc(asAnon, 'pilot_lead_rate_limits', '203_0_113_7'), { count: 0, windowStart: 0 })
+  );
+  await assertFails(getDoc(doc(asAdmin, 'pilot_lead_rate_limits', '203_0_113_7')));
+});
+
+// ===========================================================================
+console.log('\n📊 System evaluations (public wall, backend-only writes)');
+// ===========================================================================
+
+await runTest('🚨 Anyone can read the wall without an account', async () => {
+  // The whole point of the wall: a supervisor or reviewer opens /queueup and reads
+  // the scores. Reads were admin-only, so it fell back to hardcoded samples.
+  await assertSucceeds(getDoc(doc(asAnon, 'systemEvaluations', 'eval_1')));
+  await assertSucceeds(getDocs(query(collection(asAnon, 'systemEvaluations'))));
+});
+
+await runTest('🚨 No client can write an evaluation, signed in or not', async () => {
+  // The form takes no sign-in, so a collection open to it is open to everyone.
+  const evaluation = {
+    userName: 'ปลอม',
+    uxScore: 10, accountScore: 10, queueScore: 10, merchantScore: 10, securityScore: 10,
+    comment: 'x',
+  };
+  await assertFails(addDoc(collection(asAnon, 'systemEvaluations'), evaluation));
+  await assertFails(addDoc(collection(asStudent, 'systemEvaluations'), evaluation));
+  await assertFails(setDoc(doc(asStudent, 'systemEvaluations', STUDENT), evaluation));
+});
+
+await runTest('🚨 A stored evaluation cannot be edited or deleted from a client', async () => {
+  await assertFails(updateDoc(doc(asAdmin, 'systemEvaluations', 'eval_1'), { uxScore: 10 }));
+  await assertFails(deleteDoc(doc(asAdmin, 'systemEvaluations', 'eval_1')));
+});
+
+await runTest('🚨 The evaluation rate-limit counter is closed to clients', async () => {
+  await assertFails(getDoc(doc(asAnon, 'evaluation_rate_limits', '203_0_113_7')));
+  await assertFails(
+    setDoc(doc(asAnon, 'evaluation_rate_limits', '203_0_113_7'), { count: 0, windowStart: 0 })
+  );
+});
+
+// ===========================================================================
+console.log('\n🌱 Seeded menu products (the shape the seeder actually writes)');
+// ===========================================================================
+
+// Exactly what StoreAdminPage's seed button hands to Firestore.
+const seeded = buildSeedProducts(
+  [{ id: 'm1', name: 'ชุดไก่บักเก็ตซอสเกาหลี', price: 69, originalPrice: 120, sales: '4.5k ครั้ง', rating: 4.9 }],
+  SHOP
+)[0];
+
+await runTest('🚨 The seeded shape is accepted by the rules, not just by the UI', async () => {
+  // A seeder whose documents the rules refuse would report success for a menu
+  // that never landed. This is the check that the two agree.
+  await assertSucceeds(setDoc(doc(asMerchant, 'products', seeded.id), seeded));
+});
+
+await runTest('An admin can seed a store they do not own', async () => {
+  await assertSucceeds(setDoc(doc(asAdmin, 'products', `${seeded.id}_admin`), seeded));
+});
+
+await runTest('🚨 A student cannot seed products', async () => {
+  await assertFails(setDoc(doc(asStudent, 'products', 'forged_1'), seeded));
+});
+
+await runTest('🚨 A merchant cannot seed products into someone else store', async () => {
+  await assertFails(
+    setDoc(doc(asMerchant, 'products', 'cross_1'), { ...seeded, storeId: 'someone_else_shop' })
+  );
+});
+
+await runTest('🚨 The seeder strips the fabricated sales figures before writing', async () => {
+  for (const field of ['sales', 'salesCount', 'rating', 'originalPrice']) {
+    if (field in seeded) throw new Error(`${field} must not reach the database`);
+  }
+});
+
+await runTest('🚨 A seeded product carries the storeId ordering requires', async () => {
+  if (seeded.storeId !== SHOP) throw new Error('a product with no store cannot be ordered');
+  if (seeded.priceSatang !== 6900) throw new Error('satang must match the baht price');
+});
+
+// ===========================================================================
+console.log('\n🔐 The sign-in profile write (client and rules must agree)');
+// ===========================================================================
+
+const GOOGLE_USER = 'google_returning_user';
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  await setDoc(doc(ctx.firestore(), 'users', GOOGLE_USER), {
+    uid: GOOGLE_USER, email: 'somchai@kkumail.com', roles: ['customer'], activeRole: 'customer',
+  });
+});
+const asGoogleUser = testEnv.authenticatedContext(GOOGLE_USER).firestore();
+
+await runTest('🚨 A returning sign-in can write exactly the fields it writes', async () => {
+  // The regression: the sign-in path wrote roles, activeRole, isSuperAdmin,
+  // isMerchantVerified, isMerchantRegistered, storeId and email back every visit.
+  // None are owner-writable, so every returning Google user saw
+  // "Missing or insufficient permissions" and lastLoginAt never moved.
+  await assertSucceeds(
+    setDoc(doc(asGoogleUser, 'users', GOOGLE_USER), {
+      displayName: 'สมชาย',
+      fullName: 'สมชาย',
+      photo: '/yeti_mascot.jpg',
+      photoURL: '/yeti_mascot.jpg',
+      accountId: 'QUP-20260908-ABC',
+      lastLoginAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }, { merge: true })
+  );
+});
+
+await runTest('🚨 The old payload is still refused, field by field', async () => {
+  for (const forged of [
+    { roles: ['admin'] },
+    { activeRole: 'admin' },
+    { isSuperAdmin: true },
+    { isMerchantVerified: true },
+    { isMerchantRegistered: true },
+    { storeId: 'shop_1' },
+    { email: 'someone-else@example.com' },
+    { role: 'admin' },
+    { admin: true },
+  ]) {
+    await assertFails(setDoc(doc(asGoogleUser, 'users', GOOGLE_USER), forged, { merge: true }));
+  }
 });
 
 await testEnv.cleanup();

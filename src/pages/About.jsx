@@ -17,10 +17,10 @@ export default function About() {
           className="about-brand flex items-center gap-2 font-black text-xl text-white bg-transparent border-0 cursor-pointer"
           onClick={() => navigate("/queueup")}
         >
-          <img src="/logo.png" alt="QueueUp" className="w-8 h-8 object-contain" /> QueueUp
+          <img decoding="async" src="/logo.png" alt="QueueUp" className="w-8 h-8 object-contain" /> QueueUp
         </button>
         <button
-          className="about-back inline-flex items-center gap-2 bg-[#ee4d2d] hover:bg-[#ff7337] text-white px-5 py-2 rounded-full font-bold text-xs shadow-md transition-all cursor-pointer border-0"
+          className="about-back inline-flex items-center gap-2 bg-[#FF7A1A] hover:bg-[#FF7A1A] text-white px-5 py-2 rounded-full font-bold text-xs shadow-md transition-all cursor-pointer border-0"
           onClick={() => navigate("/home")}
         >
           เข้าสู่ระบบ <i className="bi bi-arrow-right" />
@@ -44,19 +44,19 @@ export default function About() {
 
       <section className="about-section space-y-6">
         <div className="about-heading text-center space-y-1">
-          <span className="text-xs font-bold text-[#ee4d2d] uppercase tracking-wider">WHY IT WORKS</span>
+          <span className="text-xs font-bold text-[#FF7A1A] uppercase tracking-wider">WHY IT WORKS</span>
           <h2 className="text-2xl font-black text-white">ออกแบบจากปัญหาจริง และขยายต่อได้</h2>
         </div>
         <div className="strength-grid grid grid-cols-1 md:grid-cols-3 gap-6">
-          <article className="bg-slate-900/80 border border-slate-800 p-6 rounded-3xl space-y-3 relative hover:border-[#ee4d2d]/50 transition-all">
-            <div className="w-10 h-10 rounded-xl bg-orange-500/20 text-[#ee4d2d] flex items-center justify-center text-xl">
+          <article className="bg-slate-900/80 border border-slate-800 p-6 rounded-3xl space-y-3 relative hover:border-[#FF7A1A]/50 transition-all">
+            <div className="w-10 h-10 rounded-xl bg-orange-500/20 text-[#FF7A1A] flex items-center justify-center text-xl">
               <i className="bi bi-person-vcard-fill" />
             </div>
             <h3 className="text-lg font-bold text-white">บัญชีเดียว ทุกบทบาท</h3>
             <p className="text-xs text-slate-400 leading-relaxed">ผู้ใช้เติบโตจาก Customer เป็น Merchant ได้โดยไม่ต้องสมัครหลายบัญชี ลดความซับซ้อน และรองรับบทบาทในอนาคต</p>
             <b className="text-xs text-amber-400 font-bold block pt-2">9.5/10</b>
           </article>
-          <article className="bg-slate-900/80 border border-slate-800 p-6 rounded-3xl space-y-3 relative hover:border-[#ee4d2d]/50 transition-all">
+          <article className="bg-slate-900/80 border border-slate-800 p-6 rounded-3xl space-y-3 relative hover:border-[#FF7A1A]/50 transition-all">
             <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl">
               <i className="bi bi-shield-lock-fill" />
             </div>
@@ -64,7 +64,7 @@ export default function About() {
             <p className="text-xs text-slate-400 leading-relaxed">Firebase Auth, Email Verification, Password Strength, PDPA Consent และแยกข้อมูลการเงินของร้านค้าอย่างเป็นสัดส่วน</p>
             <b className="text-xs text-emerald-400 font-bold block pt-2">9.0/10</b>
           </article>
-          <article className="bg-slate-900/80 border border-slate-800 p-6 rounded-3xl space-y-3 relative hover:border-[#ee4d2d]/50 transition-all">
+          <article className="bg-slate-900/80 border border-slate-800 p-6 rounded-3xl space-y-3 relative hover:border-[#FF7A1A]/50 transition-all">
             <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center text-xl">
               <i className="bi bi-lightning-charge-fill" />
             </div>

@@ -77,13 +77,13 @@ export default function ShopReelsFeed({ onOrderFromReel }) {
           return (
             <div key={reel.id} className="reel-card bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all flex flex-col justify-between">
               <div className="reel-video-container relative aspect-[4/3] w-full overflow-hidden bg-slate-900">
-                <img src={reel.videoPoster} alt={reel.title} className="reel-poster-img w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
+                <img loading="lazy" decoding="async" src={reel.videoPoster} alt={reel.title} className="reel-poster-img w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
                 <div className="reel-overlay-play absolute inset-0 flex items-center justify-center bg-black/25 backdrop-blur-[1px] cursor-pointer">
                   <i className="bi bi-play-circle-fill reel-play-icon text-4xl text-white/90 drop-shadow-md" />
                 </div>
                 <div className="reel-author-badge absolute top-3 left-3">
                   {reel.authorType === "MERCHANT" ? (
-                    <span className="badge bg-[#ee4d2d] text-white px-2.5 py-1 rounded-full text-[11px] font-bold shadow-md flex items-center gap-1">
+                    <span className="badge bg-[#FF7A1A] text-white px-2.5 py-1 rounded-full text-[11px] font-bold shadow-md flex items-center gap-1">
                       <i className="bi bi-shop" /> คลิปโปรโมตร้าน
                     </span>
                   ) : (
@@ -96,7 +96,7 @@ export default function ShopReelsFeed({ onOrderFromReel }) {
 
               <div className="reel-card-content p-4 flex flex-col justify-between flex-1">
                 <div className="reel-author-row flex items-center gap-2 mb-2">
-                  <img src={reel.shopAvatar} alt="" className="reel-avatar w-7 h-7 rounded-full object-cover border border-slate-200 dark:border-slate-700" />
+                  <img loading="lazy" decoding="async" src={reel.shopAvatar} alt="" className="reel-avatar w-7 h-7 rounded-full object-cover border border-slate-200 dark:border-slate-700" />
                   <span className="reel-author-name text-xs font-semibold text-slate-600 dark:text-slate-300">{reel.shopName}</span>
                 </div>
 
@@ -119,10 +119,10 @@ export default function ShopReelsFeed({ onOrderFromReel }) {
                 <div className="reel-direct-order-box flex items-center justify-between pt-3 border-t border-slate-200/60 dark:border-slate-700/60 mt-auto">
                   <div>
                     <span className="reel-menu-name text-xs font-bold text-slate-700 dark:text-slate-200 block truncate max-w-[140px]">{reel.menuLinked}</span>
-                    <div className="reel-menu-price text-sm font-black text-[#ee4d2d]">฿{reel.menuPrice}</div>
+                    <div className="reel-menu-price text-sm font-black text-[#FF7A1A]">฿{reel.menuPrice}</div>
                   </div>
                   <button
-                    className="btn btn-sm btn-primary fw-bold rounded-full px-3 py-1 text-xs bg-[#ee4d2d] hover:bg-[#ff7337] border-0 text-white shadow-sm flex items-center gap-1 cursor-pointer"
+                    className="btn btn-sm btn-primary fw-bold rounded-full px-3 py-1 text-xs bg-[#FF7A1A] hover:bg-[#FF7A1A] border-0 text-white shadow-sm flex items-center gap-1 cursor-pointer"
                     onClick={() => onOrderFromReel && onOrderFromReel(reel.productId)}
                   >
                     <i className="bi bi-bag-plus-fill" />

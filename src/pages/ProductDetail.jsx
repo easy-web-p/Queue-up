@@ -371,7 +371,7 @@ const CUSTOMER_REVIEWS = [
     id: "r2",
     author: "พรรณวษา (เจ้าหน้าที่คณะพาณิชย์ฯ)",
     avatarLetter: "PW",
-    avatarBg: "#fd5837",
+    avatarBg: "#FF7A1A",
     role: "ผู้สั่งจริงผ่านแอป",
     date: "15 ส.ค. 2026",
     dishInfo: "สั่ง: เกาเหลาน้ำตก + ไข่ต้มยางมะตูม",
@@ -437,6 +437,9 @@ function resolveStoreByStoreId(storeId) {
 
 function ProductDetail() {
   const toast = useToast();
+  // Ids of required option groups the customer has not answered, so the fields
+  // themselves can show it rather than only a toast in the corner.
+  const [missingModifierIds, setMissingModifierIds] = useState([]);
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -668,6 +671,10 @@ function ProductDetail() {
   };
 
   // Helper to get selected value for a group with default fallback
+  /** Answering a group clears its marker straight away. */
+  const clearMissingFlag = (groupId) =>
+    setMissingModifierIds((prev) => prev.filter((id) => id !== groupId));
+
   const getValForGroup = (grp) => {
     if (selectedModifiersMap[grp.id] !== undefined) {
       return selectedModifiersMap[grp.id];
@@ -749,17 +756,38 @@ function ProductDetail() {
   };
 
   // Helper to validate required modifiers dynamically
-  const validateRequiredModifiers = () => {
+  /**
+   * The required option groups the customer has not answered yet.
+   *
+   * Returns ids as well as titles: naming them in a corner toast, while the
+   * groups themselves sit at the top of a long form, tells someone what is wrong
+   * without telling them where. The ids let the page mark the actual fields.
+   */
+  const findMissingRequiredModifiers = () => {
     const missing = [];
     activeModifierGroups.forEach((grp) => {
       if (grp.required) {
         const val = getValForGroup(grp);
         if (!val || (Array.isArray(val) && val.length === 0)) {
-          missing.push(grp.title);
+          missing.push({ id: grp.id, title: grp.title });
         }
       }
     });
     return missing;
+  };
+
+  /**
+   * Marks the unanswered groups and scrolls to the first one, so the message and
+   * the thing it is about are in the same place.
+   */
+  const flagMissingRequiredModifiers = (missing) => {
+    setMissingModifierIds(missing.map((g) => g.id));
+    const first = missing[0];
+    if (!first) return;
+    const el = document.getElementById(`mod-group-${first.id}`);
+    if (el && typeof el.scrollIntoView === "function") {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
   };
 
   const createCurrentCartItem = () => {
@@ -823,11 +851,13 @@ function ProductDetail() {
   };
 
   const handleAddToCart = async () => {
-    const missing = validateRequiredModifiers();
+    const missing = findMissingRequiredModifiers();
     if (missing.length > 0) {
-      toast.warning(`กรุณาเลือกรายละเอียดอาหารให้ครบถ้วนก่อนใส่ตะกร้า:\n• ${missing.join("\n• ")}`);
+      flagMissingRequiredModifiers(missing);
+      toast.warning(`กรุณาเลือกรายละเอียดอาหารให้ครบถ้วนก่อนใส่ตะกร้า:\n• ${missing.map((g) => g.title).join("\n• ")}`);
       return;
     }
+    setMissingModifierIds([]);
 
     // 🚨 Allergen Safety Confirmation Guard
     if (allergenResult.hasAllergens) {
@@ -869,11 +899,13 @@ function ProductDetail() {
     }
 
     // 4. Required Modifier Validation
-    const missingMods = validateRequiredModifiers();
+    const missingMods = findMissingRequiredModifiers();
     if (missingMods.length > 0) {
-      toast.warning(`กรุณาเลือกรายละเอียดอาหารให้ครบถ้วน:\n• ${missingMods.join("\n• ")}`);
+      flagMissingRequiredModifiers(missingMods);
+      toast.warning(`กรุณาเลือกรายละเอียดอาหารให้ครบถ้วน:\n• ${missingMods.map((g) => g.title).join("\n• ")}`);
       return;
     }
+    setMissingModifierIds([]);
 
     // 5. Profile Completeness Check
     const { isComplete, missing } = await checkProfileCompleteness();
@@ -903,12 +935,18 @@ function ProductDetail() {
       return;
     }
 
-    const cartItem = createCurrentCartItem();
+    // This button says "ไปที่ตะกร้า", so it has to put the item IN the cart.
+    //
+    // It used to hand the item to the booking page through router state instead,
+    // and the booking page preferred that state over the real cart — so anything
+    // already added with "เพิ่มลงตะกร้า" simply did not appear, and the order that
+    // followed cleared those items from the cart without ever having ordered them.
+    // One source of truth: the cart.
+    dispatch(addItem(createCurrentCartItem()));
 
     // 6. Seamless Navigation to Authoritative Booking Flow (Strict ISO date format YYYY-MM-DD)
     navigate("/booking", {
       state: {
-        cartItems: [cartItem],
         pickupTime: selectedTimeSlot?.time || "12:00",
         bookingDate: selectedDay.isoDateStr,
         bookingDateLabel: selectedDay.fullDateStr,
@@ -945,7 +983,7 @@ function ProductDetail() {
           {/* LEFT COLUMN: Gallery & Terms */}
           <div className="queue-pd-left-col">
             <div className="queue-pd-main-img-box">
-              <img
+              <img loading="lazy" decoding="async"
                 src={selectedImg}
                 alt={product.name}
                 className="queue-pd-main-img"
@@ -976,7 +1014,7 @@ function ProductDetail() {
                   className={`queue-pd-thumb-box ${selectedImg === img ? "active" : ""}`}
                   onClick={() => setSelectedImg(img)}
                 >
-                  <img
+                  <img loading="lazy" decoding="async"
                     src={img}
                     alt={`Thumbnail ${idx}`}
                     className="queue-pd-thumb-img"
@@ -1012,7 +1050,7 @@ function ProductDetail() {
           <div className="queue-pd-right-card">
             {/* Store Banner & Mini Header */}
             <div className="queue-pd-shop-banner-box">
-              <img
+              <img loading="lazy" decoding="async"
                 src={product.shopBanner || store.banner}
                 alt={store.name || product.shopName}
                 className="queue-pd-shop-banner-img"
@@ -1104,8 +1142,14 @@ function ProductDetail() {
                 const isSingle = grp.selectionType === "single";
                 const currentVal = getValForGroup(grp);
 
+                const isMissing = missingModifierIds.includes(grp.id);
+
                 return (
-                  <div key={grp.id} className="queue-pd-mod-group">
+                  <div
+                    key={grp.id}
+                    id={`mod-group-${grp.id}`}
+                    className={`queue-pd-mod-group${isMissing ? " queue-pd-mod-group-missing" : ""}`}
+                  >
                     <div className="queue-pd-mod-title">
                       <span>
                         {grp.icon && <i className={`bi ${grp.icon} me-1`} />}
@@ -1113,6 +1157,12 @@ function ProductDetail() {
                       </span>
                       {grp.subtitle && <span className="queue-pd-mod-subtitle">{grp.subtitle}</span>}
                     </div>
+
+                    {isMissing && (
+                      <p role="alert" className="queue-pd-mod-required-msg">
+                        กรุณาเลือก{grp.title}
+                      </p>
+                    )}
 
                     <div className={`queue-pd-options-grid cols-${Math.min(grp.options.length, 5)}`}>
                       {grp.options.map((opt) => {
@@ -1135,6 +1185,7 @@ function ProductDetail() {
                                     ...prev,
                                     [grp.id]: opt.id,
                                   }));
+                                  clearMissingFlag(grp.id);
                                 }}
                               />
                             </label>
@@ -1160,6 +1211,7 @@ function ProductDetail() {
                                         : existingArr.filter((id) => id !== opt.id);
                                       return { ...prev, [grp.id]: nextArr };
                                     });
+                                    if (nextChecked) clearMissingFlag(grp.id);
                                   }}
                                 />
                                 <span>{opt.name}</span>
@@ -1433,7 +1485,7 @@ function ProductDetail() {
                   className="queue-pd-video-card"
                   onClick={() => setActiveVideo(vid)}
                 >
-                  <img src={vid.thumbnail} alt={vid.title} className="queue-pd-video-thumb" />
+                  <img loading="lazy" decoding="async" src={vid.thumbnail} alt={vid.title} className="queue-pd-video-thumb" />
                   <div className="queue-pd-video-overlay" />
                   <div className="queue-pd-video-top">
                     <span className="badge bg-dark bg-opacity-75 text-white">
@@ -1606,7 +1658,7 @@ function ProductDetail() {
                     }}
                   >
                     <div className="queue-pd-rec-img-box">
-                      <img
+                      <img loading="lazy" decoding="async"
                         src={rec.image || rec.mainImg}
                         alt={rec.name}
                         className="queue-pd-rec-img"
@@ -1623,7 +1675,7 @@ function ProductDetail() {
                         <button
                           type="button"
                           aria-label={`ดูเมนู ${rec.name}`}
-                          className="btn btn-sm btn-primary rounded-circle d-flex align-items-center justify-content-center w-7 h-7"
+                          className="btn btn-sm btn-primary rounded-circle d-flex align-items-center justify-content-center w-7 h-7 min-w-[44px] min-h-[44px]"
                         >
                           <i className="bi bi-plus" />
                         </button>
@@ -1922,7 +1974,7 @@ function ProductDetail() {
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content rounded-4 border-0 shadow-lg p-0 overflow-hidden bg-dark text-white">
               <div className="position-relative h-[360px]">
-                <img
+                <img loading="lazy" decoding="async"
                   src={activeVideo.thumbnail}
                   alt={activeVideo.title}
                   className="w-100 h-100 object-fit-cover opacity-75"

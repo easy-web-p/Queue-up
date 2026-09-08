@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectCartItems, clearCart } from '../store/cartSlice';
+import { calculateCartItemUnitPrice } from '../store/cartPricing.js';
 import { Utensils, ArrowLeft, Sparkles, AlertCircle, Clock, CheckCircle2, ShoppingBag, Store, MapPin, Calendar, Compass, Wallet, CreditCard, Phone, Tag, Ticket, Percent, X } from 'lucide-react';
 import { CartItem, Order, CustomerProfile, SelectedModifierOption } from '../types';
 import {
@@ -14,7 +15,6 @@ import { soundManager } from '../utils/audioNotification.js';
 import { ClientQueueTicket } from '../components/ClientQueueTicket.jsx';
 
 interface FoodBookingPageProps {
-  cartItems?: CartItem[];
   currentUser?: CustomerProfile | null;
   onBookingSuccess?: (createdOrder: Order) => void;
   onBack?: () => void;
@@ -41,7 +41,6 @@ const formatThaiDate = (ymdStr?: string) => {
 };
 
 export const FoodBooking: React.FC<FoodBookingPageProps> = ({
-  cartItems: propCartItems = [],
   currentUser: propCurrentUser,
   onBookingSuccess,
   onBack: propOnBack
@@ -53,8 +52,12 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
   const reduxCartItems = useSelector(selectCartItems);
 
   // Fallback to router state or local storage if props are not provided
+  // Router state carries the pickup context chosen on the product page. It no
+  // longer carries the items: it used to, and it took priority over the real cart,
+  // so a customer who pressed "เพิ่มลงตะกร้า" and then "ไปที่ตะกร้า" was shown one
+  // item and none of the ones they had added. Worse, a successful order cleared the
+  // whole cart, deleting items that had never been ordered.
   const locationState = location.state as {
-    cartItems?: CartItem[];
     pickupTime?: string;
     bookingDate?: string;
     storeId?: string;
@@ -62,11 +65,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
     storeLocation?: string;
   } | null;
 
-  const cartItems = propCartItems.length > 0 
-    ? propCartItems 
-    : ((locationState?.cartItems && locationState.cartItems.length > 0) 
-        ? locationState.cartItems 
-        : reduxCartItems);
+  const cartItems = reduxCartItems;
   const currentUser = propCurrentUser || reduxUser || null;
 
   const [pickupTime, setPickupTime] = useState<string>(locationState?.pickupTime || '');
@@ -109,17 +108,8 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
     }
   });
 
-  const calculateItemUnitPrice = (item: CartItem) => {
-    const base = item.menuItem?.price || 0;
-    const mods = Array.isArray(item.selectedModifiers) ? (item.selectedModifiers as SelectedModifierOption[]) : [];
-    const modTotal = mods.reduce((sum, m) => {
-      const p = typeof m.priceModifier === 'number'
-        ? m.priceModifier
-        : (m.priceModifierSatang ? m.priceModifierSatang / 100 : 0);
-      return sum + p;
-    }, 0);
-    return base + modTotal;
-  };
+  // Shared with the cart modal so the price cannot change between the two screens.
+  const calculateItemUnitPrice = calculateCartItemUnitPrice;
 
   const calculateTotal = () => {
     return cartItems.reduce((sum, item) => sum + calculateItemUnitPrice(item) * item.quantity, 0);

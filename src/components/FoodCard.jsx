@@ -25,10 +25,10 @@ function FoodCard({
   const foodTitle = name || title || "เมนูอาหารน่าทาน";
 
   return (
-    <div className="shopee-food-card bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-sm hover:shadow-md hover:border-[#ee4d2d]/50 transition-all overflow-hidden flex flex-col cursor-pointer group" onClick={onClick}>
+    <div className="shopee-food-card bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-sm hover:shadow-md hover:border-[#FF7A1A]/50 transition-all overflow-hidden flex flex-col cursor-pointer group" onClick={onClick}>
       {/* 1. Image Wrapper with Badges & Floating Heart Button */}
       <div className="shopee-food-img-wrapper relative aspect-[4/3] w-full overflow-hidden bg-slate-100 dark:bg-slate-900">
-        <img
+        <img loading="lazy" decoding="async"
           src={image}
           alt={foodTitle}
           className="shopee-food-img w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -39,19 +39,20 @@ function FoodCard({
         />
 
         {/* Mall / Recommended Tag (Top-Left) */}
-        <span className="shopee-food-badge-mall absolute top-2 left-2 bg-[#ee4d2d] text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-sm z-10">ร้านเด็ด</span>
+        <span className="shopee-food-badge-mall absolute top-2 left-2 bg-[#FF7A1A] text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-sm z-10">ร้านเด็ด</span>
 
         {/* Canteen Queue Reservation Tag (Bottom-Left Image) */}
         <span className="shopee-food-badge-freeship absolute bottom-2 left-2 bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-sm z-10">จองคิวฟรี*</span>
 
         {/* Floating Heart Favorite Button */}
         <button
-          className="shopee-food-heart-btn absolute top-2 right-2 w-7 h-7 rounded-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm flex items-center justify-center text-xs shadow-sm hover:scale-110 transition-all z-10 border-0 cursor-pointer"
+          className="shopee-food-heart-btn absolute top-2 right-2 w-7 h-7 min-w-[44px] min-h-[44px] rounded-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm flex items-center justify-center text-xs shadow-sm hover:scale-110 transition-all z-10 border-0 cursor-pointer"
           onClick={(e) => {
             e.stopPropagation();
             if (onToggleFavorite) onToggleFavorite(id);
           }}
           title="บันทึกเป็นเมนูโปรด"
+          aria-label="บันทึกเป็นเมนูโปรด"
         >
           <i
             className={`bi ${
@@ -71,13 +72,13 @@ function FoodCard({
         )}
 
         {/* Food Title (Bold & 2-Line Clamp) */}
-        <h4 className="shopee-food-title font-bold text-sm text-slate-900 dark:text-white line-clamp-2 mb-1 group-hover:text-[#ee4d2d] transition-colors" title={foodTitle}>
+        <h4 className="shopee-food-title font-bold text-sm text-slate-900 dark:text-white line-clamp-2 mb-1 group-hover:text-[#FF7A1A] transition-colors" title={foodTitle}>
           {foodTitle}
         </h4>
 
         {/* Small Circular Shop Logo & Shop Name */}
         <div className="shopee-food-shop-row flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 mb-1">
-          <img
+          <img loading="lazy" decoding="async"
             src={shopLogo}
             alt={shopName}
             className="shopee-food-shop-logo w-4 h-4 rounded-full object-cover"
@@ -87,14 +88,14 @@ function FoodCard({
 
         {/* Shop Location / Counter Location */}
         <div className="shopee-food-location-row text-[11px] text-slate-400 flex items-center gap-1 mb-2">
-          <i className="bi bi-geo-alt-fill text-[#ee4d2d]" />
+          <i className="bi bi-geo-alt-fill text-[#FF7A1A]" />
           <span className="truncate">{shopLocation}</span>
         </div>
 
         {/* Promo Badges (ลด %, สั่งล่วงหน้า) */}
         <div className="shopee-food-tags-row flex items-center gap-1 flex-wrap mb-2">
-          {promoTag && <span className="shopee-food-tag-promo text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-950/60 text-[#ee4d2d] dark:text-orange-400 border border-orange-200 dark:border-orange-900/60">{promoTag}</span>}
-          <span className="shopee-food-tag-promo text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-950/60 text-[#ee4d2d] dark:text-orange-400 border border-orange-200 dark:border-orange-900/60">สั่งล่วงหน้า</span>
+          {promoTag && <span className="shopee-food-tag-promo text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-950/60 text-[#FF7A1A] dark:text-orange-400 border border-orange-200 dark:border-orange-900/60">{promoTag}</span>}
+          <span className="shopee-food-tag-promo text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-950/60 text-[#FF7A1A] dark:text-orange-400 border border-orange-200 dark:border-orange-900/60">สั่งล่วงหน้า</span>
         </div>
 
         {/* Rating & Sales Stats */}
@@ -112,7 +113,7 @@ function FoodCard({
             {originalPrice && (
               <span className="shopee-food-price-old text-xs text-slate-400 line-through mr-1">฿{originalPrice}</span>
             )}
-            <span className="shopee-food-price-current text-base font-black text-[#ee4d2d]">฿{price}</span>
+            <span className="shopee-food-price-current text-base font-black text-[#FF7A1A]">฿{price}</span>
           </div>
         </div>
       </div>

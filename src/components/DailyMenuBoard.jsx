@@ -84,12 +84,12 @@ export default function DailyMenuBoard() {
         {MOCK_ANNOUNCEMENTS.map((item) => (
           <div key={item.id} className="announcement-card bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md transition-all">
             <div>
-              <div className="announcement-badge inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-orange-100 dark:bg-orange-950/60 text-[#ee4d2d] dark:text-orange-400 mb-2 w-fit">
+              <div className="announcement-badge inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-orange-100 dark:bg-orange-950/60 text-[#FF7A1A] dark:text-orange-400 mb-2 w-fit">
                 <i className={`bi ${item.icon} me-1`} />
                 {item.tag}
               </div>
               <div className="announcement-shop text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1 flex items-center gap-1">
-                <i className="bi bi-shop me-1 text-[#ee4d2d]" />
+                <i className="bi bi-shop me-1 text-[#FF7A1A]" />
                 {item.shopName}
               </div>
               <p className="announcement-text text-sm font-medium text-slate-800 dark:text-slate-100 leading-snug mb-3">{item.title}</p>
@@ -106,7 +106,7 @@ export default function DailyMenuBoard() {
       <div className="daily-specials-section mt-4">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
           <h6 className="font-bold text-slate-800 dark:text-slate-100 text-sm sm:text-base mb-0 flex items-center gap-2">
-            <i className="bi bi-journal-bookmark-fill text-[#ee4d2d]" />
+            <i className="bi bi-journal-bookmark-fill text-[#FF7A1A]" />
             ตารางเมนูพิเศษประจำวันในสัปดาห์นี้
           </h6>
           <div className="day-picker-chips flex items-center gap-1.5 flex-wrap">
@@ -115,7 +115,7 @@ export default function DailyMenuBoard() {
                 key={d.id}
                 className={`day-chip px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
                   selectedDay === d.id
-                    ? "active bg-[#ee4d2d] text-white shadow-sm"
+                    ? "active bg-[#FF7A1A] text-white shadow-sm"
                     : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
                 }`}
                 onClick={() => setSelectedDay(d.id)}
@@ -128,7 +128,7 @@ export default function DailyMenuBoard() {
 
         <div className="daily-specials-grid grid grid-cols-1 sm:grid-cols-2 gap-3">
           {MOCK_DAILY_SPECIALS[selectedDay]?.map((menu, idx) => (
-            <div key={idx} className="daily-special-card bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-4 shadow-sm hover:border-[#ee4d2d]/40 transition-all">
+            <div key={idx} className="daily-special-card bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-4 shadow-sm hover:border-[#FF7A1A]/40 transition-all">
               <div className="flex justify-between items-start">
                 <div>
                   <span className="daily-shop-tag text-[11px] font-semibold text-slate-500 dark:text-slate-400 block mb-1">
@@ -136,9 +136,9 @@ export default function DailyMenuBoard() {
                     {menu.shop}
                   </span>
                   <h6 className="font-bold mb-1 text-slate-900 dark:text-white text-sm sm:text-base">{menu.name}</h6>
-                  <span className="text-[#ee4d2d] font-black text-lg">฿{menu.price}</span>
+                  <span className="text-[#FF7A1A] font-black text-lg">฿{menu.price}</span>
                 </div>
-                <button className="btn btn-sm btn-primary fw-bold rounded-full px-3 py-1 text-xs bg-[#ee4d2d] hover:bg-[#ff7337] border-0 text-white shadow-sm flex items-center gap-1 cursor-pointer">
+                <button className="btn btn-sm btn-primary fw-bold rounded-full px-3 py-1 text-xs bg-[#FF7A1A] hover:bg-[#FF7A1A] border-0 text-white shadow-sm flex items-center gap-1 cursor-pointer">
                   <i className="bi bi-calendar-plus" />
                   จองล่วงหน้า
                 </button>

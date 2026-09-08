@@ -230,6 +230,11 @@ service cloud.firestore {
         isAdmin() ||
         (
           isOwner(userId) &&
+          // lastLoginAt is written by the sign-in path on every return visit. It is
+          // a timestamp about the user's own session, carries no privilege, and
+          // leaving it out meant every returning Google user's profile write was
+          // refused — they were shown "Missing or insufficient permissions" for
+          // simply logging in again.
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'name', 'displayName', 'fullName', 'lastName', 'gender', 'birthDate', 'phone', 'school', 'photo', 'photoURL', 'avatar', 'accountId', 'updatedAt', 'lastLoginAt', 'pdpaAcceptedAt'
           ])
@@ -335,16 +340,26 @@ service cloud.firestore {
     // 8. SYSTEM EVALUATIONS / SURVEYS (One per User Anti-Spam)
     // ==========================================
     match /systemEvaluations/{evalId} {
-      allow read: if isAdmin();
-      // 🔒 Anti-Spam: One evaluation per user doc ID convention (evalId == request.auth.uid)
-      allow create: if isAuthenticated() && 
-        evalId == request.auth.uid &&
-        request.resource.data.userId == request.auth.uid &&
-        isValidNumber(request.resource.data.rating) && 
-        request.resource.data.rating >= 1 && 
-        request.resource.data.rating <= 5 &&
-        (!('comment' in request.resource.data) || isValidString(request.resource.data.comment, 0, 500));
-      allow update, delete: if false; // Immutable evaluation records
+      // 📖 Public read: the wall exists so the project's supervisor and reviewers
+      // can see the scores without holding an account. Evaluators are told on the
+      // form that their name and comment are shown publicly.
+      allow read: if true;
+
+      // ✍️ Backend-only write. The form takes no sign-in, so a collection open to
+      // it would be open to everyone; submitSystemEvaluation validates the shape,
+      // bounds every field and rate limits the caller.
+      //
+      // The previous rule required a uid-keyed document with a single `rating`
+      // field, while the client wrote five scores under a timestamp id — so every
+      // submission was rejected, the rejection was swallowed into localStorage, and
+      // the page still said thank you. The shape now lives in one tested place
+      // (functions/systemEvaluation.js) rather than in two that disagreed.
+      allow write: if false;
+    }
+
+    match /evaluation_rate_limits/{callerKey} {
+      // 🔒 The only bound on an unauthenticated endpoint.
+      allow read, write: if false;
     }
 
     // ==========================================
@@ -485,6 +500,25 @@ service cloud.firestore {
     // ==========================================
     match /assistant_rate_limits/{uid} {
       // 🔒 A quota the client could read or reset would not be a quota.
+      allow read, write: if false;
+    }
+
+    // ==========================================
+    // 18.2 PILOT PROGRAMME LEADS (Backend-Only Write, Admin Read)
+    // ==========================================
+    match /pilot_leads/{leadId} {
+      // Schools submit a name, position, phone and email through the public
+      // landing page. The page promises to keep that confidential under the PDPA,
+      // which rules out a client-writable collection: what a browser can write it
+      // can be tricked into writing, and what a browser can read is not
+      // confidential. The submitPilotLead Cloud Function is the only writer.
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /pilot_lead_rate_limits/{callerKey} {
+      // 🔒 The only thing standing between an unauthenticated form and a filled
+      // collection. Readable or resettable from a client, it would stop one.
       allow read, write: if false;
     }
 

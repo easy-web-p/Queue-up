@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "../firebase/config.js";
 import { useToast } from "../components/ToastProvider.jsx";
+import { submitPilotLead } from "../services/pilotLeadService.js";
 
 export default function LandingPage() {
   const toast = useToast();
@@ -18,7 +17,8 @@ export default function LandingPage() {
     notes: "",
   });
   const [submitted, setSubmitted] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   // FAQ Accordion State
   const [openFaq, setOpenFaq] = useState<number | null>(null);
@@ -35,31 +35,28 @@ export default function LandingPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSending) return;
+
     if (!form.schoolName.trim() || !form.contactName.trim() || !form.phone.trim()) {
       toast.warning("กรุณากรอกข้อมูลที่จำเป็น (* ) ให้ครบถ้วน");
       return;
     }
 
-    setIsSubmitting(true);
+    setIsSending(true);
+    setSendError(null);
     try {
-      await addDoc(collection(db, "pilot_leads"), {
-        schoolName: form.schoolName.trim(),
-        studentCount: form.studentCount,
-        contactName: form.contactName.trim(),
-        position: form.position.trim(),
-        phone: form.phone.trim(),
-        email: form.email.trim(),
-        notes: form.notes.trim(),
-        status: "PENDING",
-        createdAt: serverTimestamp(),
-      });
+      await submitPilotLead(form);
       setSubmitted(true);
       toast.success("ส่งข้อมูลขอรับข้อเสนอโครงการนำร่องสำเร็จ! ทีมงานจะติดต่อกลับภายใน 24 ชั่วโมง");
-    } catch (err: any) {
-      console.error("Pilot Proposal Lead submission error:", err);
-      toast.error(`เกิดข้อผิดพลาดในการบันทึกข้อมูล: ${err.message || err}`);
+    } catch (err) {
+      const msg =
+        err instanceof Error && err.message
+          ? err.message
+          : "ส่งข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง หรือติดต่อเราทางโทรศัพท์";
+      setSendError(msg);
+      toast.error(`ส่งข้อมูลไม่สำเร็จ: ${msg}`);
     } finally {
-      setIsSubmitting(false);
+      setIsSending(false);
     }
   };
 
@@ -90,7 +87,7 @@ export default function LandingPage() {
       <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           <Link to="/" className="flex items-center gap-2 group">
-            <img src="/logo.png" alt="QueueUp Logo" className="w-8 h-8 rounded-lg object-contain shadow-xs" />
+            <img decoding="async" src="/logo.png" alt="QueueUp Logo" className="w-8 h-8 rounded-lg object-contain shadow-xs" />
             <span className="text-2xl font-black tracking-tight text-slate-900 group-hover:text-emerald-700 transition-colors">
               Queue<span className="text-emerald-600">Up</span>
             </span>
@@ -200,7 +197,7 @@ export default function LandingPage() {
               <div className="bg-[#064e3b] px-6 py-4 text-white flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center">
-                    <img src="/logo.png" alt="QueueUp" className="w-5 h-5 object-contain" />
+                    <img decoding="async" src="/logo.png" alt="QueueUp" className="w-5 h-5 object-contain" />
                   </div>
                   <div>
                     <div className="font-bold text-sm leading-tight">QueueUp Express Ticket</div>
@@ -828,13 +825,26 @@ export default function LandingPage() {
                     />
                   </div>
 
+                  {sendError && (
+                    <div
+                      role="alert"
+                      className="bg-red-50 border border-red-200 text-red-800 rounded-xl px-4 py-3 text-xs leading-relaxed space-y-1"
+                    >
+                      <p className="font-bold">ส่งข้อมูลไม่สำเร็จ</p>
+                      <p>{sendError}</p>
+                      <p className="text-red-700">
+                        หากยังไม่สำเร็จ ติดต่อเราได้ที่ 092-197-5525 หรือ hi00000087@gmail.com
+                      </p>
+                    </div>
+                  )}
+
                   <button
                     type="submit"
-                    disabled={isSubmitting}
-                    className="w-full bg-[#064e3b] hover:bg-[#065f46] disabled:opacity-60 text-white py-3.5 px-6 rounded-xl font-bold text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                    disabled={isSending}
+                    className="w-full bg-[#064e3b] hover:bg-[#065f46] disabled:opacity-60 disabled:cursor-wait text-white py-3.5 px-6 rounded-xl font-bold text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer active:scale-98"
                   >
-                    <span>{isSubmitting ? "กำลังบันทึกข้อมูล..." : "ส่งข้อมูลขอรับข้อเสนอโครงการนำร่อง"}</span>
-                    <span>➜</span>
+                    <span>{isSending ? "กำลังส่งข้อมูล..." : "ส่งข้อมูลขอรับข้อเสนอโครงการนำร่อง"}</span>
+                    <span aria-hidden="true">➜</span>
                   </button>
                 </form>
               )}

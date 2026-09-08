@@ -1,8 +1,8 @@
 .booking-calendar-wrapper {
-  background: #ffffff;
+  background: var(--qu-surface);
   border-radius: 16px;
   padding: 24px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--qu-border);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
   margin-bottom: 24px;
 }
@@ -14,7 +14,7 @@
   flex-wrap: wrap;
   gap: 16px;
   padding-bottom: 16px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--qu-border);
 }
 
 .booking-title-group {
@@ -27,7 +27,7 @@
   width: 48px;
   height: 48px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%);
+  background: linear-gradient(135deg, var(--qu-accent) 0%, var(--qu-accent) 100%);
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -39,18 +39,18 @@
 .booking-title {
   margin: 0;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--qu-text);
 }
 
 .booking-subtitle {
   margin: 0;
   font-size: 0.875rem;
-  color: #64748b;
+  color: var(--qu-text-muted);
 }
 
 .booking-view-toggle {
   display: flex;
-  background: #f1f5f9;
+  background: var(--qu-surface-alt);
   padding: 4px;
   border-radius: 10px;
   gap: 4px;
@@ -62,15 +62,15 @@
   padding: 8px 14px;
   font-size: 0.875rem;
   font-weight: 600;
-  color: #64748b;
+  color: var(--qu-text-muted);
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .booking-toggle-btn.active {
-  background: #ffffff;
-  color: #ff6b35;
+  background: var(--qu-surface);
+  color: var(--qu-accent);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
 }
 
@@ -86,7 +86,7 @@
 .booking-date-label {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #475569;
+  color: var(--qu-text-secondary);
 }
 
 .booking-date-chips {
@@ -96,21 +96,21 @@
 }
 
 .booking-date-chip {
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
+  border: 1px solid var(--qu-border);
+  background: var(--qu-surface);
   padding: 6px 14px;
   border-radius: 20px;
   font-size: 0.85rem;
   font-weight: 500;
-  color: #475569;
+  color: var(--qu-text-secondary);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .booking-date-chip.selected {
-  background: #ff6b35;
+  background: var(--qu-accent);
   color: #ffffff;
-  border-color: #ff6b35;
+  border-color: var(--qu-accent);
   font-weight: 600;
 }
 
@@ -121,10 +121,10 @@
 }
 
 .booking-card {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--qu-border);
   border-radius: 12px;
   padding: 16px;
-  background: #f8fafc;
+  background: var(--qu-surface-alt);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -140,7 +140,7 @@
 .booking-id {
   font-size: 0.75rem;
   font-weight: 700;
-  color: #64748b;
+  color: var(--qu-text-muted);
   text-transform: uppercase;
   background: #e2e8f0;
   padding: 2px 8px;
@@ -149,14 +149,14 @@
 
 .booking-shop-name {
   font-weight: 700;
-  color: #0f172a;
+  color: var(--qu-text);
   margin-top: 4px;
 
 }
 
 .booking-canteen-location {
   font-size: 0.8rem;
-  color: #64748b;
+  color: var(--qu-text-muted);
 }
 
 .booking-status-badge {
@@ -184,13 +184,13 @@
 }
 
 .status-completed {
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--qu-surface-alt);
+  color: var(--qu-text-secondary);
 }
 
 .booking-time-highlight {
-  background: #ffffff;
-  border: 1px solid #f1f5f9;
+  background: var(--qu-surface);
+  border: 1px solid var(--qu-border);
   padding: 10px 14px;
   border-radius: 8px;
   margin-bottom: 12px;
@@ -203,7 +203,7 @@
   gap: 6px;
   margin-bottom: 12px;
   font-size: 0.85rem;
-  color: #334155;
+  color: var(--qu-text-secondary);
 }
 
 .booking-item-row {
@@ -216,7 +216,7 @@
   justify-content: space-between;
   align-items: center;
   padding-top: 12px;
-  border-top: 1px dashed #cbd5e1;
+  border-top: 1px dashed var(--qu-border);
 
 }
 
@@ -235,16 +235,16 @@
   text-align: center;
   padding: 40px 20px;
   grid-column: 1 / -1;
-  background: #f8fafc;
+  background: var(--qu-surface-alt);
   border-radius: 12px;
-  border: 1px dashed #cbd5e1;
+  border: 1px dashed var(--qu-border);
 }
 
 .merchant-prep-matrix {
-  background: #f8fafc;
+  background: var(--qu-surface-alt);
   border-radius: 12px;
   padding: 18px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--qu-border);
 }
 
 .prep-time-grid {
@@ -255,8 +255,8 @@
 }
 
 .prep-time-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--qu-surface);
+  border: 1px solid var(--qu-border);
   border-radius: 10px;
   padding: 12px;
 }
@@ -274,12 +274,12 @@
 .prep-time-label {
   font-size: 0.8rem;
   font-weight: 700;
-  color: #475569;
+  color: var(--qu-text-secondary);
 }
 
 .prep-time-count {
   font-size: 0.9rem;
-  color: #1e293b;
+  color: var(--qu-text);
   margin-top: 4px;
 }
 
@@ -293,7 +293,7 @@
 
 .prep-progress-fill {
   height: 100%;
-  background: #ff6b35;
+  background: var(--qu-accent);
   border-radius: 3px;
 }
 
@@ -304,7 +304,7 @@
 .prep-status-text {
   font-size: 0.72rem;
   font-weight: 700;
-  color: #64748b;
+  color: var(--qu-text-muted);
 }
 
 .status-full .prep-status-text {

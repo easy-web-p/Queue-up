@@ -28,12 +28,12 @@
   max-width: 95vw;
   height: 580px;
   max-height: 85vh;
-  background: #ffffff;
+  background: var(--qu-surface);
   border-radius: 12px;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.2);
   display: flex;
   overflow: hidden;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--qu-border);
   animation: slideUpCard 0.25s ease forwards;
 }
 
@@ -45,8 +45,8 @@
 /* ---------------- 1. Left Sidebar Conversation List ---------------- */
 .queueup-chat-sidebar {
   width: 280px;
-  background: #f8fafc;
-  border-right: 1px solid #e2e8f0;
+  background: var(--qu-surface-alt);
+  border-right: 1px solid var(--qu-border);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -54,8 +54,8 @@
 
 .queueup-chat-sidebar-header {
   padding: 16px;
-  background: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
+  background: var(--qu-surface);
+  border-bottom: 1px solid var(--qu-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -64,7 +64,7 @@
 .queueup-chat-sidebar-title {
   font-weight: 700;
   font-size: 15px;
-  color: #1e293b;
+  color: var(--qu-text);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -84,18 +84,18 @@
   gap: 12px;
   padding: 12px 16px;
   cursor: pointer;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--qu-border);
   transition: background 0.15s ease;
   position: relative;
 }
 
 .queueup-chat-item:hover {
-  background: #f1f5f9;
+  background: var(--qu-surface-alt);
 }
 
 .queueup-chat-item.active {
   background: #fff5f2;
-  border-left: 4px solid #ff4500;
+  border-left: 4px solid var(--qu-accent);
 }
 
 .queueup-chat-item-avatar-wrapper {
@@ -108,7 +108,7 @@
   height: 44px;
   border-radius: 50%;
   object-fit: cover;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--qu-border);
 }
 
 .queueup-chat-online-dot {
@@ -130,7 +130,7 @@
 .queueup-chat-item-name {
   font-weight: 600;
   font-size: 14px;
-  color: #0f172a;
+  color: var(--qu-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -138,7 +138,7 @@
 
 .queueup-chat-item-preview {
   font-size: 12px;
-  color: #64748b;
+  color: var(--qu-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -155,11 +155,11 @@
 
 .queueup-chat-item-time {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--qu-text-muted);
 }
 
 .queueup-chat-unread-badge {
-  background: #ff4500;
+  background: var(--qu-accent);
   color: #ffffff;
   font-size: 10px;
   font-weight: 700;
@@ -174,17 +174,17 @@
   flex-grow: 1;
   display: flex;
   flex-direction: column;
-  background: #ffffff;
+  background: var(--qu-surface);
   min-width: 0;
 }
 
 .queueup-chat-main-header {
   padding: 14px 20px;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--qu-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #ffffff;
+  background: var(--qu-surface);
 }
 
 .queueup-chat-header-user {
@@ -196,7 +196,7 @@
 .queueup-chat-header-title {
   font-weight: 700;
   font-size: 15px;
-  color: #0f172a;
+  color: var(--qu-text);
 }
 
 .queueup-chat-header-status {
@@ -211,7 +211,7 @@
   background: transparent;
   border: none;
   font-size: 18px;
-  color: #64748b;
+  color: var(--qu-text-muted);
   cursor: pointer;
   padding: 4px 8px;
   border-radius: 4px;
@@ -219,7 +219,7 @@
 }
 
 .queueup-chat-close-btn:hover {
-  background: #f1f5f9;
+  background: var(--qu-surface-alt);
   color: #ef4444;
 }
 
@@ -238,11 +238,11 @@
   align-items: center;
   gap: 10px;
   font-size: 13px;
-  color: #1e293b;
+  color: var(--qu-text);
 }
 
 .queueup-chat-order-tag {
-  background: #ff4500;
+  background: var(--qu-accent);
   color: #ffffff;
   font-size: 11px;
   font-weight: 700;
@@ -258,7 +258,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: #fafafa;
+  background: var(--qu-surface-alt);
 }
 
 .queueup-chat-msg-row {
@@ -286,23 +286,23 @@
 }
 
 .queueup-chat-msg-row.sent .queueup-chat-msg-bubble {
-  background: linear-gradient(135deg, #ff5226 0%, #ff2500 100%);
+  background: linear-gradient(135deg, var(--qu-accent) 0%, #ff2500 100%);
   color: #ffffff;
   border-bottom-right-radius: 2px;
   box-shadow: 0 2px 6px rgba(255, 69, 0, 0.2);
 }
 
 .queueup-chat-msg-row.received .queueup-chat-msg-bubble {
-  background: #ffffff;
-  color: #1e293b;
-  border: 1px solid #e2e8f0;
+  background: var(--qu-surface);
+  color: var(--qu-text);
+  border: 1px solid var(--qu-border);
   border-bottom-left-radius: 2px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
 }
 
 .queueup-chat-msg-time {
   font-size: 10.5px;
-  color: #94a3b8;
+  color: var(--qu-text-muted);
   margin-top: 4px;
   padding: 0 4px;
 }
@@ -312,15 +312,15 @@
   display: flex;
   gap: 8px;
   padding: 8px 16px;
-  background: #ffffff;
+  background: var(--qu-surface);
   overflow-x: auto;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--qu-border);
 }
 
 .queueup-chat-suggest-chip {
-  background: #f1f5f9;
-  color: #334155;
-  border: 1px solid #cbd5e1;
+  background: var(--qu-surface-alt);
+  color: var(--qu-text-secondary);
+  border: 1px solid var(--qu-border);
   font-size: 12px;
   padding: 4px 10px;
   border-radius: 16px;
@@ -331,15 +331,15 @@
 
 .queueup-chat-suggest-chip:hover {
   background: #ffede8;
-  color: #ff4500;
+  color: var(--qu-accent);
   border-color: #ffb8a6;
 }
 
 /* Footer Input Field */
 .queueup-chat-input-footer {
   padding: 12px 16px;
-  background: #ffffff;
-  border-top: 1px solid #e2e8f0;
+  background: var(--qu-surface);
+  border-top: 1px solid var(--qu-border);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -347,8 +347,8 @@
 
 .queueup-chat-input-box {
   flex-grow: 1;
-  background: #f8fafc;
-  border: 1px solid #cbd5e1;
+  background: var(--qu-surface-alt);
+  border: 1px solid var(--qu-border);
   border-radius: 20px;
   padding: 8px 16px;
   font-size: 13.5px;
@@ -357,12 +357,12 @@
 }
 
 .queueup-chat-input-box:focus {
-  border-color: #ff4500;
-  background: #ffffff;
+  border-color: var(--qu-accent);
+  background: var(--qu-surface);
 }
 
 .queueup-chat-send-btn {
-  background: #ff4500;
+  background: var(--qu-accent);
   color: #ffffff;
   border: none;
   width: 38px;
@@ -378,7 +378,7 @@
 
 .queueup-chat-send-btn:hover {
   transform: scale(1.05);
-  background: #e03d00;
+  background: var(--qu-accent-hover);
 }
 
 /* Responsive adjustments */

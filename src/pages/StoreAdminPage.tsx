@@ -26,8 +26,14 @@ import {
   Download
 } from 'lucide-react';
 import { MenuItem, Order, MerchantShop } from '../types';
-import { fetchMenuItemsFromFirestore, fetchOrdersFromFirestore, fetchShopsFromFirestore } from '../lib/firebase';
-import { db, doc, setDoc } from '../firebase/config.js';
+import {
+  fetchMenuItemsFromFirestore,
+  fetchOrdersFromFirestore,
+  fetchShopsFromFirestore,
+  saveProductsToFirestore,
+} from '../lib/firebase';
+import { db, doc, setDoc, INITIAL_PRODUCTS } from '../firebase/config.js';
+import { buildSeedProducts } from '../lib/seedCatalog.js';
 import { writeBatch } from 'firebase/firestore';
 import { useToast } from '../components/ToastProvider.jsx';
 
@@ -67,6 +73,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
 
   // Menu Items State
   const [localMenuItems, setLocalMenuItems] = useState<MenuItem[]>([]);
+  const [isSeeding, setIsSeeding] = useState(false);
   const menuItems = propsMenuItems && propsMenuItems.length > 0 ? propsMenuItems : localMenuItems;
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -86,9 +93,16 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
     fetchShopsFromFirestore().then((shops) => {
       if (shops && shops.length > 0) setShopInfo(shops[0]);
     });
-    fetchMenuItemsFromFirestore().then((dbItems) => {
-      if (dbItems && dbItems.length > 0) setLocalMenuItems(dbItems);
-    });
+    // fetchMenuItemsFromFirestore now throws instead of returning a hardcoded
+    // catalogue, so a failure has to be handled rather than silently swallowed.
+    fetchMenuItemsFromFirestore()
+      .then((dbItems) => {
+        if (dbItems && dbItems.length > 0) setLocalMenuItems(dbItems);
+      })
+      .catch((err) => {
+        console.warn('Could not load the menu:', err);
+        setToastMsg('โหลดรายการเมนูไม่สำเร็จ กรุณารีเฟรชหน้าอีกครั้ง');
+      });
     fetchOrdersFromFirestore().then((dbOrders) => {
       if (dbOrders && dbOrders.length > 0) setOrders(dbOrders);
     });
@@ -124,6 +138,55 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
     { id: 'L-103', time: '09:45 น.', action: 'เปิดร้านค้าประจำวัน รับออเดอร์ปกติ', user: 'ป้าแดง ใจดี' },
     { id: 'L-104', time: '09:30 น.', action: 'เติมสต็อกวัตถุดิบไก่ทอด +50 จาน', user: 'นายสมชาย มีชัย' },
   ]);
+
+  /**
+   * Writes the sample dishes into this store's menu as real, orderable products.
+   *
+   * The app no longer shows a hardcoded catalogue when the collection is empty, so
+   * a fresh canteen genuinely has no menu until something puts one there. This is
+   * that something — and it attaches the store id the ordering function requires
+   * and strips the placeholder sales figures, so what lands in the database is a
+   * real menu rather than a mock made permanent.
+   */
+  const handleSeedMenu = async () => {
+    const targetStoreId = shopInfo?.id || user?.storeId;
+    if (!targetStoreId) {
+      toast.error('ยังไม่มีร้านค้าในระบบ กรุณาสร้างร้านค้าก่อนเพิ่มเมนู');
+      return;
+    }
+
+    const confirmed = await toast.confirm({
+      title: 'เพิ่มเมนูตัวอย่างเข้าร้านนี้',
+      message:
+        `จะเพิ่มเมนูตัวอย่าง ${INITIAL_PRODUCTS.length} รายการเข้าร้าน "${shopInfo?.shopName || targetStoreId}" ` +
+        'โดยเมนูเหล่านี้จะเป็นเมนูจริงที่นักเรียนสั่งได้ทันที\n\n' +
+        'ยอดขายและคะแนนรีวิวจะเริ่มจากศูนย์ ไม่ใช่ตัวเลขตัวอย่าง',
+      confirmLabel: 'เพิ่มเมนู',
+      tone: 'info',
+    });
+    if (!confirmed) return;
+
+    setIsSeeding(true);
+    try {
+      const products = buildSeedProducts(INITIAL_PRODUCTS, targetStoreId);
+      const { written } = await saveProductsToFirestore(products);
+      const dbItems = await fetchMenuItemsFromFirestore();
+      setLocalMenuItems(dbItems);
+      toast.success(`เพิ่มเมนูเข้าร้านเรียบร้อย ${written} รายการ`);
+    } catch (err) {
+      // A partial write is a real outcome: saying "failed" when half the menu
+      // landed would send the admin looking for products that are already there.
+      const written = (err as { written?: number })?.written;
+      const detail = err instanceof Error ? err.message : 'ไม่ทราบสาเหตุ';
+      toast.error(
+        written
+          ? `เพิ่มเมนูได้เพียง ${written} รายการก่อนเกิดข้อผิดพลาด: ${detail}`
+          : `เพิ่มเมนูไม่สำเร็จ: ${detail}`
+      );
+    } finally {
+      setIsSeeding(false);
+    }
+  };
 
   const handleAddStaffSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -334,13 +397,13 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
       {/* 1. System Admin Top Navigation Bar */}
       <header className="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 px-4 sm:px-8 py-3 flex items-center justify-between shadow-md flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#f6402e] flex items-center justify-center text-white font-black shadow-lg">
+          <div className="w-10 h-10 rounded-xl bg-[#FF7A1A] flex items-center justify-center text-white font-black shadow-lg">
             <Store className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-base font-black tracking-tight text-white">
-                QueueUp <span className="text-[#f6402e]">Store & School Admin</span>
+                QueueUp <span className="text-[#FF7A1A]">Store & School Admin</span>
               </h1>
               <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -399,7 +462,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
 
           <button
             onClick={() => onNavigateToLogin ? onNavigateToLogin() : navigate('/login')}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#f6402e] hover:bg-orange-600 text-white text-xs font-bold rounded-xl shadow-sm transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#FF7A1A] hover:bg-orange-600 text-white text-xs font-bold rounded-xl shadow-sm transition-all cursor-pointer"
           >
             <LogOut className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">ออกจากระบบ</span>
@@ -429,7 +492,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
                   isActive
-                    ? 'bg-[#f6402e] text-white shadow-md shadow-orange-500/20'
+                    ? 'bg-[#FF7A1A] text-white shadow-md shadow-orange-500/20'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                 }`}
               >
@@ -457,7 +520,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
               <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-2">
                 <div className="flex items-center justify-between text-slate-500 text-xs font-bold">
                   <span>ออเดอร์ทั้งหมดวันนี้</span>
-                  <Utensils className="w-4 h-4 text-[#f6402e]" />
+                  <Utensils className="w-4 h-4 text-[#FF7A1A]" />
                 </div>
                 <div className="text-2xl font-black text-slate-900">68 รายการ</div>
                 <p className="text-[11px] text-slate-500">เสร็จสิ้นแล้ว 62 รายการ</p>
@@ -485,7 +548,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
             {/* Quick System Toggles Panel */}
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
               <h3 className="font-extrabold text-base text-slate-900 flex items-center gap-2">
-                <Settings className="w-5 h-5 text-[#f6402e]" />
+                <Settings className="w-5 h-5 text-[#FF7A1A]" />
                 <span>การตั้งค่าการทำงานอัตโนมัติของร้านค้า</span>
               </h3>
 
@@ -527,7 +590,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                 <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-xs text-slate-800">ระยะเวลาประกอบอาหารมาตรฐาน</span>
-                    <span className="text-xs font-extrabold text-[#f6402e]">{prepTimeDefault} นาที</span>
+                    <span className="text-xs font-extrabold text-[#FF7A1A]">{prepTimeDefault} นาที</span>
                   </div>
                   <input
                     type="range"
@@ -535,7 +598,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                     max="30"
                     value={prepTimeDefault}
                     onChange={(e) => setPrepTimeDefault(Number(e.target.value))}
-                    className="w-full accent-[#f6402e]"
+                    className="w-full accent-[#FF7A1A]"
                   />
                   <p className="text-[11px] text-slate-500">
                     ใช้ในการคำนวณเวลารอคิวประมาณการล่วงหน้าให้ลูกค้า
@@ -570,7 +633,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
               <div>
                 <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
                   <span>จัดการรายการอาหาร & บริหารราคา (Price Management)</span>
-                  <span className="text-[10px] bg-orange-100 text-[#f6402e] font-bold px-2 py-0.5 rounded-full border border-orange-200">
+                  <span className="text-[10px] bg-orange-100 text-[#FF7A1A] font-bold px-2 py-0.5 rounded-full border border-orange-200">
                     อัปเดตเรียลไทม์
                   </span>
                 </h3>
@@ -579,7 +642,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
 
               <button
                 onClick={() => setShowAddItemModal(true)}
-                className="px-4 py-2 bg-[#f6402e] hover:bg-orange-600 text-white font-bold text-xs rounded-xl shadow-md shadow-orange-500/20 flex items-center gap-1.5 cursor-pointer shrink-0"
+                className="px-4 py-2 bg-[#FF7A1A] hover:bg-orange-600 text-white font-bold text-xs rounded-xl shadow-md shadow-orange-500/20 flex items-center gap-1.5 cursor-pointer shrink-0"
               >
                 <Plus className="w-4 h-4" />
                 <span>เพิ่มรายการอาหารใหม่</span>
@@ -590,7 +653,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
             <div className="bg-orange-50/60 p-4 rounded-xl border border-orange-200/80 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <DollarSign className="w-4 h-4 text-[#f6402e]" />
+                  <DollarSign className="w-4 h-4 text-[#FF7A1A]" />
                   <span>เครื่องมือปรับราคาด่วนยกหมวด (Batch Price Adjustment)</span>
                 </span>
                 <span className="text-[11px] text-slate-500 hidden sm:inline">
@@ -598,9 +661,22 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                 </span>
               </div>
               <div className="flex flex-wrap gap-2 text-xs">
+                {/* Only offered while there is nothing to adjust. Once the canteen
+                    has a menu, a "add the samples" button next to the batch price
+                    tools is an accident waiting to happen. */}
+                {menuItems.length === 0 && (
+                  <button
+                    onClick={handleSeedMenu}
+                    disabled={isSeeding}
+                    className="min-h-[44px] px-4 py-3 bg-[#FF7A1A] hover:bg-[#E6680D] disabled:opacity-60 disabled:cursor-wait text-white font-bold rounded-lg shadow-md transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span>{isSeeding ? 'กำลังเพิ่มเมนู...' : 'เพิ่มเมนูตัวอย่างเข้าร้าน'}</span>
+                  </button>
+                )}
                 <button
                   onClick={() => handleBatchAdjustPrices(5)}
-                  className="px-3 py-1.5 bg-white hover:bg-orange-100 text-[#f6402e] border border-orange-300 font-bold rounded-lg shadow-2xs transition-all cursor-pointer flex items-center gap-1"
+                  className="px-3 py-1.5 bg-white hover:bg-orange-100 text-[#FF7A1A] border border-orange-300 font-bold rounded-lg shadow-2xs transition-all cursor-pointer flex items-center gap-1"
                 >
                   <span>+5 บาท ทุกเมนู</span>
                 </button>
@@ -612,15 +688,24 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                 </button>
                 <button
                   onClick={() => handleBatchAdjustPrices(10)}
-                  className="px-3 py-1.5 bg-white hover:bg-orange-100 text-[#f6402e] border border-orange-300 font-bold rounded-lg shadow-2xs transition-all cursor-pointer flex items-center gap-1"
+                  className="px-3 py-1.5 bg-white hover:bg-orange-100 text-[#FF7A1A] border border-orange-300 font-bold rounded-lg shadow-2xs transition-all cursor-pointer flex items-center gap-1"
                 >
                   <span>+10 บาท</span>
                 </button>
                 <button
                   onClick={() => {
-                    fetchMenuItemsFromFirestore().then((dbItems) => setLocalMenuItems(dbItems));
-                    setToastMsg('รีเซ็ตราคากลับสู่มาตรฐานโรงอาหารเรียบร้อย');
-                    setTimeout(() => setToastMsg(null), 2500);
+                    // The confirmation used to appear before the reload had even
+                    // returned, so a failed reload still read as success.
+                    fetchMenuItemsFromFirestore()
+                      .then((dbItems) => {
+                        setLocalMenuItems(dbItems);
+                        setToastMsg('รีเซ็ตราคากลับสู่มาตรฐานโรงอาหารเรียบร้อย');
+                      })
+                      .catch((err) => {
+                        console.warn('Could not reload the menu:', err);
+                        setToastMsg('รีเซ็ตราคาไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+                      })
+                      .finally(() => setTimeout(() => setToastMsg(null), 2500));
                   }}
                   className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1 ml-auto"
                 >
@@ -639,7 +724,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                   placeholder="ค้นหาชื่ออาหาร หรือ รหัสเมนู..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#f6402e]"
+                  className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#FF7A1A]"
                 />
               </div>
 
@@ -674,7 +759,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                   {filteredMenuItems.map((item) => (
                     <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="p-3 flex items-center gap-3">
-                        <img
+                        <img loading="lazy" decoding="async"
                           src={item.image}
                           alt={item.name}
                           className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0"
@@ -696,7 +781,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                             type="number"
                             value={item.price}
                             onChange={(e) => handleUpdatePrice(item.id, Number(e.target.value))}
-                            className="w-16 px-2 py-1 bg-white border border-slate-300 rounded-lg font-black text-xs text-[#f6402e] shadow-2xs focus:ring-2 focus:ring-orange-500"
+                            className="w-16 px-2 py-1 bg-white border border-slate-300 rounded-lg font-black text-xs text-[#FF7A1A] shadow-2xs focus:ring-2 focus:ring-orange-500"
                           />
                         </div>
                       </td>
@@ -725,7 +810,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                           </button>
                           <button
                             onClick={() => handleUpdatePrice(item.id, item.price + 5)}
-                            className="px-2 py-1 bg-orange-100 hover:bg-orange-200 text-[#f6402e] font-bold text-[10px] rounded border border-orange-300 cursor-pointer"
+                            className="px-2 py-1 bg-orange-100 hover:bg-orange-200 text-[#FF7A1A] font-bold text-[10px] rounded border border-orange-300 cursor-pointer"
                             title="เพิ่มราคา 5 บาท"
                           >
                             +5
@@ -774,7 +859,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                 <h3 className="text-base font-extrabold text-slate-900">รายการออเดอร์ & หน้าจอทำอาหาร KDS</h3>
                 <p className="text-xs text-slate-500">จัดการสถานะทำอาหารและเตรียมแจกจ่ายตามลำดับคิว</p>
               </div>
-              <span className="text-xs px-3 py-1 rounded-full bg-orange-100 text-[#f6402e] font-extrabold">
+              <span className="text-xs px-3 py-1 rounded-full bg-orange-100 text-[#FF7A1A] font-extrabold">
                 {orders.length} ออเดอร์ล่าสุด
               </span>
             </div>
@@ -787,7 +872,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                 >
                   <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                     <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-1 rounded-lg bg-[#f6402e] text-white font-black text-xs">
+                      <span className="px-2.5 py-1 rounded-lg bg-[#FF7A1A] text-white font-black text-xs">
                         คิว {order.queueNumber}
                       </span>
                       <span className="font-extrabold text-xs text-slate-900">{order.id}</span>
@@ -862,7 +947,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                         setToastMsg(`อัปเดตกำลังการผลิตเป็น ${val} ออเดอร์/สล็อต สำเร็จ`);
                       }
                     }}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#f6402e]"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#FF7A1A]"
                   />
                   <p className="text-[11px] text-slate-400">ระบบจะป้องกัน Overbooking อัตโนมัติเมื่อจำนวนออเดอร์ในรอบเวลาถึงขีดจำกัด</p>
                 </div>
@@ -873,7 +958,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                     type="text"
                     value={shopInfo?.ownerName || 'เจ้าของร้าน'}
                     onChange={(e) => setShopInfo((prev) => prev ? { ...prev, ownerName: e.target.value } : null)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#f6402e]"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#FF7A1A]"
                   />
                 </div>
 
@@ -939,7 +1024,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                     <tr key={st.id} className="hover:bg-slate-50/80">
                       <td className="p-3 font-mono font-bold text-slate-500">{st.id}</td>
                       <td className="p-3 font-extrabold text-slate-900">{st.name}</td>
-                      <td className="p-3 font-bold text-[#f6402e]">{st.role}</td>
+                      <td className="p-3 font-bold text-[#FF7A1A]">{st.role}</td>
                       <td className="p-3 text-slate-600">{st.phone}</td>
                       <td className="p-3">
                         <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold text-[10px]">
@@ -984,7 +1069,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
               </div>
               <button
                 onClick={() => setShowAddCouponModal(true)}
-                className="px-3.5 py-1.5 bg-[#f6402e] hover:bg-orange-600 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                className="px-3.5 py-1.5 bg-[#FF7A1A] hover:bg-orange-600 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
               >
                 <Plus className="w-4 h-4" />
                 <span>สร้างคูปองส่วนลดใหม่</span>
@@ -1020,7 +1105,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                 <tbody className="divide-y divide-slate-100 font-medium">
                   {coupons.map((cp) => (
                     <tr key={cp.id} className="hover:bg-slate-50/80">
-                      <td className="p-3 font-mono font-extrabold text-[#f6402e]">{cp.code}</td>
+                      <td className="p-3 font-mono font-extrabold text-[#FF7A1A]">{cp.code}</td>
                       <td className="p-3 font-bold text-emerald-600">ลด ฿{cp.discount}</td>
                       <td className="p-3 text-slate-600">ขั้นต่ำ ฿{cp.minSpend}</td>
                       <td className="p-3">
@@ -1212,7 +1297,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[#f6402e] hover:bg-orange-600 text-white text-xs font-extrabold rounded-xl shadow-md transition-all"
+                  className="px-4 py-2 bg-[#FF7A1A] hover:bg-orange-600 text-white text-xs font-extrabold rounded-xl shadow-md transition-all"
                 >
                   สร้างคูปอง
                 </button>
@@ -1296,7 +1381,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[#f6402e] hover:bg-orange-600 text-white text-xs font-extrabold rounded-xl shadow-md transition-all"
+                  className="px-4 py-2 bg-[#FF7A1A] hover:bg-orange-600 text-white text-xs font-extrabold rounded-xl shadow-md transition-all"
                 >
                   บันทึกเมนูใหม่
                 </button>

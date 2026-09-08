@@ -93,6 +93,62 @@ body {
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Design tokens (docs/design_system.md — "Warm Dark Canteen")
+   ---------------------------------------------------------------------------
+   25 hand-written stylesheets carried 1,110 hard-coded colour declarations, and
+   the accent among them was a red-orange family (var(--qu-accent) and eight neighbours,
+   218 uses) that the design system does not contain — so the app read as two
+   products stitched together, and every one of those colours was invisible to
+   the theme switch.
+
+   These are the one place a colour is decided. A stylesheet using var(--qu-*)
+   follows the palette and gets dark mode for free; theme is always stamped
+   explicitly on <html> by PreferencesContext, so :root holds the light values
+   and the dark block overrides them.
+--------------------------------------------------------------------------- */
+:root {
+  /* Brand */
+  --qu-accent: #FF7A1A;
+  --qu-accent-hover: #E6680D;
+  --qu-accent-soft: rgba(255, 122, 26, 0.12);
+  --qu-accent-border: rgba(255, 122, 26, 0.28);
+
+  /* Status */
+  --qu-amber: #F59E0B;
+  --qu-green: #10B981;
+  --qu-red: #EF4444;
+
+  /* Light surfaces */
+  --qu-bg: #F8FAFC;
+  --qu-surface: #FFFFFF;
+  --qu-surface-alt: #F1F5F9;
+  --qu-border: #E2E8F0;
+
+  /* Light text */
+  --qu-text: #0F172A;
+  --qu-text-secondary: #334155;
+  --qu-text-muted: #64748B;
+
+  --qu-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+html[data-theme="dark"] {
+  --qu-accent-soft: rgba(255, 122, 26, 0.16);
+  --qu-accent-border: rgba(255, 122, 26, 0.15);
+
+  --qu-bg: #16100C;
+  --qu-surface: #241C16;
+  --qu-surface-alt: #1D140F;
+  --qu-border: rgba(255, 255, 255, 0.10);
+
+  --qu-text: #FFFFFF;
+  --qu-text-secondary: #E5E7EB;
+  --qu-text-muted: #9CA3AF;
+
+  --qu-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
 /* App-level Light & Dark design system. */
 html[data-theme="light"] { color-scheme: light; }
 html[data-theme="light"] body,
@@ -202,7 +258,7 @@ html[data-theme="dark"] .queue-claim-btn {
 }
 
 html[data-theme="dark"] .queue-claim-btn:hover {
-  background: #FF8E38 !important;
+  background: var(--qu-accent) !important;
 }
 
 /* 6. Hero Banner Gradient (#4A1B0C -> #7A2A12 แดงเข้มลึกอบอุ่น) */
@@ -284,8 +340,8 @@ html[data-theme="dark"] .shopee-search-button {
 
 html[data-theme="dark"] .queue-chat-floating-btn:hover,
 html[data-theme="dark"] .btn-primary:hover {
-  background-color: #FF8E38 !important;
-  border-color: #FF8E38 !important;
+  background-color: var(--qu-accent) !important;
+  border-color: var(--qu-accent) !important;
   box-shadow: 0 6px 20px rgba(255, 142, 56, 0.45) !important;
 }
 
@@ -307,7 +363,7 @@ html[data-theme="dark"] .queue-cat-pill {
 
 html[data-theme="dark"] .queue-cat-pill.active {
   background-color: #FF7A1A !important;
-  border-color: #FF8E38 !important;
+  border-color: var(--qu-accent) !important;
   color: #FFFFFF !important;
   box-shadow: 0 0 15px rgba(255, 122, 26, 0.35) !important;
 }

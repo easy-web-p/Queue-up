@@ -52,7 +52,7 @@ function PdpaPolicy() {
           <button
             className={`pdpa-page-tab-btn px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 border-0 ${
               activeTab === "privacy"
-                ? "active bg-[#ee4d2d] text-white shadow-md shadow-orange-500/20 font-black"
+                ? "active bg-[#FF7A1A] text-white shadow-md shadow-orange-500/20 font-black"
                 : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
             }`}
             onClick={() => handleTabChange("privacy")}
@@ -64,7 +64,7 @@ function PdpaPolicy() {
           <button
             className={`pdpa-page-tab-btn px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 border-0 ${
               activeTab === "terms"
-                ? "active bg-[#ee4d2d] text-white shadow-md shadow-orange-500/20 font-black"
+                ? "active bg-[#FF7A1A] text-white shadow-md shadow-orange-500/20 font-black"
                 : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
             }`}
             onClick={() => handleTabChange("terms")}
@@ -76,7 +76,7 @@ function PdpaPolicy() {
           <button
             className={`pdpa-page-tab-btn px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 border-0 ${
               activeTab === "parent"
-                ? "active bg-[#ee4d2d] text-white shadow-md shadow-orange-500/20 font-black"
+                ? "active bg-[#FF7A1A] text-white shadow-md shadow-orange-500/20 font-black"
                 : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
             }`}
             onClick={() => handleTabChange("parent")}
@@ -88,7 +88,7 @@ function PdpaPolicy() {
           <button
             className={`pdpa-page-tab-btn px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 border-0 ${
               activeTab === "merchant"
-                ? "active bg-[#ee4d2d] text-white shadow-md shadow-orange-500/20 font-black"
+                ? "active bg-[#FF7A1A] text-white shadow-md shadow-orange-500/20 font-black"
                 : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
             }`}
             onClick={() => handleTabChange("merchant")}
@@ -100,7 +100,7 @@ function PdpaPolicy() {
           <button
             className={`pdpa-page-tab-btn px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 border-0 ${
               activeTab === "refund"
-                ? "active bg-[#ee4d2d] text-white shadow-md shadow-orange-500/20 font-black"
+                ? "active bg-[#FF7A1A] text-white shadow-md shadow-orange-500/20 font-black"
                 : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
             }`}
             onClick={() => handleTabChange("refund")}
@@ -216,7 +216,7 @@ function PdpaPolicy() {
 
           {/* Action Footer */}
           <div className="pdpa-page-actions pt-6 border-t border-slate-100 dark:border-slate-800 flex justify-center">
-            <Link to="/home" className="btn btn-primary fw-bold px-6 py-2.5 rounded-full bg-[#ee4d2d] hover:bg-[#ff7337] text-white border-0 shadow-lg shadow-orange-500/30 font-black text-sm flex items-center gap-2 transition-all cursor-pointer">
+            <Link to="/home" className="btn btn-primary fw-bold px-6 py-2.5 rounded-full bg-[#FF7A1A] hover:bg-[#FF7A1A] text-white border-0 shadow-lg shadow-orange-500/30 font-black text-sm flex items-center gap-2 transition-all cursor-pointer">
               <i className="bi bi-house-door-fill" />
               กลับสู่หน้าหลักโรงอาหาร
             </Link>

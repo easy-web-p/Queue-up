@@ -26,7 +26,14 @@
     "test:auth-domain": "node test-auth-domain-config.js",
     "test:audit": "node test-merchant-audit-log.js",
     "test:ux": "node test-ux-accessibility.js",
-    "test": "node test-transaction-e2e.js && node test-campus-wallet-authority.js && node test-auth-roles-escalation.js && node test-campus-wallet-limits.js && node test-campus-monitor-access.js && node test-allergen-guard.js && node test-guardian-link-review.js && node test-auth-domain-config.js && node test-merchant-audit-log.js && node test-ux-accessibility.js && node test-auth-lifecycle.js && node test-firestore-rules-integration.js && node test-storage-rules-integration.js && node test-campus-security-rules.js && node test-campus-integration.js && node test-cart-redux-e2e.js && node test-ticket-allergy-e2e.js"
+    "test:pilot": "node test-pilot-lead.js",
+    "test:evaluation": "node test-system-evaluation.js",
+    "test:cart-flow": "node test-cart-flow.js",
+    "test:ui-states": "node test-ui-states.js",
+    "test:seeding": "node test-menu-seeding.js",
+    "test:design": "node test-design-system.js",
+    "test:signin": "node test-signin-and-feedback.js",
+    "test": "node test-transaction-e2e.js && node test-campus-wallet-authority.js && node test-auth-roles-escalation.js && node test-campus-wallet-limits.js && node test-campus-monitor-access.js && node test-allergen-guard.js && node test-guardian-link-review.js && node test-auth-domain-config.js && node test-merchant-audit-log.js && node test-ux-accessibility.js && node test-pilot-lead.js && node test-system-evaluation.js && node test-cart-flow.js && node test-ui-states.js && node test-menu-seeding.js && node test-design-system.js && node test-signin-and-feedback.js && node test-auth-lifecycle.js && node test-firestore-rules-integration.js && node test-storage-rules-integration.js && node test-campus-security-rules.js && node test-campus-integration.js && node test-cart-redux-e2e.js && node test-ticket-allergy-e2e.js"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.12.0",
@@ -35,7 +42,6 @@
     "firebase": "^12.17.1",
     "lucide-react": "^1.37.0",
     "react": "^19.2.8",
-    "react-bootstrap": "^2.10.10",
     "react-dom": "^19.2.8",
     "react-redux": "^9.3.0",
     "react-router-dom": "^7.18.2"

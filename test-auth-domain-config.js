@@ -23,7 +23,11 @@
  */
 
 import fs from 'node:fs';
-import { resolveAuthDomainForHost, DEFAULT_AUTH_DOMAIN } from './src/firebase/authDomain.js';
+import {
+  resolveAuthDomainForHost,
+  explainAuthDomainChoice,
+  DEFAULT_AUTH_DOMAIN,
+} from './src/firebase/authDomain.js';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -123,13 +127,68 @@ runTest('🚨 A custom host falls back to the Firebase domain', () => {
   }
 });
 
-runTest('An explicit VITE_FIREBASE_AUTH_DOMAIN overrides everything', () => {
+runTest('An explicit Firebase-served domain is taken as configured', () => {
   assertEqual(
-    resolveAuthDomainForHost('queueup-65e82.firebaseapp.com', 'auth.example.ac.th'),
-    'auth.example.ac.th',
-    'a deliberate setting wins'
+    resolveAuthDomainForHost('queue-up-nu.vercel.app', 'other-project.firebaseapp.com'),
+    'other-project.firebaseapp.com',
+    'Firebase serves and pre-registers it, so it cannot mismatch'
   );
-  assertEqual(resolveAuthDomainForHost('anything', '  spaced.example.com  '), 'spaced.example.com');
+  assertEqual(
+    resolveAuthDomainForHost('anything', '  spaced.web.app  '),
+    'spaced.web.app',
+    'surrounding whitespace must not defeat the match'
+  );
+});
+
+runTest('🚨 A custom VITE_FIREBASE_AUTH_DOMAIN alone is REFUSED, not obeyed', () => {
+  // This is the bug that produced "Error 400: redirect_uri_mismatch" in production.
+  // Setting the variable looks like the whole job, but it is one of three steps, and
+  // the missing one — registering the redirect URI with Google — is checked by Google
+  // before any app code runs, so obeying the variable locks every user out with no
+  // fallback. Refusing it degrades to a working sign-in instead.
+  const choice = explainAuthDomainChoice('queue-up-nu.vercel.app', 'queue-up-nu.vercel.app', {});
+  assertEqual(choice.authDomain, DEFAULT_AUTH_DOMAIN, 'must fall back to the Firebase domain');
+  assert(choice.warning, 'refusing a deliberate setting must not be silent');
+  assert(
+    choice.warning.includes('VITE_FIREBASE_AUTH_HANDLER_REGISTERED'),
+    'the warning must say how to opt in'
+  );
+  assert(
+    choice.warning.includes('/__/auth/handler'),
+    'the warning must name the exact redirect URI to register'
+  );
+});
+
+runTest('A custom domain IS used once the deployment confirms it is registered', () => {
+  for (const flag of [true, 'true']) {
+    assertEqual(
+      resolveAuthDomainForHost('queueup.example.ac.th', 'queueup.example.ac.th', {
+        handlerRegistered: flag,
+      }),
+      'queueup.example.ac.th',
+      `handlerRegistered=${JSON.stringify(flag)} must opt in`
+    );
+  }
+});
+
+runTest('🚨 Only an explicit affirmative opts in', () => {
+  // An unset Vite variable arrives as undefined and a disabled one as "false"; a
+  // loose truthiness check would read both as consent from anything non-empty.
+  for (const flag of [undefined, null, '', 'false', 'FALSE', '0', 0, 'yes', 1]) {
+    assertEqual(
+      resolveAuthDomainForHost('queueup.example.ac.th', 'queueup.example.ac.th', {
+        handlerRegistered: flag,
+      }),
+      DEFAULT_AUTH_DOMAIN,
+      `handlerRegistered=${JSON.stringify(flag)} must not opt in`
+    );
+  }
+});
+
+runTest('🚨 A lookalike domain cannot pass itself off as Firebase-served', () => {
+  const choice = explainAuthDomainChoice('app.example.com', 'evil-firebaseapp.com', {});
+  assertEqual(choice.authDomain, DEFAULT_AUTH_DOMAIN, 'must require the dot-prefixed suffix');
+  assert(choice.warning, 'and must be reported as refused');
 });
 
 runTest('A blank or missing override is ignored rather than used', () => {
@@ -152,7 +211,18 @@ runTest('🚨 A lookalike host does not pass as a Firebase domain', () => {
 });
 
 runTest('config.js delegates rather than re-implementing the rule', () => {
-  assert(config.includes('resolveAuthDomainForHost('), 'config must use the shared rule');
+  assert(config.includes('explainAuthDomainChoice('), 'config must use the shared rule');
+  assert(
+    config.includes('VITE_FIREBASE_AUTH_HANDLER_REGISTERED'),
+    'config must pass the registration flag through, or the opt-in is unreachable'
+  );
+});
+
+runTest('🚨 A refused override is reported to the developer', () => {
+  // Silently using a different domain than the deployment configured is how this
+  // took a production outage to notice.
+  assert(config.includes('choice.warning'), 'config must surface the warning');
+  assert(/console\.warn/.test(config), 'it must reach the console');
 });
 
 // ===========================================================================

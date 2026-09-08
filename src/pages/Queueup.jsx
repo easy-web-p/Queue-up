@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { fetchEvaluationsFromFirestore, submitEvaluationToFirestore } from "../lib/firebase.js";
+import { submitPilotLead } from "../services/pilotLeadService.js";
 import PdpaPolicyModal from "../components/PdpaPolicyModal.jsx";
 import Footer from "../components/Footer.jsx";
 import { useToast } from "../components/ToastProvider.jsx";
@@ -19,6 +20,7 @@ export default function Queueup() {
 
   // Dynamic Real User Evaluations State
   const [evaluations, setEvaluations] = useState([]);
+  const [evalLoadFailed, setEvalLoadFailed] = useState(false);
   const [isEvalModalOpen, setIsEvalModalOpen] = useState(false);
   const [isCookieModalOpen, setIsCookieModalOpen] = useState(false);
   const [isPdpaModalOpen, setIsPdpaModalOpen] = useState(false);
@@ -34,17 +36,49 @@ export default function Queueup() {
   const [isContactSuccess, setIsContactSuccess] = useState(false);
   const [isContactSending, setIsContactSending] = useState(false);
 
-  const handleContactSubmit = (e) => {
+  const INTEREST_LABELS = {
+    school_demo: "สนใจติดตั้งระบบสำหรับโรงเรียน (นัด Live Demo)",
+    merchant_join: "สนใจสมัครเป็นร้านค้าพันธมิตรในโรงอาหาร",
+    custom_enterprise: "สนใจโซลูชันศูนย์อาหารขนาดใหญ่ / มหาวิทยาลัย",
+    other: "สอบถามข้อมูลทั่วไปหรือเสนอแนะเพิ่มเติม",
+  };
+
+  // Goes to the same lead capture as the landing page form: this is the same kind
+  // of enquiry and there is no reason for it to land anywhere else.
+  //
+  // It previously ran a 600 ms setTimeout and then declared success, so every
+  // enquiry sent from this page was discarded while the sender was told the team
+  // had it.
+  const handleContactSubmit = async (e) => {
     e.preventDefault();
+    if (isContactSending) return;
     if (!contactName.trim() || !contactPhone.trim()) {
       toast.warning("กรุณากรอกชื่อและเบอร์โทรศัพท์สำหรับติดต่อกลับ");
       return;
     }
+
     setIsContactSending(true);
-    setTimeout(() => {
-      setIsContactSending(false);
+    try {
+      const interest = INTEREST_LABELS[contactPackage] || contactPackage;
+      await submitPilotLead({
+        schoolName: contactOrg.trim() || contactName.trim(),
+        contactName: contactName.trim(),
+        phone: contactPhone,
+        email: contactEmail,
+        studentCount: "",
+        position: "",
+        notes: [`ประเภทความสนใจ: ${interest}`, contactMsg.trim()].filter(Boolean).join("\n"),
+      });
       setIsContactSuccess(true);
-    }, 600);
+    } catch (err) {
+      toast.error(
+        err?.message
+          ? `ส่งข้อมูลไม่สำเร็จ: ${err.message}`
+          : "ส่งข้อมูลไม่สำเร็จ กรุณาลองใหม่ หรือโทร 092-197-5525"
+      );
+    } finally {
+      setIsContactSending(false);
+    }
   };
 
   // Form Inputs for Rating Submission
@@ -56,39 +90,82 @@ export default function Queueup() {
   const [evalSecurity, setEvalSecurity] = useState(9.0);
   const [evalComment, setEvalComment] = useState("");
 
-  // Load Real Evaluations from Firestore / LocalStorage
+  // Load the real evaluations. An empty collection stays empty: the page reports
+  // the count as "ผลประเมินจริง", so substituting sample rows when there are none
+  // puts fabricated scores under that heading.
   useEffect(() => {
-    fetchEvaluationsFromFirestore().then((data) => {
-      if (data && data.length > 0) {
-        setEvaluations(data);
-      }
-    });
+    let cancelled = false;
+    fetchEvaluationsFromFirestore()
+      .then((data) => {
+        if (!cancelled) setEvaluations(data || []);
+      })
+      .catch((err) => {
+        console.warn("Could not load system evaluations:", err);
+        if (!cancelled) setEvalLoadFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // Dynamically Compute Averages from Real User Data
+  // Dynamically Compute Averages from Real User Data.
+  //
+  // Two things this must not do, because the page presents the result as
+  // "ผลประเมินจริง" beside the count:
+  //   - invent a headline score when nobody has evaluated (it used to return 9.2
+  //     out of 10 next to "จากผลประเมินจริง 0 รายการ");
+  //   - treat a score of 0 as missing. `Number(curr.uxScore || 9)` reads a
+  //     deliberate 0 as 9, so the one review that matters is the one silently
+  //     rewritten. Scores are validated server-side now, so a field that is
+  //     genuinely absent is the anomaly and is skipped rather than guessed at.
   const scores = useMemo(() => {
-    if (!evaluations || evaluations.length === 0) {
-      return { ux: 9.5, account: 9.5, queue: 10.0, merchant: 10.0, security: 9.0, total: 9.2, count: 0 };
-    }
     const count = evaluations.length;
-    const uxSum = evaluations.reduce((acc, curr) => acc + Number(curr.uxScore || 9), 0);
-    const accountSum = evaluations.reduce((acc, curr) => acc + Number(curr.accountScore || 9), 0);
-    const queueSum = evaluations.reduce((acc, curr) => acc + Number(curr.queueScore || 10), 0);
-    const merchantSum = evaluations.reduce((acc, curr) => acc + Number(curr.merchantScore || 10), 0);
-    const securitySum = evaluations.reduce((acc, curr) => acc + Number(curr.securityScore || 9), 0);
+    if (count === 0) {
+      return { ux: null, account: null, queue: null, merchant: null, security: null, total: null, count: 0 };
+    }
 
-    const ux = (uxSum / count).toFixed(1);
-    const account = (accountSum / count).toFixed(1);
-    const queue = (queueSum / count).toFixed(1);
-    const merchant = (merchantSum / count).toFixed(1);
-    const security = (securitySum / count).toFixed(1);
+    const mean = (field) => {
+      const values = evaluations
+        .map((item) => Number(item[field]))
+        .filter((value) => Number.isFinite(value));
+      if (values.length === 0) return null;
+      return values.reduce((sum, value) => sum + value, 0) / values.length;
+    };
 
-    const total = (
-      (Number(ux) + Number(account) + Number(queue) + Number(merchant) + Number(security)) / 5
-    ).toFixed(1);
+    const ux = mean("uxScore");
+    const account = mean("accountScore");
+    const queue = mean("queueScore");
+    const merchant = mean("merchantScore");
+    const security = mean("securityScore");
 
-    return { ux, account, queue, merchant, security, total, count };
+    const present = [ux, account, queue, merchant, security].filter((v) => v !== null);
+    const total = present.length ? present.reduce((a, b) => a + b, 0) / present.length : null;
+
+    const round = (value) => (value === null ? null : Number(value.toFixed(1)));
+    return {
+      ux: round(ux),
+      account: round(account),
+      queue: round(queue),
+      merchant: round(merchant),
+      security: round(security),
+      total: round(total),
+      count,
+    };
   }, [evaluations]);
+
+  /** A displayed score, or an em dash where there is nothing to display. */
+  const showScore = (value) => (value === null || value === undefined ? "—" : value.toFixed(1));
+  /** Bar width for a score that may not exist yet. */
+  const scoreWidth = (value) => `${((Number(value) || 0) / 10) * 100}%`;
+
+  /** One evaluation's own average, across whichever of the five scores it carries. */
+  const averageScore = (item) => {
+    const values = ["uxScore", "accountScore", "queueScore", "merchantScore", "securityScore"]
+      .map((field) => Number(item[field]))
+      .filter((value) => Number.isFinite(value));
+    if (values.length === 0) return 0;
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+  };
 
   // Handle User Evaluation Form Submission
   const handleEvalSubmit = async (e) => {
@@ -108,12 +185,23 @@ export default function Queueup() {
       comment: evalComment.trim(),
     };
 
-    const saved = await submitEvaluationToFirestore(newRating);
-    setEvaluations((prev) => [saved, ...prev]);
-    setIsSubmitting(false);
-    setIsEvalModalOpen(false);
-    setEvalComment("");
-    toast.success("ขอบคุณสำหรับผลประเมินสถาปัตยกรรมระบบ QueueUp CRM ครับ!");
+    // The thank-you is only honest once the evaluation is stored. This previously
+    // ran unconditionally while every write was being rejected and swallowed.
+    try {
+      const saved = await submitEvaluationToFirestore(newRating);
+      setEvaluations((prev) => [saved, ...prev]);
+      setIsEvalModalOpen(false);
+      setEvalComment("");
+      toast.success("ขอบคุณสำหรับผลประเมินสถาปัตยกรรมระบบ QueueUp CRM ครับ!");
+    } catch (err) {
+      toast.error(
+        err?.message
+          ? `ส่งผลประเมินไม่สำเร็จ: ${err.message}`
+          : "ส่งผลประเมินไม่สำเร็จ กรุณาลองใหม่อีกครั้ง"
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Scroll listener for sticky glass navbar
@@ -148,7 +236,7 @@ export default function Queueup() {
       <header className={`qup-navbar ${isScrolled ? "scrolled" : ""}`}>
         <div className="qup-nav-content">
           <div className="qup-logo-group" onClick={() => navigate("/about")}>
-            <img src="/logo.png" alt="QueueUp Logo" className="qup-logo-img" />
+            <img decoding="async" src="/logo.png" alt="QueueUp Logo" className="qup-logo-img" />
             <span className="qup-logo-text">QueueUp</span>
           </div>
 
@@ -207,7 +295,7 @@ export default function Queueup() {
 
         <div className="qup-hero-card-display">
           <div className="qup-mascot-frame">
-            <img src="/yeti_mascot.jpg" alt="QueueUp Yeti Mascot" className="qup-mascot-img" />
+            <img loading="lazy" decoding="async" src="/yeti_mascot.jpg" alt="QueueUp Yeti Mascot" className="qup-mascot-img" />
 
             {/* Floating Live Badges */}
             <div className="qup-float-badge qup-float-1">
@@ -431,7 +519,7 @@ export default function Queueup() {
         <div className="row g-4 qup-score-banner">
           <div className="col-lg-4 d-flex flex-column align-items-center justify-content-center text-center">
             <div className="qup-score-badge-box w-100">
-              <div className="qup-score-big-num">{scores.total}</div>
+              <div className="qup-score-big-num">{showScore(scores.total)}</div>
               <div className="fw-bold fs-5 mt-1">/ 10 คะแนนรวมเฉลี่ย</div>
               <div className="badge bg-white text-danger mt-2 px-3 py-1">
                 จากผลประเมินจริง {scores.count} รายการ
@@ -449,28 +537,28 @@ export default function Queueup() {
 
           <div className="col-lg-8">
             <div className="qup-score-bar-item">
-              <div className="qup-score-bar-label"><span>🎨 UX/UI Design & Responsiveness</span><span>{scores.ux} / 10</span></div>
-              <div className="qup-score-progress-track"><div className="qup-score-progress-fill bg-[#ee4d2d]" style={{ width: `${(scores.ux / 10) * 100}%` }} /></div>
+              <div className="qup-score-bar-label"><span>🎨 UX/UI Design & Responsiveness</span><span>{showScore(scores.ux)} / 10</span></div>
+              <div className="qup-score-progress-track"><div className="qup-score-progress-fill bg-[#FF7A1A]" style={{ width: scoreWidth(scores.ux) }} /></div>
             </div>
 
             <div className="qup-score-bar-item">
-              <div className="qup-score-bar-label"><span>👤 "บัญชีเดียว ขยายได้ตามการเติบโต" (One Account Role Switch)</span><span>{scores.account} / 10</span></div>
-              <div className="qup-score-progress-track"><div className="qup-score-progress-fill bg-[#8b5cf6]" style={{ width: `${(scores.account / 10) * 100}%` }} /></div>
+              <div className="qup-score-bar-label"><span>👤 "บัญชีเดียว ขยายได้ตามการเติบโต" (One Account Role Switch)</span><span>{showScore(scores.account)} / 10</span></div>
+              <div className="qup-score-progress-track"><div className="qup-score-progress-fill bg-[#8b5cf6]" style={{ width: scoreWidth(scores.account) }} /></div>
             </div>
 
             <div className="qup-score-bar-item">
-              <div className="qup-score-bar-label"><span>📋 Order & Live Queue Flow (Pre-Order / Smart Queue)</span><span>{scores.queue} / 10</span></div>
-              <div className="qup-score-progress-track"><div className="qup-score-progress-fill bg-[#22c55e]" style={{ width: `${(scores.queue / 10) * 100}%` }} /></div>
+              <div className="qup-score-bar-label"><span>📋 Order & Live Queue Flow (Pre-Order / Smart Queue)</span><span>{showScore(scores.queue)} / 10</span></div>
+              <div className="qup-score-progress-track"><div className="qup-score-progress-fill bg-[#22c55e]" style={{ width: scoreWidth(scores.queue) }} /></div>
             </div>
 
             <div className="qup-score-bar-item">
-              <div className="qup-score-bar-label"><span>🏪 Merchant Seller Centre CRM & Analytics</span><span>{scores.merchant} / 10</span></div>
-              <div className="qup-score-progress-track"><div className="qup-score-progress-fill bg-[#0ea5e9]" style={{ width: `${(scores.merchant / 10) * 100}%` }} /></div>
+              <div className="qup-score-bar-label"><span>🏪 Merchant Seller Centre CRM & Analytics</span><span>{showScore(scores.merchant)} / 10</span></div>
+              <div className="qup-score-progress-track"><div className="qup-score-progress-fill bg-[#0ea5e9]" style={{ width: scoreWidth(scores.merchant) }} /></div>
             </div>
 
             <div className="qup-score-bar-item">
-              <div className="qup-score-bar-label"><span>🛡️ Authentication & Private Finance Isolation</span><span>{scores.security} / 10</span></div>
-              <div className="qup-score-progress-track"><div className="qup-score-progress-fill bg-[#f59e0b]" style={{ width: `${(scores.security / 10) * 100}%` }} /></div>
+              <div className="qup-score-bar-label"><span>🛡️ Authentication & Private Finance Isolation</span><span>{showScore(scores.security)} / 10</span></div>
+              <div className="qup-score-progress-track"><div className="qup-score-progress-fill bg-[#f59e0b]" style={{ width: scoreWidth(scores.security) }} /></div>
             </div>
           </div>
         </div>
@@ -480,6 +568,25 @@ export default function Queueup() {
           <h4 className="fw-bold text-light mb-3">
             <i className="bi bi-chat-quote-fill text-warning me-2" /> ความคิดเห็นและผลประเมินจากผู้ใช้งานจริงล่าสุด ({evaluations.length} ความคิดเห็น)
           </h4>
+          {evalLoadFailed && (
+            <div role="alert" className="p-3 rounded-3 bg-slate-800/60 border border-amber-500/40 text-amber-200 small">
+              ไม่สามารถโหลดผลประเมินได้ในขณะนี้ กรุณารีเฟรชหน้าอีกครั้ง
+            </div>
+          )}
+
+          {!evalLoadFailed && evaluations.length === 0 && (
+            <div className="p-4 rounded-3 bg-slate-800/60 border border-white/10 text-center">
+              <p className="text-slate-300 small mb-2">ยังไม่มีผลประเมินจากผู้ใช้งาน</p>
+              <button
+                type="button"
+                className="btn btn-light btn-sm fw-bold"
+                onClick={() => setIsEvalModalOpen(true)}
+              >
+                <i className="bi bi-star-fill text-warning me-1" /> เป็นคนแรกที่ส่งผลประเมิน
+              </button>
+            </div>
+          )}
+
           <div className="row g-3">
             {evaluations.slice(0, 4).map((item, idx) => (
               <div key={item.id || idx} className="col-md-6">
@@ -490,10 +597,17 @@ export default function Queueup() {
                     </div>
                     <span className="badge bg-warning text-dark">
                       <i className="bi bi-star-fill me-1" />
-                      {(((Number(item.uxScore || 9) + Number(item.accountScore || 9) + Number(item.queueScore || 10) + Number(item.merchantScore || 10) + Number(item.securityScore || 9)) / 5)).toFixed(1)} / 10
+                      {averageScore(item).toFixed(1)} / 10
                     </span>
                   </div>
-                  <p className="text-slate-300 small mb-0 font-italic">"{item.comment || "สถาปัตยกรรมระบบสมบูรณ์และใช้งานได้จริงดีเยี่ยม"}"</p>
+                  {/* No invented quote: a blank comment used to be replaced with
+                      "สถาปัตยกรรมระบบสมบูรณ์และใช้งานได้จริงดีเยี่ยม", attributing
+                      praise to an evaluator who never wrote it. */}
+                  {item.comment ? (
+                    <p className="text-slate-300 small mb-0 font-italic">"{item.comment}"</p>
+                  ) : (
+                    <p className="text-slate-500 small mb-0">(ให้คะแนนโดยไม่ระบุความคิดเห็น)</p>
+                  )}
                 </div>
               </div>
             ))}
@@ -545,7 +659,7 @@ export default function Queueup() {
       {/* ==================== 8.5. HIGH-CONVERTING SALES & SOLUTION PACKAGES ==================== */}
       <section id="solution" className="qup-section-container">
         <div className="qup-section-header">
-          <span className="qup-section-sub text-[#ee4d2d]">QUEUEUP SOLUTION & PACKAGES — โซลูชันยกระดับโรงอาหาร</span>
+          <span className="qup-section-sub text-[#FF7A1A]">QUEUEUP SOLUTION & PACKAGES — โซลูชันยกระดับโรงอาหาร</span>
           <h2 className="qup-section-title">เปลี่ยนโรงอาหารแบบเดิม สู่ Smart Canteen 4.0</h2>
           <p className="qup-section-desc">
             โซลูชันครบวงจรที่ตอบโจทย์ทั้งนักเรียน ครู ผู้ปกครอง ร้านค้า และฝ่ายบริหารสถานศึกษา เพื่อเพิ่มประสิทธิภาพการบริการและสร้างความประทับใจสูงสุด
@@ -648,7 +762,7 @@ export default function Queueup() {
               role: "UX/UI Lead & Super Admin",
               desc: "ออกแบบประสบการณ์ผู้ใช้ สถาปัตยกรรมหน้าจอ Responsive และระบบจัดการสิทธิ์สูงสุด",
               icon: "bi-palette-fill",
-              color: "#ee4d2d",
+              color: "#FF7A1A",
               bg: "rgba(238, 77, 45, 0.15)",
             },
             {
@@ -738,7 +852,7 @@ export default function Queueup() {
           <div className="row g-5 align-items-center">
             {/* Left Info Column */}
             <div className="col-lg-5">
-              <span className="qup-section-sub text-[#ee4d2d]">CONTACT & INQUIRIES — ติดต่อเรา</span>
+              <span className="qup-section-sub text-[#FF7A1A]">CONTACT & INQUIRIES — ติดต่อเรา</span>
               <h2 className="qup-section-title text-4xl">
                 พร้อมยกระดับโรงอาหารของคุณหรือยัง?
               </h2>
@@ -854,13 +968,14 @@ export default function Queueup() {
                         />
                       </div>
                       <div className="col-md-6">
-                        <label className="text-slate-300 small fw-bold mb-1">อีเมลติดต่อ</label>
+                        <label className="text-slate-300 small fw-bold mb-1">อีเมลติดต่อ *</label>
                         <input
                           type="email"
                           className="form-control qup-input"
                           placeholder="your-email@school.ac.th"
                           value={contactEmail}
                           onChange={(e) => setContactEmail(e.target.value)}
+                          required
                         />
                       </div>
                     </div>
@@ -914,7 +1029,7 @@ export default function Queueup() {
         <div className="qup-footer-grid">
           <div>
             <div className="qup-logo-group mb-3" onClick={() => navigate("/")}>
-              <img src="/logo.png" alt="QueueUp Logo" className="qup-logo-img" />
+              <img decoding="async" src="/logo.png" alt="QueueUp Logo" className="qup-logo-img" />
               <span className="qup-logo-text">QueueUp</span>
             </div>
             <p className="text-slate-400 text-[0.92rem] leading-relaxed max-w-[320px]">
@@ -963,7 +1078,7 @@ export default function Queueup() {
       {isEvalModalOpen && (
         <div className="modal fade show d-block bg-slate-900/80 backdrop-blur-md z-[10000]" tabIndex="-1">
           <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content text-white bg-gradient-to-br from-slate-800 to-slate-900 border border-[#ee4d2d]/40 rounded-[20px] shadow-2xl">
+            <div className="modal-content text-white bg-gradient-to-br from-slate-800 to-slate-900 border border-[#FF7A1A]/40 rounded-[20px] shadow-2xl">
               <div className="modal-header border-bottom border-secondary">
                 <h5 className="modal-title fw-bold">
                   <i className="bi bi-star-fill text-warning me-2" />
@@ -977,6 +1092,18 @@ export default function Queueup() {
                   <p className="text-slate-300 small mb-4">
                     กรอกคะแนนประเมินของคุณในแต่ละหมวด (1.0 - 10.0 คะแนน) ระบบจะนำคะแนนของคุณไปคำนวณค่าเฉลี่ยสถาปัตยกรรมระบบในหน้าเกี่ยวกับเราทันที!
                   </p>
+
+                  {/* The wall is public so supervisors and reviewers can read it
+                      without an account, which means what is typed here is visible
+                      to anyone. Saying so is the difference between publishing and
+                      exposing. */}
+                  <div className="alert alert-warning py-2 px-3 small d-flex align-items-start gap-2 mb-3">
+                    <i className="bi bi-eye-fill mt-1" />
+                    <span>
+                      ชื่อผู้ประเมินและความคิดเห็นของคุณจะ<strong>แสดงต่อสาธารณะ</strong>บนหน้านี้
+                      กรุณาไม่กรอกข้อมูลส่วนบุคคลที่ไม่ต้องการเปิดเผย
+                    </span>
+                  </div>
 
                   <div className="mb-3">
                     <label className="form-label font-weight-bold">ชื่อผู้ประเมิน / บทบาท:</label>
@@ -1086,7 +1213,7 @@ export default function Queueup() {
       {isCookieModalOpen && (
         <div className="modal fade show d-block bg-slate-900/80 backdrop-blur-md z-[10001]" tabIndex="-1">
           <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content text-white bg-gradient-to-br from-slate-800 to-slate-900 border border-[#ee4d2d]/40 rounded-[20px]">
+            <div className="modal-content text-white bg-gradient-to-br from-slate-800 to-slate-900 border border-[#FF7A1A]/40 rounded-[20px]">
               <div className="modal-header border-bottom border-secondary">
                 <h5 className="modal-title fw-bold">
                   <i className="bi bi-gear-fill text-warning me-2" />
