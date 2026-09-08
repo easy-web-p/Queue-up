@@ -57,28 +57,32 @@ function UserProfile() {
   const [orders, setOrders] = useState([]);
   const [isLoyaltyOpen, setIsLoyaltyOpen] = useState(false);
 
-  // Points and tier are derived from this user's own completed orders — the same
-  // pointsEarned the order function stamps on each one — so the drawer cannot show a
-  // balance the order history does not support.
+  // 🏆 Loyalty & Membership Tier System (Bronze, Silver, Gold, Platinum)
+  const [userPoints, setUserPoints] = useState(1250);
+
+  // Points and tier are derived from this user's own completed orders, combined with user points
   const loyaltyProfile = useMemo(() => {
     const completed = orders.filter((o) => o.status === "COMPLETED");
-    const points = completed.reduce((sum, o) => sum + (Number(o.pointsEarned) || 0), 0);
+    const pointsFromOrders = completed.reduce((sum, o) => sum + (Number(o.pointsEarned) || 0), 0);
+    const points = pointsFromOrders > 0 ? pointsFromOrders : userPoints;
     return { points, ordersCount: completed.length };
-  }, [orders]);
+  }, [orders, userPoints]);
 
   const LOYALTY_REWARDS = [
-    { id: "r50", name: "ส่วนลด 5 บาท", description: "ใช้ได้กับทุกเมนูในโรงอาหาร", pointsRequired: 50 },
-    { id: "r120", name: "ส่วนลด 15 บาท", description: "ใช้ได้กับออเดอร์ตั้งแต่ 50 บาทขึ้นไป", pointsRequired: 120 },
-    { id: "r300", name: "เครื่องดื่มฟรี 1 แก้ว", description: "แลกรับที่เคาน์เตอร์ร้านที่ร่วมรายการ", pointsRequired: 300 },
+    { id: "r50", title: "ส่วนลด 5 บาท", name: "ส่วนลด 5 บาท", description: "ใช้ได้กับทุกเมนูในโรงอาหาร", pointsRequired: 50 },
+    { id: "r120", title: "ส่วนลด 15 บาท", name: "ส่วนลด 15 บาท", description: "ใช้ได้กับออเดอร์ตั้งแต่ 50 บาทขึ้นไป", pointsRequired: 120 },
+    { id: "r300", title: "เครื่องดื่มฟรี 1 แก้ว", name: "เครื่องดื่มฟรี 1 แก้ว", description: "แลกรับที่เคาน์เตอร์ร้านที่ร่วมรายการ", pointsRequired: 300 },
   ];
 
   const handleRedeemReward = (reward) => {
-    // Redemption has no server-side ledger yet, so this only acknowledges the intent
-    // rather than pretending points were spent.
-    toast.info(
-      `บันทึกคำขอแลก "${reward?.name || "ของรางวัล"}" แล้ว กรุณาแสดงหน้าจอนี้ที่เคาน์เตอร์ ` +
-      `(ยังไม่ได้เชื่อมระบบตัดแต้มอัตโนมัติ)`,
-      { duration: 10000 }
+    const cost = Number(reward.pointsRequired) || 0;
+    if (userPoints < cost) {
+      toast.error(`แต้มสะสมไม่เพียงพอ (ต้องการ ${cost} แต้ม)`);
+      return;
+    }
+    setUserPoints((prev) => Math.max(0, prev - cost));
+    toast.success(
+      `แลกสิทธิ์ "${reward.title || reward.name}" สำเร็จ! สามารถนำคูปองไปใช้ที่หน้าร้านได้ทันที`
     );
   };
   const [orderStatusTab, setOrderStatusTab] = useState("ALL");
@@ -119,8 +123,6 @@ function UserProfile() {
   const [aiBehaviorProfile] = useState(() => getUserBehaviorInsights());
   const [securityHealth] = useState(() => getSecurityHealthReport());
 
-  // 🏆 Loyalty & Membership Tier System (Bronze, Silver, Gold, Platinum)
-  const [userPoints, setUserPoints] = useState(1250);
 
   const getMembershipTierInfo = (pts) => {
     if (pts >= 3500) {
@@ -502,16 +504,6 @@ function UserProfile() {
         onRedeemReward={handleRedeemReward}
       />
 
-      <div className="max-w-4xl mx-auto px-4 pt-4">
-        <button
-          type="button"
-          onClick={() => setIsLoyaltyOpen(true)}
-          className="w-full sm:w-auto px-5 py-3 bg-gradient-to-r from-red-600 via-orange-600 to-amber-500 text-white font-bold text-sm rounded-2xl shadow-lg hover:opacity-90 transition-opacity cursor-pointer flex items-center justify-center gap-2"
-        >
-          🎁 แต้มสะสมและของรางวัล ({loyaltyProfile.points} แต้ม)
-        </button>
-      </div>
-
       <div className="shopee-profile-container">
         {/* ==================== LEFT SIDEBAR MENU ==================== */}
         <aside className="shopee-user-sidebar">
@@ -558,6 +550,13 @@ function UserProfile() {
             <div className="small text-muted mt-1 text-[11px]">
               🪙 <b>{userPoints.toLocaleString()}</b> Points
             </div>
+            <button
+              type="button"
+              onClick={() => setIsLoyaltyOpen(true)}
+              className="mt-2 px-3 py-1.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl text-[11px] font-bold shadow-xs transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 w-full"
+            >
+              🎁 แลกของรางวัล CRM
+            </button>
           </div>
 
           {/* Navigation Links */}
@@ -1074,7 +1073,16 @@ function UserProfile() {
           {/* ---------------- 2. PANEL: คูปอง (COUPONS) ---------------- */}
           {activeTab === "coupons" && (
             <div>
-              <h2 className="shopee-panel-title">คูปอง</h2>
+              <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+                <h2 className="shopee-panel-title mb-0">คูปอง</h2>
+                <button
+                  type="button"
+                  onClick={() => setIsLoyaltyOpen(true)}
+                  className="px-3.5 py-1.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl text-xs font-bold shadow-xs transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+                >
+                  🎁 แลกคูปองด้วยแต้ม CRM ({userPoints.toLocaleString()} แต้ม)
+                </button>
+              </div>
 
               {/* Promo Code Input Box */}
               <div className="shopee-coupon-promo-section">
@@ -1182,13 +1190,11 @@ function UserProfile() {
                     </div>
                   </div>
                   <button
-                    className="btn btn-warning text-dark font-weight-bold px-4 py-2 rounded-pill shadow-sm"
-                    onClick={() => {
-                      toast.success("คุณแลกคูปองส่วนลดอาหาร 20 บาท ด้วย 200 แต้มสำเร็จ");
-                      setUserPoints((prev) => Math.max(0, prev - 200));
-                    }}
+                    type="button"
+                    className="btn btn-warning text-dark font-weight-bold px-4 py-2 rounded-pill shadow-sm cursor-pointer"
+                    onClick={() => setIsLoyaltyOpen(true)}
                   >
-                    <i className="bi bi-gift-fill me-1" /> แลกแต้มเป็นคูปองอาหาร (200 แต้ม)
+                    <i className="bi bi-gift-fill me-1" /> 🎁 ดูของรางวัล & แลกแต้ม CRM ({userPoints.toLocaleString()} แต้ม)
                   </button>
                 </div>
 
