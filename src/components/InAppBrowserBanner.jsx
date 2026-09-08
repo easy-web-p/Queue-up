@@ -7,12 +7,13 @@ export default function InAppBrowserBanner() {
   const toast = useToast();
   const [visible, setVisible] = useState(() => {
     if (typeof window === "undefined") return false;
+    let isDismissed = false;
     try {
-      const isDismissed = sessionStorage.getItem("queueup_dismiss_inapp_banner") === "true";
-      return isInAppBrowser() && !isDismissed;
+      isDismissed = sessionStorage.getItem("queueup_dismiss_inapp_banner") === "true";
     } catch {
-      return false;
+      // Storage restricted or inaccessible (e.g. Instagram WebKit ITP); default to not dismissed
     }
+    return isInAppBrowser() && !isDismissed;
   });
   const [browserName] = useState(() => getInAppBrowserName());
   const [copied, setCopied] = useState(false);
