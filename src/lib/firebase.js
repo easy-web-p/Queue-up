@@ -149,8 +149,20 @@ export const fetchProductByIdFromFirestore = async (productId) => {
   return null;
 };
 
-// ฟังก์ชันบันทึก / อัปเดตรายการอาหารทั้งหมดลง Firestore
+/**
+ * Writes products to Firestore.
+ *
+ * It used to catch every failure and log a warning, so a caller that seeded a
+ * menu blocked by security rules was told nothing and assumed it had worked. It
+ * now throws, and reports how far it got — a partial write is a real outcome the
+ * caller has to be able to describe.
+ *
+ * @param {Array<object>} productsArray - products carrying an id
+ * @returns {Promise<{written: number}>}
+ * @throws with `written` attached, when a write is refused
+ */
 export const saveProductsToFirestore = async (productsArray) => {
+  let written = 0;
   try {
     for (const item of productsArray) {
       await setDoc(
@@ -158,10 +170,13 @@ export const saveProductsToFirestore = async (productsArray) => {
         { ...item, updatedAt: serverTimestamp() },
         { merge: true }
       );
+      written += 1;
     }
   } catch (error) {
-    console.warn("Firestore saveProducts warning:", error);
+    error.written = written;
+    throw error;
   }
+  return { written };
 };
 
 // Save user evaluation rating.

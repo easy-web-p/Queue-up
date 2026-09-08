@@ -26,8 +26,14 @@ import {
   Download
 } from 'lucide-react';
 import { MenuItem, Order, MerchantShop } from '../types';
-import { fetchMenuItemsFromFirestore, fetchOrdersFromFirestore, fetchShopsFromFirestore } from '../lib/firebase';
-import { db, doc, setDoc } from '../firebase/config.js';
+import {
+  fetchMenuItemsFromFirestore,
+  fetchOrdersFromFirestore,
+  fetchShopsFromFirestore,
+  saveProductsToFirestore,
+} from '../lib/firebase';
+import { db, doc, setDoc, INITIAL_PRODUCTS } from '../firebase/config.js';
+import { buildSeedProducts } from '../lib/seedCatalog.js';
 import { writeBatch } from 'firebase/firestore';
 import { useToast } from '../components/ToastProvider.jsx';
 
@@ -67,6 +73,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
 
   // Menu Items State
   const [localMenuItems, setLocalMenuItems] = useState<MenuItem[]>([]);
+  const [isSeeding, setIsSeeding] = useState(false);
   const menuItems = propsMenuItems && propsMenuItems.length > 0 ? propsMenuItems : localMenuItems;
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -131,6 +138,55 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
     { id: 'L-103', time: '09:45 น.', action: 'เปิดร้านค้าประจำวัน รับออเดอร์ปกติ', user: 'ป้าแดง ใจดี' },
     { id: 'L-104', time: '09:30 น.', action: 'เติมสต็อกวัตถุดิบไก่ทอด +50 จาน', user: 'นายสมชาย มีชัย' },
   ]);
+
+  /**
+   * Writes the sample dishes into this store's menu as real, orderable products.
+   *
+   * The app no longer shows a hardcoded catalogue when the collection is empty, so
+   * a fresh canteen genuinely has no menu until something puts one there. This is
+   * that something — and it attaches the store id the ordering function requires
+   * and strips the placeholder sales figures, so what lands in the database is a
+   * real menu rather than a mock made permanent.
+   */
+  const handleSeedMenu = async () => {
+    const targetStoreId = shopInfo?.id || user?.storeId;
+    if (!targetStoreId) {
+      toast.error('ยังไม่มีร้านค้าในระบบ กรุณาสร้างร้านค้าก่อนเพิ่มเมนู');
+      return;
+    }
+
+    const confirmed = await toast.confirm({
+      title: 'เพิ่มเมนูตัวอย่างเข้าร้านนี้',
+      message:
+        `จะเพิ่มเมนูตัวอย่าง ${INITIAL_PRODUCTS.length} รายการเข้าร้าน "${shopInfo?.shopName || targetStoreId}" ` +
+        'โดยเมนูเหล่านี้จะเป็นเมนูจริงที่นักเรียนสั่งได้ทันที\n\n' +
+        'ยอดขายและคะแนนรีวิวจะเริ่มจากศูนย์ ไม่ใช่ตัวเลขตัวอย่าง',
+      confirmLabel: 'เพิ่มเมนู',
+      tone: 'info',
+    });
+    if (!confirmed) return;
+
+    setIsSeeding(true);
+    try {
+      const products = buildSeedProducts(INITIAL_PRODUCTS, targetStoreId);
+      const { written } = await saveProductsToFirestore(products);
+      const dbItems = await fetchMenuItemsFromFirestore();
+      setLocalMenuItems(dbItems);
+      toast.success(`เพิ่มเมนูเข้าร้านเรียบร้อย ${written} รายการ`);
+    } catch (err) {
+      // A partial write is a real outcome: saying "failed" when half the menu
+      // landed would send the admin looking for products that are already there.
+      const written = (err as { written?: number })?.written;
+      const detail = err instanceof Error ? err.message : 'ไม่ทราบสาเหตุ';
+      toast.error(
+        written
+          ? `เพิ่มเมนูได้เพียง ${written} รายการก่อนเกิดข้อผิดพลาด: ${detail}`
+          : `เพิ่มเมนูไม่สำเร็จ: ${detail}`
+      );
+    } finally {
+      setIsSeeding(false);
+    }
+  };
 
   const handleAddStaffSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -605,6 +661,19 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                 </span>
               </div>
               <div className="flex flex-wrap gap-2 text-xs">
+                {/* Only offered while there is nothing to adjust. Once the canteen
+                    has a menu, a "add the samples" button next to the batch price
+                    tools is an accident waiting to happen. */}
+                {menuItems.length === 0 && (
+                  <button
+                    onClick={handleSeedMenu}
+                    disabled={isSeeding}
+                    className="min-h-[44px] px-4 py-3 bg-[#FF7A1A] hover:bg-[#E6680D] disabled:opacity-60 disabled:cursor-wait text-white font-bold rounded-lg shadow-md transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span>{isSeeding ? 'กำลังเพิ่มเมนู...' : 'เพิ่มเมนูตัวอย่างเข้าร้าน'}</span>
+                  </button>
+                )}
                 <button
                   onClick={() => handleBatchAdjustPrices(5)}
                   className="px-3 py-1.5 bg-white hover:bg-orange-100 text-[#f6402e] border border-orange-300 font-bold rounded-lg shadow-2xs transition-all cursor-pointer flex items-center gap-1"

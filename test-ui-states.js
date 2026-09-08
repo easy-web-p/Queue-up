@@ -135,14 +135,26 @@ runTest('The error state is announced, not just coloured red', () => {
   assert(block.includes('role="alert"'), 'a failure must reach a screen reader');
 });
 
-runTest('🚨 The admin menu load handles the throw it can now receive', () => {
+runTest('🚨 Every admin menu load handles the throw it can now receive', () => {
   // fetchMenuItemsFromFirestore throws instead of returning a catalogue, so an
-  // unhandled rejection would leave the page silently stale.
-  const loads = admin.split('fetchMenuItemsFromFirestore()').slice(1);
-  assert(loads.length >= 2, 'both call sites must be present');
-  for (const [i, block] of loads.entries()) {
-    assert(/\.catch\(/.test(block.slice(0, 600)), `call site ${i + 1} must handle a failure`);
+  // unhandled rejection would leave the page silently stale. A call is handled
+  // either by chaining .catch() or by being awaited inside a try/catch — both are
+  // correct, so both are accepted.
+  const marker = 'fetchMenuItemsFromFirestore()';
+  let from = 0;
+  let sites = 0;
+  for (;;) {
+    const idx = admin.indexOf(marker, from);
+    if (idx === -1) break;
+    sites += 1;
+    from = idx + marker.length;
+    const after = admin.slice(idx, idx + 800);
+    const before = admin.slice(Math.max(0, idx - 400), idx);
+    const chained = /\.catch\(/.test(after);
+    const awaited = /await\s+$/.test(before) && /catch \(/.test(after);
+    assert(chained || awaited, `call site ${sites} leaves a rejection unhandled`);
   }
+  assert(sites >= 3, `expected every call site to be checked, found ${sites}`);
 });
 
 runTest('🚨 The admin price reset confirms only after the reload returns', () => {

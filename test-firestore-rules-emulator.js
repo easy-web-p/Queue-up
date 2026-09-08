@@ -15,6 +15,7 @@
 
 import fs from 'node:fs';
 import process from 'node:process';
+import { buildSeedProducts } from './src/lib/seedCatalog.js';
 import {
   initializeTestEnvironment,
   assertFails,
@@ -530,6 +531,47 @@ await runTest('🚨 The evaluation rate-limit counter is closed to clients', asy
   await assertFails(
     setDoc(doc(asAnon, 'evaluation_rate_limits', '203_0_113_7'), { count: 0, windowStart: 0 })
   );
+});
+
+// ===========================================================================
+console.log('\n🌱 Seeded menu products (the shape the seeder actually writes)');
+// ===========================================================================
+
+// Exactly what StoreAdminPage's seed button hands to Firestore.
+const seeded = buildSeedProducts(
+  [{ id: 'm1', name: 'ชุดไก่บักเก็ตซอสเกาหลี', price: 69, originalPrice: 120, sales: '4.5k ครั้ง', rating: 4.9 }],
+  SHOP
+)[0];
+
+await runTest('🚨 The seeded shape is accepted by the rules, not just by the UI', async () => {
+  // A seeder whose documents the rules refuse would report success for a menu
+  // that never landed. This is the check that the two agree.
+  await assertSucceeds(setDoc(doc(asMerchant, 'products', seeded.id), seeded));
+});
+
+await runTest('An admin can seed a store they do not own', async () => {
+  await assertSucceeds(setDoc(doc(asAdmin, 'products', `${seeded.id}_admin`), seeded));
+});
+
+await runTest('🚨 A student cannot seed products', async () => {
+  await assertFails(setDoc(doc(asStudent, 'products', 'forged_1'), seeded));
+});
+
+await runTest('🚨 A merchant cannot seed products into someone else store', async () => {
+  await assertFails(
+    setDoc(doc(asMerchant, 'products', 'cross_1'), { ...seeded, storeId: 'someone_else_shop' })
+  );
+});
+
+await runTest('🚨 The seeder strips the fabricated sales figures before writing', async () => {
+  for (const field of ['sales', 'salesCount', 'rating', 'originalPrice']) {
+    if (field in seeded) throw new Error(`${field} must not reach the database`);
+  }
+});
+
+await runTest('🚨 A seeded product carries the storeId ordering requires', async () => {
+  if (seeded.storeId !== SHOP) throw new Error('a product with no store cannot be ordered');
+  if (seeded.priceSatang !== 6900) throw new Error('satang must match the baht price');
 });
 
 await testEnv.cleanup();
