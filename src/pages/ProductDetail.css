@@ -240,13 +240,6 @@
 }
 
 /* Time Slot Discount Badges Carousel */
-.queue-pd-time-slots-grid {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 6px;
-}
-
 .queue-pd-time-slot-btn {
   background: #ef4444;
   color: #ffffff;
@@ -332,11 +325,6 @@
 
   .queue-pd-main-img-box {
     height: 220px;
-  }
-
-  .queue-pd-slots-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
   }
 
   .queue-pd-btn-next {
@@ -492,6 +480,10 @@ html[data-theme="dark"] .queue-pd-input-select {
 
 .queue-pd-options-grid.cols-3 {
   grid-template-columns: repeat(3, 1fr);
+}
+
+.queue-pd-options-grid.cols-4 {
+  grid-template-columns: repeat(4, 1fr);
 }
 
 .queue-pd-options-grid.cols-5 {
@@ -1121,5 +1113,40 @@ html[data-theme="dark"] .queue-pd-input-select {
      bar now is. Lift it clear, and off the home indicator. */
   .queue-floating-chat-btn {
     bottom: calc(var(--order-bar-height) + 16px + var(--safe-bottom, 0px)) !important;
+  }
+}
+
+
+/* ==========================================================================
+   PHONE GRID OVERRIDES
+   ==========================================================================
+   These live at the end of the file on purpose. The 576px block higher up sits
+   above the base grid declarations, and at equal specificity the later rule
+   wins — an override written up there never applies. That is exactly how
+   `.queue-pd-slots-grid`, a class the markup has never used, sat in it unnoticed.
+   ========================================================================== */
+@media (max-width: 576px) {
+  /* Every option group gets the same two columns, whatever the count.
+     Before this, `cols-${n}` meant three options rendered three across, four
+     rendered one per row (there was no cols-4 rule at all) and five rendered
+     five across at 68px each, where "ไข่มุกบราวน์ชูการ์" wraps onto three lines.
+     One question, three different-looking controls. */
+  .queue-pd-options-grid,
+  .queue-pd-options-grid.cols-3,
+  .queue-pd-options-grid.cols-4,
+  .queue-pd-options-grid.cols-5 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Four time slots across a phone is 87px each, carrying a time and a
+     "-50% เปิดจอง" caption underneath. */
+  .queue-pd-time-slots-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  /* And four canteen stalls leaves no room for a stall name. */
+  .queue-pd-stalls-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }

@@ -225,6 +225,72 @@ runTest('🚨 The cookie banner sits above the order bar', () => {
   );
 });
 
+// ===========================================================================
+console.log('\n5. Phone rules that actually apply');
+// ===========================================================================
+
+runTest('🚨 No phone override is dead behind a later base rule', () => {
+  // At equal specificity the later rule wins, so a mobile override written above
+  // the base declaration it targets never applies — and nothing reports it. Two
+  // real ones hid here: the option grid stayed at five columns and the time slots
+  // at four, both invisible until someone opened the page on a phone.
+  //
+  // !important flips the outcome, so a rule carrying it is not dead. Login.css
+  // relies on exactly that to hide its hero.
+  const dead = [];
+  for (const f of cssFiles) {
+    const src = readFileSync(f, 'utf8');
+    const decls = [];
+    for (const m of src.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const selector = m[1].trim().split('\n').pop().trim();
+      if (!selector.startsWith('.') || selector.includes(',')) continue;
+      const before = src.slice(0, m.index);
+      const lastMedia = before.lastIndexOf('@media');
+      const open = (before.slice(lastMedia).match(/\{/g) || []).length;
+      const close = (before.slice(lastMedia).match(/\}/g) || []).length;
+      const inMedia = lastMedia !== -1 && open > close;
+      const isPhone = inMedia && /max-width:\s*[1-7]\d\dpx/.test(before.slice(lastMedia, lastMedia + 90));
+      for (const d of m[2].matchAll(/^\s*([a-z-]+)\s*:([^;]*);/gm)) {
+        decls.push({ selector, prop: d[1], at: m.index, isPhone, important: d[2].includes('!important') });
+      }
+    }
+    for (const d of decls) {
+      if (!d.isPhone || d.important) continue;
+      const overridden = decls.some(
+        (o) => o.selector === d.selector && o.prop === d.prop && !o.isPhone && !o.important && o.at > d.at
+      );
+      if (overridden) dead.push(`${relative(ROOT, f)}: ${d.selector} { ${d.prop} }`);
+    }
+  }
+  assert(dead.length === 0, `phone rules that never apply:\n       ${dead.join('\n       ')}`);
+});
+
+runTest('🚨 Every option group renders the same way, whatever the count', () => {
+  // `cols-${Math.min(options.length, 5)}` had no cols-4 rule at all, so three
+  // options rendered three across, four rendered one per row, and five rendered
+  // five across at 68px — one question, three different controls.
+  assert(/\.cols-4\s*\{/.test(productCss), 'cols-4 must exist');
+  const phone = productCss.slice(productCss.indexOf('PHONE GRID OVERRIDES'));
+  assert(phone.length > 0, 'the phone grid block must exist');
+  for (const n of ['cols-3', 'cols-4', 'cols-5']) {
+    assert(phone.includes(`.queue-pd-options-grid.${n}`), `${n} must be capped on phones`);
+  }
+});
+
+runTest('🚨 No grid the ordering flow uses stays above two columns on a phone', () => {
+  const phone = productCss.slice(productCss.indexOf('PHONE GRID OVERRIDES'));
+  for (const grid of ['.queue-pd-time-slots-grid', '.queue-pd-stalls-grid']) {
+    assert(phone.includes(grid), `${grid} must be capped`);
+  }
+  const twos = (phone.match(/repeat\(2, 1fr\)/g) || []).length;
+  assert(twos >= 3, `expected each capped grid at two columns, found ${twos}`);
+});
+
+runTest('A grid rule is declared in one place, not two', () => {
+  const count = (productCss.match(/\.queue-pd-time-slots-grid\s*\{/g) || []).length;
+  assert(count === 2, `expected the base rule and one phone override, found ${count}`);
+});
+
 console.log(`\n${'='.repeat(60)}`);
 console.log(`RESULT: ${passed} passed, ${failed} failed`);
 console.log('='.repeat(60));

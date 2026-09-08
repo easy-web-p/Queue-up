@@ -987,3 +987,13 @@
     justify-content: center;
   }
 }
+
+
+/* The marketing grids kept three columns all the way down, so each card was
+   ~118px wide on a phone — narrower than the Thai headings inside them. */
+@media (max-width: 576px) {
+  .qup-features-grid,
+  .qup-values-grid {
+    grid-template-columns: 1fr;
+  }
+}
