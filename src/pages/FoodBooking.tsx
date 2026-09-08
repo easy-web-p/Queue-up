@@ -556,7 +556,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
                       <button
                         type="button"
                         onClick={() => handleApplyCoupon()}
-                        className="px-4 py-2 bg-[#8B0000] hover:bg-[#700000] dark:bg-[#FF7A1A] dark:hover:bg-[#E0660D] text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer whitespace-nowrap"
+                        className="px-4 py-2 bg-[#8B0000] hover:bg-[#700000] dark:bg-[#FF7A1A] dark:hover:bg-[#E6680D] text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer whitespace-nowrap"
                       >
                         ใช้โค้ด
                       </button>

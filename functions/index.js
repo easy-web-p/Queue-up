@@ -1605,22 +1605,37 @@ export const scheduledDailyMaintenance = onSchedule(
  * 🏫 Pilot Programme Lead Submission (Authoritative Backend)
  */
 export const submitPilotLead = onCall(
-  { region: "asia-southeast1" },
+  { region: "asia-southeast1", cors: true },
   async (request) => {
-    const data = request.data || {};
-    const validation = validatePilotLead(data);
+    const validation = validatePilotLead(request.data);
     if (!validation.ok) {
-      throw new HttpsError("invalid-argument", validation.message);
+      throw new HttpsError("invalid-argument", `${validation.reason}: ${validation.message}`);
     }
 
-    const leadRef = await db.collection("pilot_leads").add({
-      ...validation.lead,
-      status: "PENDING",
-      createdAt: FieldValue.serverTimestamp(),
-      submittedByUid: request.auth?.uid || null,
+    // rawRequest.ip is Express's view of the caller; behind a proxy it can be
+    // absent, in which case rateLimitKeyForAddress buckets them together rather
+    // than letting them past the limit.
+    const callerKey = rateLimitKeyForAddress(request.rawRequest?.ip);
+    await consumeRateLimit(callerKey, {
+      collection: "pilot_lead_rate_limits",
+      maxCalls: 5,
+      windowMs: 60 * 60 * 1000,
+      message: "ส่งคำขอบ่อยเกินไป กรุณาติดต่อเราทางโทรศัพท์หรืออีเมลโดยตรง",
     });
 
-    return { leadId: leadRef.id };
+    const ref = await db.collection("pilot_leads").add({
+      ...validation.lead,
+      status: "NEW",
+      source: "landing_page_pilot_form",
+      submittedByUid: request.auth?.uid || null,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+    // No lead content in the log line: this collection exists precisely so the
+    // school's contact details live in one controlled place.
+    console.log(`[QueueUp] Pilot lead recorded: ${ref.id}`);
+
+    return { success: true, leadId: ref.id };
   }
 );
 

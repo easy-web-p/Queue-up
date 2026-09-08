@@ -9,8 +9,7 @@
  */
 
 import { httpsCallable } from 'firebase/functions';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { functions, db } from '../firebase/config.js';
+import { functions } from '../firebase/config.js';
 
 /**
  * @param {{schoolName: string, studentCount?: string, contactName: string,
@@ -19,35 +18,15 @@ import { functions, db } from '../firebase/config.js';
  * @throws {Error} with a message safe to show the school
  */
 export async function submitPilotLead(form) {
-  try {
-    const callable = httpsCallable(functions, 'submitPilotLead');
-    const result = await callable({
-      schoolName: form.schoolName,
-      studentCount: form.studentCount,
-      contactName: form.contactName,
-      position: form.position,
-      phone: form.phone,
-      email: form.email,
-      notes: form.notes,
-    });
-    if (result?.data?.leadId) {
-      return { leadId: result.data.leadId };
-    }
-  } catch (fnErr) {
-    console.warn('[pilotLeadService] Cloud Function submitPilotLead unavailable, falling back to direct Firestore insert:', fnErr?.message || fnErr);
-  }
-
-  // Fallback: Direct Firestore insertion with security rules validation
-  const docRef = await addDoc(collection(db, 'pilot_leads'), {
-    schoolName: form.schoolName.trim(),
+  const callable = httpsCallable(functions, 'submitPilotLead');
+  const result = await callable({
+    schoolName: form.schoolName,
     studentCount: form.studentCount,
-    contactName: form.contactName.trim(),
-    position: (form.position || '').trim(),
-    phone: form.phone.trim(),
-    email: (form.email || '').trim(),
-    notes: (form.notes || '').trim(),
-    status: 'PENDING',
-    createdAt: serverTimestamp(),
+    contactName: form.contactName,
+    position: form.position,
+    phone: form.phone,
+    email: form.email,
+    notes: form.notes,
   });
-  return { leadId: docRef.id };
+  return { leadId: result?.data?.leadId };
 }

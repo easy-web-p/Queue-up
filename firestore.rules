@@ -532,13 +532,15 @@ service cloud.firestore {
     }
 
     // ==========================================
-    // 20. PILOT PROPOSAL LEADS (Public Submit, Admin Review)
+    // 20. PILOT PROPOSAL LEADS (Admin Read, Backend Only Writes)
     // ==========================================
     match /pilot_leads/{leadId} {
-      allow read, update, delete: if isAdmin();
-      allow create: if isValidString(request.resource.data.schoolName, 2, 200) &&
-                       isValidString(request.resource.data.contactName, 2, 100) &&
-                       isValidString(request.resource.data.phone, 8, 30);
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /pilot_lead_rate_limits/{key} {
+      allow read, write: if false;
     }
 
     // ==========================================
