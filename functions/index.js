@@ -737,6 +737,103 @@ export const createOrderAuthoritative = onCall(
 );
 
 /**
+ * 🔒 Update Order Status Authoritative (Server-Authoritative Lifecycle)
+ *
+ * Verifies caller authentication, confirms shop ownership via /shops/{storeId}.ownerUid
+ * or admin claim, validates synchronized state transitions:
+ *   PENDING/waiting -> CONFIRMED/waiting -> PREPARING/cooking -> READY/ready -> COMPLETED/completed
+ *   (or PENDING/CONFIRMED -> CANCELLED/cancelled),
+ * and updates the order status atomically.
+ */
+export const updateOrderStatusAuthoritative = onCall(
+  { region: "asia-southeast1", cors: true },
+  async (request) => {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "AUTH_REQUIRED: กรุณาเข้าสู่ระบบก่อนดำเนินการ");
+    }
+
+    const authUid = request.auth.uid;
+    const { orderId, status: targetStatus, queueStatus: targetQueue, merchantNote, estimatedReadyTime } = request.data || {};
+
+    if (!orderId || typeof orderId !== "string") {
+      throw new HttpsError("invalid-argument", "INVALID_ORDER_ID: รหัสออร์เดอร์ไม่ถูกต้อง");
+    }
+
+    const orderRef = db.collection("orders").doc(orderId.trim());
+
+    return await db.runTransaction(async (tx) => {
+      const orderSnap = await tx.get(orderRef);
+      if (!orderSnap.exists) {
+        throw new HttpsError("not-found", `ORDER_NOT_FOUND: ไม่พบข้อมูลออร์เดอร์ #${orderId}`);
+      }
+
+      const orderData = orderSnap.data();
+      const storeId = orderData.storeId;
+      if (!storeId) {
+        throw new HttpsError("failed-precondition", "ORDER_MISSING_STORE: ออร์เดอร์ไม่มีข้อมูลร้านค้า");
+      }
+
+      // 1. Authorization: Admin or verified Store Owner
+      const isAdminUser = Boolean(
+        request.auth.token?.admin === true ||
+        request.auth.token?.role === "admin" ||
+        ["58140@lomsak.ac.th", "hi00000087@gmail.com", "easy.web.p@gmail.com"].includes(request.auth.token?.email)
+      );
+
+      if (!isAdminUser) {
+        const shopSnap = await tx.get(db.collection("shops").doc(storeId));
+        if (!shopSnap.exists || shopSnap.data().ownerUid !== authUid) {
+          throw new HttpsError("permission-denied", "STORE_OWNER_REQUIRED: คุณไม่มีสิทธิ์จัดการออร์เดอร์ของร้านนี้");
+        }
+      }
+
+      // 2. Validate Synchronized State Transition
+      const currentStatus = orderData.status || "PENDING";
+      const currentQueue = orderData.queueStatus || "waiting";
+      const newStatus = (targetStatus || currentStatus).toUpperCase();
+      const newQueue = (targetQueue || currentQueue).toLowerCase();
+
+      const isValidTransition =
+        (currentStatus === newStatus && currentQueue === newQueue) ||
+        (currentStatus === "PENDING" && currentQueue === "waiting" && newStatus === "CONFIRMED" && newQueue === "waiting") ||
+        (currentStatus === "CONFIRMED" && currentQueue === "waiting" && newStatus === "PREPARING" && newQueue === "cooking") ||
+        (currentStatus === "PREPARING" && currentQueue === "cooking" && newStatus === "READY" && newQueue === "ready") ||
+        (currentStatus === "READY" && currentQueue === "ready" && newStatus === "COMPLETED" && newQueue === "completed") ||
+        ((currentStatus === "PENDING" || currentStatus === "CONFIRMED") && newStatus === "CANCELLED" && newQueue === "cancelled");
+
+      if (!isValidTransition) {
+        throw new HttpsError(
+          "failed-precondition",
+          `INVALID_STATE_TRANSITION: ไม่สามารถเปลี่ยนสถานะจาก [${currentStatus}/${currentQueue}] ไปเป็น [${newStatus}/${newQueue}] ได้`
+        );
+      }
+
+      const updatePayload = {
+        status: newStatus,
+        queueStatus: newQueue,
+        updatedAt: FieldValue.serverTimestamp(),
+      };
+
+      if (typeof merchantNote === "string") {
+        updatePayload.merchantNote = merchantNote.slice(0, 500);
+      }
+      if (typeof estimatedReadyTime === "string") {
+        updatePayload.estimatedReadyTime = estimatedReadyTime.slice(0, 50);
+      }
+
+      tx.update(orderRef, updatePayload);
+
+      return {
+        ok: true,
+        orderId,
+        status: newStatus,
+        queueStatus: newQueue,
+      };
+    });
+  }
+);
+
+/**
  * 🔒 Record Merchant Audit Log (Server-Authoritative)
  *
  * Replaces client-side direct writes to `/audit_logs` which are blocked by

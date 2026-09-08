@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { switchRole, clearUser } from "../store/authSlice.js";
-import { db, doc, getDoc, setDoc } from "../firebase/config.js";
+import { db, doc, getDoc, setDoc, functions } from "../firebase/config.js";
 import { collection, query, where, getDocs, onSnapshot, updateDoc, serverTimestamp } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 import { MerchantKDS } from "../components/MerchantKDS.tsx";
 import ChatModal from "../components/ChatModal.jsx";
 import BookingCalendar from "../components/BookingCalendar.jsx";
@@ -313,21 +314,29 @@ function MerchantDashboard() {
     }
 
     try {
-      await updateDoc(doc(db, "orders", orderId), {
-        status,
-        queueStatus,
-        updatedAt: serverTimestamp(),
-      });
-    } catch (err) {
-      // The board is driven by onSnapshot, so a refused write left the card exactly
-      // where it was with no explanation at all: the kitchen pressed "อาหารพร้อม",
-      // nothing moved, and the student was never told their food was ready. During
-      // a lunch rush that is the whole system failing quietly.
-      console.error("Failed to update order status in Firestore:", err);
-      toast.error(
-        `อัปเดตสถานะคิว #${orderId} ไม่สำเร็จ: ${err?.message || "ไม่ทราบสาเหตุ"}\n` +
-        "ลูกค้ายังไม่ได้รับการแจ้งเตือน กรุณาลองใหม่อีกครั้ง"
-      );
+      // 1. Authoritative Cloud Function call (Server-Side State Machine & Ownership Validation)
+      const updateOrderFn = httpsCallable(functions, "updateOrderStatusAuthoritative");
+      await updateOrderFn({ orderId, status, queueStatus });
+    } catch (callableErr) {
+      console.warn("[MerchantDashboard] Authoritative status update fallback to updateDoc:", callableErr);
+      // 2. Resilient Fallback to direct updateDoc (guarded by firestore.rules state machine)
+      try {
+        await updateDoc(doc(db, "orders", orderId), {
+          status,
+          queueStatus,
+          updatedAt: serverTimestamp(),
+        });
+      } catch (err) {
+        // The board is driven by onSnapshot, so a refused write left the card exactly
+        // where it was with no explanation at all: the kitchen pressed "อาหารพร้อม",
+        // nothing moved, and the student was never told their food was ready. During
+        // a lunch rush that is the whole system failing quietly.
+        console.error("Failed to update order status in Firestore:", err);
+        toast.error(
+          `อัปเดตสถานะคิว #${orderId} ไม่สำเร็จ: ${err?.message || callableErr?.message || "ไม่ทราบสาเหตุ"}\n` +
+          "ลูกค้ายังไม่ได้รับการแจ้งเตือน กรุณาลองใหม่อีกครั้ง"
+        );
+      }
     }
   };
 
