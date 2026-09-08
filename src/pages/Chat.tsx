@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import { Send, ArrowLeft, Store, Image as ImageIcon, CheckCheck, ShieldCheck } from 'lucide-react';
 import { ChatMessage, MerchantShop, CustomerProfile, formatTimestamp } from '../types';
 import { fetchShopsFromFirestore } from '../lib/firebase';
+import { db } from '../firebase/config.js';
+import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from 'firebase/firestore';
 
 interface ChatPageProps {
   currentUser?: CustomerProfile | null;
@@ -10,9 +13,13 @@ interface ChatPageProps {
 }
 
 export const Chat: React.FC<ChatPageProps> = ({
+  currentUser: propUser,
   activeShop: propShop,
   onBack
 }) => {
+  const reduxUser = useSelector((state: any) => state.auth?.user);
+  const activeUser = propUser || reduxUser;
+
   const [shops, setShops] = useState<MerchantShop[]>([]);
   const [selectedShop, setSelectedShop] = useState<MerchantShop | null>(propShop || null);
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -30,9 +37,6 @@ export const Chat: React.FC<ChatPageProps> = ({
     fetchShopsFromFirestore().then((remoteShops) => {
       if (cancelled || !remoteShops || remoteShops.length === 0) return;
       setShops(remoteShops);
-      // Defaults to the first shop only when nothing is selected yet. Uses the
-      // updater form so the effect does not have to depend on selectedShop, which
-      // would re-run the fetch every time the user picked a different shop.
       setSelectedShop((current) => current ?? remoteShops[0]);
     });
     return () => {
@@ -40,33 +44,104 @@ export const Chat: React.FC<ChatPageProps> = ({
     };
   }, []);
 
-  const handleSend = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputMsg.trim()) return;
+  const targetShop = selectedShop || propShop;
+  const currentChatId = (activeUser?.uid && targetShop?.id) ? `${activeUser.uid}_${targetShop.id}` : null;
 
+  // Real-time Firestore Listener for Chat Messages
+  useEffect(() => {
+    if (!currentChatId) return;
+
+    try {
+      const q = query(
+        collection(db, 'chats', currentChatId, 'messages'),
+        orderBy('createdAt', 'asc')
+      );
+
+      const unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const remoteMsgs: ChatMessage[] = snapshot.docs.map((d) => {
+              const data = d.data();
+              return {
+                id: d.id,
+                sender: data.sender || 'merchant',
+                text: data.text || '',
+                timestamp: data.timestamp || 'เพิ่งส่ง',
+              };
+            });
+            setMessages(remoteMsgs);
+          }
+        },
+        (err) => {
+          console.warn('[Chat] onSnapshot messages error:', err);
+        }
+      );
+
+      return () => unsubscribe();
+    } catch (err) {
+      console.warn('[Chat] Firestore listener setup error:', err);
+    }
+  }, [currentChatId]);
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanText = inputMsg.trim();
+    if (!cleanText) return;
+
+    const timeStr = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.';
     const newMsg: ChatMessage = {
       id: `msg-${Date.now()}`,
       sender: 'client',
-      text: inputMsg.trim(),
-      timestamp: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
+      text: cleanText,
+      timestamp: timeStr,
     };
 
     setMessages((prev) => [...prev, newMsg]);
     setInputMsg('');
 
-    // Simulated merchant auto reply
-    setTimeout(() => {
+    // Write to Firestore if connected
+    if (currentChatId) {
+      try {
+        await addDoc(collection(db, 'chats', currentChatId, 'messages'), {
+          sender: 'client',
+          senderUid: activeUser?.uid || 'guest',
+          text: cleanText,
+          timestamp: timeStr,
+          createdAt: serverTimestamp(),
+        });
+      } catch (err) {
+        console.warn('[Chat] Could not save message to Firestore:', err);
+      }
+    }
+
+    // Simulated merchant auto reply if offline
+    setTimeout(async () => {
+      const replyTime = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.';
+      const autoReplyText = `รับทราบครับ ทางร้าน${targetShop?.shopName ? ` (${targetShop.shopName})` : ''} ได้รับข้อความแล้ว จะรีบจัดเตรียมอาหารให้อย่างรวดเร็วครับ! 🍳`;
       const autoReply: ChatMessage = {
         id: `msg-reply-${Date.now()}`,
         sender: 'merchant',
-        text: 'รับทราบครับ ทางร้านได้รับข้อความแล้ว จะรีบจัดเตรียมอาหารให้อย่างรวดเร็วครับ!',
-        timestamp: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
+        text: autoReplyText,
+        timestamp: replyTime,
       };
+
       setMessages((prev) => [...prev, autoReply]);
+
+      if (currentChatId) {
+        try {
+          await addDoc(collection(db, 'chats', currentChatId, 'messages'), {
+            sender: 'merchant',
+            text: autoReplyText,
+            timestamp: replyTime,
+            createdAt: serverTimestamp(),
+          });
+        } catch {
+          // ignore
+        }
+      }
     }, 1200);
   };
-
-  const targetShop = selectedShop || propShop;
 
   return (
     <div className="min-h-screen bg-[#FAF8F5] py-6 px-4 sm:px-6">

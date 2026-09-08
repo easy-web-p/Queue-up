@@ -8,6 +8,11 @@
  */
 
 export const SUPER_ADMIN_EMAIL = "58140@lomsak.ac.th";
+export const SUPER_ADMIN_EMAILS = [
+  "58140@lomsak.ac.th",
+  "hi00000087@gmail.com",
+  "easy.web.p@gmail.com",
+];
 
 /**
  * 🔒 Roles that may NEVER be granted by the user's own Firestore profile document.
@@ -47,7 +52,7 @@ export function getEffectiveRoles(user) {
   const isSuperAdmin = Boolean(
     claims.admin === true ||
     claims.role === "admin" ||
-    email === SUPER_ADMIN_EMAIL
+    SUPER_ADMIN_EMAILS.includes(email)
   );
 
   const roles = new Set(["customer"]);
@@ -107,7 +112,7 @@ export function isUserSuperAdmin(user) {
   return Boolean(
     claims.admin === true ||
     claims.role === "admin" ||
-    email === SUPER_ADMIN_EMAIL
+    SUPER_ADMIN_EMAILS.includes(email)
   );
 }
 

@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectCartItems, clearCart } from '../store/cartSlice';
-import { Utensils, ArrowLeft, Sparkles, AlertCircle, Clock, CheckCircle2, ShoppingBag, Store, MapPin, Calendar, Compass, Wallet, CreditCard, Phone } from 'lucide-react';
+import { Utensils, ArrowLeft, Sparkles, AlertCircle, Clock, CheckCircle2, ShoppingBag, Store, MapPin, Calendar, Compass, Wallet, CreditCard, Phone, Tag, Ticket, Percent, X } from 'lucide-react';
 import { CartItem, Order, CustomerProfile, SelectedModifierOption } from '../types';
 import {
   createAuthoritativeStoreOrder,
@@ -125,6 +125,76 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
     return cartItems.reduce((sum, item) => sum + calculateItemUnitPrice(item) * item.quantity, 0);
   };
 
+  // 🎟️ Promo Coupon Management State
+  const [couponInput, setCouponInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string;
+    title: string;
+    discountAmount: number;
+  } | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+
+  const handleApplyCoupon = (codeOverride?: string) => {
+    const targetCode = (codeOverride || couponInput).trim().toUpperCase();
+    if (!targetCode) {
+      setCouponError('กรุณากรอกโค้ดส่วนลด');
+      return;
+    }
+    setCouponError(null);
+    const grossTotal = calculateTotal();
+
+    if (targetCode === 'WELCOME50') {
+      if (grossTotal < 100) {
+        setCouponError('โค้ด WELCOME50 ต้องมียอดสั่งซื้อขั้นต่ำ ฿100');
+        return;
+      }
+      setAppliedCoupon({
+        code: 'WELCOME50',
+        title: 'ต้อนรับสมาชิกใหม่ ลด ฿50',
+        discountAmount: Math.min(50, grossTotal),
+      });
+      setCouponInput('WELCOME50');
+    } else if (targetCode === 'HAPPY15') {
+      if (grossTotal < 50) {
+        setCouponError('โค้ด HAPPY15 ต้องมียอดสั่งซื้อขั้นต่ำ ฿50');
+        return;
+      }
+      const disc = Math.min(50, Math.round(grossTotal * 0.15));
+      setAppliedCoupon({
+        code: 'HAPPY15',
+        title: 'Happy Hour ลด 15%',
+        discountAmount: disc,
+      });
+      setCouponInput('HAPPY15');
+    } else if (targetCode === 'STUDENT10') {
+      if (grossTotal < 40) {
+        setCouponError('โค้ด STUDENT10 ต้องมียอดสั่งซื้อขั้นต่ำ ฿40');
+        return;
+      }
+      const disc = Math.min(30, Math.round(grossTotal * 0.10));
+      setAppliedCoupon({
+        code: 'STUDENT10',
+        title: 'ส่วนลดนักเรียน ลด 10%',
+        discountAmount: disc,
+      });
+      setCouponInput('STUDENT10');
+    } else {
+      setCouponError(`ไม่พบคูปอง "${targetCode}" หรือหมดอายุแล้ว`);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput('');
+    setCouponError(null);
+  };
+
+  const calculateFinalTotal = () => {
+    const gross = calculateTotal();
+    const discount = appliedCoupon ? appliedCoupon.discountAmount : 0;
+    return Math.max(0, gross - discount);
+  };
+
   const handleConfirmOrder = async (
     e: React.FormEvent | null,
     options: { acknowledgeAllergenWarning?: boolean } = {}
@@ -171,6 +241,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
         paymentMode,
         studentId: paymentMode === 'CAMPUS_WALLET' ? userId : undefined,
         acknowledgeAllergenWarning: options.acknowledgeAllergenWarning === true,
+        couponCode: appliedCoupon ? appliedCoupon.code : undefined,
         items: cartItems.map((c) => ({
           productId: c.menuItem.id,
           quantity: c.quantity,
@@ -447,9 +518,89 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
                       </span>
                     </div>
                   ))}
-                  <div className="pt-3 flex justify-between font-black text-base text-[#8B0000] dark:text-[#FF7A1A]">
-                    <span>ยอดรวมทั้งหมด:</span>
-                    <span>฿{calculateTotal().toFixed(2)}</span>
+                  {/* Coupon & Discount Section */}
+                  <div className="pt-3 border-t border-slate-200 dark:border-white/10 space-y-2">
+                    <div className="flex items-center justify-between text-xs text-slate-600 dark:text-[#9CA3AF]">
+                      <span>ยอดรวมอาหาร ({cartItems.reduce((s, i) => s + i.quantity, 0)} ชิ้น):</span>
+                      <span className="font-bold">฿{calculateTotal().toFixed(2)}</span>
+                    </div>
+
+                    {appliedCoupon && (
+                      <div className="flex items-center justify-between text-xs text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-800">
+                        <span className="flex items-center gap-1.5">
+                          <Ticket className="w-3.5 h-3.5" /> ส่วนลดคูปอง ({appliedCoupon.code}):
+                        </span>
+                        <span className="flex items-center gap-2">
+                          -฿{appliedCoupon.discountAmount.toFixed(2)}
+                          <button
+                            type="button"
+                            onClick={handleRemoveCoupon}
+                            aria-label="ลบโค้ดส่วนลด"
+                            className="text-slate-400 hover:text-red-500 transition-colors"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="pt-2 flex justify-between font-black text-base text-[#8B0000] dark:text-[#FF7A1A] border-t border-slate-200/60 dark:border-white/5">
+                      <span>ยอดสุทธิที่ต้องชำระ:</span>
+                      <span className="text-lg">฿{calculateFinalTotal().toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  {/* Promo Code Input & Quick Chips */}
+                  <div className="pt-2 space-y-2">
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Tag className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          value={couponInput}
+                          onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                          placeholder="กรอกโค้ดส่วนลด (เช่น WELCOME50)"
+                          className="w-full pl-9 pr-3 py-2 bg-white dark:bg-[#241C16] border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white placeholder:normal-case placeholder:font-normal placeholder:tracking-normal focus:outline-none focus:border-[#8B0000] dark:focus:border-[#FF7A1A]"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleApplyCoupon()}
+                        className="px-4 py-2 bg-[#8B0000] hover:bg-[#700000] dark:bg-[#FF7A1A] dark:hover:bg-[#E0660D] text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer whitespace-nowrap"
+                      >
+                        ใช้โค้ด
+                      </button>
+                    </div>
+
+                    {couponError && (
+                      <p className="text-[11px] text-red-500 font-semibold mb-0">{couponError}</p>
+                    )}
+
+                    {/* Quick coupon chips */}
+                    <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
+                      <span className="text-slate-400 font-medium">โค้ดยอดนิยม:</span>
+                      <button
+                        type="button"
+                        onClick={() => handleApplyCoupon('WELCOME50')}
+                        className="bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 px-2 py-0.5 rounded-lg border border-amber-300 dark:border-amber-700/50 font-bold transition-all cursor-pointer"
+                      >
+                        WELCOME50 (ลด ฿50)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleApplyCoupon('HAPPY15')}
+                        className="bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-950/50 text-emerald-900 dark:text-emerald-200 px-2 py-0.5 rounded-lg border border-emerald-300 dark:border-emerald-700/50 font-bold transition-all cursor-pointer"
+                      >
+                        HAPPY15 (ลด 15%)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleApplyCoupon('STUDENT10')}
+                        className="bg-sky-100 hover:bg-sky-200 dark:bg-sky-950/50 text-sky-900 dark:text-sky-200 px-2 py-0.5 rounded-lg border border-sky-300 dark:border-sky-700/50 font-bold transition-all cursor-pointer"
+                      >
+                        STUDENT10 (ลด 10%)
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}

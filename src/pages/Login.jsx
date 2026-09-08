@@ -307,16 +307,58 @@ function Login() {
       const defaultName = existingData.displayName || existingData.fullName || gUser.displayName || "ผู้ใช้งาน Google";
       const defaultEmail = gUser.email || existingData.email || "";
       const defaultPhoto = existingData.photoURL || existingData.photo || gUser.photoURL || "/yeti_mascot.jpg";
-      const mergedForRoles = { ...existingData, uid: gUser.uid, email: defaultEmail, isVerifiedAuth: true, isTokenVerified: true, isFromCache: false };
+      const studentNum = parseInt(defaultEmail.replace(/\D/g, ""), 10) || Math.floor(10000 + Math.random() * 90000);
+      const accountId = existingData.accountId || generateSecureAccountId(studentNum);
+
+      if (userSnap.exists()) {
+        const updatePayload = {
+          displayName: defaultName,
+          fullName: defaultName,
+          photoURL: defaultPhoto,
+          photo: defaultPhoto,
+          lastLoginAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        };
+        await setDoc(userDocRef, updatePayload, { merge: true });
+      } else {
+        const initialPayload = {
+          uid: gUser.uid,
+          accountId: accountId,
+          roles: ["customer"],
+          activeRole: "customer",
+          provider: "google.com",
+          isGoogleUser: true,
+          email: defaultEmail,
+          displayName: defaultName,
+          fullName: defaultName,
+          photo: defaultPhoto,
+          photoURL: defaultPhoto,
+          isMerchantVerified: false,
+          isMerchantRegistered: false,
+          isSuperAdmin: false,
+          createdAt: serverTimestamp(),
+          lastLoginAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        };
+        await setDoc(userDocRef, initialPayload);
+      }
+
+      const mergedForRoles = {
+        ...existingData,
+        uid: gUser.uid,
+        email: defaultEmail,
+        isVerifiedAuth: true,
+        isTokenVerified: true,
+        isFromCache: false,
+      };
       const userRoles = getEffectiveRoles(mergedForRoles);
       const isAdminAccount = isUserSuperAdmin(mergedForRoles);
       const isMerchant = userRoles.includes("merchant");
       const activeRole = existingData.activeRole || (isAdminAccount ? "admin" : (isMerchant ? "merchant" : "customer"));
-      
-      const studentNum = parseInt(defaultEmail.replace(/\D/g, ""), 10) || Math.floor(10000 + Math.random() * 90000);
-      const accountId = existingData.accountId || generateSecureAccountId(studentNum);
 
-      const profilePayload = {
+      localStorage.setItem("queueup_secure_account_id", accountId);
+      dispatch(setUser({
+        ...existingData,
         uid: gUser.uid,
         accountId: accountId,
         roles: userRoles,
@@ -332,15 +374,6 @@ function Login() {
         isMerchantRegistered: Boolean(existingData.isMerchantRegistered || isAdminAccount),
         isSuperAdmin: isAdminAccount,
         ...(existingData.storeId ? { storeId: existingData.storeId } : {}),
-        lastLoginAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
-
-      await setDoc(userDocRef, profilePayload, { merge: true });
-
-      localStorage.setItem("queueup_secure_account_id", accountId);
-      dispatch(setUser({
-        ...profilePayload,
         lastLoginAt: new Date().toISOString(),
       }));
 

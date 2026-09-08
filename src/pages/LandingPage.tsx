@@ -1,7 +1,12 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "../firebase/config.js";
+import { useToast } from "../components/ToastProvider.jsx";
 
 export default function LandingPage() {
+  const toast = useToast();
+
   // Form State
   const [form, setForm] = useState({
     schoolName: "",
@@ -13,6 +18,7 @@ export default function LandingPage() {
     notes: "",
   });
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // FAQ Accordion State
   const [openFaq, setOpenFaq] = useState<number | null>(null);
@@ -27,10 +33,34 @@ export default function LandingPage() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Pilot Proposal Lead submitted:", form);
-    setSubmitted(true);
+    if (!form.schoolName.trim() || !form.contactName.trim() || !form.phone.trim()) {
+      toast.warning("กรุณากรอกข้อมูลที่จำเป็น (* ) ให้ครบถ้วน");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await addDoc(collection(db, "pilot_leads"), {
+        schoolName: form.schoolName.trim(),
+        studentCount: form.studentCount,
+        contactName: form.contactName.trim(),
+        position: form.position.trim(),
+        phone: form.phone.trim(),
+        email: form.email.trim(),
+        notes: form.notes.trim(),
+        status: "PENDING",
+        createdAt: serverTimestamp(),
+      });
+      setSubmitted(true);
+      toast.success("ส่งข้อมูลขอรับข้อเสนอโครงการนำร่องสำเร็จ! ทีมงานจะติดต่อกลับภายใน 24 ชั่วโมง");
+    } catch (err: any) {
+      console.error("Pilot Proposal Lead submission error:", err);
+      toast.error(`เกิดข้อผิดพลาดในการบันทึกข้อมูล: ${err.message || err}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -800,9 +830,10 @@ export default function LandingPage() {
 
                   <button
                     type="submit"
-                    className="w-full bg-[#064e3b] hover:bg-[#065f46] text-white py-3.5 px-6 rounded-xl font-bold text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                    disabled={isSubmitting}
+                    className="w-full bg-[#064e3b] hover:bg-[#065f46] disabled:opacity-60 text-white py-3.5 px-6 rounded-xl font-bold text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer active:scale-98"
                   >
-                    <span>ส่งข้อมูลขอรับข้อเสนอโครงการนำร่อง</span>
+                    <span>{isSubmitting ? "กำลังบันทึกข้อมูล..." : "ส่งข้อมูลขอรับข้อเสนอโครงการนำร่อง"}</span>
                     <span>➜</span>
                   </button>
                 </form>

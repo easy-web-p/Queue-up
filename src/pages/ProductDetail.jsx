@@ -4,6 +4,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { addItem } from "../store/cartSlice";
 import { detectMatchedAllergens } from "../utils/allergenMatcher";
 import { db, doc, getDoc } from "../firebase/config.js";
+import { collection, addDoc, query, where, getDocs, serverTimestamp } from "firebase/firestore";
 import ShopeeSearchBar from "../components/ShopeeSearchBar.jsx";
 import ChatModal from "../components/ChatModal.jsx";
 import Footer from "../components/Footer.jsx";
@@ -479,6 +480,76 @@ function ProductDetail() {
 
   const [isIncompleteProfileModalOpen, setIsIncompleteProfileModalOpen] = useState(false);
   const [missingProfileFields, setMissingProfileFields] = useState([]);
+
+  // ⭐ Real Customer Reviews State & Loader
+  const [reviews, setReviews] = useState(CUSTOMER_REVIEWS);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [newReviewRating, setNewReviewRating] = useState(5);
+  const [newReviewComment, setNewReviewComment] = useState("");
+  const [newReviewDishInfo, setNewReviewDishInfo] = useState("");
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
+  useEffect(() => {
+    if (!id) return;
+    let isCancelled = false;
+    async function loadFirestoreReviews() {
+      try {
+        const q = query(collection(db, "reviews"), where("productId", "==", id));
+        const snap = await getDocs(q);
+        if (!isCancelled && !snap.empty) {
+          const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          setReviews([...list, ...CUSTOMER_REVIEWS]);
+        }
+      } catch (err) {
+        console.warn("[ProductDetail] Could not load reviews from Firestore:", err);
+      }
+    }
+    loadFirestoreReviews();
+    return () => {
+      isCancelled = true;
+    };
+  }, [id]);
+
+  const handleSubmitReview = async (e) => {
+    e.preventDefault();
+    if (!user) {
+      toast.warning("กรุณาเข้าสู่ระบบก่อนเขียนรีวิว");
+      return;
+    }
+    if (!newReviewComment.trim()) {
+      toast.warning("กรุณากรอกความคิดเห็นรีวิว");
+      return;
+    }
+    setIsSubmittingReview(true);
+    try {
+      const reviewDoc = {
+        productId: id,
+        storeId: product?.storeId || store?.id || "",
+        userId: user.uid,
+        author: user.displayName || user.name || user.fullName || "ผู้ใช้งาน QueueUp",
+        avatarLetter: (user.displayName || user.name || "Q").slice(0, 2).toUpperCase(),
+        avatarBg: "#065f46",
+        role: "ผู้สั่งจริงผ่านแอป",
+        date: "วันนี้",
+        dishInfo: newReviewDishInfo.trim() || `สั่ง: ${product?.name || "เมนูแนะนำ"}`,
+        rating: Number(newReviewRating),
+        comment: newReviewComment.trim(),
+        createdAt: serverTimestamp(),
+      };
+      const docRef = await addDoc(collection(db, "reviews"), reviewDoc);
+      setReviews((prev) => [{ id: docRef.id, ...reviewDoc }, ...prev]);
+      setIsReviewModalOpen(false);
+      setNewReviewComment("");
+      setNewReviewDishInfo("");
+      setNewReviewRating(5);
+      toast.success("ขอบคุณสำหรับรีวิว! คะแนนของคุณถูกบันทึกและแสดงผลเรียบร้อยแล้ว");
+    } catch (err) {
+      console.error("[ProductDetail] Failed to save review:", err);
+      toast.error(`ไม่สามารถบันทึกรีวิวได้: ${err.message || err}`);
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
 
   // 🚨 Student Allergy Safety Profile Loader
   const [studentAllergies, setStudentAllergies] = useState([]);
@@ -1398,7 +1469,13 @@ function ProductDetail() {
             <button
               type="button"
               className="btn btn-primary btn-sm rounded-pill fw-bold"
-              onClick={() => toast.info("ระบบจะเปิดให้เขียนรีวิวหลังท่านรับอาหารเสร็จสิ้นเรียบร้อยแล้ว")}
+              onClick={() => {
+                if (!user) {
+                  toast.warning("กรุณาเข้าสู่ระบบก่อนเขียนรีวิวอาหาร");
+                  return;
+                }
+                setIsReviewModalOpen(true);
+              }}
             >
               <i className="bi bi-pencil-square me-1" /> เขียนรีวิวอาหาร / ให้คะแนน
             </button>
@@ -1474,7 +1551,7 @@ function ProductDetail() {
 
           {/* Diner Reviews List */}
           <div className="d-flex flex-column gap-3 mt-2">
-            {CUSTOMER_REVIEWS.map((rev) => (
+            {reviews.map((rev) => (
               <div key={rev.id} className="queue-pd-review-card">
                 <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
                   <div className="d-flex align-items-center gap-2">
@@ -1739,6 +1816,98 @@ function ProductDetail() {
                   เข้าใจแล้ว
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 8.1 ✍️ WRITE REVIEW MODAL */}
+      {isReviewModalOpen && (
+        <div
+          className="modal fade show d-block bg-slate-900/75 backdrop-blur-sm z-[100001]"
+          tabIndex="-1"
+        >
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content rounded-4 border-0 shadow-xl p-3">
+              <div className="modal-header border-0 pb-2">
+                <div>
+                  <h5 className="modal-title fw-bold text-dark d-flex align-items-center gap-2">
+                    <i className="bi bi-pencil-square text-warning" /> เขียนรีวิวและให้คะแนน
+                  </h5>
+                  <p className="text-muted small mb-0">{product?.name || "เมนูอาหาร"}</p>
+                </div>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setIsReviewModalOpen(false)}
+                />
+              </div>
+              <form onSubmit={handleSubmitReview}>
+                <div className="modal-body py-2">
+                  {/* Star Rating Selector */}
+                  <div className="text-center py-2 mb-3 bg-light rounded-3">
+                    <div className="text-muted small mb-1">ให้คะแนนความพึงพอใจ:</div>
+                    <div className="d-flex justify-content-center gap-2 fs-3 text-warning">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <i
+                          key={star}
+                          className={`bi ${star <= newReviewRating ? "bi-star-fill" : "bi-star"} cursor-pointer hover:scale-110 transition-transform`}
+                          onClick={() => setNewReviewRating(star)}
+                        />
+                      ))}
+                    </div>
+                    <div className="small font-bold text-dark mt-1">
+                      {newReviewRating === 5 && "⭐ ยอดเยี่ยมมาก อร่อยประทับใจ"}
+                      {newReviewRating === 4 && "👍 อร่อย รสชาติดีได้มาตรฐาน"}
+                      {newReviewRating === 3 && "👌 ปานกลาง พอใช้ได้"}
+                      {newReviewRating === 2 && "⚠️ ควรปรับปรุง"}
+                      {newReviewRating === 1 && "❌ ไม่ประทับใจ"}
+                    </div>
+                  </div>
+
+                  {/* Menu details */}
+                  <div className="mb-3">
+                    <label className="form-label small fw-bold text-dark">เมนูหรือท็อปปิ้งที่สั่ง:</label>
+                    <input
+                      type="text"
+                      className="form-control form-control-sm rounded-3"
+                      placeholder={`เช่น สั่ง: ${product?.name || "เมนูนี้"} + ไข่ดาว`}
+                      value={newReviewDishInfo}
+                      onChange={(e) => setNewReviewDishInfo(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Comment */}
+                  <div className="mb-2">
+                    <label className="form-label small fw-bold text-dark">ข้อความรีวิวประสบการณ์ของคุณ *:</label>
+                    <textarea
+                      rows={3}
+                      required
+                      className="form-control form-control-sm rounded-3"
+                      placeholder="บอกเล่าความอร่อย ความรวดเร็ว หรือความคุ้มค่าให้เพื่อนๆ ได้รู้..."
+                      value={newReviewComment}
+                      onChange={(e) => setNewReviewComment(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="modal-footer border-0 pt-2 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-light btn-sm px-3 rounded-pill text-muted font-bold"
+                    onClick={() => setIsReviewModalOpen(false)}
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingReview}
+                    className="btn btn-primary btn-sm px-4 rounded-pill fw-bold"
+                  >
+                    {isSubmittingReview ? "กำลังบันทึก..." : "ส่งรีวิวอาหาร"}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
