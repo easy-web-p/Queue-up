@@ -727,7 +727,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
             </button>
 
             {/* 📱 Mobile-First Sticky Checkout Bar (Fixed at bottom for mobile < 640px) */}
-            <div className="fixed bottom-0 left-0 right-0 z-30 sm:hidden bg-white/95 dark:bg-[#241C16]/95 backdrop-blur-md border-t border-slate-200 dark:border-white/10 p-3 px-4 shadow-2xl flex items-center justify-between gap-3">
+            <div className="fixed bottom-0 left-0 right-0 z-30 sm:hidden bg-white/95 dark:bg-[#241C16]/95 backdrop-blur-md border-t border-slate-200 dark:border-white/10 p-3 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] shadow-2xl flex items-center justify-between gap-3">
               <div className="flex flex-col">
                 <span className="text-[10px] font-extrabold text-slate-500 dark:text-[#9CA3AF] uppercase">ยอดรวมสุทธิ</span>
                 <span className="text-lg font-black text-[#8B0000] dark:text-[#FF7A1A]">

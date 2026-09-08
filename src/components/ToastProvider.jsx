@@ -120,7 +120,7 @@ export function ToastProvider({ children }) {
       <div
         aria-live="polite"
         aria-atomic="false"
-        className="fixed bottom-4 right-4 left-4 sm:left-auto sm:w-96 z-[99999990] flex flex-col gap-2 pointer-events-none"
+        className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] right-4 left-4 sm:left-auto sm:w-96 z-[99999990] flex flex-col gap-2 pointer-events-none"
       >
         {toasts.map((t) => {
           const tone = TONE[t.tone] || TONE.info;
@@ -155,7 +155,7 @@ export function ToastProvider({ children }) {
           onClick={() => closeDialog(false)}
         >
           <div
-            className="bg-white dark:bg-[#241C16] border-2 border-slate-200 dark:border-white/10 rounded-3xl shadow-2xl max-w-md w-full p-6 space-y-4 font-['IBM_Plex_Sans_Thai']"
+            className="bg-white dark:bg-[#241C16] border-2 border-slate-200 dark:border-white/10 rounded-3xl shadow-2xl max-w-md w-full max-h-[90dvh] overflow-y-auto overscroll-contain p-6 space-y-4 font-['IBM_Plex_Sans_Thai']"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start gap-3">

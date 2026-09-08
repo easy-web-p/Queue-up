@@ -359,7 +359,7 @@ export const ClientQueueTicket = ({
       {/* Digital Pickup Code & QR Modal */}
       {showQrModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white text-stone-900 rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-stone-200 text-center space-y-4 animate-scale-in">
+          <div className="bg-white text-stone-900 rounded-3xl p-6 max-w-sm w-full max-h-[90dvh] overflow-y-auto overscroll-contain shadow-2xl border border-stone-200 text-center space-y-4 animate-scale-in">
             <div className="flex justify-between items-center pb-2 border-b border-stone-200">
               <span className="text-xs font-black uppercase text-amber-700">Digital Pickup Token</span>
               <button

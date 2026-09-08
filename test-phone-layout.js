@@ -66,6 +66,7 @@ function collect(dir, pattern) {
   return found;
 }
 const cssFiles = collect(join(ROOT, 'src'), /\.css$/);
+const componentFiles = collect(join(ROOT, 'src'), /\.(jsx|tsx)$/);
 const indexCss = read('src/index.css');
 const productCss = read('src/pages/ProductDetail.css');
 const productJsx = read('src/pages/ProductDetail.jsx');
@@ -289,6 +290,75 @@ runTest('🚨 No grid the ordering flow uses stays above two columns on a phone'
 runTest('A grid rule is declared in one place, not two', () => {
   const count = (productCss.match(/\.queue-pd-time-slots-grid\s*\{/g) || []).length;
   assert(count === 2, `expected the base rule and one phone override, found ${count}`);
+});
+
+// ===========================================================================
+console.log('\n6. Fixed bars and modals on a phone');
+// ===========================================================================
+
+runTest('🚨 Tailwind-pinned bars clear the home indicator too', () => {
+  // The safe-area sweep above reads stylesheets. Three elements pin themselves
+  // from JSX instead — the toast stack, the checkout bar, and the search page's
+  // chat button — and all three sat inside the home-indicator zone.
+  const offenders = [];
+  for (const f of componentFiles) {
+    const src = readFileSync(f, 'utf8');
+    for (const m of src.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/gs)) {
+      const cls = m[1] || m[2] || '';
+      if (!cls.includes('fixed')) continue;
+      if (!/\bbottom-\d/.test(cls)) continue;
+      if (cls.includes('safe-area-inset-bottom')) continue;
+      offenders.push(`${relative(ROOT, f)}:${src.slice(0, m.index).split('\n').length}`);
+    }
+  }
+  assert(offenders.length === 0, `pinned above the edge without a safe area:\n       ${offenders.join('\n       ')}`);
+});
+
+runTest('🚨 The checkout bar keeps its buttons off the home bar', () => {
+  const booking = read('src/pages/FoodBooking.tsx');
+  const bar = booking.slice(booking.indexOf('fixed bottom-0 left-0 right-0 z-30'));
+  assert(bar.length > 0, 'the phone checkout bar must exist');
+  assert(
+    /pb-\[calc\([^\]]*safe-area-inset-bottom/.test(bar.slice(0, 400)),
+    'flush to the bottom, its padding is what clears the home indicator'
+  );
+});
+
+runTest('🚨 No modal panel can be cut off with nothing to scroll', () => {
+  // A panel taller than the phone puts its confirm button below the fold. Ten
+  // were uncapped, including the staff, guardian and vendor-approval dialogs and
+  // the fullscreen queue ticket.
+  const offenders = [];
+  for (const f of componentFiles) {
+    const src = readFileSync(f, 'utf8');
+    for (const m of src.matchAll(/className="([^"]*fixed inset-0[^"]*)"/g)) {
+      const after = src.slice(m.index + m[0].length, m.index + m[0].length + 2200);
+      const panel = after.match(/className="([^"]*)"/);
+      if (!panel) continue;
+      const capped = /max-h-|h-full|h-screen/.test(panel[1]) || /max-height/.test(readFileSync(f, 'utf8'));
+      const scrolls = /overflow-y-auto|overflow-auto/.test(panel[1]) || /overflow-y-auto/.test(after);
+      // Panels styled from a stylesheet cap themselves there; those are checked
+      // by hand and excluded by the class-name test below.
+      const styled = /className="[\w-]*(modal|drawer|card|assistant)[\w-]*/.test(panel[1]);
+      if (!capped && !scrolls && !styled) {
+        offenders.push(`${relative(ROOT, f)}:${src.slice(0, m.index).split('\n').length}`);
+      }
+    }
+  }
+  assert(offenders.length === 0, `modal panels that clip:\n       ${offenders.join('\n       ')}`);
+});
+
+runTest('The dialogs a student or staff member actually opens are capped', () => {
+  for (const [f, count] of [
+    ['src/pages/StoreAdminPage.tsx', 3],
+    ['src/pages/GuardianDashboard.tsx', 2],
+    ['src/pages/VendorApprovalPanel.tsx', 1],
+    ['src/components/ClientQueueTicket.jsx', 1],
+    ['src/components/ToastProvider.jsx', 1],
+  ]) {
+    const found = (read(f).match(/max-h-\[90dvh\]/g) || []).length;
+    assert(found >= count, `${f}: expected ${count} capped panel(s), found ${found}`);
+  }
 });
 
 console.log(`\n${'='.repeat(60)}`);

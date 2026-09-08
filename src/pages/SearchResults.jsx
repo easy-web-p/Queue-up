@@ -419,7 +419,7 @@ function SearchResults() {
 
       {/* Floating Bottom-Right Chat Button */}
       <button
-        className="queue-floating-chat-btn fixed bottom-6 right-6 z-40 px-4 py-2.5 bg-gradient-to-r from-red-600 to-orange-500 text-white rounded-full shadow-xl flex items-center gap-2 text-xs font-black cursor-pointer hover:shadow-2xl hover:scale-105 transition-all border-0"
+        className="queue-floating-chat-btn fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] right-6 z-40 px-4 py-2.5 bg-[#FF7A1A] hover:bg-[#E6680D] text-white rounded-full shadow-xl flex items-center gap-2 text-xs font-black cursor-pointer hover:shadow-2xl hover:scale-105 transition-all border-0"
         onClick={() => setIsChatOpen(true)}
         title="เปิดแชทผู้ช่วย QueueUp"
       >

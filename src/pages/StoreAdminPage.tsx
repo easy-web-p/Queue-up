@@ -1166,7 +1166,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
       {/* Add Staff Modal Overlay */}
       {showAddStaffModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4 border border-slate-200 shadow-2xl">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[90dvh] overflow-y-auto overscroll-contain space-y-4 border border-slate-200 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="font-extrabold text-slate-900 text-base">เพิ่มพนักงานใหม่</h3>
               <button
@@ -1238,7 +1238,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
       {/* Add Coupon Modal Overlay */}
       {showAddCouponModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4 border border-slate-200 shadow-2xl">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[90dvh] overflow-y-auto overscroll-contain space-y-4 border border-slate-200 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="font-extrabold text-slate-900 text-base">สร้างโค้ดคูปองส่วนลดใหม่</h3>
               <button
@@ -1310,7 +1310,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
       {/* Add New Item Modal Overlay */}
       {showAddItemModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4 border border-slate-200 shadow-2xl">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[90dvh] overflow-y-auto overscroll-contain space-y-4 border border-slate-200 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="font-extrabold text-slate-900 text-base">เพิ่มรายการอาหารใหม่</h3>
               <button

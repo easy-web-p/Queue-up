@@ -86,7 +86,7 @@ export default function CookieConsentBanner() {
       {/* Cookie Custom Settings Modal */}
       {isSettingsOpen && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in font-['IBM_Plex_Sans_Thai']">
-          <div className="bg-gradient-to-br from-slate-900 via-stone-900 to-slate-950 border border-orange-500/40 rounded-3xl shadow-2xl max-w-lg w-full text-white overflow-hidden flex flex-col">
+          <div className="bg-gradient-to-br from-slate-900 via-stone-900 to-slate-950 border border-orange-500/40 rounded-3xl shadow-2xl max-w-lg w-full max-h-[90dvh] text-white overflow-hidden flex flex-col">
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
