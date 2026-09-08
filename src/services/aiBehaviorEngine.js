@@ -1,15 +1,16 @@
-/**
- * AI USER BEHAVIOR & CONVENIENCE ENGINE (aiBehaviorEngine.js)
- * Tracks user order preferences, favorite items, customizations, peak hours & predicts queue times.
- */
+import {
+  syncUserBehaviorToFirestore,
+  fetchUserBehaviorFromFirestore,
+} from "./communityService.js";
 
 const USER_BEHAVIOR_STORAGE_KEY = "queueup_user_behavior_profile_v1";
 
 /**
  * 1. Record User Order Event to Build AI Behavior Intelligence Profile
  * @param {object} orderData - { itemId, itemTitle, variant, price, storeName, timestamp }
+ * @param {string} userId - Optional user UID for Firestore sync
  */
-export function recordUserOrderBehavior(orderData) {
+export function recordUserOrderBehavior(orderData, userId = null) {
   if (!orderData || !orderData.itemTitle) return;
 
   try {
@@ -60,9 +61,35 @@ export function recordUserOrderBehavior(orderData) {
     };
 
     localStorage.setItem(USER_BEHAVIOR_STORAGE_KEY, JSON.stringify(profile));
+
+    // Also sync to Firestore if authenticated user ID is provided
+    if (userId) {
+      syncUserBehaviorToFirestore(userId, profile).catch(() => {});
+    }
   } catch (err) {
     console.warn("User behavior tracking error:", err);
   }
+}
+
+/**
+ * Sync profile from Firestore when user logs in
+ */
+export async function loadAndSyncUserBehavior(userId) {
+  if (!userId) return null;
+  try {
+    const remote = await fetchUserBehaviorFromFirestore(userId);
+    if (remote) {
+      const rawLocal = localStorage.getItem(USER_BEHAVIOR_STORAGE_KEY);
+      const local = rawLocal ? JSON.parse(rawLocal) : null;
+      if (!local || (remote.totalOrders || 0) >= (local.totalOrders || 0)) {
+        localStorage.setItem(USER_BEHAVIOR_STORAGE_KEY, JSON.stringify(remote));
+        return remote;
+      }
+    }
+  } catch (err) {
+    console.warn("loadAndSyncUserBehavior warn:", err);
+  }
+  return null;
 }
 
 /**

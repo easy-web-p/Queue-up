@@ -253,8 +253,60 @@ runTest('Closing the popup is still treated as a cancellation, not a failure', (
   assert(popupClosedIdx < fallbackIdx, 'dismissal must be handled before the fallback');
 });
 
+// ===========================================================================
+console.log('\n4. Same-origin custom deployment host resolution (e.g. Vercel)');
+// ===========================================================================
+
+runTest('A registered Vercel host uses its own origin as authDomain', () => {
+  assertEqual(
+    resolveAuthDomainForHost('queue-up-nu.vercel.app', undefined, { handlerRegistered: true }),
+    'queue-up-nu.vercel.app',
+    'registered custom host should resolve to same-origin auth handler'
+  );
+  assertEqual(
+    resolveAuthDomainForHost('queue-up-nu.vercel.app', undefined, { handlerRegistered: 'true' }),
+    'queue-up-nu.vercel.app',
+    'string "true" must also opt in'
+  );
+});
+
+runTest('An unregistered Vercel host falls back to default Firebase domain', () => {
+  assertEqual(
+    resolveAuthDomainForHost('queue-up-nu.vercel.app', undefined, { handlerRegistered: false }),
+    DEFAULT_AUTH_DOMAIN
+  );
+  assertEqual(
+    resolveAuthDomainForHost('queue-up-nu.vercel.app', undefined, {}),
+    DEFAULT_AUTH_DOMAIN
+  );
+});
+
+// ===========================================================================
+console.log('\n5. In-App Browser & WebView Detection (Instagram / LINE / FB)');
+// ===========================================================================
+
+const browserEnvCode = read('src/utils/browserEnv.js');
+
+runTest('browserEnv.js accurately targets known in-app webviews', () => {
+  assert(browserEnvCode.includes('Instagram'), 'must check for Instagram');
+  assert(browserEnvCode.includes('FBAN'), 'must check for Facebook');
+  assert(/Line/i.test(browserEnvCode), 'must check for LINE');
+  assert(browserEnvCode.includes('TikTok'), 'must check for TikTok');
+});
+
+runTest('AuthContext imports and checks in-app browser before popup', () => {
+  assert(authCtx.includes('isInAppBrowser'), 'AuthContext must import isInAppBrowser');
+  assert(authCtx.includes('getInAppBrowserName'), 'AuthContext must import getInAppBrowserName');
+  const inAppCheckIdx = authCtx.indexOf('isInAppBrowser()');
+  const popupCallIdx = authCtx.indexOf('signInWithPopup(auth, googleProvider)');
+  assert(inAppCheckIdx !== -1, 'in-app check missing');
+  assert(popupCallIdx !== -1, 'signInWithPopup missing');
+  assert(inAppCheckIdx < popupCallIdx, 'in-app check must execute BEFORE signInWithPopup');
+});
+
 console.log(`\n${'='.repeat(60)}`);
 console.log(`RESULT: ${passed} passed, ${failed} failed`);
 console.log('='.repeat(60));
 
 if (failed > 0) process.exit(1);
+

@@ -280,7 +280,7 @@ export default function Queueup() {
             <span className="qup-gradient-text">อัจฉริยะแห่งอนาคต</span>
           </h1>
           <p className="qup-hero-desc">
-            ยกระดับการให้บริการของร้านค้าและการจองคิวของลูกค้าด้วย <strong>QueueUp Platform</strong> ระบบจัดการคิว Real-Time พร้อมระบบสั่งอาหารและชำระเงินอัตโนมัติ ด้วยมาตรฐานความปลอดภัยสูงสุดแบบ Zero-Trust & Salted Cryptography
+            ยกระดับการให้บริการของร้านค้าและการจองคิวของลูกค้าด้วย <strong>QueueUp Platform</strong> ระบบจัดการคิว Real-Time พร้อมระบบสั่งอาหารล่วงหน้า รับบัตรคิวทันทีด้วย Server-Authoritative Architecture โดยไม่มีขั้นตอนการชำระเงินคั่นกลาง (Pure Zero-Payment)
           </p>
 
           <div className="qup-hero-btns">
@@ -627,7 +627,7 @@ export default function Queueup() {
               <ul className="qup-roadmap-list">
                 <li className="qup-roadmap-item">• <strong>Notification Center</strong>: คอลเลกชัน <code>notifications/{`{notificationId}`}</code> แจ้งเตือนอาหารพร้อมรับ & โปรโมชั่น</li>
                 <li className="qup-roadmap-item">• <strong>Favorites Data Sync</strong>: <code>users/{`{uid}`}/favorites</code> เก็บรายการเมนูโปรด</li>
-                <li className="qup-roadmap-item">• <strong>Cart System</strong>: <code>users/{`{uid}`}/cart</code> คำนวณตะกร้าก่อนชำระเงิน</li>
+                <li className="qup-roadmap-item">• <strong>Cart System</strong>: Ephemeral Cart คำนวณยอดรายการก่อนส่งออกบัตรคิว</li>
               </ul>
             </div>
           </div>
@@ -786,8 +786,8 @@ export default function Queueup() {
             {
               name: "นายพลกฤต นิลอยู่",
               id: "693380584-4",
-              role: "KDS & Payment Integration Lead",
-              desc: "พัฒนาระบบกระดานร้านค้า Kitchen Display System และระบบชำระเงิน Dynamic QR",
+              role: "KDS & Realtime Pipeline Lead",
+              desc: "พัฒนาระบบกระดานร้านค้า Kitchen Display System และ Server-Authoritative Queue Pipeline",
               icon: "bi-credit-card-2-front-fill",
               color: "#22c55e",
               bg: "rgba(34, 197, 94, 0.15)",

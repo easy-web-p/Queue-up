@@ -216,7 +216,7 @@ export default function ChildOrderHistory() {
 
                   <div className="flex items-center justify-between border-t border-slate-100 dark:border-white/10 pt-3 text-xs">
                     <span className="text-slate-500 dark:text-[#9CA3AF]">
-                      การชำระ: {ord.paymentMode === 'CAMPUS_WALLET' ? '💳 กระเป๋าเงินนักเรียน' : '⚡ สั่งตรง Zero-Payment'}
+                      การสั่งซื้อ: ⚡ Zero-Payment รับคิวทันที
                     </span>
                     <div className="text-sm font-bold font-['Kanit'] text-[#FF7A1A]">
                       ยอดรวม ฿{Number(ord.totalAmount || 0).toFixed(2)}

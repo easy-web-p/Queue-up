@@ -13,6 +13,7 @@ import { setUser, clearUser } from '../store/authSlice.js'
 
 import { getEffectiveRoles } from '../utils/authRoles.js'
 import { useToast } from '../components/ToastProvider.jsx'
+import { isInAppBrowser, getInAppBrowserName } from '../utils/browserEnv.js'
 
 export const AuthContext = createContext()
 
@@ -27,10 +28,18 @@ export function AuthProvider({ children }) {
     getRedirectResult(auth).catch((err) => {
       if (err?.code === 'auth/no-auth-event') return; // no redirect was in flight
       console.error('Firebase Google login redirect result error:', err);
-      toast.error(
-        'การเข้าสู่ระบบด้วย Google ไม่สำเร็จ (' + (err?.code || 'unknown') + ')\n' +
-        'กรุณาลองใหม่ หรือเข้าสู่ระบบด้วยอีเมลและรหัสผ่าน'
-      );
+      if (err?.code === 'auth/missing-initial-state') {
+        toast.error(
+          'การเข้าสู่ระบบ Google ไม่สำเร็จ (Missing Initial State)\n' +
+          'ตรวจพบว่าเปิดผ่าน In-App Browser หรือเบราว์เซอร์ที่จำกัด Storage\n' +
+          'กรุณากด ⋯ เพื่อเปิดใน Safari หรือเข้าสู่ระบบด้วยอีเมลและรหัสผ่าน'
+        );
+      } else {
+        toast.error(
+          'การเข้าสู่ระบบด้วย Google ไม่สำเร็จ (' + (err?.code || 'unknown') + ')\n' +
+          'กรุณาลองใหม่ หรือเข้าสู่ระบบด้วยอีเมลและรหัสผ่าน'
+        );
+      }
     });
     // toast is stable for the life of the provider; this must run once per mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -172,6 +181,17 @@ export function AuthProvider({ children }) {
   ];
 
   const loginWithGoogle = async () => {
+    // Proactive In-App Browser check: prevent user from landing on raw missing-initial-state Firebase page
+    if (isInAppBrowser()) {
+      const browserName = getInAppBrowserName();
+      console.warn(`[AuthContext] In-App Browser detected (${browserName}). Proactively guiding user to external browser.`);
+      toast.error(
+        `⚠️ กำลังเปิดผ่าน ${browserName} ซึ่งระบบความปลอดภัยจำกัด Google OAuth (auth/missing-initial-state)\n` +
+        `กรุณากดที่จุดไข่ปลา (...) มุมจอ แล้วเลือก "Open in Safari" หรือเข้าสู่ระบบด้วยอีเมล/รหัสผ่าน`
+      );
+      return null;
+    }
+
     try {
       const result = await signInWithPopup(auth, googleProvider);
       return result.user;

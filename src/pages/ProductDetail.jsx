@@ -8,7 +8,7 @@ import { collection, addDoc, query, where, getDocs, serverTimestamp } from "fire
 import ShopeeSearchBar from "../components/ShopeeSearchBar.jsx";
 import ChatModal from "../components/ChatModal.jsx";
 import Footer from "../components/Footer.jsx";
-import { PRODUCTS_BY_ID, SHARED_PRODUCTS, SHARED_SHOPS } from "../data/mockProducts.js";
+// Strictly Firestore-authoritative: No mock product or mock store fallbacks
 import {
   fetchProductByIdFromFirestore,
   fetchStoreByIdFromFirestore,
@@ -391,50 +391,6 @@ const CUSTOMER_REVIEWS = [
   },
 ];
 
-function resolveProductByParam(rawParam) {
-  if (!rawParam) return PRODUCTS_BY_ID.m1;
-
-  const decoded = decodeURIComponent(rawParam).trim();
-
-  // 1. Direct match by ID (e.g. m1, m2)
-  if (PRODUCTS_BY_ID[decoded]) return PRODUCTS_BY_ID[decoded];
-  if (PRODUCTS_BY_ID[rawParam]) return PRODUCTS_BY_ID[rawParam];
-
-  // 2. Match by exact product name or title or encoded name
-  const foundByName = SHARED_PRODUCTS.find((p) => {
-    if (!p) return false;
-    const pName = (p.name || "").trim();
-    const pTitle = (p.title || "").trim();
-    return (
-      pName === decoded ||
-      pTitle === decoded ||
-      encodeURIComponent(pName) === rawParam ||
-      encodeURIComponent(pTitle) === rawParam ||
-      pName.includes(decoded) ||
-      decoded.includes(pName)
-    );
-  });
-
-  return foundByName || PRODUCTS_BY_ID.m1;
-}
-
-function resolveStoreByStoreId(storeId) {
-  if (!storeId) return SHARED_SHOPS[0];
-  const found = SHARED_SHOPS.find((s) => s.id === storeId);
-  return (
-    found || {
-      id: storeId,
-      name: "ร้านป้าแดง ตามสั่ง & ไก่ทอด",
-      location: "โรงอาหาร 2 (โรงอาหารกลาง 1) ชั้น 1 • ช่อง 04",
-      hours: "07:00 - 14:30 น.",
-      rating: 4.8,
-      reviewsCount: 1840,
-      isOpen: true,
-      status: "open",
-    }
-  );
-}
-
 function ProductDetail() {
   const toast = useToast();
   // Ids of required option groups the customer has not answered, so the fields
@@ -445,13 +401,15 @@ function ProductDetail() {
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
 
-  const initialProduct = resolveProductByParam(id);
-  const [product, setProduct] = useState(initialProduct);
+  // 🔒 Strictly Firestore-authoritative product & store state (fail-closed, no mock fallback)
+  const [product, setProduct] = useState(null);
+  const [store, setStore] = useState(null);
+  const [isLoadingProduct, setIsLoadingProduct] = useState(true);
+  const [productNotFound, setProductNotFound] = useState(false);
+  const [firestoreModifiers, setFirestoreModifiers] = useState([]);
+  const [recommendedProducts, setRecommendedProducts] = useState([]);
 
-  const initialStore = resolveStoreByStoreId(initialProduct.storeId);
-  const [store, setStore] = useState(initialStore);
-
-  const [selectedImg, setSelectedImg] = useState(initialProduct.mainImg || initialProduct.image);
+  const [selectedImg, setSelectedImg] = useState("/crispy_fried_chicken.jpg");
   const [quantity, setQuantity] = useState(1);
   
   // 📅 Calendar Date Selection State
@@ -471,12 +429,15 @@ function ProductDetail() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
 
-  // 🍜 Category-Aware Dynamic Modifiers State
+  // 🍜 Category-Aware Dynamic Modifiers State: Prioritize Firestore Modifier Groups
   const productCategory = product?.category || "";
   const productTitle = product?.name || product?.title || "";
   const activeModifierGroups = useMemo(() => {
+    if (firestoreModifiers && firestoreModifiers.length > 0) {
+      return firestoreModifiers;
+    }
     return getCategoryModifiers(productCategory, productTitle);
-  }, [productCategory, productTitle]);
+  }, [firestoreModifiers, productCategory, productTitle]);
 
   const [selectedModifiersMap, setSelectedModifiersMap] = useState({});
   const [customerNote, setCustomerNote] = useState("");
@@ -603,30 +564,121 @@ function ProductDetail() {
 
   const matchedAllergens = allergenResult.matchedAllergenNames;
 
-  // Load Product & Store from Firestore database service layer
+  // Load Product & Store strictly from Firestore (Server-Authoritative, fail-closed)
   useEffect(() => {
     let isMounted = true;
     async function loadProductAndStoreData() {
+      setIsLoadingProduct(true);
+      setProductNotFound(false);
+
+      if (!id) {
+        if (isMounted) {
+          setProductNotFound(true);
+          setIsLoadingProduct(false);
+        }
+        return;
+      }
+
       const decoded = decodeURIComponent(id || "").trim();
       let docData = await fetchProductByIdFromFirestore(id);
       if (!docData && decoded !== id) {
         docData = await fetchProductByIdFromFirestore(decoded);
       }
 
-      if (isMounted) {
-        const resolvedProd = docData || resolveProductByParam(id);
-        setProduct(resolvedProd);
-        setSelectedImg(resolvedProd.mainImg || resolvedProd.image);
+      // If still not found by direct ID, check query by name in Firestore
+      if (!docData) {
+        try {
+          const qName = query(collection(db, "products"), where("name", "==", decoded));
+          const nameSnap = await getDocs(qName);
+          if (!nameSnap.empty) {
+            docData = { id: nameSnap.docs[0].id, ...nameSnap.docs[0].data() };
+          }
+        } catch (e) {
+          console.warn("[ProductDetail] Name query fallback warning:", e);
+        }
+      }
 
-        // Load Store Data from Database / Service Layer
-        const storeData = await fetchStoreByIdFromFirestore(resolvedProd.storeId);
-        setStore(storeData || resolveStoreByStoreId(resolvedProd.storeId));
+      // Strict Authority Check: Must exist in Firestore and must have a valid storeId
+      if (!docData || !docData.storeId) {
+        if (isMounted) {
+          setProduct(null);
+          setStore(null);
+          setProductNotFound(true);
+          setIsLoadingProduct(false);
+        }
+        return;
+      }
+
+      // Load Store Data strictly from Firestore
+      const storeData = await fetchStoreByIdFromFirestore(docData.storeId);
+      if (!storeData) {
+        if (isMounted) {
+          setProduct(null);
+          setStore(null);
+          setProductNotFound(true);
+          setIsLoadingProduct(false);
+        }
+        return;
+      }
+
+      // Load Firestore Modifier Groups if available
+      let loadedModifiers = [];
+      if (Array.isArray(docData.modifierGroupIds) && docData.modifierGroupIds.length > 0) {
+        try {
+          const modPromises = docData.modifierGroupIds.map(async (mgId) => {
+            const mSnap = await getDoc(doc(db, "modifier_groups", mgId));
+            if (mSnap.exists()) {
+              const mData = mSnap.data();
+              return {
+                id: mSnap.id,
+                title: mData.name || mSnap.id,
+                required: Boolean(mData.isRequired),
+                selectionType: mData.selectionType || "single",
+                options: (mData.options || []).map((o) => ({
+                  id: o.id,
+                  name: o.name,
+                  price: (o.priceModifierSatang !== undefined ? o.priceModifierSatang / 100 : (Number(o.priceModifier) || 0)),
+                })),
+              };
+            }
+            return null;
+          });
+          const modResults = await Promise.all(modPromises);
+          loadedModifiers = modResults.filter(Boolean);
+        } catch (mErr) {
+          console.warn("[ProductDetail] Failed loading modifier groups from Firestore:", mErr);
+        }
+      }
+
+      // Load other store products for recommendations strictly from Firestore
+      try {
+        const prodsQ = query(collection(db, "products"), where("storeId", "==", docData.storeId));
+        const prodsSnap = await getDocs(prodsQ);
+        const storeProds = [];
+        prodsSnap.forEach((d) => {
+          if (d.id !== docData.id) {
+            storeProds.push({ id: d.id, ...d.data() });
+          }
+        });
+        if (isMounted) {
+          setRecommendedProducts(storeProds.slice(0, 4));
+        }
+      } catch (rErr) {
+        console.warn("[ProductDetail] Failed loading recommended products:", rErr);
+      }
+
+      if (isMounted) {
+        setProduct(docData);
+        setStore(storeData);
+        setFirestoreModifiers(loadedModifiers);
+        setSelectedImg(docData.mainImg || docData.image || "/crispy_fried_chicken.jpg");
 
         // Check Favorite Status if user logged in
-        if (user && user.uid && resolvedProd.id) {
-          const favStatus = await checkUserFavoriteInFirestore(user.uid, resolvedProd.id);
+        if (user && user.uid && docData.id) {
+          const favStatus = await checkUserFavoriteInFirestore(user.uid, docData.id);
           if (isMounted) setIsFavorite(favStatus);
         }
+        setIsLoadingProduct(false);
       }
     }
     loadProductAndStoreData();
@@ -707,14 +759,6 @@ function ProductDetail() {
   const discountedUnitPrice = Math.max(0, Math.round((basePrice + dynamicModifiersPrice) * (1 - discountPercent)));
   const totalCalculatedPrice = discountedUnitPrice * quantity;
 
-  // 15. Store Menu Recommendations
-  const recommendedProducts = useMemo(() => {
-    const storeId = product?.storeId || store?.id || store?.storeId;
-    if (!storeId) return [];
-    return SHARED_PRODUCTS.filter(
-      (p) => p.storeId === storeId && p.id !== product.id
-    ).slice(0, 4);
-  }, [product, store]);
 
   // 11. Profile Completeness Check
   const checkProfileCompleteness = async () => {
@@ -851,6 +895,10 @@ function ProductDetail() {
   };
 
   const handleAddToCart = async () => {
+    if (!product || !store) {
+      toast.error("ไม่สามารถเพิ่มลงตะกร้าได้: ไม่พบข้อมูลสินค้าหรือร้านค้าที่ถูกต้องในระบบจริง");
+      return;
+    }
     const missing = findMissingRequiredModifiers();
     if (missing.length > 0) {
       flagMissingRequiredModifiers(missing);
@@ -880,6 +928,10 @@ function ProductDetail() {
 
   // 8. ORDER VALIDATION BEFORE CHECKOUT
   const handleNextBooking = async () => {
+    if (!product || !store) {
+      toast.error("ไม่สามารถสั่งซื้อได้: ไม่พบข้อมูลสินค้าหรือร้านค้าที่ถูกต้องในระบบจริง");
+      return;
+    }
     // 1. Store Open Guard
     if (store?.isOpen === false || store?.status === "closed") {
       toast.warning("ขออภัย ร้านค้าปิดบริการชั่วคราว ไม่สามารถทำการสั่งซื้อคิวอาหารได้ในขณะนี้");
@@ -957,6 +1009,49 @@ function ProductDetail() {
     });
   };
 
+  // 🔒 Server-Authoritative UI Loading State
+  if (isLoadingProduct) {
+    return (
+      <div className="queue-pd-container">
+        <ShopeeSearchBar />
+        <div className="container py-5 text-center my-5">
+          <div className="spinner-border text-danger" role="status" style={{ width: "3rem", height: "3rem" }}>
+            <span className="visually-hidden">กำลังโหลดข้อมูลเมนูอาหาร...</span>
+          </div>
+          <p className="mt-3 text-muted fw-bold">กำลังโหลดข้อมูลเมนูอาหารจากฐานข้อมูลร้านค้าจริง...</p>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  // 🔒 Server-Authoritative Product Not Found Guard (Fail-Closed, No Mock Fallback)
+  if (productNotFound || !product || !store) {
+    return (
+      <div className="queue-pd-container">
+        <ShopeeSearchBar />
+        <div className="container py-5 text-center my-5">
+          <div className="card shadow-sm border-0 p-5 mx-auto" style={{ maxWidth: 520, borderRadius: 16 }}>
+            <div className="text-danger mb-3" style={{ fontSize: "3.5rem" }}>
+              <i className="bi bi-exclamation-octagon-fill" />
+            </div>
+            <h4 className="fw-bold mb-2">ไม่พบเมนูนี้ในระบบร้านค้าจริง</h4>
+            <p className="text-muted mb-4">
+              เมนูอาหารที่คุณค้นหาไม่มีอยู่ในฐานข้อมูลของร้านค้า หรือร้านค้ายกเลิกรายการอาหารนี้แล้ว
+            </p>
+            <button
+              className="btn btn-danger px-4 py-2 fw-bold"
+              style={{ borderRadius: 10 }}
+              onClick={() => navigate("/home")}
+            >
+              <i className="bi bi-arrow-left me-2" /> กลับสู่หน้าร้านค้าหลัก
+            </button>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="queue-pd-container">

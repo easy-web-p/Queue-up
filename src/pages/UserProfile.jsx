@@ -1376,8 +1376,13 @@ function UserProfile() {
                               รับ {order.pickupTime} น. ({order.pickupDate || "วันนี้"})
                             </span>
                           )}
-                          <span className={`badge ${order.paymentMode === 'CAMPUS_WALLET' ? 'bg-success-subtle text-success border border-success' : 'bg-warning-subtle text-warning-emphasis border border-warning'}`}>
-                            {order.paymentMode === 'CAMPUS_WALLET' ? '💳 ชำระผ่านกระเป๋านักเรียน' : '⚡ Zero-Payment (หน้าร้าน)'}
+                          {order.queueNumber && (
+                            <span className="badge bg-warning-subtle text-warning-emphasis border border-warning">
+                              คิว #{order.queueNumber}
+                            </span>
+                          )}
+                          <span className="badge bg-light text-secondary border">
+                            ⚡ Zero-Payment
                           </span>
                         </div>
                         <div className="shopee-order-total mt-1">

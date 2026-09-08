@@ -109,6 +109,11 @@ export function explainAuthDomainChoice(host, configured, options = {}) {
     return { authDomain: host, source: "same-origin-firebase-domain", warning: null };
   }
 
+  // Same-origin custom deployment host (e.g. queue-up-nu.vercel.app) confirmed registered with Google
+  if (registered && host !== "localhost" && !host.startsWith("127.0.0.1")) {
+    return { authDomain: host, source: "same-origin-registered-custom-host", warning: null };
+  }
+
   return { authDomain: DEFAULT_AUTH_DOMAIN, source: "default-custom-host", warning: null };
 }
 

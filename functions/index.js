@@ -5,7 +5,6 @@ import { onRequest, onCall, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
 import { resolveWalletAuthority, isStaffOrAdmin, MAX_TOPUP_SATANG } from "./walletAuthority.js";
-import { resolveSpendingCounters } from "./walletLimits.js";
 import { scanOrderForAllergens } from "./allergenGuard.js";
 import { resolveLinkDecision, LINK_DECISIONS } from "./linkReview.js";
 import { validatePilotLead, rateLimitKeyForAddress } from "./pilotLead.js";
@@ -215,7 +214,7 @@ export const submitSystemEvaluation = onCall(
 );
 
 /**
- * 🔒 Server-Authoritative Order Creation (5-Phase Ordering with Campus Wallet support)
+ * 🔒 Server-Authoritative Order Creation (Pure Zero-Payment Direct Queue Issuance)
  */
 export const createOrderAuthoritative = onCall(
   { region: "asia-southeast1", cors: true },
@@ -234,8 +233,6 @@ export const createOrderAuthoritative = onCall(
       items,
       pickupTime,
       pickupDate,
-      paymentMode, // 'CAMPUS_WALLET' | 'DIRECT_ZERO_PAYMENT'
-      studentId,   // Required if paymentMode === 'CAMPUS_WALLET'
       acknowledgeAllergenWarning, // set after the caller confirms an ALLERGEN_ALERT
       couponCode, // Optional coupon promo code
     } = request.data || {};
@@ -313,23 +310,6 @@ export const createOrderAuthoritative = onCall(
       productTotalQuantityMap.set(it.productId, (productTotalQuantityMap.get(it.productId) || 0) + qty);
     }
 
-    const isCampusWallet = paymentMode === "CAMPUS_WALLET";
-
-    // 🔒 `studentId` is caller-supplied: without this check any signed-in user could
-    // charge their own order to another student's wallet. Spending from a wallet that
-    // is not your own requires a verified guardian link or a staff role.
-    let effectiveStudentId = null;
-    if (isCampusWallet) {
-      effectiveStudentId =
-        typeof studentId === "string" && studentId.trim() ? studentId.trim() : authUid;
-      if (effectiveStudentId !== authUid) {
-        await assertWalletAuthority(request.auth, effectiveStudentId, {
-          allowSelf: true,
-          action: "สั่งซื้อโดยใช้กระเป๋าเงิน",
-        });
-      }
-    }
-
     try {
       return await db.runTransaction(async (tx) => {
         // ===================================================================
@@ -342,17 +322,9 @@ export const createOrderAuthoritative = onCall(
         }
         const shopData = shopSnap.data();
 
-        // Optional Campus Wallet document
-        let walletSnap = null;
-        let walletRef = null;
-        if (isCampusWallet && effectiveStudentId) {
-          walletRef = db.collection("wallets").doc(effectiveStudentId);
-          walletSnap = await tx.get(walletRef);
-        }
-
         // Allergy profile for whoever the food is for. All reads must precede any
         // write in a transaction, so this is fetched here with the rest of Phase 1.
-        const allergyProfileId = effectiveStudentId || authUid;
+        const allergyProfileId = authUid;
         const studentSnap = await tx.get(db.collection("students").doc(allergyProfileId));
 
         // Read all product documents
@@ -616,57 +588,6 @@ export const createOrderAuthoritative = onCall(
 
         const finalAmountSatang = Math.max(0, calculatedTotalSatang - discountSatang);
 
-        // 2.3 Campus Wallet Spending Rules Enforcement (Phase 0)
-        let walletData = null;
-        let walletCounters = null;
-        if (isCampusWallet) {
-          if (!walletSnap || !walletSnap.exists) {
-            throw new HttpsError("not-found", "CAMPUS_WALLET_NOT_FOUND: ไม่พบบัญชีกระเป๋าเงินดิจิทัลสำหรับนักเรียน");
-          }
-          walletData = walletSnap.data();
-          if (walletData.isLocked === true) {
-            throw new HttpsError("failed-precondition", "CAMPUS_WALLET_LOCKED: กระเป๋าเงินถูกระงับการใช้งานชั่วคราวโดยผู้ปกครองหรือโรงเรียน");
-          }
-
-          const currentBalance = Number(walletData.balanceSatang) || 0;
-          if (currentBalance < finalAmountSatang) {
-            throw new HttpsError("failed-precondition", `INSUFFICIENT_WALLET_BALANCE: ยอดเงินในกระเป๋าไม่เพียงพอ (คงเหลือ ${currentBalance / 100} บาท, ยอดสั่งซื้อหลังหักส่วนลด ${finalAmountSatang / 100} บาท)`);
-          }
-
-          // Counters are keyed on the server's current Bangkok date, NOT on the
-          // client-supplied pickup date — see walletLimits.js. Resolved once and
-          // reused by the Phase 4 write below so the check and the increment can
-          // never disagree about which period the spend belongs to.
-          walletCounters = resolveSpendingCounters(walletData, currentBangkok.ymd);
-          const { spentToday, spentThisWeek, dailyLimitSatang, weeklyLimitSatang } = walletCounters;
-
-          // Fail-Closed: Guardian MUST configure limits before a student wallet can be used to purchase food
-          if (dailyLimitSatang === null || weeklyLimitSatang === null) {
-            throw new HttpsError(
-              "failed-precondition",
-              "WALLET_LIMITS_NOT_CONFIGURED: ผู้ปกครองยังไม่ได้ตั้งค่าวงเงินจำกัดการใช้จ่าย กรุณาตั้งค่าผ่าน Guardian Dashboard ก่อนทำรายการ"
-            );
-          }
-
-          // Check Daily Limit
-          if (spentToday + finalAmountSatang > dailyLimitSatang) {
-            throw new HttpsError("failed-precondition", `DAILY_LIMIT_EXCEEDED: ยอดการใช้จ่ายเกินวงเงินรายวัน (${dailyLimitSatang / 100} บาท/วัน) วันนี้ใช้ไปแล้ว ${spentToday / 100} บาท`);
-          }
-
-          // Check Weekly Limit
-          if (spentThisWeek + finalAmountSatang > weeklyLimitSatang) {
-            throw new HttpsError("failed-precondition", `WEEKLY_LIMIT_EXCEEDED: ยอดการใช้จ่ายเกินวงเงินรายสัปดาห์ (${weeklyLimitSatang / 100} บาท/สัปดาห์) สัปดาห์นี้ใช้ไปแล้ว ${spentThisWeek / 100} บาท`);
-          }
-
-          // Check Blocked Categories
-          const blockedCategories = Array.isArray(walletData.blockedCategories) ? walletData.blockedCategories : [];
-          for (const cat of itemCategories) {
-            if (blockedCategories.includes(cat)) {
-              throw new HttpsError("failed-precondition", `BLOCKED_CATEGORY_VIOLATION: หมวดหมู่สินค้า "${cat}" ถูกจำกัดการซื้อโดยผู้ปกครอง`);
-            }
-          }
-        }
-
         // 2.4 Slot Capacity (Fail-Closed)
         if (typeof shopData.maxOrdersPerSlot !== "number" || shopData.maxOrdersPerSlot <= 0) {
           throw new HttpsError("failed-precondition", "STORE_CAPACITY_NOT_CONFIGURED: ร้านค้ายังไม่ได้กำหนดขีดจำกัดโควตาคิวรับอาหาร");
@@ -681,15 +602,21 @@ export const createOrderAuthoritative = onCall(
           throw new HttpsError("resource-exhausted", `SLOT_CAPACITY_EXCEEDED: รอบเวลารับอาหาร ${cleanPickupTime} น. ของวันที่ ${targetYmd} คิวเต็มแล้ว (${currentSlotOrders}/${authoritativeCapacity})`);
         }
 
-        // 2.5 Queue Number Generation
+        // 2.5 Queue Number Generation (Bounded Q001 - Q999)
         let sequenceNumber = 1;
         if (counterSnap.exists) {
           sequenceNumber = (Number(counterSnap.data().lastSequence) || 0) + 1;
         }
+        if (sequenceNumber > 999) {
+          throw new HttpsError(
+            "resource-exhausted",
+            `QUEUE_CAPACITY_EXCEEDED: คิวประจำวันของร้านนี้เต็มแล้วสำหรับวันที่ ${targetYmd} (จำกัดสูงสุด 999 คิว/วัน)`
+          );
+        }
         const queueNumber = `Q${String(sequenceNumber).padStart(3, "0")}`;
 
         // ===================================================================
-        // PHASE 3 & 4: WRITE ALL MUTATIONS ATOMICALLY (Including Wallet Deduction)
+        // PHASE 3: WRITE ALL MUTATIONS ATOMICALLY (Zero-Payment Server-Authoritative)
         // ===================================================================
         // Update product stock
         for (const [prodId, requiredTotalQty] of productTotalQuantityMap.entries()) {
@@ -744,9 +671,6 @@ export const createOrderAuthoritative = onCall(
           queueNumber,
           status: "PENDING",
           queueStatus: "waiting",
-          paymentMode: isCampusWallet ? "CAMPUS_WALLET" : "DIRECT_ZERO_PAYMENT",
-          paymentStatus: isCampusWallet ? "PAID" : "NOT_APPLICABLE",
-          studentId: effectiveStudentId,
           totalAmountSatang: calculatedTotalSatang,
           totalAmount: calculatedTotalSatang / 100,
           finalAmountSatang: finalAmountSatang,
@@ -789,37 +713,6 @@ export const createOrderAuthoritative = onCall(
           });
         }
 
-        // Phase 4: Atomic Wallet Deduction & Transaction Log
-        if (isCampusWallet && walletRef && walletData && walletCounters) {
-          const currentBal = Number(walletData.balanceSatang) || 0;
-
-          // Same counters the limit check above ran on, stamped with the period keys
-          // they belong to so the next order knows whether they are still current.
-          tx.update(walletRef, {
-            balanceSatang: currentBal - finalAmountSatang,
-            spentTodaySatang: walletCounters.spentToday + finalAmountSatang,
-            spentThisWeekSatang: walletCounters.spentThisWeek + finalAmountSatang,
-            lastSpentDate: walletCounters.todayYmd,
-            lastSpentWeek: walletCounters.weekKey,
-            updatedAt: FieldValue.serverTimestamp(),
-          });
-
-          const txRef = db.collection("wallet_transactions").doc();
-          tx.set(txRef, {
-            id: txRef.id,
-            walletId: effectiveStudentId,
-            studentId: effectiveStudentId,
-            orderId,
-            amountSatang: finalAmountSatang,
-            type: "SPEND",
-            storeId,
-            storeName: shopData.name || "Campus Store",
-            actorUid: authUid,
-            note: `ซื้ออาหารคิว ${queueNumber} ที่ร้าน ${shopData.name || storeId}${discountSatang > 0 ? ` (ใช้คูปอง ${cleanCoupon} ลด ${discountSatang / 100} บ.)` : ''}`,
-            timestamp: FieldValue.serverTimestamp(),
-          });
-        }
-
         return {
           success: true,
           orderId,
@@ -832,7 +725,6 @@ export const createOrderAuthoritative = onCall(
           discountBaht: discountSatang / 100,
           couponCode: discountSatang > 0 ? cleanCoupon : null,
           orderStatus: "PENDING",
-          paymentMode: isCampusWallet ? "CAMPUS_WALLET" : "DIRECT_ZERO_PAYMENT",
           order: orderPayload,
         };
       });
@@ -1598,44 +1490,6 @@ export const scheduledDailyMaintenance = onSchedule(
   { schedule: "0 0 * * *", timeZone: "Asia/Bangkok", region: "asia-southeast1" },
   async () => {
     console.log("[QueueUp] Daily maintenance routine triggered successfully.");
-  }
-);
-
-/**
- * 🏫 Pilot Programme Lead Submission (Authoritative Backend)
- */
-export const submitPilotLead = onCall(
-  { region: "asia-southeast1", cors: true },
-  async (request) => {
-    const validation = validatePilotLead(request.data);
-    if (!validation.ok) {
-      throw new HttpsError("invalid-argument", `${validation.reason}: ${validation.message}`);
-    }
-
-    // rawRequest.ip is Express's view of the caller; behind a proxy it can be
-    // absent, in which case rateLimitKeyForAddress buckets them together rather
-    // than letting them past the limit.
-    const callerKey = rateLimitKeyForAddress(request.rawRequest?.ip);
-    await consumeRateLimit(callerKey, {
-      collection: "pilot_lead_rate_limits",
-      maxCalls: 5,
-      windowMs: 60 * 60 * 1000,
-      message: "ส่งคำขอบ่อยเกินไป กรุณาติดต่อเราทางโทรศัพท์หรืออีเมลโดยตรง",
-    });
-
-    const ref = await db.collection("pilot_leads").add({
-      ...validation.lead,
-      status: "NEW",
-      source: "landing_page_pilot_form",
-      submittedByUid: request.auth?.uid || null,
-      createdAt: FieldValue.serverTimestamp(),
-    });
-
-    // No lead content in the log line: this collection exists precisely so the
-    // school's contact details live in one controlled place.
-    console.log(`[QueueUp] Pilot lead recorded: ${ref.id}`);
-
-    return { success: true, leadId: ref.id };
   }
 );
 

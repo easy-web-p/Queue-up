@@ -79,6 +79,7 @@ export interface MenuItem {
   popular?: boolean;
   storeId?: string;
   shopName?: string;
+  storeName?: string;
   modifierGroupIds?: string[]; // 🔒 Normalized Modifier References
   /**
    * Allergens the store declares this dish contains, as ALLERGEN_PRESET_DICTIONARY
@@ -124,6 +125,7 @@ export interface CartItem {
   customInstructions?: string;
   customNotes?: string;
   selectedModifiers?: SelectedModifierOption[] | Record<string, string | string[]>;
+  unitPriceSatang?: number;
 }
 
 export interface Order {

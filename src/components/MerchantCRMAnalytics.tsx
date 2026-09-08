@@ -1,15 +1,50 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CustomerProfile } from '../types';
-import { Users, Send, TrendingUp, Award, Phone, CheckCircle2 } from 'lucide-react';
+import { Users, Send, Award, Phone, CheckCircle2, DollarSign, ShoppingBag } from 'lucide-react';
+import { fetchStoreStatsFromFirestore } from '../services/communityService.js';
 
 interface Props {
   customers: CustomerProfile[];
   onSendBroadcast: (announcementText: string) => void;
+  storeId?: string;
 }
 
-export const MerchantCRMAnalytics: React.FC<Props> = ({ customers, onSendBroadcast }) => {
+export const MerchantCRMAnalytics: React.FC<Props> = ({ customers, onSendBroadcast, storeId }) => {
   const [broadcastText, setBroadcastText] = useState('');
   const [sentNotice, setSentNotice] = useState(false);
+  const [storeStats, setStoreStats] = useState<{
+    id?: string;
+    totalRevenueSatang?: number;
+    totalOrdersCount?: number;
+    totalItemsSold?: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!storeId) return;
+    let isCancelled = false;
+    async function loadStats() {
+      try {
+        const stats = await fetchStoreStatsFromFirestore(storeId);
+        if (!isCancelled && stats) {
+          setStoreStats(stats);
+        }
+      } catch (err) {
+        console.warn("Could not load store stats:", err);
+      }
+    }
+    loadStats();
+    return () => {
+      isCancelled = true;
+    };
+  }, [storeId]);
+
+  const totalRevenueBaht = storeStats?.totalRevenueSatang
+    ? Math.round(storeStats.totalRevenueSatang / 100)
+    : customers.reduce((acc, c) => acc + c.totalSpent, 0);
+
+  const totalOrders = storeStats?.totalOrdersCount
+    ? storeStats.totalOrdersCount
+    : customers.reduce((acc, c) => acc + c.totalOrders, 0);
 
   const handleBroadcast = (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,35 +59,44 @@ export const MerchantCRMAnalytics: React.FC<Props> = ({ customers, onSendBroadca
   return (
     <div className="space-y-6">
       
-      {/* Top CRM Analytics Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Top CRM & Store Analytics Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-gradient-to-br from-emerald-600 to-teal-600 text-white p-5 rounded-3xl shadow-lg space-y-1">
+          <div className="flex items-center justify-between opacity-80 text-xs font-semibold">
+            <span>ยอดขายรวมสะสม</span>
+            <DollarSign className="w-4 h-4" />
+          </div>
+          <div className="text-3xl font-black">฿{totalRevenueBaht.toLocaleString()}</div>
+          <p className="text-[11px] text-emerald-100">บันทึกอัตโนมัติจากทุกคำสั่งซื้อ</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-blue-600 to-indigo-600 text-white p-5 rounded-3xl shadow-lg space-y-1">
+          <div className="flex items-center justify-between opacity-80 text-xs font-semibold">
+            <span>ออเดอร์ทั้งหมด</span>
+            <ShoppingBag className="w-4 h-4" />
+          </div>
+          <div className="text-3xl font-black">{totalOrders} ออเดอร์</div>
+          <p className="text-[11px] text-blue-100">ผ่านระบบ Queue & Booking</p>
+        </div>
+
         <div className="bg-gradient-to-br from-orange-500 to-amber-500 text-white p-5 rounded-3xl shadow-lg space-y-1">
           <div className="flex items-center justify-between opacity-80 text-xs font-semibold">
-            <span>จำนวนลูกค้าประจำทั้งหมด</span>
+            <span>ลูกค้าประจำ CRM</span>
             <Users className="w-4 h-4" />
           </div>
           <div className="text-3xl font-black">{customers.length} คน</div>
-          <p className="text-[11px] text-orange-100">มีประวัติสั่งซื้อซ้ำในระบบ CRM</p>
+          <p className="text-[11px] text-orange-100">อัตราซื้อซ้ำ 78.5% (+12%)</p>
         </div>
 
-        <div className="bg-gradient-to-br from-emerald-600 to-teal-500 text-white p-5 rounded-3xl shadow-lg space-y-1">
+        <div className="bg-gradient-to-br from-purple-600 to-pink-600 text-white p-5 rounded-3xl shadow-lg space-y-1">
           <div className="flex items-center justify-between opacity-80 text-xs font-semibold">
-            <span>อัตราการกลับมาซื้อซ้ำ (Repeat Rate)</span>
-            <TrendingUp className="w-4 h-4" />
-          </div>
-          <div className="text-3xl font-black">78.5%</div>
-          <p className="text-[11px] text-emerald-100">+12% สูงกว่าเกณฑ์เฉลี่ยโรงอาหาร</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-indigo-600 to-blue-500 text-white p-5 rounded-3xl shadow-lg space-y-1">
-          <div className="flex items-center justify-between opacity-80 text-xs font-semibold">
-            <span>คะแนนสะสม CRM ที่แจกแล้ว</span>
+            <span>คะแนน CRM แจกแล้ว</span>
             <Award className="w-4 h-4" />
           </div>
           <div className="text-3xl font-black">
             {customers.reduce((acc, c) => acc + c.points, 0)} แต้ม
           </div>
-          <p className="text-[11px] text-blue-100">สะสมอัตโนมัติผ่านเบอร์โทรศัพท์</p>
+          <p className="text-[11px] text-purple-100">สะสมผ่านเบอร์โทรศัพท์</p>
         </div>
       </div>
 

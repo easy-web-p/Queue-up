@@ -1,0 +1,166 @@
+.inapp-browser-banner {
+  background: linear-gradient(135deg, #7c2d12 0%, #9a3412 50%, #c2410c 100%);
+  color: #ffffff;
+  padding: 12px 16px;
+  box-shadow: 0 4px 14px rgba(124, 45, 18, 0.4);
+  position: sticky;
+  top: 0;
+  z-index: 99999;
+  font-family: inherit;
+  border-bottom: 2px solid rgba(254, 215, 170, 0.3);
+  animation: inappSlideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes inappSlideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.inapp-banner-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.inapp-banner-icon-wrapper {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+}
+
+.inapp-banner-content {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.inapp-banner-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.inapp-banner-badge {
+  background: #fef08a;
+  color: #713f12;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  letter-spacing: 0.02em;
+}
+
+.inapp-banner-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #ffedd5;
+}
+
+.inapp-banner-description {
+  font-size: 0.85rem;
+  margin: 0 0 6px 0;
+  line-height: 1.4;
+  color: #fed7aa;
+}
+
+.inapp-banner-steps {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: #ffedd5;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 4px 10px;
+  border-radius: 6px;
+  display: inline-flex;
+  flex-wrap: wrap;
+}
+
+.inapp-step-arrow {
+  color: #fdba74;
+  font-weight: bold;
+}
+
+.inapp-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.inapp-btn-copy {
+  background: #ffffff;
+  color: #9a3412;
+  border: none;
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.inapp-btn-copy:hover {
+  background: #ffedd5;
+  transform: translateY(-1px);
+}
+
+.inapp-btn-copy:active {
+  transform: translateY(0);
+}
+
+.inapp-btn-dismiss {
+  background: transparent;
+  color: #ffedd5;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+}
+
+.inapp-btn-dismiss:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+@media (max-width: 640px) {
+  .inapp-browser-banner {
+    padding: 10px 12px;
+  }
+  .inapp-banner-container {
+    gap: 10px;
+  }
+  .inapp-banner-actions {
+    width: 100%;
+    justify-content: space-between;
+    margin-top: 4px;
+  }
+  .inapp-btn-copy {
+    flex: 1;
+    text-align: center;
+  }
+}

@@ -16,7 +16,7 @@ import ShopReelsFeed from "../components/ShopReelsFeed.jsx";
 import { usePreferences } from "../context/PreferencesContext.jsx";
 import { FoodGridSkeleton, EmptyState, ErrorState } from "../components/LoadingStates.jsx";
 import { Utensils } from "lucide-react";
-import { getUserBehaviorInsights, recordUserOrderBehavior } from "../services/aiBehaviorEngine.js";
+import { getUserBehaviorInsights, recordUserOrderBehavior, loadAndSyncUserBehavior } from "../services/aiBehaviorEngine.js";
 import { getActiveMerchantCoupons } from "../services/aiMarketingService.js";
 import { useToast } from "../components/ToastProvider.jsx";
 import "./Home.css";
@@ -93,6 +93,13 @@ function Home() {
       carouselRef.current.scrollBy({ left: scrollAmount, behavior: "smooth" });
     }
   };
+
+  // Sync and load user behavior intelligence profile from Firestore
+  useEffect(() => {
+    if (user?.uid) {
+      loadAndSyncUserBehavior(user.uid);
+    }
+  }, [user?.uid]);
 
   // First-time user welcome coupon state
   const [showWelcomeBanner, setShowWelcomeBanner] = useState(() => {
@@ -812,7 +819,7 @@ function Home() {
         <DailyMenuBoard />
 
         {/* 7.2 Shop Reels — short menu videos from shops and student vendors */}
-        <ShopReelsFeed />
+        <ShopReelsFeed onOrderFromReel={(productId) => navigate(productId ? `/product/${productId}` : "/search")} />
 
         {/* 8. Food Catalog Grid with Interactive Filters & Sorting */}
         <section className="bg-white p-4 rounded-4 shadow-sm border mb-4">

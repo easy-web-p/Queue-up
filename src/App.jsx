@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import PageRouteLoader, { PageRouteLoaderView } from "./components/PageRouteLoader.jsx";
 import CookieConsentBanner from "./components/CookieConsentBanner.jsx";
 import CookieSessionTracker from "./components/CookieSessionTracker.jsx";
+import InAppBrowserBanner from "./components/InAppBrowserBanner.jsx";
 
 import NotFound from "./pages/NotFound.jsx"; // eager: ProtectedRoute imports it synchronously
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
@@ -51,6 +52,8 @@ function App() {
           <a href="#main-content" className="skip-to-content">ข้ามไปยังเนื้อหาหลัก</a>
           {/* Global Page Route Transition Loading Animation Overlay */}
           <PageRouteLoader />
+          {/* Global In-App Browser Guidance Banner (Instagram / LINE / Facebook WebView) */}
+          <InAppBrowserBanner />
           {/* Global Cookie Session Tracker on Every Page */}
           <CookieSessionTracker />
           {/* Global PDPA Cookie Consent Banner */}

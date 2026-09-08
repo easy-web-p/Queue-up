@@ -31,9 +31,6 @@ export const MerchantKDS: React.FC<Props> = ({
   const readyOrders = orders.filter((o) => o.status === 'READY' || o.queueStatus === 'ready');
 
   const renderOrderCard = (order: Order, nextStatus: QueueStatus, btnLabel: string, btnIcon: React.ReactNode, btnClass: string, soundAction: () => void) => {
-    const isCampusWallet = (order as any).paymentMode === 'CAMPUS_WALLET';
-    const isPaid = isCampusWallet || (order as any).paymentStatus === 'PAID';
-
     return (
       <div
         key={order.id}
@@ -45,13 +42,6 @@ export const MerchantKDS: React.FC<Props> = ({
             <div className="flex items-center gap-2">
               <span className="text-sm font-black font-['JetBrains_Mono'] text-orange-600 block">
                 คิว #{order.queueNumber}
-              </span>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                isPaid
-                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                  : 'bg-amber-100 text-amber-800 border border-amber-300'
-              }`}>
-                {isPaid ? '💳 Wallet (จ่ายแล้ว)' : '⚡ จ่ายหน้าร้าน'}
               </span>
             </div>
             <span className="text-xs font-bold text-slate-800 mt-1 block">

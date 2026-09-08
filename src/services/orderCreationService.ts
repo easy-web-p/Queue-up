@@ -46,8 +46,6 @@ export interface CreateOrderRequest {
   items: OrderItemRequest[];
   pickupTime: string; // Must match HH:mm (e.g. "12:15")
   pickupDate?: string; // e.g. "2026-09-04" (YYYY-MM-DD or YYYYMMDD)
-  paymentMode?: 'CAMPUS_WALLET' | 'DIRECT_ZERO_PAYMENT';
-  studentId?: string;
   /** Set only after the customer has confirmed an ALLERGEN_ALERT warning. */
   acknowledgeAllergenWarning?: boolean;
   couponCode?: string;

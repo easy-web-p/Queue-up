@@ -3,8 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectCartItems, clearCart } from '../store/cartSlice';
 import { calculateCartItemUnitPrice } from '../store/cartPricing.js';
-import { Utensils, ArrowLeft, Sparkles, AlertCircle, Clock, CheckCircle2, ShoppingBag, Store, MapPin, Calendar, Compass, Wallet, CreditCard, Phone, Tag, Ticket, Percent, X } from 'lucide-react';
-import { CartItem, Order, CustomerProfile, SelectedModifierOption } from '../types';
+import { Utensils, ArrowLeft, Sparkles, AlertCircle, Clock, CheckCircle2, ShoppingBag, Store, MapPin, Calendar, Compass, Phone, Tag, Ticket, X } from 'lucide-react';
+import { Order, CustomerProfile, SelectedModifierOption } from '../types';
 import {
   createAuthoritativeStoreOrder,
   getBangkokYmd,
@@ -13,6 +13,8 @@ import {
 } from '../services/orderCreationService';
 import { soundManager } from '../utils/audioNotification.js';
 import { ClientQueueTicket } from '../components/ClientQueueTicket.jsx';
+import { recordUserOrderBehavior } from '../services/aiBehaviorEngine.js';
+import { recordStoreOrderStatInFirestore } from '../services/communityService.js';
 
 interface FoodBookingPageProps {
   currentUser?: CustomerProfile | null;
@@ -81,7 +83,6 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
     ? customPhone 
     : (currentUser?.phone || currentUser?.phoneNumber || '');
 
-  const [paymentMode, setPaymentMode] = useState<'DIRECT_ZERO_PAYMENT' | 'CAMPUS_WALLET'>('DIRECT_ZERO_PAYMENT');
   const [customInstructions, setCustomInstructions] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
@@ -228,8 +229,6 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
         customerPhone: userPhone,
         pickupTime,
         pickupDate: pickupDate || locationState?.bookingDate,
-        paymentMode,
-        studentId: paymentMode === 'CAMPUS_WALLET' ? userId : undefined,
         acknowledgeAllergenWarning: options.acknowledgeAllergenWarning === true,
         couponCode: appliedCoupon ? appliedCoupon.code : undefined,
         items: cartItems.map((c) => ({
@@ -252,6 +251,33 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
 
       soundManager.playQueueIssuedSound();
       setCreatedOrder(orderData);
+
+      // 🧠 Record User Order Behavior for AI Preferences & Sync to Firestore
+      try {
+        cartItems.forEach((c) => {
+          recordUserOrderBehavior(
+            {
+              itemId: c.menuItem.id,
+              itemTitle: c.menuItem.name,
+              variant: c.customNotes || '',
+              price: c.unitPriceSatang ? c.unitPriceSatang / 100 : c.menuItem.price,
+              storeName: c.menuItem.storeName || 'ร้านค้าโรงเรียน',
+              timestamp: new Date().toISOString(),
+            },
+            userId
+          );
+        });
+      } catch (e) {
+        console.warn('Record behavior warn:', e);
+      }
+
+      // 📊 Record Store Sales Statistics in Firestore
+      try {
+        const totalSatang = orderData.finalAmountSatang || (orderData.totalAmount ? Math.round(orderData.totalAmount * 100) : 0);
+        recordStoreOrderStatInFirestore(storeId, totalSatang, cartItems.length);
+      } catch (e) {
+        console.warn('Record store stat warn:', e);
+      }
 
       if (onBookingSuccess) {
         onBookingSuccess(orderData);
@@ -644,49 +670,6 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
               </div>
             </div>
 
-            {/* Payment Method Selector */}
-            <div>
-              <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-200 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                <CreditCard className="w-4 h-4 text-[#8B0000] dark:text-[#FF7A1A]" />
-                เลือกวิธีการชำระเงิน (Payment Option) *
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setPaymentMode('DIRECT_ZERO_PAYMENT')}
-                  className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
-                    paymentMode === 'DIRECT_ZERO_PAYMENT'
-                      ? 'border-[#8B0000] dark:border-[#FF7A1A] bg-amber-50/60 dark:bg-[#FF7A1A]/10 ring-2 ring-[#8B0000]/20 dark:ring-[#FF7A1A]/30'
-                      : 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-[#16100C] hover:bg-slate-100 dark:hover:bg-white/5'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-black text-slate-900 dark:text-white">⚡ Zero-Payment รับคิวทันที</span>
-                    <span className="text-[10px] font-bold bg-amber-200 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200 px-2 py-0.5 rounded-full">มาตรฐาน</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 dark:text-[#9CA3AF] mb-0">ออกคิวทันที และชำระเงินตรงกับร้านค้าเมื่อไปรับอาหาร</p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setPaymentMode('CAMPUS_WALLET')}
-                  className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
-                    paymentMode === 'CAMPUS_WALLET'
-                      ? 'border-[#8B0000] dark:border-[#FF7A1A] bg-amber-50/60 dark:bg-[#FF7A1A]/10 ring-2 ring-[#8B0000]/20 dark:ring-[#FF7A1A]/30'
-                      : 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-[#16100C] hover:bg-slate-100 dark:hover:bg-white/5'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1.5">
-                      <Wallet className="w-4 h-4 text-[#8B0000] dark:text-[#FF7A1A]" /> กระเป๋าเงินนักเรียน
-                    </span>
-                    <span className="text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 rounded-full">Digital Wallet</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 dark:text-[#9CA3AF] mb-0">ตัดยอดอัตโนมัติ พร้อมตรวจเช็ควงเงินและหมวดหมู่ที่ผู้ปกครองอนุญาต</p>
-                </button>
-              </div>
-            </div>
-
             {/* Customer Phone for Queue Alert */}
             <div>
               <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-200 uppercase tracking-wider mb-2 flex items-center gap-1.5">
@@ -723,7 +706,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
               className="w-full py-4 bg-gradient-to-r from-[#8B0000] via-[#A50000] to-[#800000] dark:from-[#FF7A1A] dark:to-[#E6680D] hover:opacity-90 text-white font-black text-base rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
             >
               <ShoppingBag className="w-5 h-5" />
-              <span>{isSubmitting ? 'กำลังตรวจสอบโควตาและบันทึกคิว...' : 'ยืนยันสั่งอาหาร'}</span>
+              <span>{isSubmitting ? 'กำลังจัดสรรคิวและบันทึกคำสั่งซื้อ...' : '⚡ ยืนยันรับบัตรคิวทันที (Zero-Payment)'}</span>
             </button>
 
             {/* 📱 Mobile-First Sticky Checkout Bar (Fixed at bottom for mobile < 640px) */}
@@ -740,7 +723,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
                 className="flex-1 py-3 px-4 bg-gradient-to-r from-[#8B0000] to-[#FF7A1A] hover:opacity-95 text-white font-extrabold text-sm rounded-xl shadow-lg flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 min-h-[48px] cursor-pointer"
               >
                 <ShoppingBag className="w-4 h-4" />
-                <span>{isSubmitting ? 'กำลังบันทึก...' : 'ยืนยันสั่งอาหาร'}</span>
+                <span>{isSubmitting ? 'กำลังบันทึก...' : '⚡ ยืนยันรับบัตรคิว'}</span>
               </button>
             </div>
           </form>

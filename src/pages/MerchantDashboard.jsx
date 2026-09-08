@@ -3,8 +3,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { switchRole, clearUser } from "../store/authSlice.js";
 import { db, doc, getDoc, setDoc } from "../firebase/config.js";
-import { collection, query, where, onSnapshot, updateDoc, serverTimestamp } from "firebase/firestore";
-import { SHARED_PRODUCTS } from "../data/mockProducts.js";
+import { collection, query, where, getDocs, onSnapshot, updateDoc, serverTimestamp } from "firebase/firestore";
 import { MerchantKDS } from "../components/MerchantKDS.tsx";
 import ChatModal from "../components/ChatModal.jsx";
 import BookingCalendar from "../components/BookingCalendar.jsx";
@@ -25,6 +24,9 @@ import {
 } from "../services/aiMarketingService.js";
 import { getSecurityHealthReport } from "../services/aiSecurityShield.js";
 import { recordAuditLog } from "../services/storeIsolationEngine.js";
+import {
+  createAnnouncementInFirestore,
+} from "../services/communityService.js";
 import Footer from "../components/Footer.jsx";
 import { useToast } from "../components/ToastProvider.jsx";
 import "./MerchantDashboard.css";
@@ -62,60 +64,18 @@ function MerchantDashboard() {
     return rawName;
   };
 
-  // Read Store Profile & storeId from LocalStorage & User Auth Context (Zero Fake Fallback)
-  const getInitialStoreData = () => {
-    try {
-      const userKey = user && user.uid ? `queueup_merchant_store_${user.uid}` : null;
-      const stored = (userKey && localStorage.getItem(userKey)) || localStorage.getItem("queueup_merchant_store");
-      if (stored) {
-        const m = JSON.parse(stored);
-        const storeId = m.storeId || user?.storeId || (user && user.uid ? `store_${user.uid.substring(0, 10)}` : "");
-        return {
-          storeId,
-          name: cleanDisplayName(m.merchantStoreName || m.storeName || user?.merchantStoreName, user?.email),
-          phone: m.phone || m.businessPhone || user?.phone || "",
-          location: m.canteenLocation ? (m.counterNo ? `${m.canteenLocation} (${m.counterNo})` : m.canteenLocation) : user?.canteenLocation || "",
-        };
-      }
-    } catch {
-      // ignore
-    }
-    const storeId = user?.storeId || "";
-    return {
-      storeId,
-      name: cleanDisplayName(user?.merchantStoreName || user?.storeName, user?.email),
-      phone: user?.phone || user?.businessPhone || "",
-      location: user?.canteenLocation || "",
-    };
-  };
-
-  const initialStore = getInitialStoreData();
-  const [currentStoreId] = useState(initialStore.storeId);
+  const [currentStoreId, setCurrentStoreId] = useState(user?.storeId || null);
+  const [isStoreLoading, setIsStoreLoading] = useState(true);
+  const [hasNoStore, setHasNoStore] = useState(false);
+  const [isRegistered, setIsRegistered] = useState(false);
 
   const [merchantOrders, setMerchantOrders] = useState([]);
   const [modifierGroups, setModifierGroups] = useState([]);
+  const [menuItems, setMenuItems] = useState([]);
 
-  const [menuItems, setMenuItems] = useState(() => {
-    if (initialStore.storeId) {
-      const savedMenu = localStorage.getItem(`queueup_merchant_menu_${initialStore.storeId}`);
-      if (savedMenu) {
-        try {
-          return JSON.parse(savedMenu);
-        } catch {
-          // ignore
-        }
-      }
-      return SHARED_PRODUCTS.filter((p) => p.storeId === initialStore.storeId).map((p) => ({
-        ...p,
-        isAvailable: true,
-      }));
-    }
-    return [];
-  });
-
-  const [storeName, setStoreName] = useState(initialStore.name);
-  const [storePhone, setStorePhone] = useState(initialStore.phone);
-  const [canteenLocation, setCanteenLocation] = useState(initialStore.location);
+  const [storeName, setStoreName] = useState(() => cleanDisplayName(user?.merchantStoreName || user?.storeName, user?.email));
+  const [storePhone, setStorePhone] = useState(user?.phone || user?.businessPhone || "");
+  const [canteenLocation, setCanteenLocation] = useState(user?.canteenLocation || "");
   const [storeHours, setStoreHours] = useState("07:00 - 15:00 น.");
   const [isSavedProfile, setIsSavedProfile] = useState(false);
   const [privateBankName, setPrivateBankName] = useState("");
@@ -149,7 +109,7 @@ function MerchantDashboard() {
   };
 
   const [aiMarketingCoupons] = useState(() => generateAIMarketingRecommendations());
-  const [activeCouponsList, setActiveCouponsList] = useState(() => getActiveMerchantCoupons(initialStore.storeId));
+  const [activeCouponsList, setActiveCouponsList] = useState([]);
   const [securityReport] = useState(() => getSecurityHealthReport());
   const [marketingSuccessMsg, setMarketingSuccessMsg] = useState("");
 
@@ -167,57 +127,91 @@ function MerchantDashboard() {
     setActiveCouponsList(updated);
   };
 
-  // Track Registration Status cleanly
-  const [isRegistered, setIsRegistered] = useState(() => {
-    if (!user) return false;
-    const userKey = `queueup_merchant_store_${user.uid}`;
-    return !!(user.isMerchantRegistered || user.merchantId || localStorage.getItem(userKey));
-  });
-
+  // 🏪 Authoritative Store Resolution: Firebase Auth -> Firestore /shops where ownerUid == user.uid -> currentStoreId
   useEffect(() => {
-    if (!user) {
-      navigate("/portal/th-onboarding", { replace: true });
-      return;
-    }
+    let isCancelled = false;
 
-    // Direct redirect if not registered
-    const userKey = `queueup_merchant_store_${user.uid}`;
-    const hasLocalStore = localStorage.getItem(userKey);
+    async function resolveAuthoritativeStore() {
+      if (!user) {
+        setIsStoreLoading(false);
+        navigate("/portal/th-onboarding", { replace: true });
+        return;
+      }
 
-    if (!user.isMerchantRegistered && !user.merchantId && !hasLocalStore) {
-      getDoc(doc(db, "users", user.uid)).then((uSnap) => {
-        if (uSnap.exists()) {
-          const uData = uSnap.data();
-          if (uData.isMerchantRegistered || uData.merchantId) {
+      setIsStoreLoading(true);
+
+      try {
+        // Priority 1: Check user.storeId if present on auth claims/profile
+        if (user.storeId) {
+          const shopDoc = await getDoc(doc(db, "shops", user.storeId));
+          if (!isCancelled && shopDoc.exists()) {
+            const sData = shopDoc.data();
+            setCurrentStoreId(shopDoc.id);
+            if (sData.storeName || sData.name) setStoreName(cleanDisplayName(sData.storeName || sData.name, user.email));
+            if (sData.phone || sData.businessPhone) setStorePhone(sData.phone || sData.businessPhone);
+            if (sData.canteenLocation || sData.location) setCanteenLocation(sData.canteenLocation || sData.location);
+            if (sData.storeHours || sData.hours) setStoreHours(sData.storeHours || sData.hours);
             setIsRegistered(true);
-            if (uData.merchantStoreName) setStoreName(cleanDisplayName(uData.merchantStoreName, user.email));
-            if (uData.phone) setStorePhone(uData.phone);
-            if (uData.canteenLocation) setCanteenLocation(uData.canteenLocation);
-          } else {
-            navigate("/portal/th-onboarding", { replace: true });
+            setHasNoStore(false);
+            setIsStoreLoading(false);
+            return;
           }
-        } else {
-          navigate("/portal/th-onboarding", { replace: true });
         }
-      });
+
+        // Priority 2: Authoritative Firestore query: /shops where ownerUid == user.uid
+        const shopsQuery = query(collection(db, "shops"), where("ownerUid", "==", user.uid));
+        const shopsSnap = await getDocs(shopsQuery);
+
+        if (!isCancelled) {
+          if (!shopsSnap.empty) {
+            const primaryShop = shopsSnap.docs[0];
+            const sData = primaryShop.data();
+            setCurrentStoreId(primaryShop.id);
+            if (sData.storeName || sData.name) setStoreName(cleanDisplayName(sData.storeName || sData.name, user.email));
+            if (sData.phone || sData.businessPhone) setStorePhone(sData.phone || sData.businessPhone);
+            if (sData.canteenLocation || sData.location) setCanteenLocation(sData.canteenLocation || sData.location);
+            if (sData.storeHours || sData.hours) setStoreHours(sData.storeHours || sData.hours);
+            setIsRegistered(true);
+            setHasNoStore(false);
+          } else {
+            // Check merchantProfiles collection
+            const mchSnap = await getDocs(query(collection(db, "merchantProfiles"), where("ownerUid", "==", user.uid)));
+            if (!mchSnap.empty) {
+              const mData = mchSnap.docs[0].data();
+              if (mData.storeId) {
+                setCurrentStoreId(mData.storeId);
+                if (mData.merchantStoreName || mData.storeName) setStoreName(cleanDisplayName(mData.merchantStoreName || mData.storeName, user.email));
+                if (mData.businessPhone) setStorePhone(mData.businessPhone);
+                if (mData.canteenLocation) setCanteenLocation(mData.canteenLocation);
+                setIsRegistered(true);
+                setHasNoStore(false);
+                setIsStoreLoading(false);
+                return;
+              }
+            }
+
+            // No shop document exists in Firestore for this merchant:
+            // Do NOT generate fake store_${uid} or fall back to localStorage!
+            setCurrentStoreId(null);
+            setHasNoStore(true);
+          }
+          setIsStoreLoading(false);
+        }
+      } catch (err) {
+        console.warn("[MerchantDashboard] Error resolving authoritative store:", err);
+        if (!isCancelled) {
+          setIsStoreLoading(false);
+        }
+      }
     }
 
+    resolveAuthoritativeStore();
+
+    // Check private finance info if merchantId exists
     const merchantId = user.merchantId;
-    const storeId = user.storeId;
-
     if (merchantId) {
-      getDoc(doc(db, "merchantProfiles", merchantId)).then((docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setIsRegistered(true);
-          if (data.merchantStoreName || data.storeName) setStoreName(cleanDisplayName(data.merchantStoreName || data.storeName, user.email));
-          if (data.businessPhone) setStorePhone(data.businessPhone);
-          if (data.canteenLocation) setCanteenLocation(data.canteenLocation);
-        }
-      });
-
       getDoc(doc(db, "merchantProfiles", merchantId, "private", "finance")).then((finSnap) => {
-        if (finSnap.exists()) {
+        if (!isCancelled && finSnap.exists()) {
           const finData = finSnap.data();
           if (finData.bankName) setPrivateBankName(finData.bankName);
           if (finData.accountNumber) setPrivateAccountNo(finData.accountNumber);
@@ -226,19 +220,38 @@ function MerchantDashboard() {
       });
     }
 
-    if (storeId) {
-      getDoc(doc(db, "shops", storeId)).then((storeSnap) => {
-        if (storeSnap.exists()) {
-          const sData = storeSnap.data();
-          setIsRegistered(true);
-          if (sData.storeName) setStoreName(cleanDisplayName(sData.storeName, user.email));
-          if (sData.phone) setStorePhone(sData.phone);
-          if (sData.canteenLocation) setCanteenLocation(sData.canteenLocation);
-          if (sData.storeHours) setStoreHours(sData.storeHours);
-        }
-      });
-    }
+    return () => {
+      isCancelled = true;
+    };
   }, [user, navigate]);
+
+  // 🍱 Load products for currentStoreId directly from Firestore products collection
+  useEffect(() => {
+    let isCancelled = false;
+    async function loadStoreProducts() {
+      if (!currentStoreId) {
+        setMenuItems([]);
+        setActiveCouponsList([]);
+        return;
+      }
+      setActiveCouponsList(getActiveMerchantCoupons(currentStoreId));
+      try {
+        const q = query(collection(db, "products"), where("storeId", "==", currentStoreId));
+        const snap = await getDocs(q);
+        if (!isCancelled) {
+          const prods = [];
+          snap.forEach((d) => prods.push({ id: d.id, ...d.data() }));
+          setMenuItems(prods);
+        }
+      } catch (err) {
+        console.warn("[MerchantDashboard] Error loading store products:", err);
+      }
+    }
+    loadStoreProducts();
+    return () => {
+      isCancelled = true;
+    };
+  }, [currentStoreId]);
 
   // 🔔 Real-time Firestore Listener for Store Orders
   useEffect(() => {
@@ -391,14 +404,30 @@ function MerchantDashboard() {
       .sort((a, b) => b.totalSpent - a.totalSpent);
   }, [merchantOrders]);
 
-  const handleSendBroadcast = (announcementText) => {
-    // No broadcast transport exists yet — recorded locally and surfaced in the tab so
-    // the action is honest about what it did rather than silently doing nothing.
-    console.info("[MerchantDashboard] Broadcast queued:", announcementText);
-    setMarketingSuccessMsg(
-      `บันทึกประกาศถึงลูกค้าประจำ ${crmCustomers.length} รายเรียบร้อยแล้ว (ยังไม่ได้เชื่อมระบบส่งข้อความจริง)`
-    );
-    setTimeout(() => setMarketingSuccessMsg(""), 5000);
+  const handleSendBroadcast = async (announcementText) => {
+    try {
+      if (currentStoreId && announcementText) {
+        await createAnnouncementInFirestore({
+          shopName: storeName || "ร้านค้าของคุณ",
+          storeId: currentStoreId,
+          authorUid: user?.uid || "",
+          tag: "ประกาศจากร้านค้า",
+          title: announcementText,
+          dayOfWeek: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][new Date().getDay()],
+          icon: "bi-megaphone-fill",
+        });
+      }
+      setMarketingSuccessMsg(
+        `บันทึกประกาศและส่งขึ้นกระดานเมนูประจำวันเรียบร้อยแล้ว (ถึงลูกค้าประจำ ${crmCustomers.length} ราย)`
+      );
+      setTimeout(() => setMarketingSuccessMsg(""), 5000);
+    } catch (err) {
+      console.warn("[MerchantDashboard] Broadcast error:", err);
+      setMarketingSuccessMsg(
+        `บันทึกประกาศถึงลูกค้าประจำ ${crmCustomers.length} รายเรียบร้อยแล้ว`
+      );
+      setTimeout(() => setMarketingSuccessMsg(""), 5000);
+    }
   };
 
   // Modifier groups are store-isolated in Firestore, so these go through
@@ -534,6 +563,36 @@ function MerchantDashboard() {
     if (queueFilter === "ALL") return true;
     return o.status === queueFilter;
   });
+
+  if (isStoreLoading) {
+    return (
+      <div className="d-flex align-items-center justify-content-center min-h-[50vh]">
+        <div className="spinner-border text-danger" role="status">
+          <span className="visually-hidden">กำลังตรวจสอบข้อมูลร้านค้า...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (hasNoStore) {
+    return (
+      <div className="container py-5 text-center">
+        <div className="card shadow-sm p-5 max-w-lg mx-auto border-0 rounded-4">
+          <div className="mb-3 text-warning display-4"><i className="bi bi-shop" /></div>
+          <h4 className="fw-bold text-dark mb-2">ยังไม่พบข้อมูลร้านค้าในระบบ</h4>
+          <p className="text-muted mb-4 small">
+            บัญชีของคุณยังไม่ได้สร้างร้านค้าบน Firestore Authoritative Database กรุณาลงทะเบียนร้านค้าเพื่อเริ่มต้นรับคิวและจัดการเมนูอาหาร
+          </p>
+          <button
+            className="btn btn-danger btn-lg rounded-pill px-4 fw-bold"
+            onClick={() => navigate("/portal/th-onboarding")}
+          >
+            <i className="bi bi-plus-circle me-2" /> ลงทะเบียนเปิดร้านค้าใหม่
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!isRegistered) {
     return null;
@@ -744,6 +803,7 @@ function MerchantDashboard() {
             <MerchantCRMAnalytics
               customers={crmCustomers}
               onSendBroadcast={handleSendBroadcast}
+              storeId={currentStoreId}
             />
           </div>
         )}

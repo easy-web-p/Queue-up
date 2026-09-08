@@ -237,6 +237,32 @@ function evaluateRules({ collection, action, auth, resource, requestResource }) 
     return false; // allow read, write: if false; (Universal Backend-Only)
   }
 
+  // --- Collection: /reels ---
+  if (collection === 'reels') {
+    if (action === 'read') return true;
+    if (action === 'create' || action === 'update') return isAuthenticated;
+    if (action === 'delete') return isAdmin() || (isAuthenticated && resource?.data?.authorUid === auth.uid);
+  }
+
+  // --- Collection: /announcements ---
+  if (collection === 'announcements') {
+    if (action === 'read') return true;
+    if (action === 'create') return isAuthenticated;
+    if (action === 'update' || action === 'delete') {
+      return isAdmin() || (isAuthenticated && (resource?.data?.authorUid === auth.uid || (resource?.data?.storeId != null && isStoreOwner(resource.data.storeId))));
+    }
+  }
+
+  // --- Collection: /user_behaviors ---
+  if (collection === 'user_behaviors') {
+    return isAuthenticated && (auth.uid === resource?.id || isAdmin());
+  }
+
+  // --- Collection: /store_stats ---
+  if (collection === 'store_stats') {
+    return isAuthenticated && (isAdmin() || (resource?.id != null && isStoreOwner(resource.id)));
+  }
+
   return false;
 }
 
@@ -598,6 +624,68 @@ async function main() {
   await runTest('Test 30: isStoreOwner in firestore.rules uses ONLY canonical shops collection', async () => {
     assert.ok(rulesContent.includes('get(/databases/$(database)/documents/shops/$(storeId)).data.ownerUid == request.auth.uid'));
     assert.ok(!rulesContent.includes('documents/merchantProfiles/$(storeId)'));
+  });
+
+  // Test 31: Unauthenticated read on /reels and /announcements is ALLOWED
+  await runTest('Test 31: Public read on /reels and /announcements is ALLOWED', async () => {
+    const reelsAllowed = evaluateRules({
+      collection: 'reels',
+      action: 'read',
+      auth: null,
+      resource: { id: 'reel_1', data: { title: 'ไก่ทอด' } }
+    });
+    const annAllowed = evaluateRules({
+      collection: 'announcements',
+      action: 'read',
+      auth: null,
+      resource: { id: 'ann_1', data: { title: 'เมนูพิเศษ' } }
+    });
+    assert.equal(reelsAllowed, true);
+    assert.equal(annAllowed, true);
+  });
+
+  // Test 32: Unauthenticated create on /reels is DENIED
+  await runTest('Test 32: Unauthenticated create on /reels is DENIED', async () => {
+    const isAllowed = evaluateRules({
+      collection: 'reels',
+      action: 'create',
+      auth: null,
+      requestResource: { data: { title: 'คลิปใหม่' } }
+    });
+    assert.equal(isAllowed, false);
+  });
+
+  // Test 33: Authenticated user creating reel on /reels is ALLOWED
+  await runTest('Test 33: Authenticated user creating reel on /reels is ALLOWED', async () => {
+    const isAllowed = evaluateRules({
+      collection: 'reels',
+      action: 'create',
+      auth: { uid: 'student_123' },
+      requestResource: { data: { title: 'รีวิวอาหาร', authorUid: 'student_123' } }
+    });
+    assert.equal(isAllowed, true);
+  });
+
+  // Test 34: User modifying another user's /user_behaviors is DENIED
+  await runTest('Test 34: User modifying another user /user_behaviors is DENIED', async () => {
+    const isAllowed = evaluateRules({
+      collection: 'user_behaviors',
+      action: 'write',
+      auth: { uid: 'user_A' },
+      resource: { id: 'user_B', data: { totalOrders: 5 } }
+    });
+    assert.equal(isAllowed, false);
+  });
+
+  // Test 35: Store Owner updating /store_stats for own store is ALLOWED
+  await runTest('Test 35: Store Owner updating /store_stats for own store is ALLOWED', async () => {
+    const isAllowed = evaluateRules({
+      collection: 'store_stats',
+      action: 'write',
+      auth: { uid: 'merchant_A_uid', storeId: 'store_A' },
+      resource: { id: 'store_A', data: { totalOrdersCount: 10 } }
+    });
+    assert.equal(isAllowed, true);
   });
 
   const passRate = Math.round((passedTests / totalTests) * 100);

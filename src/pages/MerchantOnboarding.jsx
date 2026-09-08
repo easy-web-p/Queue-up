@@ -64,16 +64,6 @@ function MerchantOnboarding() {
     const merchantId = generateMerchantId();
     const storeId = generateStoreId();
 
-    const userProfileUpdate = {
-      accountId,
-      merchantId,
-      storeId,
-      isMerchantRegistered: true,
-      role: "merchant",
-      isMerchantVerified: true,
-      updatedAt: new Date().toISOString(),
-    };
-
     // Save to Firestore Structure v3.0
     if (user && user.uid) {
       try {

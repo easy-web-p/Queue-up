@@ -576,6 +576,41 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // ==========================================
+    // 24. REELS & SHORT VIDEOS (คลิปสั้นโปรโมตและรีวิวอาหาร)
+    // ==========================================
+    match /reels/{reelId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.authorUid == request.auth.uid);
+    }
+
+    // ==========================================
+    // 25. COMMUNITY ANNOUNCEMENTS & POSTS (การโพสต์กระดานอาหารและข่าวสาร)
+    // ==========================================
+    match /announcements/{announcementId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin() || (isAuthenticated() && (resource.data.authorUid == request.auth.uid || isStoreOwner(resource.data.storeId)));
+    }
+
+    // ==========================================
+    // 26. USER BEHAVIORS & USAGE ANALYTICS (ข้อมูลพฤติกรรมการใช้งาน)
+    // ==========================================
+    match /user_behaviors/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+    }
+
+    // ==========================================
+    // 27. STORE STATS & DAILY ANALYTICS (สถิติร้านค้าและยอดขาย)
+    // ==========================================
+    match /store_stats/{storeId} {
+      allow read: if isAuthenticated() && (isAdmin() || isStoreOwner(storeId));
+      allow write: if isAuthenticated() && (isAdmin() || isStoreOwner(storeId));
+    }
+
   }
 }
 
