@@ -237,6 +237,7 @@ export const createOrderAuthoritative = onCall(
       paymentMode, // 'CAMPUS_WALLET' | 'DIRECT_ZERO_PAYMENT'
       studentId,   // Required if paymentMode === 'CAMPUS_WALLET'
       acknowledgeAllergenWarning, // set after the caller confirms an ALLERGEN_ALERT
+      couponCode, // Optional coupon promo code
     } = request.data || {};
 
     if (userId && userId !== authUid && request.auth.token?.admin !== true) {
@@ -589,6 +590,32 @@ export const createOrderAuthoritative = onCall(
           );
         }
 
+        // 2.2c 🎟️ Server-Authoritative Coupon Validation & Discount Calculation
+        const cleanCoupon = couponCode && typeof couponCode === "string" ? couponCode.trim().toUpperCase() : null;
+        let discountSatang = 0;
+        let couponTitle = "";
+
+        if (cleanCoupon) {
+          if (cleanCoupon === "WELCOME50") {
+            if (calculatedTotalSatang >= 10000) { // min spend 100 THB
+              discountSatang = Math.min(5000, calculatedTotalSatang); // 50 THB discount
+              couponTitle = "ต้อนรับสมาชิกใหม่ ลด ฿50 (WELCOME50)";
+            }
+          } else if (cleanCoupon === "HAPPY15") {
+            if (calculatedTotalSatang >= 5000) { // min spend 50 THB
+              discountSatang = Math.min(5000, Math.round(calculatedTotalSatang * 0.15)); // 15% discount
+              couponTitle = "Happy Hour พิเศษ ลด 15% (HAPPY15)";
+            }
+          } else if (cleanCoupon === "STUDENT10") {
+            if (calculatedTotalSatang >= 4000) { // min spend 40 THB
+              discountSatang = Math.min(3000, Math.round(calculatedTotalSatang * 0.10)); // 10% discount
+              couponTitle = "ส่วนลดนักเรียนนักศึกษา ลด 10% (STUDENT10)";
+            }
+          }
+        }
+
+        const finalAmountSatang = Math.max(0, calculatedTotalSatang - discountSatang);
+
         // 2.3 Campus Wallet Spending Rules Enforcement (Phase 0)
         let walletData = null;
         let walletCounters = null;
@@ -602,8 +629,8 @@ export const createOrderAuthoritative = onCall(
           }
 
           const currentBalance = Number(walletData.balanceSatang) || 0;
-          if (currentBalance < calculatedTotalSatang) {
-            throw new HttpsError("failed-precondition", `INSUFFICIENT_WALLET_BALANCE: ยอดเงินในกระเป๋าไม่เพียงพอ (คงเหลือ ${currentBalance / 100} บาท, ยอดสั่งซื้อ ${calculatedTotalSatang / 100} บาท)`);
+          if (currentBalance < finalAmountSatang) {
+            throw new HttpsError("failed-precondition", `INSUFFICIENT_WALLET_BALANCE: ยอดเงินในกระเป๋าไม่เพียงพอ (คงเหลือ ${currentBalance / 100} บาท, ยอดสั่งซื้อหลังหักส่วนลด ${finalAmountSatang / 100} บาท)`);
           }
 
           // Counters are keyed on the server's current Bangkok date, NOT on the
@@ -622,12 +649,12 @@ export const createOrderAuthoritative = onCall(
           }
 
           // Check Daily Limit
-          if (spentToday + calculatedTotalSatang > dailyLimitSatang) {
+          if (spentToday + finalAmountSatang > dailyLimitSatang) {
             throw new HttpsError("failed-precondition", `DAILY_LIMIT_EXCEEDED: ยอดการใช้จ่ายเกินวงเงินรายวัน (${dailyLimitSatang / 100} บาท/วัน) วันนี้ใช้ไปแล้ว ${spentToday / 100} บาท`);
           }
 
           // Check Weekly Limit
-          if (spentThisWeek + calculatedTotalSatang > weeklyLimitSatang) {
+          if (spentThisWeek + finalAmountSatang > weeklyLimitSatang) {
             throw new HttpsError("failed-precondition", `WEEKLY_LIMIT_EXCEEDED: ยอดการใช้จ่ายเกินวงเงินรายสัปดาห์ (${weeklyLimitSatang / 100} บาท/สัปดาห์) สัปดาห์นี้ใช้ไปแล้ว ${spentThisWeek / 100} บาท`);
           }
 
@@ -722,10 +749,13 @@ export const createOrderAuthoritative = onCall(
           studentId: effectiveStudentId,
           totalAmountSatang: calculatedTotalSatang,
           totalAmount: calculatedTotalSatang / 100,
-          finalAmountSatang: calculatedTotalSatang,
-          finalAmount: calculatedTotalSatang / 100,
-          discountAppliedSatang: 0,
-          pointsEarned: Math.floor(calculatedTotalSatang / 1000),
+          finalAmountSatang: finalAmountSatang,
+          finalAmount: finalAmountSatang / 100,
+          discountAppliedSatang: discountSatang,
+          discountAppliedBaht: discountSatang / 100,
+          couponCode: discountSatang > 0 ? cleanCoupon : null,
+          couponTitle: discountSatang > 0 ? couponTitle : null,
+          pointsEarned: Math.floor(finalAmountSatang / 1000),
           items: validatedOrderItems,
           allergenWarningAcknowledged: allergenScan.hasAllergens,
           acknowledgedAllergenNames: allergenScan.matchedAllergenNames,
@@ -766,9 +796,9 @@ export const createOrderAuthoritative = onCall(
           // Same counters the limit check above ran on, stamped with the period keys
           // they belong to so the next order knows whether they are still current.
           tx.update(walletRef, {
-            balanceSatang: currentBal - calculatedTotalSatang,
-            spentTodaySatang: walletCounters.spentToday + calculatedTotalSatang,
-            spentThisWeekSatang: walletCounters.spentThisWeek + calculatedTotalSatang,
+            balanceSatang: currentBal - finalAmountSatang,
+            spentTodaySatang: walletCounters.spentToday + finalAmountSatang,
+            spentThisWeekSatang: walletCounters.spentThisWeek + finalAmountSatang,
             lastSpentDate: walletCounters.todayYmd,
             lastSpentWeek: walletCounters.weekKey,
             updatedAt: FieldValue.serverTimestamp(),
@@ -780,12 +810,12 @@ export const createOrderAuthoritative = onCall(
             walletId: effectiveStudentId,
             studentId: effectiveStudentId,
             orderId,
-            amountSatang: calculatedTotalSatang,
+            amountSatang: finalAmountSatang,
             type: "SPEND",
             storeId,
             storeName: shopData.name || "Campus Store",
             actorUid: authUid,
-            note: `ซื้ออาหารคิว ${queueNumber} ที่ร้าน ${shopData.name || storeId}`,
+            note: `ซื้ออาหารคิว ${queueNumber} ที่ร้าน ${shopData.name || storeId}${discountSatang > 0 ? ` (ใช้คูปอง ${cleanCoupon} ลด ${discountSatang / 100} บ.)` : ''}`,
             timestamp: FieldValue.serverTimestamp(),
           });
         }
@@ -796,6 +826,11 @@ export const createOrderAuthoritative = onCall(
           queueNumber,
           totalAmountSatang: calculatedTotalSatang,
           totalAmountBaht: calculatedTotalSatang / 100,
+          finalAmountSatang,
+          finalAmountBaht: finalAmountSatang / 100,
+          discountSatang,
+          discountBaht: discountSatang / 100,
+          couponCode: discountSatang > 0 ? cleanCoupon : null,
           orderStatus: "PENDING",
           paymentMode: isCampusWallet ? "CAMPUS_WALLET" : "DIRECT_ZERO_PAYMENT",
           order: orderPayload,
@@ -1565,3 +1600,42 @@ export const scheduledDailyMaintenance = onSchedule(
     console.log("[QueueUp] Daily maintenance routine triggered successfully.");
   }
 );
+
+/**
+ * 🏫 Pilot Programme Lead Submission (Authoritative Backend)
+ */
+export const submitPilotLead = onCall(
+  { region: "asia-southeast1", cors: true },
+  async (request) => {
+    const validation = validatePilotLead(request.data);
+    if (!validation.ok) {
+      throw new HttpsError("invalid-argument", `${validation.reason}: ${validation.message}`);
+    }
+
+    // rawRequest.ip is Express's view of the caller; behind a proxy it can be
+    // absent, in which case rateLimitKeyForAddress buckets them together rather
+    // than letting them past the limit.
+    const callerKey = rateLimitKeyForAddress(request.rawRequest?.ip);
+    await consumeRateLimit(callerKey, {
+      collection: "pilot_lead_rate_limits",
+      maxCalls: 5,
+      windowMs: 60 * 60 * 1000,
+      message: "ส่งคำขอบ่อยเกินไป กรุณาติดต่อเราทางโทรศัพท์หรืออีเมลโดยตรง",
+    });
+
+    const ref = await db.collection("pilot_leads").add({
+      ...validation.lead,
+      status: "NEW",
+      source: "landing_page_pilot_form",
+      submittedByUid: request.auth?.uid || null,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+    // No lead content in the log line: this collection exists precisely so the
+    // school's contact details live in one controlled place.
+    console.log(`[QueueUp] Pilot lead recorded: ${ref.id}`);
+
+    return { success: true, leadId: ref.id };
+  }
+);
+

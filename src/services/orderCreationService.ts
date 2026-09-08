@@ -50,6 +50,7 @@ export interface CreateOrderRequest {
   studentId?: string;
   /** Set only after the customer has confirmed an ALLERGEN_ALERT warning. */
   acknowledgeAllergenWarning?: boolean;
+  couponCode?: string;
 }
 
 export interface AllergenTriggerDetail {

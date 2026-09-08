@@ -307,24 +307,62 @@ function Login() {
       const defaultName = existingData.displayName || existingData.fullName || gUser.displayName || "ผู้ใช้งาน Google";
       const defaultEmail = gUser.email || existingData.email || "";
       const defaultPhoto = existingData.photoURL || existingData.photo || gUser.photoURL || "/yeti_mascot.jpg";
-      const mergedForRoles = { ...existingData, uid: gUser.uid, email: defaultEmail, isVerifiedAuth: true, isTokenVerified: true, isFromCache: false };
+      const studentNum = parseInt(defaultEmail.replace(/\D/g, ""), 10) || Math.floor(10000 + Math.random() * 90000);
+      const accountId = existingData.accountId || generateSecureAccountId(studentNum);
+
+      if (userSnap.exists()) {
+        const updatePayload = {
+          displayName: defaultName,
+          fullName: defaultName,
+          photoURL: defaultPhoto,
+          photo: defaultPhoto,
+          lastLoginAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        };
+        await setDoc(userDocRef, updatePayload, { merge: true });
+      } else {
+        const initialPayload = {
+          uid: gUser.uid,
+          accountId: accountId,
+          roles: ["customer"],
+          activeRole: "customer",
+          provider: "google.com",
+          isGoogleUser: true,
+          email: defaultEmail,
+          displayName: defaultName,
+          fullName: defaultName,
+          photo: defaultPhoto,
+          photoURL: defaultPhoto,
+          isMerchantVerified: false,
+          isMerchantRegistered: false,
+          isSuperAdmin: false,
+          createdAt: serverTimestamp(),
+          lastLoginAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        };
+        await setDoc(userDocRef, initialPayload);
+      }
+
+      const mergedForRoles = {
+        ...existingData,
+        uid: gUser.uid,
+        email: defaultEmail,
+        isVerifiedAuth: true,
+        isTokenVerified: true,
+        isFromCache: false,
+      };
       const userRoles = getEffectiveRoles(mergedForRoles);
       const isAdminAccount = isUserSuperAdmin(mergedForRoles);
       const isMerchant = userRoles.includes("merchant");
       const activeRole = existingData.activeRole || (isAdminAccount ? "admin" : (isMerchant ? "merchant" : "customer"));
-      
-      const studentNum = parseInt(defaultEmail.replace(/\D/g, ""), 10) || Math.floor(10000 + Math.random() * 90000);
-      const accountId = existingData.accountId || generateSecureAccountId(studentNum);
 
       // What the CLIENT is allowed to write, and what it must only ever read.
       //
       // This used to write roles, activeRole, isSuperAdmin, isMerchantVerified,
       // isMerchantRegistered, storeId and email back on every sign-in. The rules
-      // let an owner change thirteen profile keys and none of those are among
+      // let an owner change safe profile keys and none of those are among
       // them — deliberately, because they are exactly the fields that decide what
-      // a user can reach. So every returning Google user's write was refused with
-      // "Missing or insufficient permissions", their lastLoginAt never moved, and
-      // they were shown an error for something they had done nothing wrong in.
+      // a user can reach.
       //
       // Privilege is derived from the ID token's claims and the stored document
       // (see getEffectiveRoles) and handed to Redux below. It is never written
@@ -373,8 +411,8 @@ function Login() {
         roles: userRoles,
         activeRole,
         isSuperAdmin: isAdminAccount,
-        isMerchantVerified: Boolean(existingData.isMerchantVerified),
-        isMerchantRegistered: Boolean(existingData.isMerchantRegistered),
+        isMerchantVerified: Boolean(existingData.isMerchantVerified || isAdminAccount),
+        isMerchantRegistered: Boolean(existingData.isMerchantRegistered || isAdminAccount),
         ...(existingData.storeId ? { storeId: existingData.storeId } : {}),
         lastLoginAt: new Date().toISOString(),
       }));

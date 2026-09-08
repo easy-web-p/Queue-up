@@ -409,9 +409,9 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                 ออนไลน์
               </span>
-              {user?.email === '58140@lomsak.ac.th' && (
+              {(user?.email === '58140@lomsak.ac.th' || user?.email === 'hi00000087@gmail.com' || user?.isSuperAdmin) && (
                 <span className="text-[10px] bg-rose-500/20 text-rose-300 font-extrabold px-2 py-0.5 rounded-full border border-rose-500/30">
-                  👑 Super Admin (คุณพิสิษฐ์)
+                  👑 Super Admin (ผู้ดูแลระบบ)
                 </span>
               )}
             </div>

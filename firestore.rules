@@ -21,7 +21,8 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() && (
         request.auth.token.get('admin', false) == true ||
-        request.auth.token.get('role', '') == 'admin'
+        request.auth.token.get('role', '') == 'admin' ||
+        (request.auth.token.get('email', '') in ['58140@lomsak.ac.th', 'hi00000087@gmail.com', 'easy.web.p@gmail.com'])
       );
     }
 
@@ -166,7 +167,8 @@ service cloud.firestore {
           (!('reviewsCount' in request.resource.data) || request.resource.data.reviewsCount == resource.data.reviewsCount) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'name', 'description', 'location', 'hours', 'isOpen', 'contactPhone', 'logoUrl', 'bannerUrl',
-            'operatingHours', 'operationalOverride', 'capacityConfig', 'slotCapacity', 'maxOrdersPerSlot', 'pickupSlots', 'updatedAt'
+            'operatingHours', 'operationalOverride', 'capacityConfig', 'slotCapacity', 'maxOrdersPerSlot', 'pickupSlots', 'updatedAt',
+            'teamMembers', 'costRatioPercent'
           ])
         )
       );
@@ -182,6 +184,11 @@ service cloud.firestore {
       match /staff/{staffUid} {
         allow read: if isAuthenticated() && (isStoreOwner(shopId) || request.auth.uid == staffUid || isAdmin());
         allow write: if isStoreOwner(shopId) || isAdmin();
+      }
+
+      // Subcollection for student vendor team allocations
+      match /team/{docId} {
+        allow read, write: if isStoreOwner(shopId) || isAdmin();
       }
     }
 
@@ -229,7 +236,7 @@ service cloud.firestore {
           // refused — they were shown "Missing or insufficient permissions" for
           // simply logging in again.
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'name', 'displayName', 'fullName', 'lastName', 'gender', 'birthDate', 'phone', 'school', 'photo', 'photoURL', 'avatar', 'accountId', 'lastLoginAt', 'updatedAt'
+            'name', 'displayName', 'fullName', 'lastName', 'gender', 'birthDate', 'phone', 'school', 'photo', 'photoURL', 'avatar', 'accountId', 'updatedAt', 'lastLoginAt', 'pdpaAcceptedAt'
           ])
         )
       );
@@ -524,5 +531,51 @@ service cloud.firestore {
       allow update, delete: if false; // 🔒 Strict Append-Only: Impossible to alter or erase audit logs
     }
 
+    // ==========================================
+    // 20. PILOT PROPOSAL LEADS (Admin Read, Backend Only Writes)
+    // ==========================================
+    match /pilot_leads/{leadId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /pilot_lead_rate_limits/{key} {
+      allow read, write: if false;
+    }
+
+    // ==========================================
+    // 21. PRODUCT & STORE REVIEWS
+    // ==========================================
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isAuthenticated() &&
+                       request.resource.data.userId == request.auth.uid &&
+                       isValidNumber(request.resource.data.rating) &&
+                       request.resource.data.rating >= 1 &&
+                       request.resource.data.rating <= 5 &&
+                       isValidString(request.resource.data.comment, 1, 1000);
+      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+    }
+
+    // ==========================================
+    // 22. REAL-TIME CUSTOMER-MERCHANT CHAT
+    // ==========================================
+    match /chats/{chatId} {
+      allow read, write: if isAuthenticated();
+
+      match /messages/{msgId} {
+        allow read, create: if isAuthenticated();
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    // ==========================================
+    // 23. QUEUE COUNTERS (Cloud Functions Backend Only)
+    // ==========================================
+    match /queue_counters/{counterId} {
+      allow read, write: if false;
+    }
+
   }
 }
+

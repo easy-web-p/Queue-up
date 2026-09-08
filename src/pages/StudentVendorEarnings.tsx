@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase/config.js';
-import { TrendingUp, Users, ShieldCheck, ArrowLeft, Calculator } from 'lucide-react';
+import { TrendingUp, Users, ShieldCheck, ArrowLeft, Calculator, Save, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useToast } from '../components/ToastProvider.jsx';
 
 interface TeamMember {
   name: string;
@@ -12,6 +13,7 @@ interface TeamMember {
 }
 
 export default function StudentVendorEarnings() {
+  const toast = useToast();
   const { user, currentUser } = useAuth();
   const uid = currentUser?.uid || user?.uid;
 
@@ -25,6 +27,28 @@ export default function StudentVendorEarnings() {
   const [newMemberRole, setNewMemberRole] = useState('');
   const [newMemberPercent, setNewMemberPercent] = useState(20);
   const [costRatioPercent, setCostRatioPercent] = useState(40); // 40% estimated ingredient cost
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Load existing team configuration from Firestore
+  useEffect(() => {
+    if (!uid) return;
+    const storeId = `shop_${uid}`;
+    getDoc(doc(db, 'shops', storeId))
+      .then((snap) => {
+        if (snap.exists()) {
+          const d = snap.data();
+          if (Array.isArray(d.teamMembers) && d.teamMembers.length > 0) {
+            setTeamMembers(d.teamMembers);
+          }
+          if (typeof d.costRatioPercent === 'number') {
+            setCostRatioPercent(d.costRatioPercent);
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn('[StudentVendorEarnings] Load shop config error:', err);
+      });
+  }, [uid]);
 
   useEffect(() => {
     if (!uid) return;
@@ -44,6 +68,28 @@ export default function StudentVendorEarnings() {
 
     return () => unsubscribe();
   }, [uid]);
+
+  const handleSaveTeamConfig = async () => {
+    if (!uid) {
+      toast.warning('กรุณาเข้าสู่ระบบก่อนบันทึกข้อมูล');
+      return;
+    }
+    const storeId = `shop_${uid}`;
+    setIsSaving(true);
+    try {
+      await setDoc(doc(db, 'shops', storeId), {
+        teamMembers,
+        costRatioPercent,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      toast.success('บันทึกข้อมูลทีมและสัดส่วนการแบ่งปันผลกำไรเรียบร้อยแล้ว!');
+    } catch (err: any) {
+      console.error('[StudentVendorEarnings] Save error:', err);
+      toast.error(`ไม่สามารถบันทึกข้อมูลได้: ${err.message || err}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const completedOrders = orders.filter((o) => o.status === 'COMPLETED');
   const totalGrossSatang = completedOrders.reduce((sum, o) => sum + (Number(o.totalAmountSatang) || Math.round((Number(o.totalAmount) || 0) * 100)), 0);
@@ -249,6 +295,19 @@ export default function StudentVendorEarnings() {
               💡 <strong>คำแนะนำทางการศึกษา:</strong> ควรบันทึกค่าใช้จ่ายวัตถุดิบจริงทุกวันเพื่อฝึกทักษะการทำบัญชีธุรกิจเบื้องต้น
             </div>
           </div>
+        </div>
+
+        {/* Action Save Bar */}
+        <div className="flex justify-end pt-4 border-t border-slate-200 dark:border-white/10">
+          <button
+            type="button"
+            disabled={isSaving}
+            onClick={handleSaveTeamConfig}
+            className="px-6 py-3 bg-[#FF7A1A] hover:bg-[#E6680D] disabled:opacity-60 text-white font-bold text-sm rounded-2xl shadow-lg transition-all flex items-center gap-2 cursor-pointer active:scale-98"
+          >
+            <Save className="w-4 h-4" />
+            <span>{isSaving ? 'กำลังบันทึกข้อมูล...' : 'บันทึกข้อมูลทีมและสัดส่วนผลกำไร'}</span>
+          </button>
         </div>
       </main>
     </div>

@@ -1,8 +1,11 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import { useToast } from "../components/ToastProvider.jsx";
 import { submitPilotLead } from "../services/pilotLeadService.js";
 
 export default function LandingPage() {
+  const toast = useToast();
+
   // Form State
   const [form, setForm] = useState({
     schoolName: "",
@@ -34,20 +37,24 @@ export default function LandingPage() {
     e.preventDefault();
     if (isSending) return;
 
-    // The success panel promises a callback within 24 hours, so it may only be
-    // shown once the lead is actually stored. This previously called console.log
-    // and then claimed success, which discarded every enquiry the product got.
+    if (!form.schoolName.trim() || !form.contactName.trim() || !form.phone.trim()) {
+      toast.warning("กรุณากรอกข้อมูลที่จำเป็น (* ) ให้ครบถ้วน");
+      return;
+    }
+
     setIsSending(true);
     setSendError(null);
     try {
       await submitPilotLead(form);
       setSubmitted(true);
+      toast.success("ส่งข้อมูลขอรับข้อเสนอโครงการนำร่องสำเร็จ! ทีมงานจะติดต่อกลับภายใน 24 ชั่วโมง");
     } catch (err) {
-      setSendError(
+      const msg =
         err instanceof Error && err.message
           ? err.message
-          : "ส่งข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง หรือติดต่อเราทางโทรศัพท์"
-      );
+          : "ส่งข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง หรือติดต่อเราทางโทรศัพท์";
+      setSendError(msg);
+      toast.error(`ส่งข้อมูลไม่สำเร็จ: ${msg}`);
     } finally {
       setIsSending(false);
     }

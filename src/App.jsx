@@ -99,8 +99,8 @@ function App() {
 
             {/* Merchant Dashboard & Onboarding Routes */}
             <Route path="/merchant/dashboard" element={<ProtectedRoute allowedRoles={["merchant", "student_vendor", "admin"]}><MerchantDashboard /></ProtectedRoute>} />
-            <Route path="/portal/th-onboarding" element={<ProtectedRoute allowedRoles={["customer", "merchant", "student_vendor", "admin"]}><MerchantOnboarding /></ProtectedRoute>} />
-            <Route path="/portal/onboarding" element={<ProtectedRoute allowedRoles={["customer", "merchant", "student_vendor", "admin"]}><MerchantOnboarding /></ProtectedRoute>} />
+            <Route path="/portal/th-onboarding" element={<ProtectedRoute><MerchantOnboarding /></ProtectedRoute>} />
+            <Route path="/portal/onboarding" element={<ProtectedRoute><MerchantOnboarding /></ProtectedRoute>} />
 
             {/* QueueUp for Campus Routes */}
             <Route path="/campus/onboarding" element={<ProtectedRoute><StudentVendorOnboarding /></ProtectedRoute>} />
