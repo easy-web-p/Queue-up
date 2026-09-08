@@ -339,12 +339,6 @@
     gap: 8px;
   }
 
-  .queue-pd-action-bar {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-
   .queue-pd-btn-next {
     width: 100%;
     text-align: center;
@@ -1012,4 +1006,120 @@ html[data-theme="dark"] .queue-pd-input-select {
   font-size: 12px;
   font-weight: 700;
   color: var(--qu-red, #EF4444);
+}
+
+/* ==========================================================================
+   PHONE ORDER BAR
+   ==========================================================================
+   The options column on this page runs to roughly two thousand pixels on a
+   360px screen — gallery, store, price, four option groups, a note field, a
+   quantity stepper, a seven-day calendar and eight time slots — and the order
+   buttons were at the bottom of it. Choosing a topping meant scrolling past
+   everything to find out what it now cost, then scrolling back.
+
+   The bar carries the running total and the two actions, stays put, and leaves
+   room for the home indicator.
+   ========================================================================== */
+.queue-pd-order-bar {
+  display: none;
+}
+
+@media (max-width: 991px) {
+  .queue-pd-order-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1200; /* above the floating chat button (1000), below every modal */
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px calc(10px + var(--safe-bottom, 0px));
+    background: var(--qu-surface);
+    /* The page behind this bar is nearly the same value as the surface, so a
+       hairline border disappears and the bar reads as part of the page. The
+       accent-tinted edge is what separates it. */
+    border-top: 1.5px solid var(--qu-accent-border);
+    box-shadow: 0 -10px 28px rgba(0, 0, 0, .35);
+  }
+
+  .queue-pd-order-bar-sum {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .queue-pd-order-bar-meta {
+    font-size: 11px;
+    color: var(--qu-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .queue-pd-order-bar-total {
+    font-family: 'Kanit', sans-serif;
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--qu-accent);
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .queue-pd-order-bar-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .queue-pd-order-bar-cart,
+  .queue-pd-order-bar-buy {
+    min-height: 48px;
+    border-radius: 14px;
+    font-family: 'Kanit', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+    transition: background-color .15s ease;
+  }
+
+  .queue-pd-order-bar-cart {
+    width: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 19px;
+    background: transparent;
+    color: var(--qu-accent);
+    border: 1.5px solid var(--qu-accent);
+  }
+
+  .queue-pd-order-bar-buy {
+    padding: 0 26px;
+    background: var(--qu-accent);
+    color: #fff;
+    border: none;
+  }
+
+  .queue-pd-order-bar-buy:hover:not(:disabled) { background: var(--qu-accent-hover); }
+  .queue-pd-order-bar-cart:hover:not(:disabled) { background: var(--qu-accent-soft); }
+
+  .queue-pd-order-bar-cart:disabled,
+  .queue-pd-order-bar-buy:disabled { opacity: .5; cursor: not-allowed; }
+
+  /* Nothing may end up underneath the bar. */
+  .queue-pd-has-order-bar {
+    padding-bottom: calc(var(--order-bar-height) + var(--safe-bottom, 0px));
+  }
+
+  /* The inline footer is the same two buttons; showing both would ask the
+     customer which one is real. */
+  .queue-pd-footer-inline { display: none; }
+
+  /* The chat button used to sit at bottom: 24px, directly on top of where the
+     bar now is. Lift it clear, and off the home indicator. */
+  .queue-floating-chat-btn {
+    bottom: calc(var(--order-bar-height) + 16px + var(--safe-bottom, 0px)) !important;
+  }
 }

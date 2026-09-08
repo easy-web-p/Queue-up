@@ -887,8 +887,16 @@ function ProductDetail() {
   };
 
 
+  // The same three-part condition was written out at each button; naming it once
+  // keeps the pinned bar and the inline footer from ever disagreeing about
+  // whether the store is taking orders.
+  const isOrderingBlocked =
+    store?.isOpen === false ||
+    store?.status === "closed" ||
+    product?.availability === false;
+
   return (
-    <div className="queue-pd-container">
+    <div className="queue-pd-container queue-pd-has-order-bar">
       <ShopeeSearchBar />
 
       <div className="queue-pd-wrapper">
@@ -1258,13 +1266,21 @@ function ProductDetail() {
               </div>
             </div>
 
-            {/* ACTION FOOTER */}
-            <div className="queue-pd-booking-footer">
+            {/* ACTION FOOTER
+                Rendered twice on purpose. On a desktop it sits in the flow at the
+                end of the options column, where it has always been. On a phone
+                that column runs image → store → price → sweetness → ice →
+                toppings → note → quantity → a seven-day calendar → eight time
+                slots, and only then the buttons: the one thing the customer came
+                to do was the last thing they could reach, and nothing on screen
+                showed the running total while they chose. The phone copy is
+                pinned to the bottom instead. */}
+            <div className="queue-pd-booking-footer queue-pd-footer-inline">
               <div>
                 <div className="queue-pd-booking-summary-text">
                   {quantity} ชาม · {selectedDay.fullDateStr}, {selectedTimeSlot.time} น. ({selectedTimeSlot.discount})
                 </div>
-                <div className="text-danger fw-bold fs-5">
+                <div className="fw-bold fs-5" style={{ color: "var(--qu-accent)" }}>
                   ยอดรวม: ฿{totalCalculatedPrice.toFixed(2)}
                 </div>
               </div>
@@ -1274,7 +1290,7 @@ function ProductDetail() {
                   type="button"
                   className="btn btn-outline-danger fw-bold px-3 py-2 rounded-3 d-flex align-items-center gap-1"
                   onClick={handleAddToCart}
-                  disabled={store?.isOpen === false || store?.status === "closed" || product?.availability === false}
+                  disabled={isOrderingBlocked}
                 >
                   <i className="bi bi-cart-plus-fill" />
                   เพิ่มลงตะกร้า
@@ -1284,13 +1300,43 @@ function ProductDetail() {
                   type="button"
                   className="queue-pd-btn-next"
                   onClick={handleNextBooking}
-                  disabled={store?.isOpen === false || store?.status === "closed" || product?.availability === false}
+                  disabled={isOrderingBlocked}
                 >
                   <i className="bi bi-bag-check-fill me-1" />
                   สั่งซื้อ / ไปที่ตะกร้า
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Phone-only order bar. Always in reach, always showing what it will
+            cost, and clear of the home indicator. */}
+        <div className="queue-pd-order-bar" role="region" aria-label="สรุปคำสั่งซื้อ">
+          <div className="queue-pd-order-bar-sum">
+            <span className="queue-pd-order-bar-meta">
+              {quantity} ชาม · {selectedDay?.fullDateStr}, {selectedTimeSlot?.time} น.
+            </span>
+            <span className="queue-pd-order-bar-total">฿{totalCalculatedPrice.toFixed(2)}</span>
+          </div>
+          <div className="queue-pd-order-bar-actions">
+            <button
+              type="button"
+              className="queue-pd-order-bar-cart"
+              onClick={handleAddToCart}
+              disabled={isOrderingBlocked}
+              aria-label="เพิ่มลงตะกร้า"
+            >
+              <i className="bi bi-cart-plus-fill" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="queue-pd-order-bar-buy"
+              onClick={handleNextBooking}
+              disabled={isOrderingBlocked}
+            >
+              {isOrderingBlocked ? "ปิดรับออเดอร์" : "สั่งซื้อ"}
+            </button>
           </div>
         </div>
 

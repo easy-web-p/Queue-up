@@ -4,7 +4,9 @@
 
 .qup-cookie-banner-wrapper {
   position: fixed;
-  bottom: 20px;
+  /* Clears the home indicator. A flat 20px put the accept button underneath it
+     on every iPhone since the X, where the swipe gesture takes the tap. */
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   left: 20px;
   right: 20px;
   max-width: 1100px;
@@ -105,4 +107,16 @@
 
 .qup-btn-cookie-secondary:hover {
   background: rgba(255, 255, 255, 0.18);
+}
+
+
+/* On a phone the banner shares the bottom edge with the order bar, so it sits
+   above it rather than on top of it — a consent notice covering the buy button
+   is how a customer decides the app is broken. */
+@media (max-width: 991px) {
+  .qup-cookie-banner-wrapper {
+    left: 8px;
+    right: 8px;
+    bottom: calc(var(--order-bar-height, 76px) + 12px + env(safe-area-inset-bottom, 0px));
+  }
 }
