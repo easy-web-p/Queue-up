@@ -147,18 +147,24 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
     if (user.activeRole === "merchant" || user.role === "merchant" || user.isMerchantVerified || user.isMerchantRegistered) {
       isRegistered = true;
     } else {
-      const savedMerchantVerified = localStorage.getItem("queueup_merchant_verified");
-      if (savedMerchantVerified === "true") {
-        isRegistered = true;
-      } else {
-        try {
-          const docSnap = await getDoc(doc(db, "users", user.uid));
-          if (docSnap.exists() && (docSnap.data()?.isMerchantRegistered || docSnap.data()?.role === "merchant")) {
-            isRegistered = true;
-          }
-        } catch (err) {
-          console.warn("Merchant check error:", err);
+      // No localStorage check here.
+      //
+      // This used to accept localStorage["queueup_merchant_verified"] === "true"
+      // as proof of merchant status and then dispatch(switchRole("merchant")).
+      // Nothing in the app ever wrote that key, so it was a back door and nothing
+      // else: anyone could set it from the console and switch their own role.
+      // ProtectedRoute and the security rules still refused them the data, so no
+      // record was ever at risk — but a role must come from the verified session,
+      // never from a string the browser will hand out to anybody.
+      try {
+        const docSnap = await getDoc(doc(db, "users", user.uid));
+        if (docSnap.exists() && (docSnap.data()?.isMerchantRegistered || docSnap.data()?.role === "merchant")) {
+          isRegistered = true;
         }
+      } catch (err) {
+        console.warn("Merchant check error:", err);
+        toast.error("ตรวจสอบสถานะร้านค้าไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+        return;
       }
     }
 

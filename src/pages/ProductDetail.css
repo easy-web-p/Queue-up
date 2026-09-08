@@ -991,3 +991,25 @@ html[data-theme="dark"] .queue-pd-input-select {
   border-radius: 4px;
 }
 
+
+/* ---------------------------------------------------------------------------
+   Unanswered required option group
+   ---------------------------------------------------------------------------
+   The validation message used to appear only as a toast in the far corner of the
+   screen, while the groups it named sat at the top of a long form — it said what
+   was wrong without saying where. The group now marks itself, and the page
+   scrolls to the first one.
+--------------------------------------------------------------------------- */
+.queue-pd-mod-group-missing {
+  border: 1.5px solid var(--qu-red, #EF4444);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.queue-pd-mod-required-msg {
+  margin: 2px 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--qu-red, #EF4444);
+}

@@ -223,8 +223,13 @@ service cloud.firestore {
         isAdmin() ||
         (
           isOwner(userId) &&
+          // lastLoginAt is written by the sign-in path on every return visit. It is
+          // a timestamp about the user's own session, carries no privilege, and
+          // leaving it out meant every returning Google user's profile write was
+          // refused — they were shown "Missing or insufficient permissions" for
+          // simply logging in again.
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'name', 'displayName', 'fullName', 'lastName', 'gender', 'birthDate', 'phone', 'school', 'photo', 'photoURL', 'avatar', 'accountId', 'updatedAt'
+            'name', 'displayName', 'fullName', 'lastName', 'gender', 'birthDate', 'phone', 'school', 'photo', 'photoURL', 'avatar', 'accountId', 'lastLoginAt', 'updatedAt'
           ])
         )
       );

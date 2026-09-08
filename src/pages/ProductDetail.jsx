@@ -436,6 +436,9 @@ function resolveStoreByStoreId(storeId) {
 
 function ProductDetail() {
   const toast = useToast();
+  // Ids of required option groups the customer has not answered, so the fields
+  // themselves can show it rather than only a toast in the corner.
+  const [missingModifierIds, setMissingModifierIds] = useState([]);
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -597,6 +600,10 @@ function ProductDetail() {
   };
 
   // Helper to get selected value for a group with default fallback
+  /** Answering a group clears its marker straight away. */
+  const clearMissingFlag = (groupId) =>
+    setMissingModifierIds((prev) => prev.filter((id) => id !== groupId));
+
   const getValForGroup = (grp) => {
     if (selectedModifiersMap[grp.id] !== undefined) {
       return selectedModifiersMap[grp.id];
@@ -678,17 +685,38 @@ function ProductDetail() {
   };
 
   // Helper to validate required modifiers dynamically
-  const validateRequiredModifiers = () => {
+  /**
+   * The required option groups the customer has not answered yet.
+   *
+   * Returns ids as well as titles: naming them in a corner toast, while the
+   * groups themselves sit at the top of a long form, tells someone what is wrong
+   * without telling them where. The ids let the page mark the actual fields.
+   */
+  const findMissingRequiredModifiers = () => {
     const missing = [];
     activeModifierGroups.forEach((grp) => {
       if (grp.required) {
         const val = getValForGroup(grp);
         if (!val || (Array.isArray(val) && val.length === 0)) {
-          missing.push(grp.title);
+          missing.push({ id: grp.id, title: grp.title });
         }
       }
     });
     return missing;
+  };
+
+  /**
+   * Marks the unanswered groups and scrolls to the first one, so the message and
+   * the thing it is about are in the same place.
+   */
+  const flagMissingRequiredModifiers = (missing) => {
+    setMissingModifierIds(missing.map((g) => g.id));
+    const first = missing[0];
+    if (!first) return;
+    const el = document.getElementById(`mod-group-${first.id}`);
+    if (el && typeof el.scrollIntoView === "function") {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
   };
 
   const createCurrentCartItem = () => {
@@ -752,11 +780,13 @@ function ProductDetail() {
   };
 
   const handleAddToCart = async () => {
-    const missing = validateRequiredModifiers();
+    const missing = findMissingRequiredModifiers();
     if (missing.length > 0) {
-      toast.warning(`กรุณาเลือกรายละเอียดอาหารให้ครบถ้วนก่อนใส่ตะกร้า:\n• ${missing.join("\n• ")}`);
+      flagMissingRequiredModifiers(missing);
+      toast.warning(`กรุณาเลือกรายละเอียดอาหารให้ครบถ้วนก่อนใส่ตะกร้า:\n• ${missing.map((g) => g.title).join("\n• ")}`);
       return;
     }
+    setMissingModifierIds([]);
 
     // 🚨 Allergen Safety Confirmation Guard
     if (allergenResult.hasAllergens) {
@@ -798,11 +828,13 @@ function ProductDetail() {
     }
 
     // 4. Required Modifier Validation
-    const missingMods = validateRequiredModifiers();
+    const missingMods = findMissingRequiredModifiers();
     if (missingMods.length > 0) {
-      toast.warning(`กรุณาเลือกรายละเอียดอาหารให้ครบถ้วน:\n• ${missingMods.join("\n• ")}`);
+      flagMissingRequiredModifiers(missingMods);
+      toast.warning(`กรุณาเลือกรายละเอียดอาหารให้ครบถ้วน:\n• ${missingMods.map((g) => g.title).join("\n• ")}`);
       return;
     }
+    setMissingModifierIds([]);
 
     // 5. Profile Completeness Check
     const { isComplete, missing } = await checkProfileCompleteness();
@@ -1039,8 +1071,14 @@ function ProductDetail() {
                 const isSingle = grp.selectionType === "single";
                 const currentVal = getValForGroup(grp);
 
+                const isMissing = missingModifierIds.includes(grp.id);
+
                 return (
-                  <div key={grp.id} className="queue-pd-mod-group">
+                  <div
+                    key={grp.id}
+                    id={`mod-group-${grp.id}`}
+                    className={`queue-pd-mod-group${isMissing ? " queue-pd-mod-group-missing" : ""}`}
+                  >
                     <div className="queue-pd-mod-title">
                       <span>
                         {grp.icon && <i className={`bi ${grp.icon} me-1`} />}
@@ -1048,6 +1086,12 @@ function ProductDetail() {
                       </span>
                       {grp.subtitle && <span className="queue-pd-mod-subtitle">{grp.subtitle}</span>}
                     </div>
+
+                    {isMissing && (
+                      <p role="alert" className="queue-pd-mod-required-msg">
+                        กรุณาเลือก{grp.title}
+                      </p>
+                    )}
 
                     <div className={`queue-pd-options-grid cols-${Math.min(grp.options.length, 5)}`}>
                       {grp.options.map((opt) => {
@@ -1070,6 +1114,7 @@ function ProductDetail() {
                                     ...prev,
                                     [grp.id]: opt.id,
                                   }));
+                                  clearMissingFlag(grp.id);
                                 }}
                               />
                             </label>
@@ -1095,6 +1140,7 @@ function ProductDetail() {
                                         : existingArr.filter((id) => id !== opt.id);
                                       return { ...prev, [grp.id]: nextArr };
                                     });
+                                    if (nextChecked) clearMissingFlag(grp.id);
                                   }}
                                 />
                                 <span>{opt.name}</span>

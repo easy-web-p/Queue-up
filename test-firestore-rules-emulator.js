@@ -29,6 +29,7 @@ import {
   getDoc,
   getDocs,
   query,
+  serverTimestamp,
   setDoc,
   updateDoc,
   where,
@@ -572,6 +573,52 @@ await runTest('🚨 The seeder strips the fabricated sales figures before writin
 await runTest('🚨 A seeded product carries the storeId ordering requires', async () => {
   if (seeded.storeId !== SHOP) throw new Error('a product with no store cannot be ordered');
   if (seeded.priceSatang !== 6900) throw new Error('satang must match the baht price');
+});
+
+// ===========================================================================
+console.log('\n🔐 The sign-in profile write (client and rules must agree)');
+// ===========================================================================
+
+const GOOGLE_USER = 'google_returning_user';
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  await setDoc(doc(ctx.firestore(), 'users', GOOGLE_USER), {
+    uid: GOOGLE_USER, email: 'somchai@kkumail.com', roles: ['customer'], activeRole: 'customer',
+  });
+});
+const asGoogleUser = testEnv.authenticatedContext(GOOGLE_USER).firestore();
+
+await runTest('🚨 A returning sign-in can write exactly the fields it writes', async () => {
+  // The regression: the sign-in path wrote roles, activeRole, isSuperAdmin,
+  // isMerchantVerified, isMerchantRegistered, storeId and email back every visit.
+  // None are owner-writable, so every returning Google user saw
+  // "Missing or insufficient permissions" and lastLoginAt never moved.
+  await assertSucceeds(
+    setDoc(doc(asGoogleUser, 'users', GOOGLE_USER), {
+      displayName: 'สมชาย',
+      fullName: 'สมชาย',
+      photo: '/yeti_mascot.jpg',
+      photoURL: '/yeti_mascot.jpg',
+      accountId: 'QUP-20260908-ABC',
+      lastLoginAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }, { merge: true })
+  );
+});
+
+await runTest('🚨 The old payload is still refused, field by field', async () => {
+  for (const forged of [
+    { roles: ['admin'] },
+    { activeRole: 'admin' },
+    { isSuperAdmin: true },
+    { isMerchantVerified: true },
+    { isMerchantRegistered: true },
+    { storeId: 'shop_1' },
+    { email: 'someone-else@example.com' },
+    { role: 'admin' },
+    { admin: true },
+  ]) {
+    await assertFails(setDoc(doc(asGoogleUser, 'users', GOOGLE_USER), forged, { merge: true }));
+  }
 });
 
 await testEnv.cleanup();

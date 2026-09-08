@@ -306,7 +306,15 @@ function MerchantDashboard() {
         updatedAt: serverTimestamp(),
       });
     } catch (err) {
+      // The board is driven by onSnapshot, so a refused write left the card exactly
+      // where it was with no explanation at all: the kitchen pressed "อาหารพร้อม",
+      // nothing moved, and the student was never told their food was ready. During
+      // a lunch rush that is the whole system failing quietly.
       console.error("Failed to update order status in Firestore:", err);
+      toast.error(
+        `อัปเดตสถานะคิว #${orderId} ไม่สำเร็จ: ${err?.message || "ไม่ทราบสาเหตุ"}\n` +
+        "ลูกค้ายังไม่ได้รับการแจ้งเตือน กรุณาลองใหม่อีกครั้ง"
+      );
     }
   };
 
