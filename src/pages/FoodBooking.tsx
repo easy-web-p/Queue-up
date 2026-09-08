@@ -3,8 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectCartItems, clearCart } from '../store/cartSlice';
 import { calculateCartItemUnitPrice } from '../store/cartPricing.js';
-import { Utensils, ArrowLeft, Sparkles, AlertCircle, Clock, CheckCircle2, ShoppingBag, Store, MapPin, Calendar, Compass, Wallet, CreditCard, Phone, Tag, Ticket, Percent, X } from 'lucide-react';
-import { CartItem, Order, CustomerProfile, SelectedModifierOption } from '../types';
+import { Utensils, ArrowLeft, Sparkles, AlertCircle, Clock, CheckCircle2, ShoppingBag, Store, MapPin, Calendar, Compass, Wallet, CreditCard, Phone, Tag, Ticket, X } from 'lucide-react';
+import { Order, CustomerProfile, SelectedModifierOption } from '../types';
 import {
   createAuthoritativeStoreOrder,
   getBangkokYmd,

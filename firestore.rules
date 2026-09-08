@@ -561,13 +561,43 @@ service cloud.firestore {
     // 22. REAL-TIME CUSTOMER-MERCHANT CHAT
     // ==========================================
     match /chats/{chatId} {
-      allow read, write: if isAuthenticated();
+      // A chat id is `<customerUid>_<storeId>` (see Chat.tsx).
+      //
+      // Matched as a prefix rather than by splitting on '_'. Splitting assumes the
+      // uid contains no underscore — true of Firebase Auth's own 28-character ids,
+      // but not of a custom-token uid, and a security rule should not rest on a
+      // convention it cannot enforce. The size check keeps the range in bounds
+      // when the id is shorter than the uid.
+      function isChatOwner() {
+        return isAuthenticated()
+          && chatId.size() > request.auth.uid.size()
+          && chatId[0:request.auth.uid.size()] == request.auth.uid
+          && chatId[request.auth.uid.size():request.auth.uid.size() + 1] == '_';
+      }
+
+      // `allow read, write: if isAuthenticated()` let any signed-in student read
+      // every other student's conversations with a shop, and post messages into
+      // them. Confirmed against the rules engine: a stranger could read a chat
+      // containing a phone number and write a message as its owner.
+      allow read, write: if isChatOwner() || isAdmin();
 
       match /messages/{msgId} {
-        allow read, create: if isAuthenticated();
+        allow read: if isChatOwner() || isAdmin();
+        // senderUid, when present, must be the caller — nobody writes as someone
+        // else. The shop's automatic acknowledgement carries no senderUid, which
+        // is why this is conditional rather than required.
+        allow create: if (isChatOwner() || isAdmin()) &&
+          (!('senderUid' in request.resource.data) ||
+           request.resource.data.senderUid == request.auth.uid ||
+           request.resource.data.senderUid == 'guest');
         allow update, delete: if isAdmin();
       }
     }
+
+    // NOTE: merchants cannot read these chats yet, and do not need to — the shop
+    // reply in Chat.tsx is generated client-side by the customer's own browser.
+    // When a real merchant inbox is built, give the chat document a participants
+    // field and widen the rule to it; do not widen it back to isAuthenticated().
 
     // ==========================================
     // 23. QUEUE COUNTERS (Cloud Functions Backend Only)

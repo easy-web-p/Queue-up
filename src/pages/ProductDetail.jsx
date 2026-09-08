@@ -355,41 +355,6 @@ const VIDEO_REVIEWS = [
 ];
 
 // ⭐ CUSTOMER REVIEWS MOCK DATA
-const CUSTOMER_REVIEWS = [
-  {
-    id: "r1",
-    author: "ธนภัทร น. (คณะวิศวกรรมศาสตร์)",
-    avatarLetter: "TN",
-    avatarBg: "#065f46",
-    role: "ผู้สั่งจริงผ่านแอป",
-    date: "16 ส.ค. 2026",
-    dishInfo: "สั่ง: เส้นเล็กน้ำตกเนื้อหมู + กากหมูกรอบ",
-    rating: 5,
-    comment: "ชอบระบบสั่งล่วงหน้าแบบนี้มากกก ปกติพักเที่ยงคิวยาวจนหมดเวลาพัก วันนี้กดรอบ 12:00 น. เดินมาถึงป้าแดงตักใส่ชามให้ทันที น้ำตกหอมพะโล้จัดจ้านไม่ต้องปรุงเพิ่มเลย กากหมูก็กรอบสนั่น 10/10 ครับ",
-  },
-  {
-    id: "r2",
-    author: "พรรณวษา (เจ้าหน้าที่คณะพาณิชย์ฯ)",
-    avatarLetter: "PW",
-    avatarBg: "#FF7A1A",
-    role: "ผู้สั่งจริงผ่านแอป",
-    date: "15 ส.ค. 2026",
-    dishInfo: "สั่ง: เกาเหลาน้ำตก + ไข่ต้มยางมะตูม",
-    rating: 5,
-    comment: "หมูนุ่มมาก ตับลวกมาไม่สุกเกินไป ไข่ต้มยางมะตูมเยิ้มกำลังดี ที่สำคัญร้านสะอาดถูกสุขอนามัยและคุณป้าคนขายน่ารักมากค่ะ ลด 50% แล้วคุ้มจนสั่งทานซ้ำแทบทุกวัน",
-  },
-  {
-    id: "r3",
-    author: "กิตติศักดิ์ ส. (นักศึกษาปี 3)",
-    avatarLetter: "KS",
-    avatarBg: "#3b82f6",
-    role: "ผู้สั่งจริงผ่านแอป",
-    date: "14 ส.ค. 2026",
-    dishInfo: "สั่ง: บะหมี่หยกน้ำตก + ลูกชิ้นหมู",
-    rating: 5,
-    comment: "ระบบบอกสล็อตคิวแม่นยำมากครับ ไม่ต้องมายืนรอท่ามกลางคนเยอะๆ เหมาะกับช่วงพักสั้นๆ มาก แนะนำเลยครับ",
-  },
-];
 
 function resolveProductByParam(rawParam) {
   if (!rawParam) return PRODUCTS_BY_ID.m1;
@@ -485,7 +450,13 @@ function ProductDetail() {
   const [missingProfileFields, setMissingProfileFields] = useState([]);
 
   // ⭐ Real Customer Reviews State & Loader
-  const [reviews, setReviews] = useState(CUSTOMER_REVIEWS);
+  // Real reviews only. CUSTOMER_REVIEWS is sample copy, and every entry carries
+  // role: "ผู้สั่งจริงผ่านแอป" — a claim that a named student ordered this dish and
+  // said this about it. Concatenating them behind the real ones put fabricated
+  // testimony under a real product, next to a real star rating, for a customer
+  // deciding what to buy.
+  const [reviews, setReviews] = useState([]);
+  const [reviewsLoaded, setReviewsLoaded] = useState(false);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [newReviewRating, setNewReviewRating] = useState(5);
   const [newReviewComment, setNewReviewComment] = useState("");
@@ -499,12 +470,13 @@ function ProductDetail() {
       try {
         const q = query(collection(db, "reviews"), where("productId", "==", id));
         const snap = await getDocs(q);
-        if (!isCancelled && !snap.empty) {
-          const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-          setReviews([...list, ...CUSTOMER_REVIEWS]);
+        if (!isCancelled) {
+          setReviews(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+          setReviewsLoaded(true);
         }
       } catch (err) {
         console.warn("[ProductDetail] Could not load reviews from Firestore:", err);
+        if (!isCancelled) setReviewsLoaded(true);
       }
     }
     loadFirestoreReviews();
@@ -1648,6 +1620,19 @@ function ProductDetail() {
           </div>
 
           {/* Diner Reviews List */}
+          {reviewsLoaded && reviews.length === 0 && (
+            <div className="queue-pd-review-empty text-center py-4">
+              <p className="text-muted small mb-2">ยังไม่มีรีวิวสำหรับเมนูนี้</p>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-danger fw-bold"
+                onClick={() => setIsReviewModalOpen(true)}
+              >
+                เป็นคนแรกที่รีวิว
+              </button>
+            </div>
+          )}
+
           <div className="d-flex flex-column gap-3 mt-2">
             {reviews.map((rev) => (
               <div key={rev.id} className="queue-pd-review-card">

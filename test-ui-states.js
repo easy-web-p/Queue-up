@@ -268,6 +268,18 @@ runTest('No preload points at a file the build does not emit', () => {
   }
 });
 
+runTest('🚨 Product reviews are real reviews, not sample copy', () => {
+  // The sample entries each carried role: "ผู้สั่งจริงผ่านแอป" — a claim that a
+  // named student ordered this dish and said this about it — and real reviews
+  // were appended behind them, under a real star rating, for a customer deciding
+  // what to buy.
+  const pd = stripComments(read('src/pages/ProductDetail.jsx'));
+  assert(!/CUSTOMER_REVIEWS/.test(pd), 'fabricated testimony must not ship under a real product');
+  assert(/useState\(\[\]\)/.test(pd), 'the list must start empty');
+  assert(pd.includes('ยังไม่มีรีวิวสำหรับเมนูนี้'), 'no reviews is an honest empty state');
+  assert(pd.includes('เป็นคนแรกที่รีวิว'), 'with a way to add the first one');
+});
+
 console.log(`\n${'='.repeat(60)}`);
 console.log(`RESULT: ${passed} passed, ${failed} failed`);
 console.log('='.repeat(60));

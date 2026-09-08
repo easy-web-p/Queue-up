@@ -621,6 +621,54 @@ await runTest('🚨 The old payload is still refused, field by field', async () 
   }
 });
 
+// ===========================================================================
+console.log('\n💬 Customer–shop chat (one conversation, one owner)');
+// ===========================================================================
+
+// A chat id is `<customerUid>_<storeId>`, so the uid prefix identifies the owner.
+const CHAT_ID = `${STUDENT}_${SHOP}`;
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  const db = ctx.firestore();
+  await setDoc(doc(db, 'chats', CHAT_ID), { storeId: SHOP });
+  await setDoc(doc(db, 'chats', CHAT_ID, 'messages', 'm1'), {
+    senderUid: STUDENT, text: 'เบอร์ติดต่อกลับ 081-234-5678',
+  });
+});
+
+await runTest('🚨 A stranger cannot read someone else conversation', async () => {
+  // `allow read, write: if isAuthenticated()` let every signed-in student read
+  // every other student's messages with a shop — phone numbers included.
+  await assertFails(getDoc(doc(asStranger, 'chats', CHAT_ID)));
+  await assertFails(getDocs(collection(asStranger, 'chats', CHAT_ID, 'messages')));
+});
+
+await runTest('🚨 A stranger cannot post into someone else conversation', async () => {
+  await assertFails(
+    addDoc(collection(asStranger, 'chats', CHAT_ID, 'messages'), { senderUid: STRANGER, text: 'x' })
+  );
+});
+
+await runTest('The customer can read and write their own', async () => {
+  await assertSucceeds(getDocs(collection(asStudent, 'chats', CHAT_ID, 'messages')));
+  await assertSucceeds(
+    addDoc(collection(asStudent, 'chats', CHAT_ID, 'messages'), { senderUid: STUDENT, text: 'สวัสดีครับ' })
+  );
+});
+
+await runTest("The shop's automatic acknowledgement still posts", async () => {
+  // It is written client-side and carries no senderUid, so the rule has to allow
+  // a message without one rather than require it.
+  await assertSucceeds(
+    addDoc(collection(asStudent, 'chats', CHAT_ID, 'messages'), { sender: 'merchant', text: 'รับทราบครับ' })
+  );
+});
+
+await runTest('🚨 Nobody can post as another user, even in their own chat', async () => {
+  await assertFails(
+    addDoc(collection(asStudent, 'chats', CHAT_ID, 'messages'), { senderUid: STRANGER, text: 'ปลอม' })
+  );
+});
+
 await testEnv.cleanup();
 
 console.log(`\n${'='.repeat(60)}`);

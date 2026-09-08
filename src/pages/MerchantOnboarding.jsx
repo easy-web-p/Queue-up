@@ -64,15 +64,10 @@ function MerchantOnboarding() {
     const merchantId = generateMerchantId();
     const storeId = generateStoreId();
 
-    const userProfileUpdate = {
-      accountId,
-      merchantId,
-      storeId,
-      isMerchantRegistered: true,
-      role: "merchant",
-      isMerchantVerified: true,
-      updatedAt: new Date().toISOString(),
-    };
+    // No client-side role payload here on purpose: isMerchantRegistered, role and
+    // isMerchantVerified are not owner-writable, and the write below deliberately
+    // sends only the safe profile fields. Merchant status is granted by the
+    // backend (submitVendorApprovalRequest / reviewVendorApprovalRequest).
 
     // Save to Firestore Structure v3.0
     if (user && user.uid) {

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { collection, query, where, onSnapshot, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase/config.js';
-import { TrendingUp, Users, ShieldCheck, ArrowLeft, Calculator, Save, Check } from 'lucide-react';
+import { TrendingUp, Users, ShieldCheck, ArrowLeft, Calculator, Save } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useToast } from '../components/ToastProvider.jsx';
 
