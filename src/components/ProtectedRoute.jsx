@@ -54,13 +54,31 @@ export function ProtectedRoute({ children, allowedRoles = [], requireApprovedVen
           <p className="text-xs text-slate-400 leading-relaxed">
             เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูลโปรไฟล์ กรุณารีเฟรชหน้าเว็บหรือลองเข้าสู่ระบบใหม่อีกครั้ง
           </p>
-          <button
-            type="button"
-            className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 cursor-pointer text-sm"
-            onClick={() => window.location.reload()}
-          >
-            ลองใหม่อีกครั้ง
-          </button>
+          <div className="space-y-2 pt-2">
+            <button
+              type="button"
+              className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 cursor-pointer text-sm"
+              onClick={() => window.location.reload()}
+            >
+              🔄 ลองใหม่อีกครั้ง
+            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl transition-all active:scale-95 cursor-pointer text-xs"
+                onClick={() => navigate("/")}
+              >
+                🏠 กลับหน้าหลัก
+              </button>
+              <button
+                type="button"
+                className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl transition-all active:scale-95 cursor-pointer text-xs"
+                onClick={() => navigate("/login")}
+              >
+                🔑 เข้าสู่ระบบใหม่
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );

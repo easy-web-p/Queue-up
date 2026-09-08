@@ -85,7 +85,7 @@ export function AuthProvider({ children }) {
           isVerifiedAuth: true,
           isTokenVerified: true,
           isFromCache: false,
-          isProfileLoaded: Boolean(userDocData),
+          isProfileLoaded: !profileFetchError,
           isProfileError: profileFetchError,
         };
 
@@ -120,7 +120,7 @@ export function AuthProvider({ children }) {
           isVerifiedAuth: true,
           isTokenVerified: true,
           isFromCache: false,
-          isProfileLoaded: Boolean(userDocData),
+          isProfileLoaded: !profileFetchError,
           isProfileError: isAdminUser ? false : profileFetchError,
           storeId: userDocData?.storeId || undefined,
         }));
