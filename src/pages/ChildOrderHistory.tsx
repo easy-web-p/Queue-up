@@ -20,6 +20,8 @@ interface ChildOrder {
   queueNumber: string;
   storeId: string;
   storeName?: string;
+  studentId?: string;
+  guardianIds?: string[];
   pickupTime: string;
   pickupDate?: string;
   status: string;
@@ -62,17 +64,35 @@ export default function ChildOrderHistory() {
     async function loadOrders() {
       setIsLoading(true);
       try {
-        // Query child's orders by studentId or userId
-        const q = query(
-          collection(db, 'orders'),
-          where('studentId', '==', selectedChild.studentId),
-          limit(30)
-        );
-        const snap = await getDocs(q);
-        const ords = snap.docs.map((d) => ({
-          id: d.id,
-          ...d.data(),
-        })) as ChildOrder[];
+        let ords: ChildOrder[] = [];
+        try {
+          const qGuardian = query(
+            collection(db, 'orders'),
+            where('guardianIds', 'array-contains', uid),
+            limit(50)
+          );
+          const snap = await getDocs(qGuardian);
+          const allChildOrders = snap.docs.map((d) => ({
+            id: d.id,
+            ...d.data(),
+          })) as ChildOrder[];
+
+          ords = allChildOrders.filter(
+            (o) => !o.studentId || o.studentId === selectedChild.studentId
+          );
+        } catch {
+          // Fallback to studentId direct query if permissible
+          const qStudent = query(
+            collection(db, 'orders'),
+            where('studentId', '==', selectedChild.studentId),
+            limit(30)
+          );
+          const snap = await getDocs(qStudent);
+          ords = snap.docs.map((d) => ({
+            id: d.id,
+            ...d.data(),
+          })) as ChildOrder[];
+        }
 
         // Sort descending by createdAt or id
         ords.sort((a, b) => {

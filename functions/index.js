@@ -4,7 +4,6 @@ import { getAuth } from "firebase-admin/auth";
 import { onRequest, onCall, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
-import { resolveWalletAuthority, isStaffOrAdmin, MAX_TOPUP_SATANG } from "./walletAuthority.js";
 import { scanOrderForAllergens } from "./allergenGuard.js";
 import { resolveLinkDecision, LINK_DECISIONS } from "./linkReview.js";
 import { validatePilotLead, rateLimitKeyForAddress } from "./pilotLead.js";
@@ -66,31 +65,6 @@ function getBangkokYmd(date = new Date()) {
   const dayOfWeekIndex = weekdayMap[weekdayShort] ?? 0;
 
   return { ymd, ymdClean, dayOfWeekIndex };
-}
-
-/**
- * Guards any operation acting on `studentId`'s wallet on behalf of the caller.
- * Throws HttpsError unless the caller is staff/admin or a school-verified guardian.
- * See walletAuthority.js for the rules themselves.
- */
-async function assertWalletAuthority(auth, studentId, { allowSelf, action }) {
-  const decision = await resolveWalletAuthority(db, auth, studentId, { allowSelf });
-
-  if (decision.allowed) {
-    return decision.role;
-  }
-
-  if (decision.reason === "SELF_SERVICE_FORBIDDEN") {
-    throw new HttpsError(
-      "permission-denied",
-      `SELF_SERVICE_FORBIDDEN: นักเรียนไม่สามารถ${action}ให้ตนเองได้ กรุณาติดต่อผู้ปกครองหรือเจ้าหน้าที่โรงเรียน`
-    );
-  }
-
-  throw new HttpsError(
-    "permission-denied",
-    `WALLET_AUTHORITY_REQUIRED: คุณไม่มีสิทธิ์${action}สำหรับนักเรียนรายนี้ (ต้องเป็นผู้ปกครองที่โรงเรียนยืนยันแล้ว หรือเจ้าหน้าที่)`
-  );
 }
 
 /**
@@ -235,6 +209,7 @@ export const createOrderAuthoritative = onCall(
       pickupDate,
       acknowledgeAllergenWarning, // set after the caller confirms an ALLERGEN_ALERT
       couponCode, // Optional coupon promo code
+      studentId, // Optional student ID for child/campus food order
     } = request.data || {};
 
     if (userId && userId !== authUid && request.auth.token?.admin !== true) {
@@ -242,6 +217,7 @@ export const createOrderAuthoritative = onCall(
     }
 
     const effectiveUserId = authUid;
+    const cleanStudentId = (studentId && typeof studentId === "string" && studentId.trim()) ? studentId.trim() : null;
 
     // 2. Strict Input Validation
     if (!storeId || typeof storeId !== "string" || !storeId.trim()) {
@@ -324,8 +300,15 @@ export const createOrderAuthoritative = onCall(
 
         // Allergy profile for whoever the food is for. All reads must precede any
         // write in a transaction, so this is fetched here with the rest of Phase 1.
-        const allergyProfileId = authUid;
+        const allergyProfileId = cleanStudentId || authUid;
         const studentSnap = await tx.get(db.collection("students").doc(allergyProfileId));
+
+        // Read coupon document if provided
+        const cleanCoupon = couponCode && typeof couponCode === "string" ? couponCode.trim().toUpperCase() : null;
+        let couponSnap = null;
+        if (cleanCoupon) {
+          couponSnap = await tx.get(db.collection("coupons").doc(cleanCoupon));
+        }
 
         // Read all product documents
         const productSnapMap = new Map();
@@ -563,12 +546,27 @@ export const createOrderAuthoritative = onCall(
         }
 
         // 2.2c 🎟️ Server-Authoritative Coupon Validation & Discount Calculation
-        const cleanCoupon = couponCode && typeof couponCode === "string" ? couponCode.trim().toUpperCase() : null;
         let discountSatang = 0;
         let couponTitle = "";
 
         if (cleanCoupon) {
-          if (cleanCoupon === "WELCOME50") {
+          if (couponSnap && couponSnap.exists) {
+            const cData = couponSnap.data();
+            const isActive = cData.isActive !== false;
+            const minSpend = Number(cData.minSpendSatang ?? ((Number(cData.minSpend) || 0) * 100)) || 0;
+            if (isActive && calculatedTotalSatang >= minSpend) {
+              couponTitle = cData.title || `คูปองส่วนลด (${cleanCoupon})`;
+              if (cData.discountType === "PERCENT") {
+                const percent = Number(cData.discountValue) || 0;
+                const rawDiscount = Math.round(calculatedTotalSatang * (percent / 100));
+                const maxCap = cData.maxDiscountSatang ?? ((Number(cData.maxDiscount) || 0) * 100);
+                discountSatang = maxCap > 0 ? Math.min(rawDiscount, maxCap) : rawDiscount;
+              } else {
+                const fixedSatang = cData.discountValueSatang ?? Math.round((Number(cData.discountValue) || 0) * 100);
+                discountSatang = Math.min(fixedSatang, calculatedTotalSatang);
+              }
+            }
+          } else if (cleanCoupon === "WELCOME50") {
             if (calculatedTotalSatang >= 10000) { // min spend 100 THB
               discountSatang = Math.min(5000, calculatedTotalSatang); // 50 THB discount
               couponTitle = "ต้อนรับสมาชิกใหม่ ลด ฿50 (WELCOME50)";
@@ -658,6 +656,11 @@ export const createOrderAuthoritative = onCall(
         );
 
         // Create authoritative Order
+        const studentProfileData = studentSnap.exists ? studentSnap.data() : null;
+        const studentGuardianIds = Array.isArray(studentProfileData?.guardianIds)
+          ? studentProfileData.guardianIds
+          : [];
+
         const orderDocRef = db.collection("orders").doc();
         const orderId = orderDocRef.id;
 
@@ -668,6 +671,8 @@ export const createOrderAuthoritative = onCall(
           userId: effectiveUserId,
           customerName: (customerName || "").trim() || "ลูกค้า QueueUp",
           customerPhone: customerPhone.trim(),
+          ...(cleanStudentId ? { studentId: cleanStudentId } : {}),
+          guardianIds: studentGuardianIds,
           queueNumber,
           status: "PENDING",
           queueStatus: "waiting",
@@ -832,6 +837,123 @@ export const updateOrderStatusAuthoritative = onCall(
     });
   }
 );
+
+/**
+ * 🔒 Cancel Order Authoritative (Server-Authoritative Cancellation)
+ *
+ * Authorizes cancellation by:
+ *   1. Customer who placed the order (if status is PENDING or CONFIRMED & queueStatus is 'waiting')
+ *   2. Store owner (if order is not already COMPLETED)
+ *   3. Admin
+ *
+ * Atomically updates order to CANCELLED/cancelled, restores item stock, and releases slot capacity.
+ */
+export const cancelOrderAuthoritative = onCall(
+  { region: "asia-southeast1", cors: true },
+  async (request) => {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "AUTH_REQUIRED: กรุณาเข้าสู่ระบบก่อนดำเนินการ");
+    }
+
+    const authUid = request.auth.uid;
+    const { orderId, reason } = request.data || {};
+
+    if (!orderId || typeof orderId !== "string") {
+      throw new HttpsError("invalid-argument", "INVALID_ORDER_ID: รหัสออร์เดอร์ไม่ถูกต้อง");
+    }
+
+    const orderRef = db.collection("orders").doc(orderId.trim());
+
+    return await db.runTransaction(async (tx) => {
+      const orderSnap = await tx.get(orderRef);
+      if (!orderSnap.exists) {
+        throw new HttpsError("not-found", `ORDER_NOT_FOUND: ไม่พบข้อมูลออร์เดอร์ #${orderId}`);
+      }
+
+      const orderData = orderSnap.data();
+      const currentStatus = (orderData.status || "PENDING").toUpperCase();
+      const currentQueue = (orderData.queueStatus || "waiting").toLowerCase();
+
+      if (currentStatus === "CANCELLED" || currentQueue === "cancelled") {
+        return { ok: true, orderId, status: "CANCELLED", queueStatus: "cancelled", message: "คำสั่งซื้อถูกยกเลิกไปแล้ว" };
+      }
+
+      if (currentStatus === "COMPLETED" || currentQueue === "completed") {
+        throw new HttpsError("failed-precondition", "ORDER_ALREADY_COMPLETED: ไม่สามารถยกเลิกคำสั่งซื้อที่เสร็จสมบูรณ์แล้วได้");
+      }
+
+      const storeId = orderData.storeId;
+      const isAdminUser = Boolean(
+        request.auth.token?.admin === true ||
+        request.auth.token?.role === "admin" ||
+        ["58140@lomsak.ac.th", "hi00000087@gmail.com", "easy.web.p@gmail.com"].includes(request.auth.token?.email)
+      );
+
+      const isCustomer = orderData.userId === authUid;
+      let isStoreOwner = false;
+
+      if (!isAdminUser && !isCustomer && storeId) {
+        const shopSnap = await tx.get(db.collection("shops").doc(storeId));
+        if (shopSnap.exists && shopSnap.data().ownerUid === authUid) {
+          isStoreOwner = true;
+        }
+      }
+
+      if (!isAdminUser && !isCustomer && !isStoreOwner) {
+        throw new HttpsError("permission-denied", "UNAUTHORIZED: คุณไม่มีสิทธิ์ยกเลิกคำสั่งซื้อนี้");
+      }
+
+      // Customer can only cancel prior to kitchen starting preparation (PENDING/CONFIRMED & waiting)
+      if (isCustomer && !isAdminUser && !isStoreOwner) {
+        const canCustomerCancel = (currentStatus === "PENDING" || currentStatus === "CONFIRMED") && currentQueue === "waiting";
+        if (!canCustomerCancel) {
+          throw new HttpsError(
+            "failed-precondition",
+            "CANNOT_CANCEL_IN_PREPARATION: ไม่สามารถยกเลิกคำสั่งซื้อได้เนื่องจากทางร้านเริ่มปรุงอาหารแล้ว"
+          );
+        }
+      }
+
+      // 1. Update Order Status
+      const cancelPayload = {
+        status: "CANCELLED",
+        queueStatus: "cancelled",
+        cancelReason: (typeof reason === "string" ? reason.slice(0, 300) : null) || (isCustomer ? "ลูกค้ายกเลิกคำสั่งซื้อ" : "ร้านค้ายกเลิกคำสั่งซื้อ"),
+        cancelledBy: authUid,
+        cancelledAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      };
+      tx.update(orderRef, cancelPayload);
+
+      // 2. Restore Stock
+      if (Array.isArray(orderData.items)) {
+        for (const item of orderData.items) {
+          const productId = item.productId || item.id;
+          const qty = Number(item.quantity || item.qty) || 0;
+          if (productId && typeof productId === "string" && qty > 0) {
+            const productRef = db.collection("products").doc(productId);
+            tx.update(productRef, { stock: FieldValue.increment(qty), updatedAt: FieldValue.serverTimestamp() });
+          }
+        }
+      }
+
+      // 3. Release Slot Allocation
+      if (storeId && orderData.pickupDate && orderData.pickupTime) {
+        const slotKey = `${storeId}_${orderData.pickupDate}_${orderData.pickupTime.replace(":", "")}`;
+        const slotRef = db.collection("store_slots").doc(slotKey);
+        tx.update(slotRef, { currentOrders: FieldValue.increment(-1), updatedAt: FieldValue.serverTimestamp() });
+      }
+
+      return {
+        ok: true,
+        orderId,
+        status: "CANCELLED",
+        queueStatus: "cancelled",
+      };
+    });
+  }
+);
+
 
 /**
  * 🔒 Record Merchant Audit Log (Server-Authoritative)
@@ -1088,14 +1210,35 @@ export const reviewVendorApprovalRequest = onCall(
  * `verifiedByGuardian` flag on it is client-supplied — so nothing downstream trusts
  * a link until a staff supervisor has confirmed it here.
  *
- * Verifying also writes `guardianIds` onto the student and wallet documents. That
- * field is what firestore.rules reads to grant a guardian access, and until now
- * nothing in the system ever wrote it: a guardian could be linked and still be
- * unable to see their own child's wallet.
+ * Verifying also writes `guardianIds` onto the student document. That
+ * field is what firestore.rules reads to grant a guardian access to view
+ * health profiles and allergen alerts.
  *
  * decision:
  *   VERIFIED  - approve a PENDING link, granting access
  *   REJECTED  - decline a PENDING link
+ *   REVOKED   - withdraw a previously VERIFIED link and remove the access it granted
+ */
+
+/**
+ * Verifies caller is a staff supervisor or system administrator
+ */
+async function isStaffOrAdmin(db, auth) {
+  if (!auth || !auth.uid) return false;
+  const token = auth.token || {};
+  if (token.admin === true || token.role === "admin" || token.role === "staff_supervisor" || token.staffSupervisor === true) {
+    return true;
+  }
+  const snap = await db.collection("staff_supervisors").doc(auth.uid).get();
+  return snap.exists;
+}
+
+/**
+ * 🔒 Review Parent-Child Link (School Staff Only)
+ *
+ * Staff supervisors review linking requests. Decisions:
+ *   VERIFIED  - approve the link and grant access to student info
+ *   REJECTED  - turn down an invalid request
  *   REVOKED   - withdraw a previously VERIFIED link and remove the access it granted
  */
 export const reviewParentChildLink = onCall(
@@ -1150,7 +1293,7 @@ export const reviewParentChildLink = onCall(
       const reviewerUid = request.auth.uid;
       const reviewerName = request.auth.token?.name || request.auth.token?.email || "เจ้าหน้าที่ผู้ดูแล";
       const studentRef = db.collection("students").doc(studentId);
-      const walletRef = db.collection("wallets").doc(studentId);
+      const walletRef = db.collection("student_wallets").doc(studentId);
 
       if (outcome.grantsAccess) {
         tx.update(linkRef, {
@@ -1164,11 +1307,7 @@ export const reviewParentChildLink = onCall(
 
         // arrayUnion is idempotent, so a re-link after a revocation is safe.
         tx.set(studentRef, { guardianIds: FieldValue.arrayUnion(guardianId) }, { merge: true });
-        tx.set(
-          walletRef,
-          { studentId, guardianIds: FieldValue.arrayUnion(guardianId) },
-          { merge: true }
-        );
+        tx.set(walletRef, { guardianIds: FieldValue.arrayUnion(guardianId) }, { merge: true });
       } else if (outcome.revokesAccess) {
         tx.update(linkRef, {
           status: outcome.nextStatus,
@@ -1191,7 +1330,7 @@ export const reviewParentChildLink = onCall(
         });
       }
 
-      // Who may see a child's wallet and health record is worth an audit trail.
+      // Record immutable audit trail
       const auditRef = db.collection("audit_logs").doc();
       tx.set(auditRef, {
         id: auditRef.id,
@@ -1218,133 +1357,6 @@ export const reviewParentChildLink = onCall(
               : "บันทึกการปฏิเสธคำขอผูกบัญชีเรียบร้อย",
       };
     });
-  }
-);
-
-/**
- * 💳 Top-up Campus Wallet (Staff or Guardian)
- */
-export const topupCampusWallet = onCall(
-  { region: "asia-southeast1", cors: true },
-  async (request) => {
-    if (!request.auth || !request.auth.uid) {
-      throw new HttpsError("unauthenticated", "กรุณาเข้าสู่ระบบก่อนทำรายการเติมเงิน");
-    }
-
-    const { studentId, amountSatang, note, paymentMethod } = request.data || {};
-    const amt = Number(amountSatang);
-    if (!studentId || typeof studentId !== "string" || !Number.isInteger(amt) || amt <= 0) {
-      throw new HttpsError("invalid-argument", "กรุณาระบุ studentId และจำนวนเงิน (Satang) ที่ถูกต้อง");
-    }
-    if (amt > MAX_TOPUP_SATANG) {
-      throw new HttpsError(
-        "invalid-argument",
-        `TOPUP_AMOUNT_TOO_LARGE: เติมเงินได้สูงสุด ${MAX_TOPUP_SATANG / 100} บาทต่อรายการ`
-      );
-    }
-
-    // 🔒 Credits balance with no payment capture, so it must never be self-service.
-    const actorRole = await assertWalletAuthority(request.auth, studentId, {
-      allowSelf: false,
-      action: "เติมเงิน",
-    });
-
-    const walletRef = db.collection("wallets").doc(studentId);
-
-    return await db.runTransaction(async (tx) => {
-      const walletSnap = await tx.get(walletRef);
-      let currentBal = 0;
-
-      if (walletSnap.exists) {
-        const walletData = walletSnap.data();
-        currentBal = Number(walletData.balanceSatang) || 0;
-      }
-
-      const newBal = currentBal + amt;
-
-      tx.set(
-        walletRef,
-        {
-          studentId,
-          balanceSatang: newBal,
-          updatedAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
-
-      const txRef = db.collection("wallet_transactions").doc();
-      tx.set(txRef, {
-        id: txRef.id,
-        walletId: studentId,
-        studentId,
-        amountSatang: amt,
-        type: "TOPUP",
-        actorUid: request.auth.uid,
-        actorRole,
-        paymentMethod: paymentMethod || "PROMPTPAY",
-        note: note || "เติมเงินเข้ากระเป๋านักเรียน",
-        timestamp: FieldValue.serverTimestamp(),
-      });
-
-      return {
-        success: true,
-        studentId,
-        addedSatang: amt,
-        newBalanceSatang: newBal,
-        newBalanceBaht: newBal / 100,
-      };
-    });
-  }
-);
-
-/**
- * 🛡️ Update Campus Wallet Spending Limits & Categories (Guardian / Supervisor)
- */
-export const updateCampusWalletLimits = onCall(
-  { region: "asia-southeast1", cors: true },
-  async (request) => {
-    if (!request.auth || !request.auth.uid) {
-      throw new HttpsError("unauthenticated", "กรุณาเข้าสู่ระบบก่อนตั้งค่ากระเป๋าเงิน");
-    }
-
-    const { studentId, dailyLimitSatang, weeklyLimitSatang, blockedCategories, isLocked } = request.data || {};
-    if (!studentId || typeof studentId !== "string") {
-      throw new HttpsError("invalid-argument", "กรุณาระบุ studentId");
-    }
-
-    // 🔒 These are the parental controls themselves: a student must never be able to
-    // raise their own limits, clear blocked categories, or unlock their own wallet.
-    await assertWalletAuthority(request.auth, studentId, {
-      allowSelf: false,
-      action: "ตั้งค่าวงเงินหรือปลดล็อกกระเป๋าเงิน",
-    });
-
-    const walletRef = db.collection("wallets").doc(studentId);
-    const updatePayload = {
-      studentId,
-      updatedAt: FieldValue.serverTimestamp(),
-    };
-
-    if (typeof dailyLimitSatang === "number" && dailyLimitSatang >= 0) {
-      updatePayload.dailyLimitSatang = dailyLimitSatang;
-    }
-    if (typeof weeklyLimitSatang === "number" && weeklyLimitSatang >= 0) {
-      updatePayload.weeklyLimitSatang = weeklyLimitSatang;
-    }
-    if (Array.isArray(blockedCategories)) {
-      updatePayload.blockedCategories = blockedCategories;
-    }
-    if (typeof isLocked === "boolean") {
-      updatePayload.isLocked = isLocked;
-    }
-
-    await walletRef.set(updatePayload, { merge: true });
-
-    return {
-      success: true,
-      studentId,
-      message: "อัปเดตการตั้งค่าและวงเงินการใช้งานเรียบร้อยแล้ว",
-    };
   }
 );
 
@@ -1430,8 +1442,7 @@ export const emergencyMedicalLookup = onCall(
       return { success: true, auditId: auditRef.id, found: false, profile: null, recentOrders: [] };
     }
 
-    // Recent meals, for allergen tracing. Orders key the student on `studentId` for
-    // wallet orders and on `userId` otherwise, so both are consulted.
+    // Recent meals, for allergen tracing. Consults studentId and userId.
     const orderFields = ["studentId", "userId"];
     const ordersById = new Map();
     for (const field of orderFields) {
@@ -1577,11 +1588,7 @@ export const getSystemHealth = onRequest(
 /**
  * Scheduled Daily Maintenance (heartbeat)
  *
- * NOTE: wallet spending counters are NOT reset here. They reset lazily on the next
- * spend, by comparing the stored period key against the current one — see
- * walletLimits.js. That keeps limits correct even if this job never runs, which
- * matters because it previously did nothing at all while the weekly counter was
- * relying on it, leaving `spentThisWeekSatang` to accumulate without bound.
+ * Daily routine for maintenance tasks and health monitoring.
  */
 export const scheduledDailyMaintenance = onSchedule(
   { schedule: "0 0 * * *", timeZone: "Asia/Bangkok", region: "asia-southeast1" },

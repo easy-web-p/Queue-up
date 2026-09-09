@@ -107,65 +107,56 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
     if (!isOpen) return;
 
     if (initialStoreName) {
-      const match = conversations.find((c) =>
-        c.storeName.toLowerCase().includes(initialStoreName.toLowerCase()) ||
-        initialStoreName.toLowerCase().includes(c.storeName.toLowerCase())
-      );
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setConversations((prev) => {
+        const match = prev.find((c) =>
+          c.storeName.toLowerCase().includes(initialStoreName.toLowerCase()) ||
+          initialStoreName.toLowerCase().includes(c.storeName.toLowerCase())
+        );
 
-      if (match) {
-        // If chat with store already exists, activate it and update orderContext
-        setTimeout(() => {
-          if (activeChatId !== match.id) {
-            setActiveChatId(match.id);
-          }
-          setConversations((prev) =>
-            prev.map((c) =>
-              c.id === match.id
-                ? {
-                    ...c,
-                    unread: 0,
-                    orderContext: initialOrderContext || c.orderContext,
-                  }
-                : c
-            )
+        if (match) {
+          setActiveChatId(match.id);
+          return prev.map((c) =>
+            c.id === match.id
+              ? {
+                  ...c,
+                  unread: 0,
+                  orderContext: initialOrderContext || c.orderContext,
+                }
+              : c
           );
-        }, 0);
-      } else {
-        // If chat with store does NOT exist yet, create a BRAND NEW store conversation dynamically!
-        const newChatId = "chat_" + Math.random().toString(36).substring(2, 9);
-        const currentTime = new Date().toLocaleTimeString("th-TH", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }) + " น.";
+        } else {
+          const newChatId = "chat_" + Math.random().toString(36).substring(2, 9);
+          const currentTime =
+            new Date().toLocaleTimeString("th-TH", {
+              hour: "2-digit",
+              minute: "2-digit",
+            }) + " น.";
 
-        const newChat = {
-          id: newChatId,
-          storeName: initialStoreName,
-          avatar: "/logo.png",
-          online: true,
-          statusText: "ตอบกลับใน 2 นาที",
-          unread: 0,
-          lastTime: currentTime,
-          orderContext: initialOrderContext || null,
-          messages: [
-            {
-              id: "m_welcome_" + Math.random().toString(36).substring(2, 9),
-              sender: "merchant",
-              text: `สวัสดีครับ! ${initialStoreName} ยินดีให้บริการ สอบถามข้อมูลเมนูอาหารหรือคิวได้เลยครับ 🍳`,
-              time: currentTime,
-            },
-          ],
-        };
-
-        setTimeout(() => {
-          setConversations((prev) => [newChat, ...prev]);
+          const newChat = {
+            id: newChatId,
+            storeName: initialStoreName,
+            avatar: "/logo.png",
+            online: true,
+            statusText: "ตอบกลับใน 2 นาที",
+            unread: 0,
+            lastTime: currentTime,
+            orderContext: initialOrderContext || null,
+            messages: [
+              {
+                id: "m_welcome_" + Math.random().toString(36).substring(2, 9),
+                sender: "merchant",
+                text: `สวัสดีครับ! ${initialStoreName} ยินดีให้บริการ สอบถามข้อมูลเมนูอาหารหรือคิวได้เลยครับ 🍳`,
+                time: currentTime,
+              },
+            ],
+          };
           setActiveChatId(newChatId);
-        }, 0);
-      }
-    } else if (conversations.length > 0 && !activeChatId) {
-      setTimeout(() => setActiveChatId(conversations[0].id), 0);
+          return [newChat, ...prev];
+        }
+      });
     }
-  }, [isOpen, initialStoreName, initialOrderContext, activeChatId, conversations]);
+  }, [isOpen, initialStoreName, initialOrderContext]);
 
   // Save to LocalStorage whenever conversations change
   useEffect(() => {

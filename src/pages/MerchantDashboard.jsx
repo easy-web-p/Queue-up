@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { switchRole, clearUser } from "../store/authSlice.js";
 import { db, doc, getDoc, setDoc, functions } from "../firebase/config.js";
-import { collection, query, where, getDocs, onSnapshot, updateDoc, serverTimestamp } from "firebase/firestore";
+import { collection, query, where, getDocs, onSnapshot, updateDoc, addDoc, serverTimestamp } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { MerchantKDS } from "../components/MerchantKDS.tsx";
 import ChatModal from "../components/ChatModal.jsx";
@@ -79,9 +79,6 @@ function MerchantDashboard() {
   const [canteenLocation, setCanteenLocation] = useState(user?.canteenLocation || "");
   const [storeHours, setStoreHours] = useState("07:00 - 15:00 น.");
   const [isSavedProfile, setIsSavedProfile] = useState(false);
-  const [privateBankName, setPrivateBankName] = useState("");
-  const [privateAccountNo, setPrivateAccountNo] = useState("");
-  const [privateAccountOwner, setPrivateAccountOwner] = useState("");
 
   const [staffList, setStaffList] = useState([
     { uid: "STF01", name: "นางสาวมยุรี ใจดี", role: "พนักงานรับออเดอร์/แคชเชียร์", phone: "082-111-2233" },
@@ -135,7 +132,7 @@ function MerchantDashboard() {
     async function resolveAuthoritativeStore() {
       if (!user) {
         setIsStoreLoading(false);
-        navigate("/portal/th-onboarding", { replace: true });
+        navigate("/login", { replace: true });
         return;
       }
 
@@ -207,19 +204,6 @@ function MerchantDashboard() {
     }
 
     resolveAuthoritativeStore();
-
-    // Check private finance info if merchantId exists
-    const merchantId = user.merchantId;
-    if (merchantId) {
-      getDoc(doc(db, "merchantProfiles", merchantId, "private", "finance")).then((finSnap) => {
-        if (!isCancelled && finSnap.exists()) {
-          const finData = finSnap.data();
-          if (finData.bankName) setPrivateBankName(finData.bankName);
-          if (finData.accountNumber) setPrivateAccountNo(finData.accountNumber);
-          if (finData.accountOwner) setPrivateAccountOwner(cleanOwnerName(finData.accountOwner, user.email));
-        }
-      });
-    }
 
     return () => {
       isCancelled = true;
@@ -293,6 +277,7 @@ function MerchantDashboard() {
   }, [currentStoreId]);
 
   const handleUpdateOrderStatus = async (orderId, newStatus) => {
+    // 🔒 100% Server-Authoritative: direct client updateDoc on /orders is blocked by firestore.rules; mutations route via Cloud Functions.
     let status = 'PENDING';
     let queueStatus = 'waiting';
 
@@ -314,66 +299,146 @@ function MerchantDashboard() {
     }
 
     try {
-      // 1. Authoritative Cloud Function call (Server-Side State Machine & Ownership Validation)
-      const updateOrderFn = httpsCallable(functions, "updateOrderStatusAuthoritative");
-      await updateOrderFn({ orderId, status, queueStatus });
-    } catch (callableErr) {
-      console.warn("[MerchantDashboard] Authoritative status update fallback to updateDoc:", callableErr);
-      // 2. Resilient Fallback to direct updateDoc (guarded by firestore.rules state machine)
-      try {
-        await updateDoc(doc(db, "orders", orderId), {
-          status,
-          queueStatus,
-          updatedAt: serverTimestamp(),
-        });
-      } catch (err) {
-        // The board is driven by onSnapshot, so a refused write left the card exactly
-        // where it was with no explanation at all: the kitchen pressed "อาหารพร้อม",
-        // nothing moved, and the student was never told their food was ready. During
-        // a lunch rush that is the whole system failing quietly.
-        console.error("Failed to update order status in Firestore:", err);
-        toast.error(
-          `อัปเดตสถานะคิว #${orderId} ไม่สำเร็จ: ${err?.message || callableErr?.message || "ไม่ทราบสาเหตุ"}\n` +
-          "ลูกค้ายังไม่ได้รับการแจ้งเตือน กรุณาลองใหม่อีกครั้ง"
-        );
+      // 100% Server-Authoritative Cloud Function (Single Authority)
+      if (status === 'CANCELLED') {
+        const cancelFn = httpsCallable(functions, "cancelOrderAuthoritative");
+        await cancelFn({ orderId, reason: "ร้านค้ายกเลิกคำสั่งซื้อผ่าน KDS Dashboard" });
+      } else {
+        const updateOrderFn = httpsCallable(functions, "updateOrderStatusAuthoritative");
+        await updateOrderFn({ orderId, status, queueStatus });
       }
+    } catch (err) {
+      console.error("[MerchantDashboard] Authoritative status update failed:", err);
+      toast.error(
+        `อัปเดตสถานะคิว #${orderId} ไม่สำเร็จ: ${err?.message || "ไม่ทราบสาเหตุ"}\n` +
+        "ลูกค้ายังไม่ได้รับการแจ้งเตือน กรุณาลองใหม่อีกครั้ง"
+      );
     }
   };
 
-  const handleToggleProductStatus = (productId) => {
+  const handleToggleProductStatus = async (productId) => {
+    const target = menuItems.find((p) => p.id === productId);
+    if (!target) return;
+    const nextVal = !target.isAvailable;
+    // Optimistic UI
     setMenuItems((prev) =>
-      prev.map((p) => (p.id === productId ? { ...p, isAvailable: !p.isAvailable } : p))
+      prev.map((p) => (p.id === productId ? { ...p, isAvailable: nextVal } : p))
     );
+    try {
+      await updateDoc(doc(db, "products", productId), {
+        isAvailable: nextVal,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error("[MerchantDashboard] Failed to toggle product availability in Firestore:", err);
+      toast.error(`บันทึกสถานะเมนูไม่สำเร็จ: ${err?.message || err}`);
+      // Revert optimistic UI
+      setMenuItems((prev) =>
+        prev.map((p) => (p.id === productId ? { ...p, isAvailable: !nextVal } : p))
+      );
+    }
   };
 
-  // Menu edits stay on the same local + localStorage state the menu tab has always
-  // used; MerchantMenuManager replaces a read-only grid whose "add item" button only
-  // raised an alert, so create/price/stock actually work now.
-  const handleUpdateStock = (productId, newStock) => {
+  const handleUpdateStock = async (productId, newStock) => {
+    const stockVal = Math.max(0, Number(newStock) || 0);
+    const prevItem = menuItems.find((p) => p.id === productId);
+    const prevStock = prevItem?.stock ?? 0;
+    // Optimistic UI
     setMenuItems((prev) =>
-      prev.map((p) => (p.id === productId ? { ...p, stock: Math.max(0, Number(newStock) || 0) } : p))
+      prev.map((p) => (p.id === productId ? { ...p, stock: stockVal } : p))
     );
+    try {
+      await updateDoc(doc(db, "products", productId), {
+        stock: stockVal,
+        updatedAt: serverTimestamp(),
+      });
+      toast.success("อัปเดตจำนวนสต็อกในระบบสำเร็จ");
+    } catch (err) {
+      console.error("[MerchantDashboard] Failed to update product stock in Firestore:", err);
+      toast.error(`บันทึกสต็อกไม่สำเร็จ: ${err?.message || err}`);
+      setMenuItems((prev) =>
+        prev.map((p) => (p.id === productId ? { ...p, stock: prevStock } : p))
+      );
+    }
   };
 
-  const handleUpdatePrice = (productId, newPrice) => {
+  const handleUpdatePrice = async (productId, newPrice) => {
     const price = Number(newPrice);
-    if (!Number.isFinite(price) || price <= 0) return;
+    if (!Number.isFinite(price) || price <= 0) {
+      toast.warning("ราคาต้องเป็นตัวเลขที่มากกว่า 0");
+      return;
+    }
+    const prevItem = menuItems.find((p) => p.id === productId);
+    const prevPrice = prevItem?.price ?? 0;
+    const prevPriceSatang = prevItem?.priceSatang ?? Math.round(prevPrice * 100);
+    // Optimistic UI
     setMenuItems((prev) =>
       prev.map((p) => (p.id === productId ? { ...p, price, priceSatang: Math.round(price * 100) } : p))
     );
+    try {
+      await updateDoc(doc(db, "products", productId), {
+        price,
+        priceSatang: Math.round(price * 100),
+        updatedAt: serverTimestamp(),
+      });
+      toast.success(`อัปเดตราคาเป็น ฿${price} สำเร็จ`);
+    } catch (err) {
+      console.error("[MerchantDashboard] Failed to update product price in Firestore:", err);
+      toast.error(`บันทึกราคาไม่สำเร็จ: ${err?.message || err}`);
+      setMenuItems((prev) =>
+        prev.map((p) => (p.id === productId ? { ...p, price: prevPrice, priceSatang: prevPriceSatang } : p))
+      );
+    }
   };
 
-  const handleUpdateAllergens = (productId, allergenIds) => {
+  const handleUpdateAllergens = async (productId, allergenIds) => {
+    const prevItem = menuItems.find((p) => p.id === productId);
+    const prevAllergens = prevItem?.allergens || [];
     setMenuItems((prev) =>
       prev.map((p) => (p.id === productId ? { ...p, allergens: allergenIds } : p))
     );
+    try {
+      await updateDoc(doc(db, "products", productId), {
+        allergens: allergenIds,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error("[MerchantDashboard] Failed to update allergens in Firestore:", err);
+      toast.error(`บันทึกข้อมูลสารก่อภูมิแพ้ไม่สำเร็จ: ${err?.message || err}`);
+      setMenuItems((prev) =>
+        prev.map((p) => (p.id === productId ? { ...p, allergens: prevAllergens } : p))
+      );
+    }
   };
 
-  const handleAddNewItem = (item) => {
-    setMenuItems((prev) => [
-      ...prev,
-      { ...item, id: `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, storeId: currentStoreId },
-    ]);
+  const handleAddNewItem = async (item) => {
+    if (!currentStoreId) {
+      toast.error("ไม่พบรหัสร้านค้า ไม่สามารถเพิ่มเมนูได้");
+      return;
+    }
+    const price = Number(item.price) || 0;
+    const productPayload = {
+      ...item,
+      storeId: currentStoreId,
+      price,
+      priceSatang: Math.round(price * 100),
+      stock: Math.max(0, Number(item.stock) || 0),
+      isAvailable: item.isAvailable !== false,
+      allergens: Array.isArray(item.allergens) ? item.allergens : [],
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+    try {
+      const docRef = await addDoc(collection(db, "products"), productPayload);
+      setMenuItems((prev) => [
+        ...prev,
+        { ...productPayload, id: docRef.id },
+      ]);
+      toast.success(`เพิ่มเมนู "${item.name}" ลงในระบบสำเร็จ`);
+    } catch (err) {
+      console.error("[MerchantDashboard] Failed to add new product to Firestore:", err);
+      toast.error(`เพิ่มเมนูอาหารไม่สำเร็จ: ${err?.message || err}`);
+    }
   };
 
   // Repeat customers, aggregated from this store's own orders. Derived rather than
@@ -493,44 +558,24 @@ function MerchantDashboard() {
 
     const merchantId = user.merchantId || `MCH-${user.uid.substring(0, 8)}`;
 
-    const publicStoreData = {
-      isMerchantRegistered: true,
-      role: "merchant",
-      isMerchantVerified: true,
-      merchantStoreName: storeName,
-      storeName,
-      phone: storePhone,
-      businessPhone: storePhone,
-      canteenLocation,
-      storeHours,
-      updatedAt: new Date().toISOString(),
+    const shopUpdateData = {
+      name: storeName,
+      location: canteenLocation,
+      contactPhone: storePhone,
+      hours: storeHours,
+      updatedAt: serverTimestamp(),
     };
 
     try {
-      // 1. users/{uid}
-      await setDoc(doc(db, "users", user.uid), publicStoreData, { merge: true });
+      // 1. Update permitted shop fields in shops/{targetStoreId}
+      await setDoc(doc(db, "shops", targetStoreId), shopUpdateData, { merge: true });
 
-      // 2. merchantProfiles/{merchantId}
-      await setDoc(doc(db, "merchantProfiles", merchantId), publicStoreData, { merge: true });
-
-      // 3. shops/{storeId}
-      await setDoc(doc(db, "shops", targetStoreId), publicStoreData, { merge: true });
-
-      // 4. Save private finance data under merchantProfiles/{merchantId}/private/finance
-      if (privateBankName || privateAccountNo || privateAccountOwner) {
-        await setDoc(
-          doc(db, "merchantProfiles", merchantId, "private", "finance"),
-          {
-            bankName: privateBankName,
-            accountNumber: privateAccountNo,
-            accountOwner: privateAccountOwner,
-            updatedAt: new Date().toISOString(),
-          },
-          { merge: true }
-        );
+      // 2. Update user phone if provided
+      if (storePhone) {
+        await setDoc(doc(db, "users", user.uid), { phone: storePhone, updatedAt: serverTimestamp() }, { merge: true });
       }
 
-      // 4. Audit Log
+      // 3. Audit Log
       await recordAuditLog(db, {
         action: "UPDATE_STORE_PROFILE",
         actorUid: user.uid,
@@ -540,6 +585,7 @@ function MerchantDashboard() {
       });
 
       setIsSavedProfile(true);
+      toast.success("บันทึกข้อมูลร้านค้าเรียบร้อย");
       setTimeout(() => setIsSavedProfile(false), 3000);
     } catch (err) {
       console.error("Save store profile error:", err);
@@ -594,9 +640,9 @@ function MerchantDashboard() {
           </p>
           <button
             className="btn btn-danger btn-lg rounded-pill px-4 fw-bold"
-            onClick={() => navigate("/portal/th-onboarding")}
+            onClick={() => navigate("/student-vendor/apply")}
           >
-            <i className="bi bi-plus-circle me-2" /> ลงทะเบียนเปิดร้านค้าใหม่
+            <i className="bi bi-plus-circle me-2" /> สมัครเปิดร้านค้าผู้ขายนักเรียน (Student Vendor)
           </button>
         </div>
       </div>
@@ -822,7 +868,7 @@ function MerchantDashboard() {
           <div className="merchant-panel-box">
             <h3 className="merchant-panel-title mb-4">
               <i className="bi bi-gear-wide-connected text-primary me-2" />
-              ตั้งค่าข้อมูลร้านค้า & ข้อมูลบัญชีรับเงินโอน
+              ตั้งค่าข้อมูลร้านค้า (Store Profile)
             </h3>
 
             <div className="row g-4">
@@ -863,41 +909,6 @@ function MerchantDashboard() {
                       className="form-control"
                       value={storeHours}
                       onChange={(e) => setStoreHours(e.target.value)}
-                    />
-                  </div>
-
-                  <hr className="my-3" />
-                  <h6 className="fw-bold mb-2 text-primary">
-                    <i className="bi bi-shield-lock-fill me-1" /> ข้อมูลบัญชีรับเงิน (Private Finance)
-                  </h6>
-                  <div className="mb-3">
-                    <label className="form-label font-weight-bold">ชื่อธนาคาร / บริการ:</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={privateBankName}
-                      onChange={(e) => setPrivateBankName(e.target.value)}
-                      placeholder="เช่น ธนาคารกสิกรไทย / พร้อมเพย์"
-                    />
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label font-weight-bold">เลขที่บัญชี / หมายเลขพร้อมเพย์:</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={privateAccountNo}
-                      onChange={(e) => setPrivateAccountNo(e.target.value)}
-                      placeholder="xxx-x-xxxxx-x"
-                    />
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label font-weight-bold">ชื่อเจ้าของบัญชี:</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={privateAccountOwner}
-                      onChange={(e) => setPrivateAccountOwner(e.target.value)}
-                      placeholder="ชื่อ-นามสกุล เจ้าของบัญชี"
                     />
                   </div>
 

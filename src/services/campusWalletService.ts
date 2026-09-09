@@ -1,11 +1,7 @@
 import {
-  doc,
-  getDoc,
   collection,
   query,
   where,
-  orderBy,
-  limit,
   getDocs,
   addDoc,
   serverTimestamp,
@@ -13,148 +9,12 @@ import {
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../firebase/config.js';
 import type {
-  StudentWallet,
-  WalletTransaction,
   ParentChildLink,
   StudentProfile,
 } from '../types/campus';
 
-/** Current Bangkok calendar date as "YYYY-MM-DD" (matches the server's day boundary). */
-function getBangkokToday(): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Bangkok',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date());
-}
-
 /**
- * Today's spending, for display.
- *
- * The stored counter resets lazily — it is only rewritten on the next spend — so a
- * wallet last used yesterday still holds yesterday's total. Reading it raw would
- * report stale spending as today's. Presentation only; the Cloud Function remains
- * the authority on whether a limit is actually breached.
- */
-export function getSpentTodaySatang(wallet: StudentWallet | null | undefined): number {
-  if (!wallet || wallet.lastSpentDate !== getBangkokToday()) return 0;
-  return Math.max(0, Number(wallet.spentTodaySatang) || 0);
-}
-
-/**
- * Fetch Student Wallet balance and spending limits
- */
-export async function fetchStudentWallet(studentId: string): Promise<StudentWallet | null> {
-  try {
-    const walletDoc = await getDoc(doc(db, 'wallets', studentId));
-    if (!walletDoc.exists()) {
-      return null;
-    }
-    return walletDoc.data() as StudentWallet;
-  } catch (err) {
-    console.error('[fetchStudentWallet] Error:', err);
-    throw err;
-  }
-}
-
-/**
- * Fetch Student Wallet Transactions history
- */
-export async function fetchWalletTransactions(
-  studentId: string,
-  limitCount = 30
-): Promise<WalletTransaction[]> {
-  try {
-    const q = query(
-      collection(db, 'wallet_transactions'),
-      where('studentId', '==', studentId),
-      orderBy('timestamp', 'desc'),
-      limit(limitCount)
-    );
-    const snap = await getDocs(q);
-    return snap.docs.map((d) => ({
-      id: d.id,
-      ...d.data(),
-    })) as WalletTransaction[];
-  } catch (err) {
-    console.error('[fetchWalletTransactions] Error:', err);
-    // Fallback if index is building or unordered query
-    try {
-      const qFallback = query(
-        collection(db, 'wallet_transactions'),
-        where('studentId', '==', studentId),
-        limit(limitCount)
-      );
-      const snap = await getDocs(qFallback);
-      return snap.docs.map((d) => ({
-        id: d.id,
-        ...d.data(),
-      })) as WalletTransaction[];
-    } catch (fallbackErr) {
-      console.error('[fetchWalletTransactions] Fallback failed:', fallbackErr);
-      return [];
-    }
-  }
-}
-
-/**
- * Top up student wallet balance via Cloud Function
- */
-export async function topupCampusWallet(
-  studentId: string,
-  amountSatang: number,
-  note?: string,
-  paymentMethod = 'PROMPTPAY'
-): Promise<{ success: boolean; newBalanceSatang: number; newBalanceBaht: number }> {
-  const callable = httpsCallable<
-    { studentId: string; amountSatang: number; note?: string; paymentMethod?: string },
-    { success: boolean; newBalanceSatang: number; newBalanceBaht: number }
-  >(functions, 'topupCampusWallet');
-
-  const res = await callable({
-    studentId,
-    amountSatang,
-    note,
-    paymentMethod,
-  });
-
-  return res.data;
-}
-
-/**
- * Update spending limits & restricted categories
- */
-export async function updateCampusWalletLimits(
-  studentId: string,
-  limits: {
-    dailyLimitSatang?: number;
-    weeklyLimitSatang?: number;
-    blockedCategories?: string[];
-    isLocked?: boolean;
-  }
-): Promise<{ success: boolean }> {
-  const callable = httpsCallable<
-    {
-      studentId: string;
-      dailyLimitSatang?: number;
-      weeklyLimitSatang?: number;
-      blockedCategories?: string[];
-      isLocked?: boolean;
-    },
-    { success: boolean; message: string }
-  >(functions, 'updateCampusWalletLimits');
-
-  const res = await callable({
-    studentId,
-    ...limits,
-  });
-
-  return res.data;
-}
-
-/**
- * Fetch Linked Children for Guardian
+ * 👪 Fetch Linked Children for Guardian
  */
 export async function fetchParentChildLinks(guardianId: string): Promise<ParentChildLink[]> {
   try {
@@ -174,7 +34,7 @@ export async function fetchParentChildLinks(guardianId: string): Promise<ParentC
 }
 
 /**
- * Request to link a new student to guardian
+ * 👪 Request to link a new student to guardian
  */
 export async function createParentChildLink(
   guardianId: string,
@@ -199,12 +59,10 @@ export async function createParentChildLink(
 }
 
 /**
- * Review a guardian ↔ student link (Staff Supervisor / Admin).
+ * 🔒 Review a guardian ↔ student link (Staff Supervisor / Admin).
  *
  * Verifying is what actually grants a guardian access: the Cloud Function writes
- * guardianIds onto the student and wallet documents, which is the field
- * firestore.rules reads. A PENDING link proves nothing on its own — anyone signed in
- * can create one claiming to be a guardian.
+ * guardianIds onto the student document, which is the field firestore.rules reads.
  */
 export async function reviewParentChildLink(
   linkId: string,
@@ -221,7 +79,7 @@ export async function reviewParentChildLink(
 }
 
 /**
- * Submit Vendor Approval Application for Student
+ * 🏪 Submit Vendor Approval Application for Student
  */
 export async function submitVendorApproval(payload: {
   studentName: string;
@@ -243,7 +101,7 @@ export async function submitVendorApproval(payload: {
 }
 
 /**
- * Review Vendor Approval Application (Staff / Admin)
+ * 🔒 Review Vendor Approval Application (Staff / Admin)
  */
 export async function reviewVendorApproval(
   approvalId: string,
@@ -284,12 +142,7 @@ export interface EmergencyLookupResult {
 }
 
 /**
- * Emergency Medical & Allergy Lookup with Immutable Audit Logging.
- *
- * 🔒 The profile read and the audit write both happen inside the Cloud Function, so
- * the access cannot be made without leaving a record. This previously logged from the
- * client with a warn-only catch and then read `students/{id}` directly, which meant
- * dropping the log request was enough to read a child's health data untraced.
+ * 🚨 Emergency Medical & Allergy Lookup with Immutable Audit Logging.
  *
  * @param studentQuery - the student's uid, or the studentCode printed on their card
  */

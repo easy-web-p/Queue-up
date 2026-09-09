@@ -2,7 +2,7 @@ import { lazy, Suspense } from "react";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { PreferencesProvider } from "./context/PreferencesContext.jsx";
 import { ToastProvider } from "./components/ToastProvider.jsx";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import PageRouteLoader, { PageRouteLoaderView } from "./components/PageRouteLoader.jsx";
 import CookieConsentBanner from "./components/CookieConsentBanner.jsx";
@@ -25,7 +25,6 @@ const UserProfile = lazy(() => import("./pages/UserProfile.jsx"));
 const Queueup = lazy(() => import("./pages/Queueup.jsx"));
 const UserPurchase = lazy(() => import("./pages/UserPurchase.jsx"));
 const MerchantDashboard = lazy(() => import("./pages/MerchantDashboard.jsx"));
-const MerchantOnboarding = lazy(() => import("./pages/MerchantOnboarding.jsx"));
 const PdpaPolicy = lazy(() => import("./pages/PdpaPolicy.jsx"));
 const StoreAdminPage = lazy(() => import("./pages/StoreAdminPage.tsx"));
 const FoodBooking = lazy(() => import("./pages/FoodBooking.tsx"));
@@ -34,7 +33,6 @@ const StudentVendorEarnings = lazy(() => import("./pages/StudentVendorEarnings.t
 const VendorApprovalPanel = lazy(() => import("./pages/VendorApprovalPanel.tsx"));
 const GuardianDashboard = lazy(() => import("./pages/GuardianDashboard.tsx"));
 const GuardianLinkApproval = lazy(() => import("./pages/GuardianLinkApproval.tsx"));
-const SpendingLimitSetting = lazy(() => import("./pages/SpendingLimitSetting.tsx"));
 const AllergyAlertSetting = lazy(() => import("./pages/AllergyAlertSetting.tsx"));
 const ChildOrderHistory = lazy(() => import("./pages/ChildOrderHistory.tsx"));
 const EmergencyLookup = lazy(() => import("./pages/EmergencyLookup.tsx"));
@@ -102,8 +100,8 @@ function App() {
 
             {/* Merchant Dashboard & Onboarding Routes */}
             <Route path="/merchant/dashboard" element={<ProtectedRoute allowedRoles={["merchant", "student_vendor", "admin"]}><MerchantDashboard /></ProtectedRoute>} />
-            <Route path="/portal/th-onboarding" element={<ProtectedRoute><MerchantOnboarding /></ProtectedRoute>} />
-            <Route path="/portal/onboarding" element={<ProtectedRoute><MerchantOnboarding /></ProtectedRoute>} />
+            <Route path="/portal/th-onboarding" element={<Navigate to="/student-vendor/apply" replace />} />
+            <Route path="/portal/onboarding" element={<Navigate to="/student-vendor/apply" replace />} />
 
             {/* QueueUp for Campus Routes */}
             <Route path="/campus/onboarding" element={<ProtectedRoute><StudentVendorOnboarding /></ProtectedRoute>} />
@@ -119,8 +117,8 @@ function App() {
             <Route path="/student-vendor/earnings" element={<ProtectedRoute allowedRoles={["student_vendor", "merchant", "admin"]}><StudentVendorEarnings /></ProtectedRoute>} />
             <Route path="/guardian" element={<ProtectedRoute><GuardianDashboard /></ProtectedRoute>} />
             <Route path="/guardian/dashboard" element={<ProtectedRoute><GuardianDashboard /></ProtectedRoute>} />
-            <Route path="/guardian/spending-limits" element={<ProtectedRoute><SpendingLimitSetting /></ProtectedRoute>} />
-            <Route path="/guardian/limits" element={<ProtectedRoute><SpendingLimitSetting /></ProtectedRoute>} />
+            <Route path="/guardian/spending-limits" element={<Navigate to="/guardian" replace />} />
+            <Route path="/guardian/limits" element={<Navigate to="/guardian" replace />} />
             <Route path="/guardian/allergy-alert" element={<ProtectedRoute><AllergyAlertSetting /></ProtectedRoute>} />
             <Route path="/guardian/allergies" element={<ProtectedRoute><AllergyAlertSetting /></ProtectedRoute>} />
             <Route path="/guardian/order-history" element={<ProtectedRoute><ChildOrderHistory /></ProtectedRoute>} />

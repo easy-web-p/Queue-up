@@ -172,7 +172,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
       dispatch(switchRole("merchant"));
       navigate("/merchant/dashboard");
     } else {
-      navigate("/portal/th-onboarding");
+      navigate("/student-vendor/apply");
     }
   };
 

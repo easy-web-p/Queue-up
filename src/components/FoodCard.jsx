@@ -14,12 +14,12 @@ function FoodCard({
     originalPrice,
     image,
     categoryLabel,
-    shopName = "ร้านป้าแดง ตามสั่ง",
-    shopLogo = "/logo.png",
-    shopLocation = "โรงอาหาร 1 (อาคารเรียน 2)",
-    rating = 4.9,
-    salesCount = "1.2k ขายแล้ว",
-    promoTag = "ลด 45%",
+    shopName = item?.storeName || item?.shopName || "ร้านค้าโรงเรียน",
+    shopLogo = item?.storeLogo || item?.shopLogo || "/logo.png",
+    shopLocation = item?.storeLocation || item?.location || item?.canteenLocation || "โรงอาหาร QueueUp",
+    rating = item?.rating || null,
+    salesCount = item?.salesCount || null,
+    promoTag = item?.promoTag || null,
   } = item || {};
 
   const foodTitle = name || title || "เมนูอาหารน่าทาน";
@@ -100,11 +100,15 @@ function FoodCard({
 
         {/* Rating & Sales Stats */}
         <div className="shopee-food-meta-row flex items-center justify-between text-xs text-slate-400 mb-2">
-          <div className="shopee-food-rating flex items-center gap-1 text-amber-500 font-bold">
-            <i className="bi bi-star-fill text-xs" />
-            <span>{rating}</span>
-          </div>
-          <span>{salesCount}</span>
+          {rating ? (
+            <div className="shopee-food-rating flex items-center gap-1 text-amber-500 font-bold">
+              <i className="bi bi-star-fill text-xs" />
+              <span>{rating}</span>
+            </div>
+          ) : (
+            <span className="text-[11px] text-slate-400">เมนูแนะนำ</span>
+          )}
+          {salesCount ? <span>{salesCount}</span> : null}
         </div>
 
         {/* Price Box */}

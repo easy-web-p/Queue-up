@@ -2,49 +2,49 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
   fetchParentChildLinks,
-  fetchStudentWallet,
-  fetchWalletTransactions,
-  updateCampusWalletLimits,
-  topupCampusWallet,
   createParentChildLink,
-  getSpentTodaySatang,
 } from '../services/campusWalletService';
 import {
-  Wallet,
   Shield,
-  CreditCard,
-  Lock,
-  Unlock,
   History,
   Plus,
   ArrowLeft,
   User,
   HeartPulse,
   Save,
-  Sliders,
+  Utensils,
+  Ban,
+  Clock,
+  ChevronRight,
 } from 'lucide-react';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { db } from '../firebase/config.js';
 import { Link } from 'react-router-dom';
-import type { ParentChildLink, StudentWallet, WalletTransaction, StudentProfile } from '../types/campus';
+import type { ParentChildLink, StudentProfile } from '../types/campus';
 import { useToast } from '../components/ToastProvider.jsx';
+
+interface RecentOrder {
+  id: string;
+  queueNumber: string;
+  storeName?: string;
+  pickupTime: string;
+  status: string;
+  items: Array<{ name: string; quantity: number }>;
+  createdAt?: any;
+}
 
 export default function GuardianDashboard() {
   const toast = useToast();
   const { user, currentUser } = useAuth();
   const [children, setChildren] = useState<ParentChildLink[]>([]);
   const [selectedChild, setSelectedChild] = useState<ParentChildLink | null>(null);
-  const [wallet, setWallet] = useState<StudentWallet | null>(null);
-  const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
+  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Limit Settings state
-  const [dailyLimitBaht, setDailyLimitBaht] = useState(200);
-  const [weeklyLimitBaht, setWeeklyLimitBaht] = useState(1000);
+  // Food Restriction state
   const [blockedCategories, setBlockedCategories] = useState<string[]>([]);
-  const [isLocked, setIsLocked] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<string | null>(null);
+  const [isSavingPreferences, setIsSavingPreferences] = useState(false);
+  const [preferenceSaveStatus, setPreferenceSaveStatus] = useState<string | null>(null);
 
   // Allergy & Health Notes State
   const [allergies, setAllergies] = useState<string[]>([]);
@@ -53,11 +53,6 @@ export default function GuardianDashboard() {
   const [isSavingHealth, setIsSavingHealth] = useState(false);
   const [healthSaveMessage, setHealthSaveMessage] = useState<string | null>(null);
 
-  // Top-up Modal State
-  const [isTopupOpen, setIsTopupOpen] = useState(false);
-  const [topupAmountBaht, setTopupAmountBaht] = useState(100);
-  const [isTopupProcessing, setIsTopupProcessing] = useState(false);
-
   // Link Child Modal State
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [newStudentId, setNewStudentId] = useState('');
@@ -65,7 +60,11 @@ export default function GuardianDashboard() {
   const [relationship, setRelationship] = useState<'FATHER' | 'MOTHER' | 'GUARDIAN'>('GUARDIAN');
 
   const categoryOptions = [
-    'Sugary Drinks', 'Fast Food', 'Snacks', 'Spicy Food', 'Dessert & Bakery', 'Energy Drinks'
+    'เครื่องดื่มหวาน / น้ำอัดลม (Sugary Drinks)',
+    'อาหารฟาสต์ฟู้ด / ของทอด (Fast Food)',
+    'ขนมขบเคี้ยว / เบเกอรี่ (Snacks & Bakery)',
+    'อาหารรสจัด / เผ็ดมาก (Spicy Food)',
+    'เครื่องดื่มคาเฟอีน (Caffeine / Energy Drinks)',
   ];
 
   const commonAllergenPresets = [
@@ -74,7 +73,7 @@ export default function GuardianDashboard() {
     'นมวัว / แลคโตส (Dairy)',
     'แป้งสาลี / กลูเตน (Gluten)',
     'ไข่ไก่ (Eggs)',
-    'ถั่วเหลือง (Soy)'
+    'ถั่วเหลือง (Soy)',
   ];
 
   const uid = currentUser?.uid || user?.uid;
@@ -100,63 +99,77 @@ export default function GuardianDashboard() {
 
   useEffect(() => {
     if (!selectedChild) {
-      // Clearing data that belonged to a child who is no longer selected. The rule
-      // targets state that should have been derived; here the alternative is to keep
-      // showing a previous child's wallet until the next fetch resolves.
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setWallet(null);
-      setTransactions([]);
+      setRecentOrders([]);
       return;
     }
 
-    async function loadChildWalletAndProfile() {
+    async function loadChildProfileAndOrders() {
       try {
-        const w = await fetchStudentWallet(selectedChild.studentId);
-        setWallet(w);
-        if (w) {
-          setDailyLimitBaht((w.dailyLimitSatang || 20000) / 100);
-          setWeeklyLimitBaht((w.weeklyLimitSatang || 100000) / 100);
-          setBlockedCategories(w.blockedCategories || []);
-          setIsLocked(w.isLocked || false);
-        }
-        const txs = await fetchWalletTransactions(selectedChild.studentId);
-        setTransactions(txs);
-
-        // Load student medical profile
+        // Load student medical profile & preferences
         const stuSnap = await getDoc(doc(db, 'students', selectedChild.studentId));
         if (stuSnap.exists()) {
-          const sData = stuSnap.data() as StudentProfile;
+          const sData = stuSnap.data() as StudentProfile & { blockedCategories?: string[] };
           setAllergies(sData.allergyInfo || []);
           setHealthNotes(sData.healthNotes || '');
+          setBlockedCategories(sData.blockedCategories || []);
         } else {
           setAllergies([]);
           setHealthNotes('');
+          setBlockedCategories([]);
+        }
+
+        // Load recent food orders for this student
+        try {
+          const q = query(
+            collection(db, 'orders'),
+            where('studentId', '==', selectedChild.studentId),
+            limit(10)
+          );
+          const snap = await getDocs(q);
+          const ords = snap.docs.map((d) => ({
+            id: d.id,
+            ...d.data(),
+          })) as RecentOrder[];
+
+          ords.sort((a, b) => {
+            const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+            const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+            return timeB - timeA;
+          });
+
+          setRecentOrders(ords);
+        } catch (ordErr) {
+          console.warn('[GuardianDashboard] Orders query notice:', ordErr);
         }
       } catch (err) {
-        console.error('[GuardianDashboard] Error loading student data:', err);
+        console.error('[GuardianDashboard] Error loading student profile:', err);
       }
     }
-    loadChildWalletAndProfile();
+    loadChildProfileAndOrders();
   }, [selectedChild]);
 
-  const handleSaveLimits = async () => {
+  const handleSavePreferences = async () => {
     if (!selectedChild) return;
-    setIsSaving(true);
-    setSaveStatus(null);
+    setIsSavingPreferences(true);
+    setPreferenceSaveStatus(null);
     try {
-      await updateCampusWalletLimits(selectedChild.studentId, {
-        dailyLimitSatang: Math.round(dailyLimitBaht * 100),
-        weeklyLimitSatang: Math.round(weeklyLimitBaht * 100),
-        blockedCategories,
-        isLocked,
-      });
-      setSaveStatus('บันทึกการตั้งค่าวงเงินและหมวดหมู่ที่จำกัดสำเร็จ');
-      const w = await fetchStudentWallet(selectedChild.studentId);
-      setWallet(w);
+      const studentRef = doc(db, 'students', selectedChild.studentId);
+      await setDoc(
+        studentRef,
+        {
+          blockedCategories,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+      setPreferenceSaveStatus('บันทึกการจำกัดหมวดหมู่อาหารสำเร็จ');
+      toast.success('บันทึกการจำกัดหมวดหมู่อาหารเรียบร้อย');
     } catch (err: any) {
-      setSaveStatus('เกิดข้อผิดพลาดในการบันทึก: ' + (err.message || 'Unknown'));
+      setPreferenceSaveStatus('เกิดข้อผิดพลาดในการบันทึก: ' + (err.message || 'Unknown'));
+      toast.error('บันทึกไม่สำเร็จ: ' + (err.message || 'Unknown'));
     } finally {
-      setIsSaving(false);
+      setIsSavingPreferences(false);
     }
   };
 
@@ -178,9 +191,11 @@ export default function GuardianDashboard() {
         },
         { merge: true }
       );
-      setHealthSaveMessage('บันทึกข้อมูลภูมิแพ้และสุขภาพสำเร็จ พร้อมเชื่อมโยงกับระบบแจ้งเตือนและระบบฉุกเฉิน');
+      setHealthSaveMessage('บันทึกข้อมูลภูมิแพ้และสุขภาพสำเร็จ ข้อมูลเชื่อมโยงกับระบบแจ้งเตือนเมนูอาหารและห้องพยาบาล');
+      toast.success('บันทึกข้อมูลภูมิแพ้สำเร็จ');
     } catch (err: any) {
       setHealthSaveMessage('เกิดข้อผิดพลาด: ' + (err.message || 'Unknown'));
+      toast.error('บันทึกไม่สำเร็จ: ' + (err.message || 'Unknown'));
     } finally {
       setIsSavingHealth(false);
     }
@@ -203,23 +218,6 @@ export default function GuardianDashboard() {
     setNewAllergyInput('');
   };
 
-  const handleTopup = async () => {
-    if (!selectedChild || topupAmountBaht <= 0) return;
-    setIsTopupProcessing(true);
-    try {
-      await topupCampusWallet(selectedChild.studentId, Math.round(topupAmountBaht * 100));
-      setIsTopupOpen(false);
-      const w = await fetchStudentWallet(selectedChild.studentId);
-      setWallet(w);
-      const txs = await fetchWalletTransactions(selectedChild.studentId);
-      setTransactions(txs);
-    } catch (err: any) {
-      toast.error('เติมเงินไม่สำเร็จ: ' + (err.message || 'Unknown'));
-    } finally {
-      setIsTopupProcessing(false);
-    }
-  };
-
   const handleLinkChild = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!uid || !newStudentId.trim() || !newStudentName.trim()) return;
@@ -234,6 +232,7 @@ export default function GuardianDashboard() {
       setIsLinkModalOpen(false);
       setNewStudentId('');
       setNewStudentName('');
+      toast.success('ส่งคำขอผูกบัญชีนักเรียนเรียบร้อย');
       const links = await fetchParentChildLinks(uid);
       setChildren(links);
       if (links.length === 1) setSelectedChild(links[0]);
@@ -250,15 +249,34 @@ export default function GuardianDashboard() {
     }
   };
 
+  const getOrderStatusText = (status: string) => {
+    switch (status) {
+      case 'READY':
+      case 'READY_FOR_PICKUP':
+        return { text: 'พร้อมรับอาหาร', className: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-500/30' };
+      case 'PREPARING':
+        return { text: 'กำลังปรุงอาหาร', className: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-500/30' };
+      case 'CONFIRMED':
+        return { text: 'รับออเดอร์แล้ว', className: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-500/30' };
+      case 'COMPLETED':
+        return { text: 'รับอาหารแล้ว', className: 'bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10' };
+      case 'CANCELLED':
+        return { text: 'ยกเลิกแล้ว', className: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 border-red-300 dark:border-red-500/30' };
+      default:
+        return { text: 'รอดำเนินการ', className: 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-500/30' };
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-[#16100C] text-slate-800 dark:text-slate-100 font-['IBM_Plex_Sans_Thai'] pb-20 transition-colors">
-        {isLoading && (
-          <div className="max-w-4xl mx-auto px-4 pt-4">
-            <div className="bg-white/80 dark:bg-[#241C16]/80 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-xs font-bold text-slate-500 dark:text-[#9CA3AF] animate-pulse">
-              กำลังโหลดข้อมูล...
-            </div>
+      {isLoading && (
+        <div className="max-w-4xl mx-auto px-4 pt-4">
+          <div className="bg-white/80 dark:bg-[#241C16]/80 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-xs font-bold text-slate-500 dark:text-[#9CA3AF] animate-pulse">
+            กำลังโหลดข้อมูลการดูแลบุตรหลาน...
           </div>
-        )}
+        </div>
+      )}
+
       {/* Header */}
       <header className="sticky top-0 z-30 bg-white/95 dark:bg-[#241C16]/95 backdrop-blur border-b border-slate-200 dark:border-[#FF7A1A]/20 px-6 py-4 flex items-center justify-between shadow-xs">
         <div className="flex items-center space-x-3">
@@ -272,10 +290,10 @@ export default function GuardianDashboard() {
           <div>
             <h1 className="text-xl font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
               <Shield className="w-5 h-5 text-[#FF7A1A]" />
-              แดชบอร์ดผู้ปกครอง (Guardian Oversight & Campus Wallet)
+              ศูนย์ดูแลบุตรหลานและสุขภาพ (Guardian Health & Food Oversight)
             </h1>
             <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">
-              ติดตามการใช้จ่าย กำหนดวงเงินรายวัน บล็อกอาหารไม่พึงประสงค์ และบันทึกข้อมูลแพ้อาหาร
+              ติดตามคิวอาหาร จัดการข้อมูลสารก่อภูมิแพ้ และกำหนดข้อจำกัดโภชนาการสำหรับนักเรียน
             </p>
           </div>
         </div>
@@ -311,219 +329,101 @@ export default function GuardianDashboard() {
 
         {selectedChild ? (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Column 1 & 2: Wallet Overview & Controls */}
+            {/* Column 1 & 2: Health Profile & Nutrition Restrictions */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Wallet Card */}
+              {/* Profile Card Banner */}
               <div className="bg-gradient-to-br from-orange-50/80 via-white to-amber-50/80 dark:from-[#2D1B10] dark:via-[#241C16] dark:to-[#1A120D] border border-orange-200 dark:border-[#FF7A1A]/30 rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
-                  <Wallet className="w-48 h-48 text-[#FF7A1A]" />
+                  <Shield className="w-48 h-48 text-[#FF7A1A]" />
                 </div>
 
                 <div className="flex items-start justify-between flex-wrap gap-3">
                   <div>
                     <span className="text-xs font-bold uppercase text-[#FF7A1A] tracking-wider font-['JetBrains_Mono']">
-                      Campus Digital Wallet
+                      Student Health Profile
                     </span>
                     <h2 className="text-2xl font-bold font-['Kanit'] text-slate-900 dark:text-white mt-1">
                       {selectedChild.studentName}
                     </h2>
                     <p className="text-xs text-slate-500 dark:text-[#9CA3AF] font-['JetBrains_Mono']">
-                      Student ID: {selectedChild.studentId}
+                      รหัสนักเรียน: {selectedChild.studentId}
                     </p>
                   </div>
-                  <button
-                    onClick={() => setIsLocked(!isLocked)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 border transition-colors cursor-pointer ${
-                      isLocked
-                        ? 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-400 border-red-300 dark:border-red-500/40'
-                        : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-400 border-emerald-300 dark:border-emerald-500/40'
-                    }`}
-                  >
-                    {isLocked ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
-                    {isLocked ? 'กระเป๋าเงินถูกล็อค' : 'กระเป๋าเงินพร้อมใช้งาน'}
-                  </button>
-                </div>
-
-                <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="bg-white/90 dark:bg-[#16100C]/70 backdrop-blur p-4 rounded-2xl border border-slate-200 dark:border-white/10 shadow-xs">
-                    <span className="text-xs text-slate-500 dark:text-[#9CA3AF]">ยอดเงินคงเหลือ</span>
-                    <p className="text-2xl font-bold font-['JetBrains_Mono'] text-slate-900 dark:text-white mt-1">
-                      {((wallet?.balanceSatang || 0) / 100).toFixed(2)} <span className="text-sm font-normal text-[#FF7A1A]">฿</span>
-                    </p>
-                  </div>
-                  <div className="bg-white/90 dark:bg-[#16100C]/70 backdrop-blur p-4 rounded-2xl border border-slate-200 dark:border-white/10 shadow-xs">
-                    <span className="text-xs text-slate-500 dark:text-[#9CA3AF]">ใช้ไปแล้ววันนี้</span>
-                    <p className="text-xl font-bold font-['JetBrains_Mono'] text-amber-600 dark:text-amber-400 mt-1">
-                      {(getSpentTodaySatang(wallet) / 100).toFixed(2)} <span className="text-sm font-normal text-slate-400 dark:text-[#9CA3AF]">฿</span>
-                    </p>
-                  </div>
-                  <div className="bg-white/90 dark:bg-[#16100C]/70 backdrop-blur p-4 rounded-2xl border border-slate-200 dark:border-white/10 shadow-xs">
-                    <span className="text-xs text-slate-500 dark:text-[#9CA3AF]">วงเงินสูงสุดต่อวัน</span>
-                    <p className="text-xl font-bold font-['JetBrains_Mono'] text-slate-800 dark:text-[#E5E7EB] mt-1">
-                      {dailyLimitBaht} <span className="text-sm font-normal text-slate-400 dark:text-[#9CA3AF]">฿</span>
-                    </p>
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 py-1 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40 rounded-full text-xs font-bold flex items-center gap-1">
+                      <Shield className="w-3.5 h-3.5" /> ระบบดูแลความปลอดภัยเปิดใช้งาน
+                    </span>
                   </div>
                 </div>
 
-                <div className="mt-6 flex gap-3">
-                  <button
-                    onClick={() => setIsTopupOpen(true)}
-                    className="px-5 py-3 bg-[#FF7A1A] hover:bg-[#E6680D] text-white font-bold font-['Kanit'] text-sm rounded-xl shadow-lg shadow-orange-500/20 flex items-center gap-2 transition-all cursor-pointer"
-                  >
-                    <CreditCard className="w-4 h-4" /> เติมเงินให้บุตรหลาน
-                  </button>
+                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="bg-white/90 dark:bg-[#16100C]/70 backdrop-blur p-4 rounded-2xl border border-slate-200 dark:border-white/10 shadow-xs">
+                    <span className="text-xs text-slate-500 dark:text-[#9CA3AF]">รายการสารก่อภูมิแพ้ที่บันทึกไว้</span>
+                    <p className="text-xl font-bold font-['Kanit'] text-red-600 dark:text-red-400 mt-1">
+                      {allergies.length > 0 ? `${allergies.length} รายการ` : 'ไม่มีประวัติแพ้'}
+                    </p>
+                  </div>
+                  <div className="bg-white/90 dark:bg-[#16100C]/70 backdrop-blur p-4 rounded-2xl border border-slate-200 dark:border-white/10 shadow-xs">
+                    <span className="text-xs text-slate-500 dark:text-[#9CA3AF]">หมวดหมู่อาหารที่จำกัด</span>
+                    <p className="text-xl font-bold font-['Kanit'] text-amber-600 dark:text-amber-400 mt-1">
+                      {blockedCategories.length > 0 ? `${blockedCategories.length} หมวดหมู่` : 'ไม่มีการจำกัด'}
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              {/* Single Responsibility Core Navigation Hub */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <Link
-                  to="/guardian/limits"
-                  className="bg-white dark:bg-[#1C1510] border border-slate-200 dark:border-white/10 hover:border-[#FF7A1A]/50 p-5 rounded-2xl transition-all group shadow-sm flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="w-10 h-10 rounded-xl bg-orange-100 dark:bg-[#FF7A1A]/10 text-[#FF7A1A] flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                      <Sliders className="w-5 h-5" />
-                    </div>
-                    <h4 className="text-base font-bold font-['Kanit'] text-slate-900 dark:text-white group-hover:text-[#FF7A1A] transition-colors">
-                      ตั้งค่าวงเงิน & บล็อกหมวด
-                    </h4>
-                    <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-1 line-clamp-2">
-                      กำหนดวงเงินรายวัน/สัปดาห์ และบล็อกอาหารต้องห้าม
-                    </p>
-                  </div>
-                  <span className="text-xs font-bold text-[#FF7A1A] mt-4 flex items-center gap-1">
-                    จัดการวงเงิน →
-                  </span>
-                </Link>
-
+              {/* Navigation Hub */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Link
                   to="/guardian/allergies"
-                  className="bg-white dark:bg-[#1C1510] border border-slate-200 dark:border-white/10 hover:border-red-500/50 p-5 rounded-2xl transition-all group shadow-sm flex flex-col justify-between"
+                  className="bg-white dark:bg-[#1C1510] border border-slate-200 dark:border-white/10 hover:border-red-500/50 p-5 rounded-2xl transition-all group shadow-xs flex flex-col justify-between"
                 >
                   <div>
                     <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-500/10 text-red-500 dark:text-red-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                       <HeartPulse className="w-5 h-5" />
                     </div>
                     <h4 className="text-base font-bold font-['Kanit'] text-slate-900 dark:text-white group-hover:text-red-500 transition-colors">
-                      ข้อมูลแพ้อาหาร & สุขภาพ
+                      จัดการข้อมูลภูมิแพ้ละเอียด
                     </h4>
-                    <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-1 line-clamp-2">
+                    <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-1">
                       บันทึกรายการสารก่อภูมิแพ้และคำแนะนำสำหรับห้องพยาบาล
                     </p>
                   </div>
                   <span className="text-xs font-bold text-red-500 dark:text-red-400 mt-4 flex items-center gap-1">
-                    จัดการข้อมูลแพ้ →
+                    เปิดหน้าจัดการภูมิแพ้ <ChevronRight className="w-3.5 h-3.5" />
                   </span>
                 </Link>
 
                 <Link
                   to="/guardian/history"
-                  className="bg-white dark:bg-[#1C1510] border border-slate-200 dark:border-white/10 hover:border-amber-400/50 p-5 rounded-2xl transition-all group shadow-sm flex flex-col justify-between"
+                  className="bg-white dark:bg-[#1C1510] border border-slate-200 dark:border-white/10 hover:border-amber-400/50 p-5 rounded-2xl transition-all group shadow-xs flex flex-col justify-between"
                 >
                   <div>
                     <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                       <History className="w-5 h-5" />
                     </div>
                     <h4 className="text-base font-bold font-['Kanit'] text-slate-900 dark:text-white group-hover:text-amber-500 transition-colors">
-                      ประวัติการกินย้อนหลัง
+                      ประวัติคิวอาหารของบุตรหลาน
                     </h4>
-                    <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-1 line-clamp-2">
-                      แสดงรายการอาหารที่บุตรหลานสั่งจริงแบบเรียลไทม์
+                    <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-1">
+                      ตรวจสอบรายการอาหารและสถานะคิวที่บุตรหลานสั่งทั้งหมด
                     </p>
                   </div>
                   <span className="text-xs font-bold text-amber-600 dark:text-amber-400 mt-4 flex items-center gap-1">
-                    ดูประวัติทั้งหมด →
+                    ดูประวัติทั้งหมด <ChevronRight className="w-3.5 h-3.5" />
                   </span>
                 </Link>
               </div>
 
-              {/* Spending Rules & Restrictions Form */}
-              <div className="bg-white dark:bg-[#241C16] border border-slate-200 dark:border-[#FF7A1A]/20 rounded-3xl p-6 sm:p-8 shadow-md space-y-6">
-                <div className="border-b border-slate-100 dark:border-white/10 pb-4">
-                  <h3 className="text-lg font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
-                    <Shield className="w-5 h-5 text-[#FF7A1A]" />
-                    กำหนดวงเงินและควบคุมพฤติกรรมการบริโภค
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">ระบบจะปฏิเสธการสั่งซื้อโดยอัตโนมัติหากเกินวงเงินหรืออยู่ในหมวดที่บล็อก</p>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">
-                      วงเงินการใช้จ่ายรายวัน (บาท/วัน)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={dailyLimitBaht}
-                      onChange={(e) => setDailyLimitBaht(Number(e.target.value))}
-                      className="w-full px-4 py-3 bg-slate-50 dark:bg-[#16100C] border border-slate-300 dark:border-[#FF7A1A]/30 rounded-xl text-slate-900 dark:text-white font-['JetBrains_Mono'] focus:outline-none focus:border-[#FF7A1A]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">
-                      วงเงินการใช้จ่ายรายสัปดาห์ (บาท/สัปดาห์)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={weeklyLimitBaht}
-                      onChange={(e) => setWeeklyLimitBaht(Number(e.target.value))}
-                      className="w-full px-4 py-3 bg-slate-50 dark:bg-[#16100C] border border-slate-300 dark:border-[#FF7A1A]/30 rounded-xl text-slate-900 dark:text-white font-['JetBrains_Mono'] focus:outline-none focus:border-[#FF7A1A]"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">
-                    บล็อกหมวดหมู่อาหารที่ไม่พึงประสงค์ (Blocked Food Categories)
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {categoryOptions.map((cat) => {
-                      const isBlocked = blockedCategories.includes(cat);
-                      return (
-                        <button
-                          key={cat}
-                          type="button"
-                          onClick={() => toggleBlockedCategory(cat)}
-                          className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                            isBlocked
-                              ? 'bg-red-50 dark:bg-red-950/60 border-red-300 dark:border-red-500/50 text-red-700 dark:text-red-300'
-                              : 'bg-slate-100 dark:bg-[#16100C] border-slate-200 dark:border-white/20 text-slate-700 dark:text-[#9CA3AF] hover:border-[#FF7A1A]/40'
-                          }`}
-                        >
-                          {isBlocked ? '🚫 ' : '+ '} {cat}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {saveStatus && (
-                  <div className="p-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-xs text-slate-800 dark:text-[#E5E7EB]">
-                    {saveStatus}
-                  </div>
-                )}
-
-                <button
-                  onClick={handleSaveLimits}
-                  disabled={isSaving}
-                  className="w-full py-3 bg-[#FF7A1A] hover:bg-[#E6680D] disabled:opacity-50 text-white font-bold font-['Kanit'] rounded-xl shadow-md shadow-orange-500/20 transition-all cursor-pointer"
-                >
-                  {isSaving ? 'กำลังบันทึก...' : 'บันทึกการตั้งค่าการควบคุม'}
-                </button>
-              </div>
-
-              {/* Allergy & Medical Notes Card */}
+              {/* Allergy & Health Notes Section */}
               <div className="bg-white dark:bg-[#241C16] border border-red-200 dark:border-red-500/30 rounded-3xl p-6 sm:p-8 shadow-md space-y-6">
                 <div className="border-b border-slate-100 dark:border-white/10 pb-4">
                   <h3 className="text-lg font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
                     <HeartPulse className="w-5 h-5 text-red-500" />
-                    ประวัติการแพ้อาหารและข้อมูลสุขภาพ (Allergy & Health Notes)
+                    ข้อมูลภูมิแพ้และข้อควรระวังสุขภาพ (Allergy & Health Guard)
                   </h3>
                   <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">
-                    ข้อมูลนี้จะแจ้งเตือนเมื่อนักเรียนเลือกเมนูอาหาร และเข้าถึงได้โดยพยาบาลโรงเรียนในกรณีฉุกเฉิน
+                    ระบบจะตรวจสอบเมนูอาหารที่สั่งโดยอัตโนมัติ และแจ้งเตือนหากมีส่วนผสมตรงกับสารก่อภูมิแพ้
                   </p>
                 </div>
 
@@ -556,7 +456,7 @@ export default function GuardianDashboard() {
                       type="text"
                       value={newAllergyInput}
                       onChange={(e) => setNewAllergyInput(e.target.value)}
-                      placeholder="เพิ่มสารก่อภูมิแพ้อื่นๆ (เช่น ผงชูรส, สีผสมอาหาร)"
+                      placeholder="เพิ่มสารก่อภูมิแพ้อื่นๆ (เช่น ผงชูรส, สีผสมอาหาร, เมล็ดงา)"
                       className="flex-1 px-4 py-2.5 bg-slate-50 dark:bg-[#16100C] border border-slate-300 dark:border-red-500/30 rounded-xl text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-red-500"
                     />
                     <button
@@ -576,7 +476,7 @@ export default function GuardianDashboard() {
                     rows={3}
                     value={healthNotes}
                     onChange={(e) => setHealthNotes(e.target.value)}
-                    placeholder="เช่น แพ้อาหารรุนแรงต้องพกยา EpiPen, ภาวะ G6PD ห้ามทานถั่วปากอ้า, โรคหอบหืด..."
+                    placeholder="เช่น ภาวะ G6PD ห้ามทานถั่วปากอ้า, มีอาการหอบหืด, แพ้อาหารรุนแรงพกยาฉุกเฉิน..."
                     className="w-full px-4 py-3 bg-slate-50 dark:bg-[#16100C] border border-slate-300 dark:border-white/20 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-xs focus:outline-none focus:border-red-500"
                   />
                 </div>
@@ -593,46 +493,112 @@ export default function GuardianDashboard() {
                   className="w-full py-3 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-bold font-['Kanit'] rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Save className="w-4 h-4" />
-                  {isSavingHealth ? 'กำลังบันทึก...' : 'บันทึกข้อมูลการแพ้อาหาร'}
+                  {isSavingHealth ? 'กำลังบันทึก...' : 'บันทึกข้อมูลสุขภาพ & ภูมิแพ้'}
+                </button>
+              </div>
+
+              {/* Food Category Restrictions Form */}
+              <div className="bg-white dark:bg-[#241C16] border border-slate-200 dark:border-[#FF7A1A]/20 rounded-3xl p-6 sm:p-8 shadow-md space-y-6">
+                <div className="border-b border-slate-100 dark:border-white/10 pb-4">
+                  <h3 className="text-lg font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
+                    <Ban className="w-5 h-5 text-[#FF7A1A]" />
+                    กำหนดหมวดหมู่อาหารที่ไม่พึงประสงค์ (Nutrition & Category Control)
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">
+                    เลือกหมวดหมู่ที่ต้องการให้ระบบแจ้งเตือนบุตรหลานเพื่อสุขภาพและโภชนาการที่ดี
+                  </p>
+                </div>
+
+                <div>
+                  <div className="flex flex-wrap gap-2">
+                    {categoryOptions.map((cat) => {
+                      const isBlocked = blockedCategories.includes(cat);
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => toggleBlockedCategory(cat)}
+                          className={`px-3.5 py-2.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                            isBlocked
+                              ? 'bg-amber-50 dark:bg-amber-950/60 border-amber-300 dark:border-amber-500/50 text-amber-700 dark:text-amber-300'
+                              : 'bg-slate-100 dark:bg-[#16100C] border-slate-200 dark:border-white/20 text-slate-700 dark:text-[#9CA3AF] hover:border-[#FF7A1A]/40'
+                          }`}
+                        >
+                          {isBlocked ? '🚫 ' : '+ '} {cat}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {preferenceSaveStatus && (
+                  <div className="p-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-xs text-slate-800 dark:text-[#E5E7EB]">
+                    {preferenceSaveStatus}
+                  </div>
+                )}
+
+                <button
+                  onClick={handleSavePreferences}
+                  disabled={isSavingPreferences}
+                  className="w-full py-3 bg-[#FF7A1A] hover:bg-[#E6680D] disabled:opacity-50 text-white font-bold font-['Kanit'] rounded-xl shadow-md shadow-orange-500/20 transition-all cursor-pointer"
+                >
+                  {isSavingPreferences ? 'กำลังบันทึก...' : 'บันทึกการจำกัดหมวดอาหาร'}
                 </button>
               </div>
             </div>
 
-            {/* Column 3: Transaction Feed */}
+            {/* Column 3: Recent Child Orders Queue Feed */}
             <div className="bg-white dark:bg-[#241C16] border border-slate-200 dark:border-[#FF7A1A]/20 rounded-3xl p-6 shadow-md flex flex-col h-full">
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/10 pb-4 mb-4">
                 <h3 className="text-base font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
-                  <History className="w-4 h-4 text-[#FF7A1A]" />
-                  ประวัติการใช้จ่ายล่าสุด
+                  <Utensils className="w-4 h-4 text-[#FF7A1A]" />
+                  คิวอาหารล่าสุดของบุตรหลาน
                 </h3>
               </div>
 
               <div className="space-y-3 flex-1 overflow-y-auto max-h-[600px] pr-1">
-                {transactions.length === 0 ? (
+                {recentOrders.length === 0 ? (
                   <div className="text-center py-12 text-slate-400 dark:text-[#9CA3AF] text-xs">
-                    ยังไม่มีรายการใช้จ่าย
+                    ยังไม่มีรายการสั่งอาหารล่าสุด
                   </div>
                 ) : (
-                  transactions.map((tx) => (
-                    <div
-                      key={tx.id}
-                      className="p-3 bg-slate-50 dark:bg-[#16100C] border border-slate-200 dark:border-white/5 rounded-2xl flex items-center justify-between"
-                    >
-                      <div>
-                        <p className="text-xs font-semibold text-slate-900 dark:text-white">
-                          {tx.storeName || tx.note || 'รายการใช้จ่าย'}
-                        </p>
-                        <span className="text-[10px] text-slate-500 dark:text-[#9CA3AF] font-['JetBrains_Mono']">
-                          {tx.type}
-                        </span>
+                  recentOrders.map((ord) => {
+                    const statusInfo = getOrderStatusText(ord.status);
+                    return (
+                      <div
+                        key={ord.id}
+                        className="p-3.5 bg-slate-50 dark:bg-[#16100C] border border-slate-200 dark:border-white/5 rounded-2xl flex flex-col gap-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-['JetBrains_Mono'] font-bold text-sm text-[#FF7A1A]">
+                            คิว {ord.queueNumber}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusInfo.className}`}>
+                            {statusInfo.text}
+                          </span>
+                        </div>
+
+                        <div>
+                          <p className="text-xs font-semibold text-slate-900 dark:text-white">
+                            {ord.storeName || 'ร้านอาหารในโรงเรียน'}
+                          </p>
+                          <div className="mt-1 space-y-0.5">
+                            {ord.items?.map((it, idx) => (
+                              <p key={idx} className="text-[11px] text-slate-600 dark:text-[#9CA3AF]">
+                                • {it.name} x{it.quantity}
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-200/50 dark:border-white/5 text-[10px] text-slate-400">
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" /> นัดรับ: {ord.pickupTime} น.
+                          </span>
+                        </div>
                       </div>
-                      <span className={`text-xs font-bold font-['JetBrains_Mono'] ${
-                        tx.type === 'TOPUP' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
-                      }`}>
-                        {tx.type === 'TOPUP' ? '+' : '-'}{(tx.amountSatang / 100).toFixed(2)} ฿
-                      </span>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -641,72 +607,13 @@ export default function GuardianDashboard() {
           <div className="p-12 text-center bg-white dark:bg-[#241C16] border border-slate-200 dark:border-[#FF7A1A]/20 rounded-3xl shadow-sm">
             <User className="w-12 h-12 text-slate-400 dark:text-[#9CA3AF] mx-auto mb-3 opacity-40" />
             <h3 className="text-lg font-bold font-['Kanit'] text-slate-800 dark:text-[#E5E7EB]">ยังไม่มีข้อมูลบุตรหลานที่ผูกไว้</h3>
-            <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-1 mb-4">กดปุ่มด้านล่างเพื่อผูกบัญชีนักเรียนเพื่อเริ่มต้นใช้งาน</p>
+            <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-1 mb-4">กดปุ่มด้านล่างเพื่อผูกบัญชีนักเรียนเพื่อเริ่มต้นใช้งานการดูแล</p>
             <button
               onClick={() => setIsLinkModalOpen(true)}
               className="px-4 py-2 bg-[#FF7A1A] hover:bg-[#E6680D] text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
             >
               ผูกบัญชีนักเรียน
             </button>
-          </div>
-        )}
-
-        {/* Top-up Modal */}
-        {isTopupOpen && (
-          <div className="fixed inset-0 z-50 bg-slate-900/70 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-[#241C16] border border-slate-200 dark:border-[#FF7A1A]/30 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
-              <h3 className="text-lg font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-[#FF7A1A]" />
-                เติมเงินเข้ากระเป๋าบุตรหลาน
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">
-                เติมเงินให้: <strong className="text-slate-900 dark:text-white">{selectedChild?.studentName}</strong>
-              </p>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700 dark:text-[#E5E7EB]">จำนวนเงิน (บาท)</label>
-                <div className="grid grid-cols-4 gap-2 mb-2">
-                  {[50, 100, 200, 500].map((amt) => (
-                    <button
-                      key={amt}
-                      type="button"
-                      onClick={() => setTopupAmountBaht(amt)}
-                      className={`py-2 rounded-xl text-xs font-bold font-['JetBrains_Mono'] cursor-pointer transition-colors ${
-                        topupAmountBaht === amt
-                          ? 'bg-[#FF7A1A] text-white shadow-xs'
-                          : 'bg-slate-100 dark:bg-[#16100C] text-slate-700 dark:text-[#E5E7EB] border border-slate-200 dark:border-white/10 hover:border-[#FF7A1A]/40'
-                      }`}
-                    >
-                      {amt} ฿
-                    </button>
-                  ))}
-                </div>
-                <input
-                  type="number"
-                  min="1"
-                  value={topupAmountBaht}
-                  onChange={(e) => setTopupAmountBaht(Number(e.target.value))}
-                  className="w-full px-4 py-3 bg-slate-50 dark:bg-[#16100C] border border-slate-300 dark:border-[#FF7A1A]/30 rounded-xl text-slate-900 dark:text-white font-['JetBrains_Mono'] text-sm focus:outline-none focus:border-[#FF7A1A]"
-                />
-              </div>
-
-              <div className="flex gap-2 justify-end pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsTopupOpen(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/20 text-slate-700 dark:text-white text-xs font-semibold rounded-xl cursor-pointer"
-                >
-                  ยกเลิก
-                </button>
-                <button
-                  type="button"
-                  disabled={isTopupProcessing}
-                  onClick={handleTopup}
-                  className="px-4 py-2 bg-[#FF7A1A] hover:bg-[#E6680D] text-white text-xs font-semibold rounded-xl cursor-pointer"
-                >
-                  {isTopupProcessing ? 'กำลังประมวลผล...' : 'ยืนยันการเติมเงิน'}
-                </button>
-              </div>
-            </div>
           </div>
         )}
 

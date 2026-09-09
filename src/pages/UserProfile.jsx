@@ -2,8 +2,9 @@ import { useState, useEffect, useMemo } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { setUser, clearUser } from "../store/authSlice.js";
-import { db, doc, setDoc, getDoc, deleteDoc } from "../firebase/config.js";
+import { db, doc, setDoc, getDoc, deleteDoc, functions } from "../firebase/config.js";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 import ShopeeSearchBar from "../components/ShopeeSearchBar.jsx";
 import ChatModal from "../components/ChatModal.jsx";
 import ClientQueueTicket from "../components/ClientQueueTicket.jsx";
@@ -266,6 +267,24 @@ function UserProfile() {
     }
   }, [user]);
 
+  const handleCancelCustomerOrder = async (orderId) => {
+    const confirmed = await toast.confirm({
+      title: "ยืนยันการยกเลิกคำสั่งซื้อ",
+      message: "คุณต้องการยกเลิกคำสั่งซื้อนี้ใช่หรือไม่? เมื่อยกเลิกแล้วโควตาคิวและสต็อกสินค้าจะถูกคืนกลับเข้าระบบ",
+      confirmLabel: "ยืนยันยกเลิกคิว",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+    try {
+      const cancelFn = httpsCallable(functions, "cancelOrderAuthoritative");
+      await cancelFn({ orderId, reason: "ลูกค้ายกเลิกคำสั่งซื้อผ่านหน้าประวัติการสั่งซื้อ" });
+      toast.success("ยกเลิกคำสั่งซื้อสำเร็จแล้ว");
+    } catch (err) {
+      console.error("Cancel order error:", err);
+      toast.error(`ไม่สามารถยกเลิกคำสั่งซื้อได้: ${err?.message || err}`);
+    }
+  };
+
   // Fetch Firestore Profile Data on Mount
   useEffect(() => {
     if (user && user.uid) {
@@ -292,8 +311,41 @@ function UserProfile() {
     }
   }, [user]);
 
+  // Client-side image compression to ensure avatar stays well under Firestore document limits
+  const compressImage = (file, maxDimension = 256, quality = 0.8) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          let width = img.width;
+          let height = img.height;
+          if (width > height) {
+            if (width > maxDimension) {
+              height = Math.round((height * maxDimension) / width);
+              width = maxDimension;
+            }
+          } else {
+            if (height > maxDimension) {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/webp", quality));
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
   // Handle Avatar Image File Upload & Auto-Save
-  const handleAvatarUpload = (e) => {
+  const handleAvatarUpload = async (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
 
@@ -308,9 +360,8 @@ function UserProfile() {
     }
 
     setAutoSaveStatus("saving");
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const newAvatarUrl = event.target.result;
+    try {
+      const newAvatarUrl = await compressImage(file, 256, 0.8);
       setAvatar(newAvatarUrl);
 
       const updatedUser = {
@@ -329,8 +380,10 @@ function UserProfile() {
             {
               photo: newAvatarUrl,
               photoURL: newAvatarUrl,
+              avatar: newAvatarUrl,
               fullName: fullName || user?.name || "",
               displayName: fullName || user?.displayName || "",
+              updatedAt: new Date().toISOString(),
             },
             { merge: true }
           );
@@ -350,9 +403,11 @@ function UserProfile() {
         setAutoSaveStatus("saved");
         setTimeout(() => setAutoSaveStatus(""), 2000);
       }, 300);
-    };
-
-    reader.readAsDataURL(file);
+    } catch (compressErr) {
+      console.error("Avatar compression error:", compressErr);
+      setAutoSaveStatus("");
+      toast.error("ไม่สามารถประมวลผลรูปภาพได้ กรุณาลองใหม่อีกครั้ง");
+    }
   };
 
   // Instant Auto-Save Field to Firestore, Redux, and LocalStorage
@@ -395,13 +450,15 @@ function UserProfile() {
       }
     }
 
+    // Preserve all existing user claims (roles, storeId, activeRole, etc.)
     dispatch(
       setUser({
+        ...(user || {}),
         uid: user ? user.uid : `user-${Date.now()}`,
         name: fieldKey === "fullName" ? value : (fullName || user?.name || "ผู้ใช้งาน"),
         displayName: fieldKey === "fullName" ? value : (fullName || user?.displayName || "ผู้ใช้งาน"),
         email: user?.email || email,
-        photo: fieldKey === "avatar" ? value : avatar,
+        photo: fieldKey === "avatar" ? value : (avatar || user?.photo),
       })
     );
 
@@ -1398,6 +1455,14 @@ function UserProfile() {
                             onClick={() => toast.info("กรุณาแสดงหน้าจอนี้ให้เจ้าหน้าที่เคาน์เตอร์เพื่อรับอาหาร")}
                           >
                             รับอาหารที่เคาน์เตอร์
+                          </button>
+                        )}
+                        {((order.status === "PENDING" || order.status === "CONFIRMED") && order.queueStatus === "waiting") && (
+                          <button
+                            className="btn btn-sm btn-outline-danger rounded-pill px-3 fw-bold"
+                            onClick={() => handleCancelCustomerOrder(order.id)}
+                          >
+                            ยกเลิกคิว
                           </button>
                         )}
                         <button

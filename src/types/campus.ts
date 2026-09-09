@@ -38,37 +38,6 @@ export interface ParentChildLink {
   revokedAt?: FirestoreTimestamp;
 }
 
-export interface StudentWallet {
-  studentId: string;
-  balanceSatang: number;
-  dailyLimitSatang: number;
-  weeklyLimitSatang: number;
-  spentTodaySatang: number;
-  spentThisWeekSatang: number;
-  // Period keys the counters above belong to. A counter whose key is not the current
-  // one has rolled over and reads as zero — see functions/walletLimits.js.
-  lastSpentDate: string; // YYYY-MM-DD
-  lastSpentWeek?: string; // ISO week, e.g. "2026-W37"
-  blockedCategories: string[];
-  guardianIds: string[];
-  isLocked: boolean;
-  updatedAt: FirestoreTimestamp;
-}
-
-export interface WalletTransaction {
-  id: string;
-  walletId: string;
-  studentId: string;
-  orderId?: string;
-  amountSatang: number;
-  type: 'TOPUP' | 'SPEND' | 'REFUND' | 'ADJUSTMENT';
-  category?: string;
-  storeId?: string;
-  storeName?: string;
-  actorUid: string;
-  note?: string;
-  timestamp: FirestoreTimestamp;
-}
 
 export interface VendorApprovalRequest {
   id: string;

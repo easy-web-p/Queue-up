@@ -102,13 +102,17 @@ service cloud.firestore {
         // rather than left for the reader to cope with.
         (!('allergens' in request.resource.data) || (request.resource.data.allergens is list && request.resource.data.allergens.size() <= 20));
       
-      // 🔒 Lock storeId: Store Owner cannot reassign products to other stores, and price must be positive
+      // 🔒 Lock storeId & Privileged Fields: Store Owner can only update authorized menu fields
       allow update: if isAuthenticated() && (
         isAdmin() || 
         (
           resource.data.storeId != null && 
           isStoreOwner(resource.data.storeId) &&
           request.resource.data.storeId == resource.data.storeId &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'name', 'description', 'price', 'priceSatang', 'stock',
+            'isAvailable', 'allergens', 'imageUrl', 'category', 'updatedAt'
+          ]) &&
           (!('price' in request.resource.data) || (isValidNumber(request.resource.data.price) && request.resource.data.price > 0)) &&
           (!('priceSatang' in request.resource.data) || (isValidNumber(request.resource.data.priceSatang) && request.resource.data.priceSatang > 0)) &&
           (!('stock' in request.resource.data) || (isValidNumber(request.resource.data.stock) && request.resource.data.stock >= 0)) &&
@@ -292,40 +296,17 @@ service cloud.firestore {
         isAdmin() ||
         isStaffSupervisor() ||
         resource.data.userId == request.auth.uid ||
+        (resource.data.guardianIds != null && request.auth.uid in resource.data.guardianIds) ||
         (resource.data.storeId != null && isStoreOwner(resource.data.storeId))
       );
 
-      // 🔒 Universal Server-Authoritative Order Creation:
-      // ALL Orders (PromptPay, Cash, Canteen Counter) MUST be created authoritatively by Cloud Functions.
-      // Direct client-side creation is blocked completely (Admin SDK on Cloud Functions bypasses rules).
+      // 🔒 100% Server-Authoritative Lifecycle:
+      // ALL Order mutations (creation, state progression, and cancellation) MUST be performed
+      // authoritatively via Cloud Functions (createOrderAuthoritative, updateOrderStatusAuthoritative,
+      // and cancelOrderAuthoritative). Direct client-side mutation is completely blocked.
       allow create: if false;
-
-      // 🔒 Restricted Update Keys & Synchronized State Transitions:
-      // Operational KDS status updates are restricted to Store Owner & Admin, and MUST strictly follow synchronized state transitions.
-      // Direct client mutation of paymentStatus / totalAmount is blocked for all client users (Admin must use Backend Cloud Functions).
-      allow update: if isAuthenticated() && (
-        (
-          (isAdmin() || (resource.data.storeId != null && isStoreOwner(resource.data.storeId))) &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['queueStatus', 'status', 'estimatedReadyTime', 'merchantNote', 'adminNote', 'updatedAt']) &&
-          isValidOrderStateTransition(
-            resource.data.status,
-            resource.data.queueStatus,
-            ('status' in request.resource.data ? request.resource.data.status : resource.data.status),
-            ('queueStatus' in request.resource.data ? request.resource.data.queueStatus : resource.data.queueStatus)
-          )
-        ) ||
-        (
-          // 🔒 Customer can only cancel prior to kitchen preparation (PENDING/CONFIRMED & waiting)
-          resource.data.userId == request.auth.uid &&
-          (resource.data.status == 'PENDING' || resource.data.status == 'CONFIRMED') &&
-          (resource.data.queueStatus == 'waiting' || !('queueStatus' in resource.data)) &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['cancelReason', 'status', 'queueStatus', 'updatedAt']) &&
-          request.resource.data.status == 'CANCELLED' &&
-          (!('queueStatus' in request.resource.data) || request.resource.data.queueStatus == 'cancelled')
-        )
-      );
-
-      allow delete: if isAdmin();
+      allow update: if false;
+      allow delete: if false;
     }
 
     // ==========================================
@@ -554,17 +535,46 @@ service cloud.firestore {
                        request.resource.data.rating >= 1 &&
                        request.resource.data.rating <= 5 &&
                        isValidString(request.resource.data.comment, 1, 1000);
-      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow update: if isAdmin() || (
+        isAuthenticated() && 
+        resource.data.userId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating', 'comment', 'updatedAt']) &&
+        isValidNumber(request.resource.data.rating) &&
+        request.resource.data.rating >= 1 &&
+        request.resource.data.rating <= 5 &&
+        isValidString(request.resource.data.comment, 1, 1000)
+      );
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
     }
 
     // ==========================================
     // 22. REAL-TIME CUSTOMER-MERCHANT CHAT
     // ==========================================
     match /chats/{chatId} {
-      allow read, write: if isAuthenticated();
+      allow read: if isAuthenticated() && (
+        resource == null ||
+        resource.data.customerUid == request.auth.uid ||
+        (resource.data.storeId != null && isStoreOwner(resource.data.storeId)) ||
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        request.resource.data.customerUid == request.auth.uid ||
+        isAdmin()
+      );
+      allow update: if isAuthenticated() && (
+        resource.data.customerUid == request.auth.uid ||
+        (resource.data.storeId != null && isStoreOwner(resource.data.storeId)) ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
 
       match /messages/{msgId} {
-        allow read, create: if isAuthenticated();
+        allow read: if isAuthenticated() && (
+          get(/databases/$(database)/documents/chats/$(chatId)).data.customerUid == request.auth.uid ||
+          isStoreOwner(get(/databases/$(database)/documents/chats/$(chatId)).data.storeId) ||
+          isAdmin()
+        );
+        allow create: if isAuthenticated() && request.resource.data.senderUid == request.auth.uid;
         allow update, delete: if isAdmin();
       }
     }
@@ -581,9 +591,11 @@ service cloud.firestore {
     // ==========================================
     match /reels/{reelId} {
       allow read: if true;
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
-      allow delete: if isAdmin() || (isAuthenticated() && resource.data.authorUid == request.auth.uid);
+      allow create: if isAuthenticated() && (
+        isAdmin() ||
+        request.resource.data.authorUid == request.auth.uid
+      );
+      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.authorUid == request.auth.uid);
     }
 
     // ==========================================
@@ -591,7 +603,10 @@ service cloud.firestore {
     // ==========================================
     match /announcements/{announcementId} {
       allow read: if true;
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated() && (
+        isAdmin() ||
+        request.resource.data.authorUid == request.auth.uid
+      );
       allow update, delete: if isAdmin() || (isAuthenticated() && (resource.data.authorUid == request.auth.uid || isStoreOwner(resource.data.storeId)));
     }
 
@@ -608,7 +623,15 @@ service cloud.firestore {
     // ==========================================
     match /store_stats/{storeId} {
       allow read: if isAuthenticated() && (isAdmin() || isStoreOwner(storeId));
-      allow write: if isAuthenticated() && (isAdmin() || isStoreOwner(storeId));
+      allow write: if false; // 🔒 Server-Authoritative: Aggregated stats managed by Cloud Functions only
+    }
+
+    // ==========================================
+    // 28. COUPONS & PROMOTIONS (คูปองส่วนลดและโปรโมชัน)
+    // ==========================================
+    match /coupons/{couponId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
 
   }

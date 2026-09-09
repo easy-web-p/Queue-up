@@ -16,9 +16,7 @@
     "test:campus": "node test-campus-security-rules.js && node test-campus-integration.js",
     "test:cart": "node test-cart-redux-e2e.js",
     "test:ticket": "node test-ticket-allergy-e2e.js",
-    "test:wallet-auth": "node test-campus-wallet-authority.js",
     "test:roles": "node test-auth-roles-escalation.js",
-    "test:limits": "node test-campus-wallet-limits.js",
     "test:monitor": "node test-campus-monitor-access.js",
     "test:allergen": "node test-allergen-guard.js",
     "test:rules:emulator": "firebase emulators:exec --only firestore --project demo-queueup-rules \"node test-firestore-rules-emulator.js\"",
@@ -34,7 +32,7 @@
     "test:seeding": "node test-menu-seeding.js",
     "test:design": "node test-design-system.js",
     "test:signin": "node test-signin-and-feedback.js",
-    "test": "node test-audit-checklist-e2e.js && node test-transaction-e2e.js && node test-campus-wallet-authority.js && node test-auth-roles-escalation.js && node test-campus-wallet-limits.js && node test-campus-monitor-access.js && node test-allergen-guard.js && node test-guardian-link-review.js && node test-auth-domain-config.js && node test-merchant-audit-log.js && node test-ux-accessibility.js && node test-pilot-lead.js && node test-system-evaluation.js && node test-cart-flow.js && node test-ui-states.js && node test-menu-seeding.js && node test-design-system.js && node test-signin-and-feedback.js && node test-auth-lifecycle.js && node test-firestore-rules-integration.js && node test-storage-rules-integration.js && node test-campus-security-rules.js && node test-campus-integration.js && node test-cart-redux-e2e.js && node test-ticket-allergy-e2e.js"
+    "test": "node test-audit-checklist-e2e.js && node test-transaction-e2e.js && node test-auth-roles-escalation.js && node test-campus-monitor-access.js && node test-allergen-guard.js && node test-guardian-link-review.js && node test-auth-domain-config.js && node test-merchant-audit-log.js && node test-ux-accessibility.js && node test-pilot-lead.js && node test-system-evaluation.js && node test-cart-flow.js && node test-ui-states.js && node test-menu-seeding.js && node test-design-system.js && node test-signin-and-feedback.js && node test-auth-lifecycle.js && node test-firestore-rules-integration.js && node test-storage-rules-integration.js && node test-campus-security-rules.js && node test-campus-integration.js && node test-cart-redux-e2e.js && node test-ticket-allergy-e2e.js"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.12.0",
