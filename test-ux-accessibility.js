@@ -19,7 +19,7 @@
  * The alternative — a DOM test per screen — would assert far less for far more.
  */
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -60,7 +60,9 @@ const rel = (file) => relative(ROOT, file);
 
 // The provider is the one file allowed to name the browser dialogs: its
 // out-of-provider fallback is what keeps an isolated component talking.
-const TOAST_PROVIDER = join(SRC, 'components', 'ToastProvider.jsx');
+const TOAST_PROVIDER = existsSync(join(SRC, 'components', 'ToastProvider.tsx'))
+  ? join(SRC, 'components', 'ToastProvider.tsx')
+  : join(SRC, 'components', 'ToastProvider.jsx');
 
 console.log('\n🎨 UX / ACCESSIBILITY REGRESSION SUITE\n');
 

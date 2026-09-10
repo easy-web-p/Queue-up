@@ -53,9 +53,10 @@ export default function AllergyAlertSetting() {
 
   useEffect(() => {
     if (!selectedChild) return;
-    async function loadStudentProfile() {
+    const studentId = selectedChild.studentId;
+    async function loadStudentProfile(id: string) {
       try {
-        const snap = await getDoc(doc(db, 'students', selectedChild.studentId));
+        const snap = await getDoc(doc(db, 'students', id));
         if (snap.exists()) {
           const data = snap.data() as StudentProfile;
           setAllergies(data.allergyInfo || []);
@@ -68,7 +69,7 @@ export default function AllergyAlertSetting() {
         console.error('[AllergyAlertSetting] Error loading profile:', err);
       }
     }
-    loadStudentProfile();
+    loadStudentProfile(studentId);
   }, [selectedChild]);
 
   const handleAddPresetAllergy = (preset: string) => {

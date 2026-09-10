@@ -8,6 +8,14 @@ import { scanOrderForAllergens } from "./allergenGuard.js";
 import { resolveLinkDecision, LINK_DECISIONS } from "./linkReview.js";
 import { validatePilotLead, rateLimitKeyForAddress } from "./pilotLead.js";
 import { validateEvaluation } from "./systemEvaluation.js";
+import { handleCreateOrderAuthoritative } from "./modules/orders/createOrder.js";
+import { handleCancelOrderAuthoritative } from "./modules/orders/cancelOrder.js";
+import { handleUpdateOrderStatusAuthoritative } from "./modules/orders/updateOrderStatus.js";
+import { handleCreateShopApplication, handleReviewShopApplication } from "./modules/identity/merchantApproval.js";
+import { handleRecordEmergencyLookupAuthoritative } from "./modules/audits/auditService.js";
+import { handleSendChatMessageAuthoritative } from "./modules/chat/chatService.js";
+import { createPromptPayIntent } from "./modules/payments/paymentService.js";
+import { paymentWebhook } from "./modules/payments/paymentWebhook.js";
 
 // 🔒 Server-only credential. Never expose this through a VITE_* variable: Vite inlines
 // those into the client bundle. Set with: firebase functions:secrets:set OPENAI_API_KEY
@@ -66,6 +74,8 @@ function getBangkokYmd(date = new Date()) {
 
   return { ymd, ymdClean, dayOfWeekIndex };
 }
+
+export { scanOrderForAllergens, isValidCalendarDate, getBangkokCurrentTime, getBangkokYmd };
 
 /**
  * Fixed-window per-user quota, applied atomically so parallel calls cannot both read
@@ -188,771 +198,74 @@ export const submitSystemEvaluation = onCall(
 );
 
 /**
- * 🔒 Server-Authoritative Order Creation (Pure Zero-Payment Direct Queue Issuance)
+ * 🔒 Server-Authoritative Order Creation (Dual Payment & Instant Queue)
  */
 export const createOrderAuthoritative = onCall(
   { region: "asia-southeast1", cors: true },
-  async (request) => {
-    // 1. Authentication Guard
-    if (!request.auth || !request.auth.uid) {
-      throw new HttpsError("unauthenticated", "กรุณาเข้าสู่ระบบก่อนทำการสั่งจองอาหาร");
-    }
-
-    const authUid = request.auth.uid;
-    const {
-      storeId,
-      userId,
-      customerName,
-      customerPhone,
-      items,
-      pickupTime,
-      pickupDate,
-      acknowledgeAllergenWarning, // set after the caller confirms an ALLERGEN_ALERT
-      couponCode, // Optional coupon promo code
-      studentId, // Optional student ID for child/campus food order
-    } = request.data || {};
-
-    if (userId && userId !== authUid && request.auth.token?.admin !== true) {
-      throw new HttpsError("permission-denied", "ไม่สามารถสร้างคำสั่งซื้อในนามของผู้ใช้อื่นได้");
-    }
-
-    const effectiveUserId = authUid;
-    const cleanStudentId = (studentId && typeof studentId === "string" && studentId.trim()) ? studentId.trim() : null;
-
-    // 2. Strict Input Validation
-    if (!storeId || typeof storeId !== "string" || !storeId.trim()) {
-      throw new HttpsError("invalid-argument", "STORE_ID_REQUIRED: ไม่พบรหัสร้านค้า");
-    }
-    if (!customerPhone || typeof customerPhone !== "string" || !customerPhone.trim()) {
-      throw new HttpsError("invalid-argument", "CUSTOMER_PHONE_REQUIRED: กรุณาระบุเบอร์โทรศัพท์สำหรับรับการแจ้งเตือนคิว");
-    }
-    if (!Array.isArray(items) || items.length === 0) {
-      throw new HttpsError("invalid-argument", "ORDER_ITEMS_EMPTY: รายการอาหารในคำสั่งซื้อว่างเปล่า");
-    }
-    if (!pickupTime || !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(pickupTime).trim())) {
-      throw new HttpsError("invalid-argument", "INVALID_PICKUP_TIME_FORMAT: รูปแบบเวลารับอาหารไม่ถูกต้อง (ต้องเป็น HH:mm)");
-    }
-
-    const cleanPickupTime = String(pickupTime).trim();
-    const now = new Date();
-    const currentBangkok = getBangkokYmd(now);
-
-    let targetYmd = currentBangkok.ymd;
-    let targetYmdClean = currentBangkok.ymdClean;
-
-    if (pickupDate) {
-      const rawDate = String(pickupDate).trim();
-      const isIsoDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDate);
-      const isCleanDate = /^\d{8}$/.test(rawDate);
-      if (!isIsoDate && !isCleanDate) {
-        throw new HttpsError("invalid-argument", "INVALID_DATE_FORMAT: รูปแบบวันที่ไม่ถูกต้อง (ต้องเป็น YYYY-MM-DD)");
-      }
-      const clean = rawDate.replace(/-/g, "");
-      if (clean < currentBangkok.ymdClean) {
-        throw new HttpsError("invalid-argument", "PAST_DATE_NOT_ALLOWED: ไม่สามารถเลือกวันที่ย้อนหลังได้");
-      }
-      targetYmd = isIsoDate ? rawDate : `${rawDate.slice(0, 4)}-${rawDate.slice(4, 6)}-${rawDate.slice(6, 8)}`;
-      targetYmdClean = clean;
-    }
-
-    const [pYear, pMonth, pDay] = targetYmd.split("-").map(Number);
-    if (!isValidCalendarDate(pYear, pMonth, pDay)) {
-      throw new HttpsError("invalid-argument", "INVALID_CALENDAR_DATE: วันที่ระบุไม่มีอยู่จริงในปฏิทิน");
-    }
-    const targetPickupDateObj = new Date(Date.UTC(pYear, pMonth - 1, pDay, 12, 0, 0));
-    const targetBangkok = getBangkokYmd(targetPickupDateObj);
-
-    // Strict same-day past pickup time validation
-    if (targetYmdClean === currentBangkok.ymdClean) {
-      const currentBangkokTime = getBangkokCurrentTime(now);
-      if (cleanPickupTime <= currentBangkokTime) {
-        throw new HttpsError("failed-precondition", `PAST_PICKUP_TIME_NOT_ALLOWED: เวลารับอาหาร (${cleanPickupTime} น.) ผ่านไปแล้วสำหรับวันนี้ (เวลาปัจจุบัน ${currentBangkokTime} น.)`);
-      }
-    }
-
-    // Aggregate Product Quantities
-    const productTotalQuantityMap = new Map();
-    let totalOrderItemsCount = 0;
-
-    for (const it of items) {
-      if (!it.productId) {
-        throw new HttpsError("invalid-argument", "PRODUCT_ID_REQUIRED: ทุกรายการต้องระบุ productId");
-      }
-      const qty = Number(it.quantity);
-      if (!Number.isInteger(qty) || qty <= 0) {
-        throw new HttpsError("invalid-argument", "INVALID_QUANTITY: จำนวนสินค้าต้องเป็นจำนวนเต็มบวก");
-      }
-      totalOrderItemsCount += qty;
-      productTotalQuantityMap.set(it.productId, (productTotalQuantityMap.get(it.productId) || 0) + qty);
-    }
-
-    try {
-      return await db.runTransaction(async (tx) => {
-        // ===================================================================
-        // PHASE 0 & 1: READ ALL REQUIRED DOCUMENTS
-        // ===================================================================
-        const shopRef = db.collection("shops").doc(storeId);
-        const shopSnap = await tx.get(shopRef);
-        if (!shopSnap.exists) {
-          throw new HttpsError("not-found", `STORE_NOT_FOUND: ร้านค้ารหัส ${storeId} ไม่มีอยู่ในระบบ`);
-        }
-        const shopData = shopSnap.data();
-
-        // Allergy profile for whoever the food is for. All reads must precede any
-        // write in a transaction, so this is fetched here with the rest of Phase 1.
-        const allergyProfileId = cleanStudentId || authUid;
-        const studentSnap = await tx.get(db.collection("students").doc(allergyProfileId));
-
-        // Read coupon document if provided
-        const cleanCoupon = couponCode && typeof couponCode === "string" ? couponCode.trim().toUpperCase() : null;
-        let couponSnap = null;
-        if (cleanCoupon) {
-          couponSnap = await tx.get(db.collection("coupons").doc(cleanCoupon));
-        }
-
-        // Read all product documents
-        const productSnapMap = new Map();
-        const referencedModifierGroupIds = new Set();
-
-        for (const prodId of productTotalQuantityMap.keys()) {
-          const prodRef = db.collection("products").doc(prodId);
-          const prodSnap = await tx.get(prodRef);
-          if (!prodSnap.exists) {
-            throw new HttpsError("not-found", `PRODUCT_NOT_FOUND: ไม่พบสินค้ารหัส ${prodId} ในระบบ`);
-          }
-          productSnapMap.set(prodId, prodSnap);
-          const pData = prodSnap.data();
-          if (Array.isArray(pData.modifierGroupIds)) {
-            pData.modifierGroupIds.forEach((mgId) => referencedModifierGroupIds.add(mgId));
-          }
-        }
-
-        // Add any modifierGroupIds selected in the request items
-        for (const it of items) {
-          if (Array.isArray(it.selectedModifiers)) {
-            it.selectedModifiers.forEach((m) => {
-              if (m.modifierGroupId) referencedModifierGroupIds.add(m.modifierGroupId);
-            });
-          }
-        }
-
-        // Read all referenced modifier groups
-        const modifierGroupSnapMap = new Map();
-        for (const mgId of referencedModifierGroupIds) {
-          const modRef = db.collection("modifier_groups").doc(mgId);
-          const modSnap = await tx.get(modRef);
-          if (modSnap.exists) {
-            modifierGroupSnapMap.set(mgId, modSnap);
-          }
-        }
-
-        // Read Slot Capacity doc
-        const cleanTime = cleanPickupTime.replace(":", "");
-        const dateScopedSlotId = `slot_${storeId}_${targetYmdClean}_${cleanTime}`;
-        const slotRef = db.collection("store_slots").doc(dateScopedSlotId);
-        const slotSnap = await tx.get(slotRef);
-
-        // Read Sequence Counter doc
-        const counterDocId = `counter_${storeId}_${targetYmdClean}`;
-        const counterRef = db.collection("queue_counters").doc(counterDocId);
-        const counterSnap = await tx.get(counterRef);
-
-        // ===================================================================
-        // PHASE 2: VALIDATE BUSINESS RULES & CALCULATE AMOUNTS
-        // ===================================================================
-        // 2.1 Store Availability & Operating Hours
-        if (shopData.isOpen === false || shopData.status === "closed") {
-          throw new HttpsError("failed-precondition", "STORE_CLOSED: ร้านค้าปิดให้บริการชั่วคราว");
-        }
-        if (shopData.operationalOverride === "FORCE_CLOSE" || shopData.operationalOverride === "EMERGENCY_STOP") {
-          throw new HttpsError("failed-precondition", "STORE_PAUSED: ร้านค้าหยุดรับออเดอร์ชั่วคราว");
-        }
-
-        if (shopData.operatingHours) {
-          const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-          const targetDayName = days[targetBangkok.dayOfWeekIndex];
-          const targetDaySchedule = shopData.operatingHours[targetDayName];
-
-          if (targetDaySchedule) {
-            if (!targetDaySchedule.isOpen) {
-              throw new HttpsError("failed-precondition", `STORE_CLOSED_ON_DATE: ร้านค้าปิดทำการในวัน${targetDayName} (${targetYmd})`);
-            }
-            const { open, close } = targetDaySchedule;
-            const isPickupAllowed =
-              open <= close
-                ? cleanPickupTime >= open && cleanPickupTime <= close
-                : cleanPickupTime >= open || cleanPickupTime <= close;
-            if (!isPickupAllowed) {
-              throw new HttpsError("failed-precondition", `INVALID_PICKUP_TIME: เวลารับอาหาร ${cleanPickupTime} น. อยู่นอกเวลาทำการ (${open} - ${close})`);
-            }
-          }
-        }
-
-        // 2.2 Product Stock & Modifier Integrity
-        for (const [prodId, requiredTotalQty] of productTotalQuantityMap.entries()) {
-          const prodData = productSnapMap.get(prodId).data();
-          if (prodData.storeId !== storeId) {
-            throw new HttpsError("invalid-argument", `CROSS_STORE_PRODUCT_VIOLATION: สินค้า ${prodData.name} ไม่ได้เป็นของร้าน ${storeId}`);
-          }
-          if (prodData.isAvailable === false) {
-            throw new HttpsError("failed-precondition", `PRODUCT_UNAVAILABLE: สินค้า ${prodData.name} ปิดรับออเดอร์ชั่วคราว`);
-          }
-          const currentStock = typeof prodData.stock === "number" ? prodData.stock : 0;
-          if (currentStock < requiredTotalQty) {
-            throw new HttpsError("failed-precondition", `INSUFFICIENT_STOCK: สินค้า "${prodData.name}" คงเหลือเพียง ${currentStock} ชุด (ต้องการ ${requiredTotalQty})`);
-          }
-        }
-
-        let calculatedTotalSatang = 0;
-        const validatedOrderItems = [];
-        const itemCategories = new Set();
-        // Menu text gathered for the allergen scan below. Built from the authoritative
-        // product documents, not from anything the client sent.
-        const allergenScanItems = [];
-
-        for (const itemReq of items) {
-          const prodData = productSnapMap.get(itemReq.productId).data();
-          if (prodData.category) itemCategories.add(prodData.category);
-
-          const basePriceSatang = prodData.priceSatang ?? Math.round((Number(prodData.price) || 0) * 100);
-          let itemModifierSatang = 0;
-
-          const selectedModifiers = itemReq.selectedModifiers || [];
-          const allowedGroupIds = new Set(prodData.modifierGroupIds || []);
-          const selectedModifierNames = [];
-
-          // Validate linked required modifier groups
-          if (Array.isArray(prodData.modifierGroupIds)) {
-            for (const mgId of prodData.modifierGroupIds) {
-              const modSnap = modifierGroupSnapMap.get(mgId);
-              if (!modSnap || !modSnap.exists) {
-                throw new HttpsError("not-found", `MODIFIER_GROUP_NOT_FOUND: ไม่พบกลุ่มตัวเลือก ${mgId} สำหรับเมนู "${prodData.name}"`);
-              }
-              const modData = modSnap.data();
-              if (modData.storeId !== storeId) {
-                throw new HttpsError("invalid-argument", `CROSS_STORE_MODIFIER_VIOLATION: กลุ่มตัวเลือก ${mgId} ไม่ได้เป็นของร้าน ${storeId}`);
-              }
-              const groupSelections = selectedModifiers.filter((m) => m.modifierGroupId === mgId);
-              const minSelections = modData.minSelections ?? modData.minSelect ?? (modData.required || modData.isRequired ? 1 : 0);
-              const maxSelections = modData.maxSelections ?? modData.maxSelect ?? (modData.selectionType === "single" ? 1 : null);
-              const isSingle = modData.selectionType === "single" || modData.type === "single";
-
-              // Check duplicate optionIds within group
-              const optionIdsInGroup = groupSelections.map((m) => m.optionId);
-              if (new Set(optionIdsInGroup).size !== optionIdsInGroup.length) {
-                throw new HttpsError("invalid-argument", `DUPLICATE_MODIFIER_OPTION: กลุ่มตัวเลือก "${modData.name || mgId}" มีตัวเลือกซ้ำกัน`);
-              }
-
-              if (groupSelections.length < minSelections) {
-                throw new HttpsError("invalid-argument", `REQUIRED_MODIFIER_MISSING: กรุณาเลือก ${modData.name || "ตัวเลือกที่จำเป็น"} อย่างน้อย ${minSelections} รายการ สำหรับเมนู "${prodData.name}"`);
-              }
-              if (maxSelections !== null && groupSelections.length > maxSelections) {
-                throw new HttpsError("invalid-argument", `MAX_SELECTIONS_EXCEEDED: กลุ่มตัวเลือก "${modData.name}" เลือกได้สูงสุดไม่เกิน ${maxSelections} รายการ`);
-              }
-              if (isSingle && groupSelections.length > 1) {
-                throw new HttpsError("invalid-argument", `SINGLE_SELECTION_VIOLATED: กลุ่มตัวเลือก "${modData.name}" สามารถเลือกได้เพียง 1 ตัวเลือกเท่านั้น`);
-              }
-            }
-          }
-
-          // Validate chosen modifier options
-          if (selectedModifiers.length > 0) {
-            for (const selMod of selectedModifiers) {
-              if (!allowedGroupIds.has(selMod.modifierGroupId)) {
-                throw new HttpsError("invalid-argument", `INVALID_PRODUCT_MODIFIER: กลุ่มตัวเลือก ${selMod.modifierGroupId} ไม่ได้เป็นของสินค้า "${prodData.name}"`);
-              }
-              const modSnap = modifierGroupSnapMap.get(selMod.modifierGroupId);
-              if (!modSnap || !modSnap.exists) {
-                throw new HttpsError("not-found", `MODIFIER_GROUP_NOT_FOUND: ไม่พบกลุ่มตัวเลือก ${selMod.modifierGroupId}`);
-              }
-              const modData = modSnap.data();
-              const opt = (modData.options || []).find((o) => o.id === selMod.optionId);
-              if (!opt) {
-                throw new HttpsError("not-found", `OPTION_NOT_FOUND: ไม่พบตัวเลือก ${selMod.optionId}`);
-              }
-              if (opt.isOutOfStock) {
-                throw new HttpsError("failed-precondition", `OPTION_OUT_OF_STOCK: ตัวเลือก "${opt.name}" หมดชั่วคราว`);
-              }
-              const optPriceSatang = opt.priceModifierSatang ?? Math.round((Number(opt.priceModifier) || 0) * 100);
-              itemModifierSatang += optPriceSatang;
-              if (opt.name) selectedModifierNames.push(String(opt.name));
-            }
-          }
-
-          allergenScanItems.push({
-            productId: itemReq.productId,
-            name: prodData.name || "",
-            category: prodData.category || "",
-            description: prodData.description || "",
-            modifierNames: selectedModifierNames,
-            // Ingredients the store declared on the product. Read from Firestore, not
-            // from the request, so a caller cannot clear the tags to dodge the check.
-            declaredAllergens: Array.isArray(prodData.allergens) ? prodData.allergens : [],
-          });
-
-          const unitPriceSatang = basePriceSatang + itemModifierSatang;
-          const subtotalSatang = unitPriceSatang * Number(itemReq.quantity);
-          calculatedTotalSatang += subtotalSatang;
-
-          validatedOrderItems.push({
-            productId: itemReq.productId,
-            name: prodData.name,
-            category: prodData.category || "General",
-            quantity: Number(itemReq.quantity),
-            unitPriceSatang,
-            unitPrice: unitPriceSatang / 100,
-            subtotalSatang,
-            subtotal: subtotalSatang / 100,
-            customNotes: itemReq.customNotes || "",
-            selectedModifiers,
-          });
-        }
-
-        // 2.2b 🛡️ Allergen Guard
-        //
-        // Enforced here rather than only in the UI: src/utils/allergenMatcher.ts runs
-        // in the browser, so calling the callable directly ordered straight past it.
-        //
-        // A hit blocks the order and reports what matched. The caller may retry with
-        // acknowledgeAllergenWarning to proceed anyway, which the spec's "warn before
-        // confirming" flow requires — matching is keyword-based and will sometimes
-        // flag a dish that is actually safe. Every override is recorded on the order
-        // and in audit_logs so a guardian or the school can see it happened.
-        const studentAllergyProfile = studentSnap.exists ? studentSnap.data() : null;
-        const studentAllergies = Array.isArray(studentAllergyProfile?.allergyInfo)
-          ? studentAllergyProfile.allergyInfo
-          : [];
-
-        const allergenScan = scanOrderForAllergens(studentAllergies, allergenScanItems);
-
-        if (allergenScan.hasAllergens && acknowledgeAllergenWarning !== true) {
-          const allergenList = allergenScan.matchedAllergenNames.join(", ");
-          const dishList = allergenScan.flaggedItems.map((f) => `"${f.name}"`).join(", ");
-          // A store-declared ingredient is a fact about the recipe; a keyword match is
-          // a guess from the name. Saying "อาจมี" for the former would understate it.
-          const lead = allergenScan.hasDeclaredMatch
-            ? `ALLERGEN_ALERT: ร้านค้าระบุว่าเมนู ${dishList} มีส่วนผสมที่แพ้ (${allergenList})`
-            : `ALLERGEN_ALERT: เมนู ${dishList} อาจมีส่วนผสมที่แพ้ (${allergenList})`;
-          throw new HttpsError(
-            "failed-precondition",
-            `${lead} กรุณาตรวจสอบกับร้านค้าก่อนยืนยันการสั่งซื้อ`,
-            {
-              code: "ALLERGEN_ALERT",
-              matchedAllergenNames: allergenScan.matchedAllergenNames,
-              hasDeclaredMatch: allergenScan.hasDeclaredMatch,
-              flaggedItems: allergenScan.flaggedItems,
-            }
-          );
-        }
-
-        // 2.2c 🎟️ Server-Authoritative Coupon Validation & Discount Calculation
-        let discountSatang = 0;
-        let couponTitle = "";
-
-        if (cleanCoupon) {
-          if (couponSnap && couponSnap.exists) {
-            const cData = couponSnap.data();
-            const isActive = cData.isActive !== false;
-            const minSpend = Number(cData.minSpendSatang ?? ((Number(cData.minSpend) || 0) * 100)) || 0;
-            if (isActive && calculatedTotalSatang >= minSpend) {
-              couponTitle = cData.title || `คูปองส่วนลด (${cleanCoupon})`;
-              if (cData.discountType === "PERCENT") {
-                const percent = Number(cData.discountValue) || 0;
-                const rawDiscount = Math.round(calculatedTotalSatang * (percent / 100));
-                const maxCap = cData.maxDiscountSatang ?? ((Number(cData.maxDiscount) || 0) * 100);
-                discountSatang = maxCap > 0 ? Math.min(rawDiscount, maxCap) : rawDiscount;
-              } else {
-                const fixedSatang = cData.discountValueSatang ?? Math.round((Number(cData.discountValue) || 0) * 100);
-                discountSatang = Math.min(fixedSatang, calculatedTotalSatang);
-              }
-            }
-          } else if (cleanCoupon === "WELCOME50") {
-            if (calculatedTotalSatang >= 10000) { // min spend 100 THB
-              discountSatang = Math.min(5000, calculatedTotalSatang); // 50 THB discount
-              couponTitle = "ต้อนรับสมาชิกใหม่ ลด ฿50 (WELCOME50)";
-            }
-          } else if (cleanCoupon === "HAPPY15") {
-            if (calculatedTotalSatang >= 5000) { // min spend 50 THB
-              discountSatang = Math.min(5000, Math.round(calculatedTotalSatang * 0.15)); // 15% discount
-              couponTitle = "Happy Hour พิเศษ ลด 15% (HAPPY15)";
-            }
-          } else if (cleanCoupon === "STUDENT10") {
-            if (calculatedTotalSatang >= 4000) { // min spend 40 THB
-              discountSatang = Math.min(3000, Math.round(calculatedTotalSatang * 0.10)); // 10% discount
-              couponTitle = "ส่วนลดนักเรียนนักศึกษา ลด 10% (STUDENT10)";
-            }
-          }
-        }
-
-        const finalAmountSatang = Math.max(0, calculatedTotalSatang - discountSatang);
-
-        // 2.4 Slot Capacity (Fail-Closed)
-        if (typeof shopData.maxOrdersPerSlot !== "number" || shopData.maxOrdersPerSlot <= 0) {
-          throw new HttpsError("failed-precondition", "STORE_CAPACITY_NOT_CONFIGURED: ร้านค้ายังไม่ได้กำหนดขีดจำกัดโควตาคิวรับอาหาร");
-        }
-        const authoritativeCapacity = shopData.maxOrdersPerSlot;
-        let currentSlotOrders = 0;
-        if (slotSnap.exists) {
-          const slotData = slotSnap.data();
-          currentSlotOrders = Number(slotData.currentOrders) || 0;
-        }
-        if (currentSlotOrders + 1 > authoritativeCapacity) {
-          throw new HttpsError("resource-exhausted", `SLOT_CAPACITY_EXCEEDED: รอบเวลารับอาหาร ${cleanPickupTime} น. ของวันที่ ${targetYmd} คิวเต็มแล้ว (${currentSlotOrders}/${authoritativeCapacity})`);
-        }
-
-        // 2.5 Queue Number Generation (Bounded Q001 - Q999)
-        let sequenceNumber = 1;
-        if (counterSnap.exists) {
-          sequenceNumber = (Number(counterSnap.data().lastSequence) || 0) + 1;
-        }
-        if (sequenceNumber > 999) {
-          throw new HttpsError(
-            "resource-exhausted",
-            `QUEUE_CAPACITY_EXCEEDED: คิวประจำวันของร้านนี้เต็มแล้วสำหรับวันที่ ${targetYmd} (จำกัดสูงสุด 999 คิว/วัน)`
-          );
-        }
-        const queueNumber = `Q${String(sequenceNumber).padStart(3, "0")}`;
-
-        // ===================================================================
-        // PHASE 3: WRITE ALL MUTATIONS ATOMICALLY (Zero-Payment Server-Authoritative)
-        // ===================================================================
-        // Update product stock
-        for (const [prodId, requiredTotalQty] of productTotalQuantityMap.entries()) {
-          const prodRef = db.collection("products").doc(prodId);
-          const prodData = productSnapMap.get(prodId).data();
-          const currentStock = typeof prodData.stock === "number" ? prodData.stock : 0;
-          tx.update(prodRef, {
-            stock: currentStock - requiredTotalQty,
-            updatedAt: FieldValue.serverTimestamp(),
-          });
-        }
-
-        // Update slot capacity
-        tx.set(
-          slotRef,
-          {
-            slotId: dateScopedSlotId,
-            storeId,
-            date: targetYmd,
-            timeSlot: cleanPickupTime,
-            capacity: authoritativeCapacity,
-            currentOrders: currentSlotOrders + 1,
-            totalItemsReserved: (slotSnap.exists ? Number(slotSnap.data().totalItemsReserved || 0) : 0) + totalOrderItemsCount,
-            updatedAt: FieldValue.serverTimestamp(),
-          },
-          { merge: true }
-        );
-
-        // Update queue counter
-        tx.set(
-          counterRef,
-          {
-            storeId,
-            date: targetYmd,
-            lastSequence: sequenceNumber,
-            updatedAt: FieldValue.serverTimestamp(),
-          },
-          { merge: true }
-        );
-
-        // Create authoritative Order
-        const studentProfileData = studentSnap.exists ? studentSnap.data() : null;
-        const studentGuardianIds = Array.isArray(studentProfileData?.guardianIds)
-          ? studentProfileData.guardianIds
-          : [];
-
-        const orderDocRef = db.collection("orders").doc();
-        const orderId = orderDocRef.id;
-
-        const orderPayload = {
-          id: orderId,
-          orderId,
-          storeId,
-          userId: effectiveUserId,
-          customerName: (customerName || "").trim() || "ลูกค้า QueueUp",
-          customerPhone: customerPhone.trim(),
-          ...(cleanStudentId ? { studentId: cleanStudentId } : {}),
-          guardianIds: studentGuardianIds,
-          queueNumber,
-          status: "PENDING",
-          queueStatus: "waiting",
-          totalAmountSatang: calculatedTotalSatang,
-          totalAmount: calculatedTotalSatang / 100,
-          finalAmountSatang: finalAmountSatang,
-          finalAmount: finalAmountSatang / 100,
-          discountAppliedSatang: discountSatang,
-          discountAppliedBaht: discountSatang / 100,
-          couponCode: discountSatang > 0 ? cleanCoupon : null,
-          couponTitle: discountSatang > 0 ? couponTitle : null,
-          pointsEarned: Math.floor(finalAmountSatang / 1000),
-          items: validatedOrderItems,
-          allergenWarningAcknowledged: allergenScan.hasAllergens,
-          acknowledgedAllergenNames: allergenScan.matchedAllergenNames,
-          pickupTime: cleanPickupTime,
-          pickupDate: targetYmd,
-          slotId: dateScopedSlotId,
-          createdAt: FieldValue.serverTimestamp(),
-          updatedAt: FieldValue.serverTimestamp(),
-        };
-
-        tx.set(orderDocRef, orderPayload);
-
-        // An order placed over an allergen warning is recorded in the same atomic
-        // write as the order itself, so an override can never exist without its
-        // audit entry. Guardians and staff can read what was overridden and why.
-        if (allergenScan.hasAllergens) {
-          const allergenAuditRef = db.collection("audit_logs").doc();
-          tx.set(allergenAuditRef, {
-            id: allergenAuditRef.id,
-            action: "ALLERGEN_WARNING_OVERRIDDEN",
-            actorUid: authUid,
-            targetStudentId: allergyProfileId,
-            orderId,
-            storeId,
-            matchedAllergenNames: allergenScan.matchedAllergenNames,
-            // Overriding an ingredient the store declared is a materially more serious
-            // act than overriding a name match, and the log should say which happened.
-            hasDeclaredMatch: allergenScan.hasDeclaredMatch === true,
-            flaggedItems: allergenScan.flaggedItems,
-            timestamp: FieldValue.serverTimestamp(),
-          });
-        }
-
-        return {
-          success: true,
-          orderId,
-          queueNumber,
-          totalAmountSatang: calculatedTotalSatang,
-          totalAmountBaht: calculatedTotalSatang / 100,
-          finalAmountSatang,
-          finalAmountBaht: finalAmountSatang / 100,
-          discountSatang,
-          discountBaht: discountSatang / 100,
-          couponCode: discountSatang > 0 ? cleanCoupon : null,
-          orderStatus: "PENDING",
-          order: orderPayload,
-        };
-      });
-    } catch (err) {
-      console.error("[createOrderAuthoritative] Error:", err);
-      if (err instanceof HttpsError) throw err;
-      throw new HttpsError("internal", err.message || "Failed to create authoritative order");
-    }
-  }
+  async (request) => handleCreateOrderAuthoritative(db, request)
 );
 
 /**
  * 🔒 Update Order Status Authoritative (Server-Authoritative Lifecycle)
- *
- * Verifies caller authentication, confirms shop ownership via /shops/{storeId}.ownerUid
- * or admin claim, validates synchronized state transitions:
- *   PENDING/waiting -> CONFIRMED/waiting -> PREPARING/cooking -> READY/ready -> COMPLETED/completed
- *   (or PENDING/CONFIRMED -> CANCELLED/cancelled),
- * and updates the order status atomically.
  */
 export const updateOrderStatusAuthoritative = onCall(
   { region: "asia-southeast1", cors: true },
+  async (request) => handleUpdateOrderStatusAuthoritative(db, request)
+);
+
+/**
+ * 🔒 Cancel Order Authoritative (Server-Authoritative)
+ */
+export const cancelOrderAuthoritative = onCall(
+  { region: "asia-southeast1", cors: true },
+  async (request) => handleCancelOrderAuthoritative(db, request)
+);
+
+/**
+ * 🔒 Merchant Shop Applications (Self-Service Onboarding & Staff Review)
+ */
+export const createShopApplication = onCall(
+  { region: "asia-southeast1", cors: true },
+  async (request) => handleCreateShopApplication(db, request)
+);
+
+export const reviewShopApplication = onCall(
+  { region: "asia-southeast1", cors: true },
+  async (request) => handleReviewShopApplication(db, authAdmin, request)
+);
+
+/**
+ * 🔒 Chat System (Server-Authoritative Messaging & Merchant Auto-Replies)
+ */
+export const sendChatMessageAuthoritative = onCall(
+  { region: "asia-southeast1", cors: true },
+  async (request) => handleSendChatMessageAuthoritative(db, request)
+);
+
+/**
+ * 🔒 PromptPay QR Intent Generation (2C2P / Bank Gateway Integration)
+ */
+export const createPromptPayQRIntent = onCall(
+  { region: "asia-southeast1", cors: true },
   async (request) => {
     if (!request.auth || !request.auth.uid) {
-      throw new HttpsError("unauthenticated", "AUTH_REQUIRED: กรุณาเข้าสู่ระบบก่อนดำเนินการ");
+      throw new HttpsError("unauthenticated", "User must be authenticated.");
     }
-
-    const authUid = request.auth.uid;
-    const { orderId, status: targetStatus, queueStatus: targetQueue, merchantNote, estimatedReadyTime } = request.data || {};
-
-    if (!orderId || typeof orderId !== "string") {
-      throw new HttpsError("invalid-argument", "INVALID_ORDER_ID: รหัสออร์เดอร์ไม่ถูกต้อง");
-    }
-
-    const orderRef = db.collection("orders").doc(orderId.trim());
-
-    return await db.runTransaction(async (tx) => {
-      const orderSnap = await tx.get(orderRef);
-      if (!orderSnap.exists) {
-        throw new HttpsError("not-found", `ORDER_NOT_FOUND: ไม่พบข้อมูลออร์เดอร์ #${orderId}`);
-      }
-
-      const orderData = orderSnap.data();
-      const storeId = orderData.storeId;
-      if (!storeId) {
-        throw new HttpsError("failed-precondition", "ORDER_MISSING_STORE: ออร์เดอร์ไม่มีข้อมูลร้านค้า");
-      }
-
-      // 1. Authorization: Admin or verified Store Owner
-      const isAdminUser = Boolean(
-        request.auth.token?.admin === true ||
-        request.auth.token?.role === "admin" ||
-        ["58140@lomsak.ac.th", "hi00000087@gmail.com", "easy.web.p@gmail.com"].includes(request.auth.token?.email)
-      );
-
-      if (!isAdminUser) {
-        const shopSnap = await tx.get(db.collection("shops").doc(storeId));
-        if (!shopSnap.exists || shopSnap.data().ownerUid !== authUid) {
-          throw new HttpsError("permission-denied", "STORE_OWNER_REQUIRED: คุณไม่มีสิทธิ์จัดการออร์เดอร์ของร้านนี้");
-        }
-      }
-
-      // 2. Validate Synchronized State Transition
-      const currentStatus = orderData.status || "PENDING";
-      const currentQueue = orderData.queueStatus || "waiting";
-      const newStatus = (targetStatus || currentStatus).toUpperCase();
-      const newQueue = (targetQueue || currentQueue).toLowerCase();
-
-      const isValidTransition =
-        (currentStatus === newStatus && currentQueue === newQueue) ||
-        (currentStatus === "PENDING" && currentQueue === "waiting" && newStatus === "CONFIRMED" && newQueue === "waiting") ||
-        (currentStatus === "CONFIRMED" && currentQueue === "waiting" && newStatus === "PREPARING" && newQueue === "cooking") ||
-        (currentStatus === "PREPARING" && currentQueue === "cooking" && newStatus === "READY" && newQueue === "ready") ||
-        (currentStatus === "READY" && currentQueue === "ready" && newStatus === "COMPLETED" && newQueue === "completed") ||
-        ((currentStatus === "PENDING" || currentStatus === "CONFIRMED") && newStatus === "CANCELLED" && newQueue === "cancelled");
-
-      if (!isValidTransition) {
-        throw new HttpsError(
-          "failed-precondition",
-          `INVALID_STATE_TRANSITION: ไม่สามารถเปลี่ยนสถานะจาก [${currentStatus}/${currentQueue}] ไปเป็น [${newStatus}/${newQueue}] ได้`
-        );
-      }
-
-      const updatePayload = {
-        status: newStatus,
-        queueStatus: newQueue,
-        updatedAt: FieldValue.serverTimestamp(),
-      };
-
-      if (typeof merchantNote === "string") {
-        updatePayload.merchantNote = merchantNote.slice(0, 500);
-      }
-      if (typeof estimatedReadyTime === "string") {
-        updatePayload.estimatedReadyTime = estimatedReadyTime.slice(0, 50);
-      }
-
-      tx.update(orderRef, updatePayload);
-
-      return {
-        ok: true,
-        orderId,
-        status: newStatus,
-        queueStatus: newQueue,
-      };
-    });
+    const { orderId, amount } = request.data || {};
+    return await createPromptPayIntent(db, { orderId, amount, uid: request.auth.uid });
   }
 );
 
 /**
- * 🔒 Cancel Order Authoritative (Server-Authoritative Cancellation)
- *
- * Authorizes cancellation by:
- *   1. Customer who placed the order (if status is PENDING or CONFIRMED & queueStatus is 'waiting')
- *   2. Store owner (if order is not already COMPLETED)
- *   3. Admin
- *
- * Atomically updates order to CANCELLED/cancelled, restores item stock, and releases slot capacity.
+ * 🔒 Emergency Lookup Audit Record (Server-Authoritative)
  */
-export const cancelOrderAuthoritative = onCall(
+export const recordEmergencyLookupAuthoritative = onCall(
   { region: "asia-southeast1", cors: true },
-  async (request) => {
-    if (!request.auth || !request.auth.uid) {
-      throw new HttpsError("unauthenticated", "AUTH_REQUIRED: กรุณาเข้าสู่ระบบก่อนดำเนินการ");
-    }
-
-    const authUid = request.auth.uid;
-    const { orderId, reason } = request.data || {};
-
-    if (!orderId || typeof orderId !== "string") {
-      throw new HttpsError("invalid-argument", "INVALID_ORDER_ID: รหัสออร์เดอร์ไม่ถูกต้อง");
-    }
-
-    const orderRef = db.collection("orders").doc(orderId.trim());
-
-    return await db.runTransaction(async (tx) => {
-      const orderSnap = await tx.get(orderRef);
-      if (!orderSnap.exists) {
-        throw new HttpsError("not-found", `ORDER_NOT_FOUND: ไม่พบข้อมูลออร์เดอร์ #${orderId}`);
-      }
-
-      const orderData = orderSnap.data();
-      const currentStatus = (orderData.status || "PENDING").toUpperCase();
-      const currentQueue = (orderData.queueStatus || "waiting").toLowerCase();
-
-      if (currentStatus === "CANCELLED" || currentQueue === "cancelled") {
-        return { ok: true, orderId, status: "CANCELLED", queueStatus: "cancelled", message: "คำสั่งซื้อถูกยกเลิกไปแล้ว" };
-      }
-
-      if (currentStatus === "COMPLETED" || currentQueue === "completed") {
-        throw new HttpsError("failed-precondition", "ORDER_ALREADY_COMPLETED: ไม่สามารถยกเลิกคำสั่งซื้อที่เสร็จสมบูรณ์แล้วได้");
-      }
-
-      const storeId = orderData.storeId;
-      const isAdminUser = Boolean(
-        request.auth.token?.admin === true ||
-        request.auth.token?.role === "admin" ||
-        ["58140@lomsak.ac.th", "hi00000087@gmail.com", "easy.web.p@gmail.com"].includes(request.auth.token?.email)
-      );
-
-      const isCustomer = orderData.userId === authUid;
-      let isStoreOwner = false;
-
-      if (!isAdminUser && !isCustomer && storeId) {
-        const shopSnap = await tx.get(db.collection("shops").doc(storeId));
-        if (shopSnap.exists && shopSnap.data().ownerUid === authUid) {
-          isStoreOwner = true;
-        }
-      }
-
-      if (!isAdminUser && !isCustomer && !isStoreOwner) {
-        throw new HttpsError("permission-denied", "UNAUTHORIZED: คุณไม่มีสิทธิ์ยกเลิกคำสั่งซื้อนี้");
-      }
-
-      // Customer can only cancel prior to kitchen starting preparation (PENDING/CONFIRMED & waiting)
-      if (isCustomer && !isAdminUser && !isStoreOwner) {
-        const canCustomerCancel = (currentStatus === "PENDING" || currentStatus === "CONFIRMED") && currentQueue === "waiting";
-        if (!canCustomerCancel) {
-          throw new HttpsError(
-            "failed-precondition",
-            "CANNOT_CANCEL_IN_PREPARATION: ไม่สามารถยกเลิกคำสั่งซื้อได้เนื่องจากทางร้านเริ่มปรุงอาหารแล้ว"
-          );
-        }
-      }
-
-      // 1. Update Order Status
-      const cancelPayload = {
-        status: "CANCELLED",
-        queueStatus: "cancelled",
-        cancelReason: (typeof reason === "string" ? reason.slice(0, 300) : null) || (isCustomer ? "ลูกค้ายกเลิกคำสั่งซื้อ" : "ร้านค้ายกเลิกคำสั่งซื้อ"),
-        cancelledBy: authUid,
-        cancelledAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      };
-      tx.update(orderRef, cancelPayload);
-
-      // 2. Restore Stock
-      if (Array.isArray(orderData.items)) {
-        for (const item of orderData.items) {
-          const productId = item.productId || item.id;
-          const qty = Number(item.quantity || item.qty) || 0;
-          if (productId && typeof productId === "string" && qty > 0) {
-            const productRef = db.collection("products").doc(productId);
-            tx.update(productRef, { stock: FieldValue.increment(qty), updatedAt: FieldValue.serverTimestamp() });
-          }
-        }
-      }
-
-      // 3. Release Slot Allocation
-      if (storeId && orderData.pickupDate && orderData.pickupTime) {
-        const slotKey = `${storeId}_${orderData.pickupDate}_${orderData.pickupTime.replace(":", "")}`;
-        const slotRef = db.collection("store_slots").doc(slotKey);
-        tx.update(slotRef, { currentOrders: FieldValue.increment(-1), updatedAt: FieldValue.serverTimestamp() });
-      }
-
-      return {
-        ok: true,
-        orderId,
-        status: "CANCELLED",
-        queueStatus: "cancelled",
-      };
-    });
-  }
+  async (request) => handleRecordEmergencyLookupAuthoritative(db, request)
 );
+
+// Re-export payment webhook for HTTPS callback
+export { paymentWebhook };
 
 
 /**
@@ -1294,6 +607,7 @@ export const reviewParentChildLink = onCall(
       const reviewerName = request.auth.token?.name || request.auth.token?.email || "เจ้าหน้าที่ผู้ดูแล";
       const studentRef = db.collection("students").doc(studentId);
       const walletRef = db.collection("student_wallets").doc(studentId);
+      const standardWalletRef = db.collection("wallets").doc(studentId);
 
       if (outcome.grantsAccess) {
         tx.update(linkRef, {
@@ -1308,6 +622,7 @@ export const reviewParentChildLink = onCall(
         // arrayUnion is idempotent, so a re-link after a revocation is safe.
         tx.set(studentRef, { guardianIds: FieldValue.arrayUnion(guardianId) }, { merge: true });
         tx.set(walletRef, { guardianIds: FieldValue.arrayUnion(guardianId) }, { merge: true });
+        tx.set(standardWalletRef, { guardianIds: FieldValue.arrayUnion(guardianId) }, { merge: true });
       } else if (outcome.revokesAccess) {
         tx.update(linkRef, {
           status: outcome.nextStatus,
@@ -1320,6 +635,7 @@ export const reviewParentChildLink = onCall(
         // Withdraw the access the approval granted, or revocation is cosmetic.
         tx.set(studentRef, { guardianIds: FieldValue.arrayRemove(guardianId) }, { merge: true });
         tx.set(walletRef, { guardianIds: FieldValue.arrayRemove(guardianId) }, { merge: true });
+        tx.set(standardWalletRef, { guardianIds: FieldValue.arrayRemove(guardianId) }, { merge: true });
       } else {
         tx.update(linkRef, {
           status: outcome.nextStatus,

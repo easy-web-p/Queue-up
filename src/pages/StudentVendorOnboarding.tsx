@@ -53,8 +53,8 @@ export default function StudentVendorOnboarding() {
       if (!snapshot.empty) {
         const docData = snapshot.docs[0].data() as VendorApprovalRequest;
         setExistingRequest({
+          ...docData,
           id: snapshot.docs[0].id,
-          ...docData
         });
       } else {
         setExistingRequest(null);

@@ -312,7 +312,12 @@ runTest('The runtime dictionary matches what is written in the file', () => {
 console.log('\n4. Enforcement is wired into createOrderAuthoritative');
 // ===========================================================================
 
-const fnSrc = fs.readFileSync(path.resolve(process.cwd(), 'functions/index.js'), 'utf8');
+const fnSrc = fs.existsSync(path.resolve(process.cwd(), 'functions/modules/orders/createOrder.js'))
+  ? [
+      fs.readFileSync(path.resolve(process.cwd(), 'functions/index.js'), 'utf8'),
+      fs.readFileSync(path.resolve(process.cwd(), 'functions/modules/orders/createOrder.js'), 'utf8'),
+    ].join('\n')
+  : fs.readFileSync(path.resolve(process.cwd(), 'functions/index.js'), 'utf8');
 
 runTest('The order function runs the scan', () => {
   assert(fnSrc.includes('scanOrderForAllergens('), 'createOrderAuthoritative must scan');

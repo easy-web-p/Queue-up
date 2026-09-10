@@ -21,8 +21,7 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() && (
         request.auth.token.get('admin', false) == true ||
-        request.auth.token.get('role', '') == 'admin' ||
-        (request.auth.token.get('email', '') in ['58140@lomsak.ac.th', 'hi00000087@gmail.com', 'easy.web.p@gmail.com'])
+        request.auth.token.get('role', '') == 'admin'
       );
     }
 
@@ -158,7 +157,14 @@ service cloud.firestore {
     // ==========================================
     match /shops/{shopId} {
       allow read: if true;
-      allow create: if isAuthenticated() && (isAdmin() || request.resource.data.ownerUid == request.auth.uid);
+      allow create: if isAuthenticated() && (
+        isAdmin() ||
+        (
+          request.resource.data.ownerUid == request.auth.uid &&
+          request.resource.data.get('status', 'PENDING_REVIEW') == 'PENDING_REVIEW' &&
+          request.resource.data.get('isOpen', false) == false
+        )
+      );
       
       // 🔒 Lock Admin Fields & ownerUid: Store Owner cannot change status, rating, reviewsCount, or transfer ownerUid
       allow update: if isAuthenticated() && (
@@ -352,6 +358,17 @@ service cloud.firestore {
     }
 
     // ==========================================
+    // 9.1 COUPON REDEMPTIONS (Single-Use Ledger, Backend Only)
+    // ==========================================
+    match /coupon_redemptions/{redemptionId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      allow write: if false; // 🔒 Server-Authoritative Ledger Managed Exclusively by Cloud Functions
+    }
+
+    // ==========================================
     // 10. IDEMPOTENCY KEYS (Internal & Owner Read)
     // ==========================================
     match /idempotency_keys/{keyId} {
@@ -504,12 +521,12 @@ service cloud.firestore {
     }
 
     // ==========================================
-    // 19. EMERGENCY AUDIT LOGS (Strict Append-Only Immutable Log)
+    // 19. EMERGENCY AUDIT LOGS (Strict Backend-Only Immutable Log)
     // ==========================================
     match /emergency_audit_logs/{auditId} {
       allow read: if isStaffSupervisor() || isAdmin();
       allow create: if isStaffSupervisor() || isAdmin();
-      allow update, delete: if false; // 🔒 Strict Append-Only: Impossible to alter or erase audit logs
+      allow update, delete: if false; // 🔒 Strict Append-Only: Audit records can never be modified or erased
     }
 
     // ==========================================
@@ -574,7 +591,13 @@ service cloud.firestore {
           isStoreOwner(get(/databases/$(database)/documents/chats/$(chatId)).data.storeId) ||
           isAdmin()
         );
-        allow create: if isAuthenticated() && request.resource.data.senderUid == request.auth.uid;
+        allow create: if isAuthenticated() &&
+          request.resource.data.senderUid == request.auth.uid &&
+          (
+            get(/databases/$(database)/documents/chats/$(chatId)).data.customerUid == request.auth.uid ||
+            isStoreOwner(get(/databases/$(database)/documents/chats/$(chatId)).data.storeId) ||
+            isAdmin()
+          );
         allow update, delete: if isAdmin();
       }
     }

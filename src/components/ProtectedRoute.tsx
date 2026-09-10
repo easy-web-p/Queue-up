@@ -1,3 +1,4 @@
+import React from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { Navigate, useNavigate, useLocation } from "react-router-dom";
 import Loading from "../pages/Loading.jsx";
@@ -5,14 +6,24 @@ import NotFound from "../pages/NotFound.jsx";
 import { switchRole } from "../store/authSlice.js";
 import { canAccessRole, isUserSuperAdmin } from "../utils/authRoles.js";
 
+export interface ProtectedRouteProps {
+  children: React.ReactNode;
+  allowedRoles?: string[];
+  requireApprovedVendor?: boolean;
+}
+
 /**
  * PROTECTED ROUTE GUARD WITH RBAC (Role-Based Access Control)
  * 1. Enforces strict authentication for private pages - redirects to /login if unauthenticated.
  * 2. Enforces Role-Based Access Control for merchant & admin dashboard routes.
  * 3. Hides admin routes from non-admin users by returning 404 (Security by Information Hiding).
  */
-export function ProtectedRoute({ children, allowedRoles = [], requireApprovedVendor = false }) {
-  const { user, isLoading } = useSelector((state) => state.auth);
+export function ProtectedRoute({
+  children,
+  allowedRoles = [],
+  requireApprovedVendor = false,
+}: ProtectedRouteProps) {
+  const { user, isLoading } = useSelector((state: any) => state.auth);
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -158,7 +169,7 @@ export function ProtectedRoute({ children, allowedRoles = [], requireApprovedVen
     }
   }
 
-  return children;
+  return <>{children}</>;
 }
 
 export default ProtectedRoute;

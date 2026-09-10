@@ -98,16 +98,18 @@ export default function GuardianDashboard() {
   }, [uid]);
 
   useEffect(() => {
-    if (!selectedChild) {
+    const currentChild = selectedChild;
+    if (!currentChild) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setRecentOrders([]);
       return;
     }
 
-    async function loadChildProfileAndOrders() {
+    const targetStudentId = currentChild.studentId;
+    async function loadChildProfileAndOrders(studentId: string) {
       try {
         // Load student medical profile & preferences
-        const stuSnap = await getDoc(doc(db, 'students', selectedChild.studentId));
+        const stuSnap = await getDoc(doc(db, 'students', studentId));
         if (stuSnap.exists()) {
           const sData = stuSnap.data() as StudentProfile & { blockedCategories?: string[] };
           setAllergies(sData.allergyInfo || []);
@@ -123,7 +125,7 @@ export default function GuardianDashboard() {
         try {
           const q = query(
             collection(db, 'orders'),
-            where('studentId', '==', selectedChild.studentId),
+            where('studentId', '==', studentId),
             limit(10)
           );
           const snap = await getDocs(q);
@@ -146,7 +148,7 @@ export default function GuardianDashboard() {
         console.error('[GuardianDashboard] Error loading student profile:', err);
       }
     }
-    loadChildProfileAndOrders();
+    loadChildProfileAndOrders(targetStudentId);
   }, [selectedChild]);
 
   const handleSavePreferences = async () => {

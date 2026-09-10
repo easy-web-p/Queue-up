@@ -49,6 +49,8 @@ export interface CreateOrderRequest {
   /** Set only after the customer has confirmed an ALLERGEN_ALERT warning. */
   acknowledgeAllergenWarning?: boolean;
   couponCode?: string;
+  paymentMethod?: 'WALLET' | 'PROMPTPAY' | 'PAY_AT_STORE';
+  studentId?: string;
 }
 
 export interface AllergenTriggerDetail {
@@ -103,6 +105,14 @@ export interface OrderCreationResult {
   totalAmountSatang: number;
   totalAmountBaht: number;
   orderStatus: OrderStatus;
+  paymentStatus?: string;
+  paymentMethod?: string;
+  promptPay?: {
+    qrPayload: string;
+    qrImageUrl?: string;
+    expiresAt: string;
+    expiresInSeconds: number;
+  };
   order: Partial<Order>;
 }
 

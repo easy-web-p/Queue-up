@@ -29,7 +29,7 @@
  * test-firestore-rules-emulator.js.
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 let passed = 0;
@@ -206,7 +206,14 @@ runTest('🚨 The merchant back door is gone', () => {
 
 runTest('🚨 No role decision anywhere reads localStorage', () => {
   // The repository's own rule: roles come from custom claims, never localStorage.
-  const roleFiles = ['src/components/ShopeeSearchBar.jsx', 'src/utils/authRoles.js', 'src/components/ProtectedRoute.jsx', 'src/context/AuthContext.jsx'];
+  const roleFiles = [
+    'src/components/ShopeeSearchBar.jsx',
+    'src/utils/authRoles.js',
+    existsSync(ROOT + 'src/components/ProtectedRoute.tsx')
+      ? 'src/components/ProtectedRoute.tsx'
+      : 'src/components/ProtectedRoute.jsx',
+    'src/context/AuthContext.jsx',
+  ];
   for (const f of roleFiles) {
     const src = read(f);
     for (const m of src.matchAll(/localStorage\.getItem\(\s*["']([\w_]+)["']/g)) {

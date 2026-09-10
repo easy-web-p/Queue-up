@@ -61,7 +61,8 @@ export default function ChildOrderHistory() {
 
   useEffect(() => {
     if (!selectedChild) return;
-    async function loadOrders() {
+    const childStudentId = selectedChild.studentId;
+    async function loadOrders(targetStudentId: string) {
       setIsLoading(true);
       try {
         let ords: ChildOrder[] = [];
@@ -78,13 +79,13 @@ export default function ChildOrderHistory() {
           })) as ChildOrder[];
 
           ords = allChildOrders.filter(
-            (o) => !o.studentId || o.studentId === selectedChild.studentId
+            (o) => !o.studentId || o.studentId === targetStudentId
           );
         } catch {
           // Fallback to studentId direct query if permissible
           const qStudent = query(
             collection(db, 'orders'),
-            where('studentId', '==', selectedChild.studentId),
+            where('studentId', '==', targetStudentId),
             limit(30)
           );
           const snap = await getDocs(qStudent);
@@ -109,7 +110,7 @@ export default function ChildOrderHistory() {
         setIsLoading(false);
       }
     }
-    loadOrders();
+    loadOrders(childStudentId);
   }, [selectedChild]);
 
   const getStatusBadge = (status: string) => {

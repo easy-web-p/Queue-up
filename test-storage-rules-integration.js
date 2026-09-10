@@ -73,7 +73,7 @@ function evaluateStorageRules({ path: filePath, action, auth, requestResource, d
 
   const isValidImage = (maxSizeMB) => {
     if (!requestResource) return false;
-    const allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
     const mimeValid = allowedMimes.includes(requestResource.contentType);
     const sizeValid = typeof requestResource.size === 'number' && requestResource.size <= maxSizeMB * 1024 * 1024;
     return mimeValid && sizeValid;
@@ -98,7 +98,7 @@ function evaluateStorageRules({ path: filePath, action, auth, requestResource, d
     const targetShopId = segments[1];
     if (action === 'read') return true;
     if (action === 'create' || action === 'update') {
-      return isStoreOwner(targetShopId) && isValidImage(10);
+      return isStoreOwner(targetShopId) && isValidImage(5);
     }
     if (action === 'delete') {
       return isStoreOwner(targetShopId);
@@ -123,7 +123,7 @@ function evaluateStorageRules({ path: filePath, action, auth, requestResource, d
       return isAuthenticated && (
         isAdmin() ||
         (productExists && isOwnerOfProductStore && isMetadataConsistent)
-      ) && isValidImage(10);
+      ) && isValidImage(5);
     }
     if (action === 'delete') {
       return isAuthenticated && (
@@ -231,6 +231,28 @@ async function main() {
       path: '/users/user_cust_01/giant_photo.jpg',
       action: 'create',
       auth: { uid: 'user_cust_01', token: { role: 'customer' } },
+      requestResource: { contentType: 'image/jpeg', size: 6 * 1024 * 1024 }
+    });
+    assert.equal(isAllowed, false);
+  });
+
+  // Test 9.1: GIF image upload is DENIED (MIME restricted to JPEG, PNG, WebP)
+  await runTest('Test 9.1: GIF image upload is DENIED', async () => {
+    const isAllowed = evaluateStorageRules({
+      path: '/shops/store_A/animation.gif',
+      action: 'create',
+      auth: { uid: 'merchant_A_uid', token: { role: 'merchant' } },
+      requestResource: { contentType: 'image/gif', size: 1024 * 100 }
+    });
+    assert.equal(isAllowed, false);
+  });
+
+  // Test 9.2: Oversized shop banner (> 5MB) is DENIED under uniform 5MB limit
+  await runTest('Test 9.2: Oversized shop banner (> 5MB) is DENIED under 5MB uniform limit', async () => {
+    const isAllowed = evaluateStorageRules({
+      path: '/shops/store_A/huge_banner.jpg',
+      action: 'create',
+      auth: { uid: 'merchant_A_uid', token: { role: 'merchant' } },
       requestResource: { contentType: 'image/jpeg', size: 6 * 1024 * 1024 }
     });
     assert.equal(isAllowed, false);

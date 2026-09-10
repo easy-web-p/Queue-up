@@ -2,12 +2,18 @@ import { lazy, Suspense } from "react";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { PreferencesProvider } from "./context/PreferencesContext.jsx";
 import { ToastProvider } from "./components/ToastProvider.jsx";
+import { CampusProvider } from "./features/identity/context/CampusContext.tsx";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import PageRouteLoader, { PageRouteLoaderView } from "./components/PageRouteLoader.jsx";
 import CookieConsentBanner from "./components/CookieConsentBanner.jsx";
 import CookieSessionTracker from "./components/CookieSessionTracker.jsx";
 import InAppBrowserBanner from "./components/InAppBrowserBanner.jsx";
+
+import marketplaceRoutes from "./app/router/marketplaceRoutes.tsx";
+import businessRoutes from "./app/router/businessRoutes.tsx";
+import supportRoutes from "./app/router/supportRoutes.tsx";
+import campusRoutes from "./app/router/campusRoutes.tsx";
 
 import NotFound from "./pages/NotFound.jsx"; // eager: ProtectedRoute imports it synchronously
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
@@ -43,7 +49,8 @@ function App() {
     <PreferencesProvider>
       <ToastProvider>
         <AuthProvider>
-        <BrowserRouter>
+          <CampusProvider>
+          <BrowserRouter>
           {/* First tab stop on every page: lets keyboard and switch users reach the
               page content without tabbing through the whole navigation. Invisible
               until focused. */}
@@ -64,6 +71,12 @@ function App() {
                 exact box they had before this wrapper existed. */}
             <div id="main-content" tabIndex={-1} className="flex flex-col flex-1 min-w-0">
             <Routes>
+            {/* Modular Tri-Product Routes */}
+            {marketplaceRoutes}
+            {businessRoutes}
+            {supportRoutes}
+            {campusRoutes}
+
             <Route path="/" element={<LandingPage />} />
             <Route path="/landing" element={<LandingPage />} />
             <Route path="/queueup" element={<Queueup />} />
@@ -139,6 +152,7 @@ function App() {
             </Suspense>
           </ErrorBoundary>
         </BrowserRouter>
+        </CampusProvider>
         </AuthProvider>
       </ToastProvider>
     </PreferencesProvider>

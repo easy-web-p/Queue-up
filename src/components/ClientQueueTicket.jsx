@@ -28,6 +28,15 @@ const PHASES = [
   { id: 'COMPLETED', label: 'รับอาหารเสร็จสิ้น', shortLabel: 'สำเร็จ', icon: CheckCircle2, color: 'text-slate-400', bg: 'bg-slate-500' }
 ];
 
+/**
+ * @param {{
+ *   activeOrder?: any;
+ *   orderId?: string;
+ *   onOpenChat?: () => void;
+ *   onClose?: () => void;
+ *   compact?: boolean;
+ * }} [props]
+ */
 export const ClientQueueTicket = ({
   activeOrder: initialOrder = null,
   orderId: initialOrderId = undefined,

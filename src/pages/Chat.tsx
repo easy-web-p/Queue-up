@@ -3,8 +3,9 @@ import { useSelector } from 'react-redux';
 import { Send, ArrowLeft, Store, Image as ImageIcon, CheckCheck, ShieldCheck } from 'lucide-react';
 import { ChatMessage, MerchantShop, CustomerProfile, formatTimestamp } from '../types';
 import { fetchShopsFromFirestore } from '../lib/firebase';
-import { db } from '../firebase/config.js';
+import { db, functions } from '../firebase/config.js';
 import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 
 interface ChatPageProps {
   currentUser?: CustomerProfile | null;
@@ -100,47 +101,30 @@ export const Chat: React.FC<ChatPageProps> = ({
     setMessages((prev) => [...prev, newMsg]);
     setInputMsg('');
 
-    // Write to Firestore if connected
+    // Authoritative send via Cloud Function if available, else secure direct client Firestore write
     if (currentChatId) {
       try {
-        await addDoc(collection(db, 'chats', currentChatId, 'messages'), {
-          sender: 'client',
-          senderUid: activeUser?.uid || 'guest',
-          text: cleanText,
-          timestamp: timeStr,
-          createdAt: serverTimestamp(),
-        });
-      } catch (err) {
-        console.warn('[Chat] Could not save message to Firestore:', err);
-      }
-    }
-
-    // Simulated merchant auto reply if offline
-    setTimeout(async () => {
-      const replyTime = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.';
-      const autoReplyText = `รับทราบครับ ทางร้าน${targetShop?.shopName ? ` (${targetShop.shopName})` : ''} ได้รับข้อความแล้ว จะรีบจัดเตรียมอาหารให้อย่างรวดเร็วครับ! 🍳`;
-      const autoReply: ChatMessage = {
-        id: `msg-reply-${Date.now()}`,
-        sender: 'merchant',
-        text: autoReplyText,
-        timestamp: replyTime,
-      };
-
-      setMessages((prev) => [...prev, autoReply]);
-
-      if (currentChatId) {
-        try {
+        if (functions && activeUser?.uid) {
+          const sendChatCallable = httpsCallable(functions, 'sendChatMessageAuthoritative');
+          await sendChatCallable({
+            chatId: currentChatId,
+            text: cleanText,
+            storeId: targetShop?.id || (targetShop as any)?.shopId || '',
+            senderRole: 'client',
+          });
+        } else {
           await addDoc(collection(db, 'chats', currentChatId, 'messages'), {
-            sender: 'merchant',
-            text: autoReplyText,
-            timestamp: replyTime,
+            sender: 'client',
+            senderUid: activeUser?.uid || 'guest',
+            text: cleanText,
+            timestamp: timeStr,
             createdAt: serverTimestamp(),
           });
-        } catch {
-          // ignore
         }
+      } catch (err) {
+        console.warn('[Chat] Message sending error:', err);
       }
-    }, 1200);
+    }
   };
 
   return (

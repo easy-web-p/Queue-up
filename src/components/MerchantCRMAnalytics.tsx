@@ -40,11 +40,11 @@ export const MerchantCRMAnalytics: React.FC<Props> = ({ customers, onSendBroadca
 
   const totalRevenueBaht = storeStats?.totalRevenueSatang
     ? Math.round(storeStats.totalRevenueSatang / 100)
-    : customers.reduce((acc, c) => acc + c.totalSpent, 0);
+    : customers.reduce((acc, c) => acc + (c.totalSpent || 0), 0);
 
   const totalOrders = storeStats?.totalOrdersCount
     ? storeStats.totalOrdersCount
-    : customers.reduce((acc, c) => acc + c.totalOrders, 0);
+    : customers.reduce((acc, c) => acc + (c.totalOrders || 0), 0);
 
   const handleBroadcast = (e: React.FormEvent) => {
     e.preventDefault();

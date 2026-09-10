@@ -51,6 +51,18 @@ async function test(index, name, fn) {
 // Helper to read files cleanly
 const readFile = (relPath) => fs.readFileSync(path.resolve(process.cwd(), relPath), 'utf-8');
 
+const readBackendCode = () => {
+  const files = [
+    'functions/index.js',
+    'functions/modules/orders/createOrder.js',
+    'functions/modules/orders/cancelOrder.js',
+    'functions/modules/orders/updateOrderStatus.js',
+    'functions/modules/orders/slotHelper.js',
+    'functions/modules/payments/paymentService.js',
+  ];
+  return files.map((f) => readFile(f)).join('\n');
+};
+
 (async () => {
   // 1. Typecheck
   await test(1, 'npm run typecheck (0 TypeScript errors)', () => {
@@ -87,19 +99,18 @@ const readFile = (relPath) => fs.readFileSync(path.resolve(process.cwd(), relPat
     assert.equal(config.emulators.firestore?.port, 8080, 'Firestore emulator port must be 8080');
   });
 
-  // 6. createOrderAuthoritative Zero-Payment Contract
-  await test(6, 'createOrderAuthoritative emits pure Order schema (no paymentMode/paymentStatus)', () => {
-    const fnCode = readFile('functions/index.js');
-    assert.ok(fnCode.includes('export const createOrderAuthoritative'), 'createOrderAuthoritative must exist');
-    assert.ok(!fnCode.includes('paymentMode:'), 'createOrderAuthoritative must not write paymentMode');
-    assert.ok(!fnCode.includes('paymentStatus:'), 'createOrderAuthoritative must not write paymentStatus');
-    assert.ok(fnCode.includes('status: "PENDING"'), 'Initial status must be PENDING');
+  // 6. createOrderAuthoritative Dual-Payment Coupled State Machine Contract
+  await test(6, 'createOrderAuthoritative emits coupled order schema (status, queueStatus, paymentStatus)', () => {
+    const fnCode = readBackendCode();
+    assert.ok(fnCode.includes('createOrderAuthoritative'), 'createOrderAuthoritative must exist');
     assert.ok(fnCode.includes('queueStatus: "waiting"'), 'Initial queueStatus must be waiting');
+    assert.ok(fnCode.includes('paymentStatus = "PAID"') || fnCode.includes('paymentStatus = "PENDING_AT_STORE"'), 'Must resolve paymentStatus');
+    assert.ok(fnCode.includes('orderStatus = "CONFIRMED"'), 'Must resolve orderStatus');
   });
 
   // 7. Concurrent Q001/Q002/Q003 & Q999 Queue Capacity Boundary
   await test(7, 'Queue counter increments Q001 -> Q999 and rejects Q1000 with QUEUE_CAPACITY_EXCEEDED', () => {
-    const fnCode = readFile('functions/index.js');
+    const fnCode = readBackendCode();
     assert.ok(fnCode.includes('if (sequenceNumber > 999)'), 'Must check sequenceNumber > 999');
     assert.ok(fnCode.includes('QUEUE_CAPACITY_EXCEEDED'), 'Must throw QUEUE_CAPACITY_EXCEEDED when overflow occurs');
     
@@ -112,21 +123,21 @@ const readFile = (relPath) => fs.readFileSync(path.resolve(process.cwd(), relPat
 
   // 8. Stock Contention Logic
   await test(8, 'createOrderAuthoritative validates stock and deducts atomically in transaction', () => {
-    const fnCode = readFile('functions/index.js');
+    const fnCode = readBackendCode();
     assert.ok(fnCode.includes('INSUFFICIENT_STOCK'), 'Must validate stock');
-    assert.ok(fnCode.includes('stock: currentStock - requiredTotalQty'), 'Must atomically decrement stock in tx');
+    assert.ok(fnCode.includes('stock: prodData.stock - requiredQty'), 'Must atomically decrement stock in tx');
   });
 
   // 9. Slot Contention Logic
   await test(9, 'createOrderAuthoritative validates slot capacity and allocates atomically in transaction', () => {
-    const fnCode = readFile('functions/index.js');
+    const fnCode = readBackendCode();
     assert.ok(fnCode.includes('SLOT_CAPACITY_EXCEEDED'), 'Must reject when slot is full');
     assert.ok(fnCode.includes('currentOrders: currentSlotOrders + 1'), 'Must increment slot currentOrders in tx');
   });
 
   // 10. Modifier Validation & Canonical Price Calculation
   await test(10, 'createOrderAuthoritative validates modifiers and calculates Satang canonical prices', () => {
-    const fnCode = readFile('functions/index.js');
+    const fnCode = readBackendCode();
     assert.ok(fnCode.includes('REQUIRED_MODIFIER_MISSING'), 'Must validate required modifier groups');
     assert.ok(fnCode.includes('SINGLE_SELECTION_VIOLATED'), 'Must validate single selection limit');
     assert.ok(fnCode.includes('calculatedTotalSatang'), 'Must calculate total in satang');
@@ -134,27 +145,27 @@ const readFile = (relPath) => fs.readFileSync(path.resolve(process.cwd(), relPat
 
   // 11. Invalid Calendar Date Rejection
   await test(11, 'Rejection of invalid calendar dates (2026-02-31, 2026-99-99)', () => {
-    const fnCode = readFile('functions/index.js');
+    const fnCode = readBackendCode();
     assert.ok(fnCode.includes('isValidCalendarDate'), 'Must validate calendar date authenticity');
     assert.ok(fnCode.includes('INVALID_CALENDAR_DATE'), 'Must throw INVALID_CALENDAR_DATE');
   });
 
   // 12. Same-Day Past Pickup Time Guard
   await test(12, 'Rejection of same-day past pickup time against Asia/Bangkok clock', () => {
-    const fnCode = readFile('functions/index.js');
+    const fnCode = readBackendCode();
     assert.ok(fnCode.includes('PAST_PICKUP_TIME_NOT_ALLOWED'), 'Must reject past pickup times on same day');
     assert.ok(fnCode.includes('getBangkokCurrentTime'), 'Must compare with Bangkok current time');
   });
 
   // 13. Cross-Store Product Guard
   await test(13, 'Rejection of cross-store products in an order', () => {
-    const fnCode = readFile('functions/index.js');
+    const fnCode = readBackendCode();
     assert.ok(fnCode.includes('CROSS_STORE_PRODUCT_VIOLATION'), 'Must reject products from other stores');
   });
 
   // 14. Missing Store Capacity Fail-Closed
   await test(14, 'Fail-closed when store capacity is not configured', () => {
-    const fnCode = readFile('functions/index.js');
+    const fnCode = readBackendCode();
     assert.ok(fnCode.includes('STORE_CAPACITY_NOT_CONFIGURED'), 'Must throw STORE_CAPACITY_NOT_CONFIGURED');
   });
 

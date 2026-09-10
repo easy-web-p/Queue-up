@@ -30,9 +30,9 @@ service firebase.storage {
       );
     }
 
-    // Strict MIME whitelist & File size limiter
+    // Strict MIME whitelist (JPEG, PNG, WebP only) & File size limiter (max 5MB)
     function isValidImage(maxSizeMB) {
-      return request.resource.contentType in ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] &&
+      return request.resource.contentType in ['image/jpeg', 'image/png', 'image/webp'] &&
              request.resource.size <= maxSizeMB * 1024 * 1024;
     }
 
@@ -46,7 +46,7 @@ service firebase.storage {
     // 2. Shop Banners, Logos & Media (Store Owner / Admin only)
     match /shops/{shopId}/{allPaths=**} {
       allow read: if true;
-      allow create, update: if isStoreOwner(shopId) && isValidImage(10);
+      allow create, update: if isStoreOwner(shopId) && isValidImage(5);
       allow delete: if isStoreOwner(shopId);
     }
 
@@ -64,7 +64,7 @@ service firebase.storage {
             request.resource.metadata.storeId == firestore.get(/databases/(default)/documents/products/$(productId)).data.storeId
           )
         )
-      ) && isValidImage(10);
+      ) && isValidImage(5);
       allow delete: if isAuthenticated() && (
         isAdmin() ||
         (

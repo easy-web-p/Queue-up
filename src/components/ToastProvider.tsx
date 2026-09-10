@@ -1,29 +1,39 @@
 /* eslint-disable react-refresh/only-export-components */
 /**
  * 🔔 Toast notifications — the in-app replacement for window.alert().
- *
- * The app raised ~60 browser alert() and confirm() dialogs for ordinary user
- * feedback. Those are the one piece of UI the design system cannot touch: they use
- * the operating system's own chrome, ignore the Warm Dark Canteen palette and the
- * Kanit/IBM Plex typography entirely, block the JavaScript thread while open, and on
- * iOS render as a jarring modal that can be suppressed by the browser. A student
- * being told their order failed deserves better than a grey OS box.
- *
- * This is a straight replacement, not a redesign: same message, same moment, in the
- * app's own visual language, announced to assistive technology, and dismissable.
- *
- * Usage:
- *   const toast = useToast();
- *   toast.error('ข้อความ');           // also .success() .info() .warning()
- *   await toast.confirm({ title, message, confirmLabel, tone });  // → boolean
  */
 
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, AlertTriangle, AlertCircle, Info, X } from 'lucide-react';
 
-const ToastContext = createContext(null);
+export type ToastTone = 'success' | 'error' | 'warning' | 'info';
 
-const TONE = {
+export interface ConfirmOptions {
+  title?: string;
+  message?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  tone?: ToastTone;
+}
+
+export interface ToastApi {
+  success: (message: string, options?: any) => void;
+  error: (message: string, options?: any) => void;
+  warning: (message: string, options?: any) => void;
+  info: (message: string, options?: any) => void;
+  dismiss: (id: number) => void;
+  confirm: (options: ConfirmOptions) => Promise<boolean>;
+}
+
+const ToastContext = createContext<ToastApi | null>(null);
+
+const TONE: Record<ToastTone, {
+  icon: any;
+  ring: string;
+  bg: string;
+  fg: string;
+  iconFg: string;
+}> = {
   success: {
     icon: CheckCircle2,
     ring: 'border-emerald-400 dark:border-emerald-600',
@@ -54,25 +64,36 @@ const TONE = {
   },
 };
 
-export function ToastProvider({ children }) {
-  const [toasts, setToasts] = useState([]);
-  const [dialog, setDialog] = useState(null);
-  const nextId = useRef(0);
-  // Held outside state so resolving does not depend on a render having happened.
-  const dialogResolver = useRef(null);
+interface ToastItem {
+  id: number;
+  message: string;
+  tone: ToastTone;
+  duration: number;
+}
 
-  const dismiss = useCallback((id) => {
-    setToasts((current) => current.filter((t) => t.id !== id));
+interface DialogState {
+  title?: string;
+  message?: string;
+  confirmLabel: string;
+  cancelLabel: string;
+  tone: ToastTone;
+}
+
+export function ToastProvider({ children }: { children: React.ReactNode }) {
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [dialog, setDialog] = useState<DialogState | null>(null);
+  const nextId = useRef(0);
+  const dialogResolver = useRef<((val: boolean) => void) | null>(null);
+
+  const dismiss = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
   const push = useCallback(
-    (tone, message, { duration = 5000 } = {}) => {
-      if (!message) return null;
+    (tone: ToastTone, message: string, { duration = 4000 } = {}) => {
       const id = ++nextId.current;
-      setToasts((current) => [...current, { id, tone, message: String(message) }]);
-      // Errors stay until dismissed: they usually carry something the user has to
-      // act on, and a message that vanishes mid-read is worse than none.
-      if (tone !== 'error' && duration > 0) {
+      setToasts((prev) => [...prev, { id, message, tone, duration }]);
+      if (duration > 0 && tone !== 'error') {
         setTimeout(() => dismiss(id), duration);
       }
       return id;
@@ -81,22 +102,22 @@ export function ToastProvider({ children }) {
   );
 
   const confirm = useCallback(
-    ({ title, message, confirmLabel = 'ยืนยัน', cancelLabel = 'ยกเลิก', tone = 'warning' }) =>
-      new Promise((resolve) => {
+    ({ title, message, confirmLabel = 'ยืนยัน', cancelLabel = 'ยกเลิก', tone = 'warning' }: ConfirmOptions) =>
+      new Promise<boolean>((resolve) => {
         dialogResolver.current = resolve;
         setDialog({ title, message, confirmLabel, cancelLabel, tone });
       }),
     []
   );
 
-  const closeDialog = useCallback((result) => {
+  const closeDialog = useCallback((result: boolean) => {
     setDialog(null);
     const resolve = dialogResolver.current;
     dialogResolver.current = null;
     if (resolve) resolve(result);
   }, []);
 
-  const api = useMemo(
+  const api: ToastApi = useMemo(
     () => ({
       success: (m, o) => push('success', m, o),
       error: (m, o) => push('error', m, o),
@@ -115,8 +136,7 @@ export function ToastProvider({ children }) {
     <ToastContext.Provider value={api}>
       {children}
 
-      {/* Live region: assistive technology announces new messages without stealing
-          focus, which is what alert() did on every single message. */}
+      {/* Live region for accessibility */}
       <div
         aria-live="polite"
         aria-atomic="false"
@@ -207,11 +227,7 @@ export function ToastProvider({ children }) {
   );
 }
 
-/**
- * Falls back to the browser dialogs when used outside the provider, so a component
- * rendered in isolation (or a test) still communicates rather than throwing.
- */
-export function useToast() {
+export function useToast(): ToastApi {
   const ctx = useContext(ToastContext);
   return (
     ctx || {
@@ -220,7 +236,9 @@ export function useToast() {
       warning: (m) => window.alert(m),
       info: (m) => window.alert(m),
       dismiss: () => {},
-      confirm: async ({ title, message }) => window.confirm([title, message].filter(Boolean).join('\n\n')),
+      confirm: async (opt) => window.confirm(opt.message || opt.title || 'ยืนยันหรือไม่?'),
     }
   );
 }
+
+export default ToastProvider;
