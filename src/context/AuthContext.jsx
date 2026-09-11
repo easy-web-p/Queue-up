@@ -204,7 +204,7 @@ export function AuthProvider({ children }) {
       }
 
       if (err.code === 'auth/unauthorized-domain') {
-        const currentHostname = typeof window !== 'undefined' ? window.location.hostname : 'queue-up-nu.vercel.app';
+        const currentHostname = typeof window !== 'undefined' ? window.location.hostname : 'queueup-65e82.web.app';
         toast.error(`⚠️ โดเมน "${currentHostname}" ยังไม่ถูกเพิ่มใน Authorized Domains ของ Firebase Console\n(กรุณาเพิ่มใน Firebase Console > Authentication > Settings > Authorized domains หรือเข้าสู่ระบบด้วยอีเมล/รหัสผ่าน)`);
         return null;
       }

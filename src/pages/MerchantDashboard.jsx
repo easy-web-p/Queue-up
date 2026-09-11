@@ -30,6 +30,7 @@ import {
 } from "../services/communityService.js";
 import Footer from "../components/Footer.jsx";
 import { useToast } from "../components/ToastProvider.jsx";
+import { isUserSuperAdmin } from "../utils/authRoles.js";
 import "./MerchantDashboard.css";
 
 function MerchantDashboard() {
@@ -199,6 +200,7 @@ function MerchantDashboard() {
         console.warn("[MerchantDashboard] Error resolving authoritative store:", err);
         if (!isCancelled) {
           setIsStoreLoading(false);
+          setHasNoStore(true);
         }
       }
     }
@@ -629,28 +631,43 @@ function MerchantDashboard() {
     );
   }
 
-  if (hasNoStore) {
+  if (hasNoStore || !isRegistered) {
+    const isSuperAdmin = isUserSuperAdmin(user);
     return (
-      <div className="container py-5 text-center">
-        <div className="card shadow-sm p-5 max-w-lg mx-auto border-0 rounded-4">
-          <div className="mb-3 text-warning display-4"><i className="bi bi-shop" /></div>
-          <h4 className="fw-bold text-dark mb-2">ยังไม่พบข้อมูลร้านค้าในระบบ</h4>
+      <div className="container py-5 text-center font-['Kanit']">
+        <div className="card shadow-lg p-5 max-w-xl mx-auto border-0 rounded-4 bg-white">
+          <div className="mb-3 text-warning display-4">
+            <i className="bi bi-shop" />
+          </div>
+          <h3 className="fw-bold text-dark mb-2">ยังไม่พบข้อมูลร้านค้าในระบบ</h3>
           <p className="text-muted mb-4 small">
-            บัญชีของคุณยังไม่ได้สร้างร้านค้าบน Firestore Authoritative Database กรุณาลงทะเบียนร้านค้าเพื่อเริ่มต้นรับคิวและจัดการเมนูอาหาร
+            บัญชีของคุณ ({user?.email || user?.name || "ผู้ใช้งาน"}) ยังไม่ได้เชื่อมโยงกับร้านค้าในระบบ หรือยังไม่ได้รับการอนุมัติ กรุณาลงทะเบียนร้านค้าเพื่อเริ่มต้นรับคิวและจัดการเมนูอาหาร
           </p>
-          <button
-            className="btn btn-danger btn-lg rounded-pill px-4 fw-bold"
-            onClick={() => navigate("/student-vendor/apply")}
-          >
-            <i className="bi bi-plus-circle me-2" /> สมัครเปิดร้านค้าผู้ขายนักเรียน (Student Vendor)
-          </button>
+          <div className="d-flex flex-column gap-2 max-w-md mx-auto">
+            <button
+              className="btn btn-danger btn-lg rounded-pill px-4 fw-bold shadow-sm"
+              onClick={() => navigate("/student-vendor/apply")}
+            >
+              <i className="bi bi-plus-circle me-2" /> สมัครเปิดร้านค้าผู้ขายนักเรียน (Student Vendor)
+            </button>
+            {isSuperAdmin && (
+              <button
+                className="btn btn-primary rounded-pill px-4 fw-bold shadow-sm"
+                onClick={() => navigate("/admin")}
+              >
+                <i className="bi bi-shield-lock-fill me-2" /> ไปที่ระบบจัดการร้านค้าส่วนกลาง (Store Admin Panel)
+              </button>
+            )}
+            <button
+              className="btn btn-outline-secondary rounded-pill px-4"
+              onClick={() => navigate("/home")}
+            >
+              <i className="bi bi-arrow-left me-1" /> กลับสู่หน้าหลัก
+            </button>
+          </div>
         </div>
       </div>
     );
-  }
-
-  if (!isRegistered) {
-    return null;
   }
 
   return (
