@@ -148,7 +148,7 @@ export function handleKeystrokeInput(
     metaKey?: boolean;
     altKey?: boolean;
     preventDefault: () => void;
-    target: KeystrokeInputElement | null;
+    target: EventTarget | KeystrokeInputElement | null;
   },
   targetLayout: 'th' | 'en'
 ): boolean {
@@ -159,7 +159,7 @@ export function handleKeystrokeInput(
   const typedChar = event.key;
   const translatedChar = translateKeystroke(typedChar, targetLayout);
 
-  if (translatedChar !== typedChar && event.target) {
+  if (translatedChar !== typedChar && event.target && 'value' in event.target) {
     event.preventDefault();
 
     const input = event.target as HTMLInputElement;
@@ -180,3 +180,100 @@ export function handleKeystrokeInput(
 
   return false;
 }
+
+export interface BackgroundTranslatorOptions {
+  /**
+   * 'auto': Translates keystrokes based on detected input language
+   * 'force-th': Always converts English keystrokes into Thai Kedmanee
+   * 'force-en': Always converts Thai keystrokes into English US QWERTY
+   */
+  mode?: 'auto' | 'force-th' | 'force-en';
+  /**
+   * 'realtime': Converts key-by-key in the background as the user types
+   * 'word': Converts word silently when space or enter is pressed
+   */
+  strategy?: 'realtime' | 'word';
+}
+
+/**
+ * Attaches a silent background listener to an HTML input or textarea.
+ * Operates 100% in the background without any visible UI, hints, or popups.
+ * Returns an unbind cleanup function.
+ */
+export function attachBackgroundKeystrokeTranslator(
+  element: HTMLInputElement | HTMLTextAreaElement,
+  options: BackgroundTranslatorOptions = {}
+): () => void {
+  const { mode = 'auto', strategy = 'realtime' } = options;
+
+  if (strategy === 'realtime') {
+    const handleKeyDown = (evt: Event) => {
+      const e = evt as KeyboardEvent;
+      if (e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1) return;
+
+      const char = e.key;
+      let targetLayout: 'th' | 'en';
+
+      if (mode === 'force-th') targetLayout = 'th';
+      else if (mode === 'force-en') targetLayout = 'en';
+      else {
+        targetLayout = isEnglishChar(char) ? 'th' : 'en';
+      }
+
+      handleKeystrokeInput(e, targetLayout);
+    };
+
+    element.addEventListener('keydown', handleKeyDown);
+    return () => element.removeEventListener('keydown', handleKeyDown);
+  }
+
+  // Strategy 'word': Silent word-level correction on space/enter
+  const handleKeyDown = (evt: Event) => {
+    const e = evt as KeyboardEvent;
+    if (e.key === ' ' || e.key === 'Enter') {
+      const val = element.value;
+      const start = element.selectionStart ?? val.length;
+      const beforeCursor = val.slice(0, start);
+      const words = beforeCursor.split(/\s+/);
+      const lastWord = words[words.length - 1];
+
+      if (lastWord && lastWord.length > 0) {
+        const translated = translateText(lastWord);
+        if (translated !== lastWord) {
+          const wordStart = beforeCursor.lastIndexOf(lastWord);
+          const afterCursor = val.slice(start);
+          element.value = val.slice(0, wordStart) + translated + afterCursor;
+          const newPos = wordStart + translated.length;
+          element.setSelectionRange(newPos, newPos);
+          element.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
+    }
+  };
+
+  element.addEventListener('keydown', handleKeyDown);
+  return () => element.removeEventListener('keydown', handleKeyDown);
+}
+
+/**
+ * Transparent background matcher for search bars, command palettes, and auto-completes.
+ * Silently matches if the target contains the raw query OR the layout-translated query.
+ * Operates 100% in the background with zero UI changes.
+ */
+export function backgroundSearchMatches(targetText: string, searchQuery: string): boolean {
+  if (!targetText || !searchQuery) return false;
+
+  const q = searchQuery.trim().toLowerCase();
+  if (!q) return false;
+
+  const target = targetText.toLowerCase();
+  if (target.includes(q)) return true;
+
+  const translated = translateText(q).toLowerCase();
+  if (translated && translated !== q && target.includes(translated)) {
+    return true;
+  }
+
+  return false;
+}
+

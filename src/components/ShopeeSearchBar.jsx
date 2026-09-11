@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth.js";
 import { clearUser, switchRole } from "../store/authSlice.js";
 import { isUserSuperAdmin } from "../utils/authRoles.js";
-import { translateText } from "../utils/keystrokeTranslator.ts";
+import { backgroundSearchMatches } from "../utils/keystrokeTranslator.ts";
 import { usePreferences } from "../context/PreferencesContext.jsx";
 import { selectCartTotalCount, selectCartItems, updateQuantity, removeItem } from "../store/cartSlice";
 import ClientCartModal from "./ClientCartModal.jsx";
@@ -46,12 +46,6 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
   const [isThemeOpen, setIsThemeOpen] = useState(false);
   const [isCampusOpen, setIsCampusOpen] = useState(false);
   const [, setIsNotificationOpen] = useState(false);
-
-  const translatedAlternative = useMemo(() => {
-    if (!searchTerm || searchTerm.trim().length === 0) return "";
-    const translated = translateText(searchTerm);
-    return translated !== searchTerm ? translated : "";
-  }, [searchTerm]);
 
   useEffect(() => {
     const handleOutsideClick = () => {
@@ -107,11 +101,11 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // 2. Filter Logic (ค้นหาคีย์เวิร์ดด้วย useMemo เพื่อหลีกเลี่ยงการ setState ใน useEffect)
+  // 2. Filter Logic (ค้นหาคีย์เวิร์ดด้วย useMemo ทำงานเบื้องหลังด้วย backgroundSearchMatches)
   const suggestions = useMemo(() => {
     if (debouncedQuery.trim().length > 0) {
       return MOCK_PRODUCTS.filter((item) =>
-        item.toLowerCase().includes(debouncedQuery.toLowerCase())
+        backgroundSearchMatches(item, debouncedQuery)
       );
     }
     return [];
@@ -845,17 +839,9 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
             <input
               type="text"
               className="shopee-search-input"
-              placeholder={language === "en" ? "Search foods, shops, or ask QueueUp AI... (F2: Switch Lang)" : "ค้นหาร้าน อาหาร หรือถาม QueueUp AI... (F2: สลับภาษา)"}
+              placeholder={language === "en" ? "Search foods, shops, or ask QueueUp AI..." : "ค้นหาร้าน อาหาร หรือถาม QueueUp AI..."}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "F2") {
-                  e.preventDefault();
-                  if (translatedAlternative) {
-                    setSearchTerm(translatedAlternative);
-                  }
-                }
-              }}
               onFocus={() => setIsInputFocused(true)}
               onBlur={() => setTimeout(() => setIsInputFocused(false), 200)}
               autoComplete="off"
@@ -948,19 +934,6 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
                   <i className="bi bi-search text-danger me-2" />
                   <span>ค้นหา "<strong>{searchTerm}</strong>"</span>
                 </div>
-                {translatedAlternative && (
-                  <div
-                    className="shopee-suggestion-row bg-warning-subtle text-dark border-bottom"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      setSearchTerm(translatedAlternative);
-                      handleSelectKeyword(translatedAlternative);
-                    }}
-                  >
-                    <i className="bi bi-keyboard text-warning me-2" />
-                    <span>สลับภาษาแป้นพิมพ์: "<strong>{translatedAlternative}</strong>" <span className="badge bg-secondary ms-1 small">กด F2</span></span>
-                  </div>
-                )}
                 {suggestions.map((item, idx) => (
                   <div
                     key={idx}

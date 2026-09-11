@@ -9,6 +9,8 @@ import {
   isThaiChar,
   isEnglishChar,
   translateKeystroke,
+  backgroundSearchMatches,
+  attachBackgroundKeystrokeTranslator,
 } from './src/utils/keystrokeTranslator.ts';
 
 console.log('🧪 Starting Thai <-> English Keystroke Translator Test Suite...\n');
@@ -53,6 +55,26 @@ assert.equal(EN_TO_TH['g'], 'เ', 'EN_TO_TH map check');
 assert.equal(TH_TO_EN['เ'], 'g', 'TH_TO_EN map check');
 assert.equal(detectLayout('สวัสดี'), 'th', 'detectLayout Thai');
 assert.equal(detectLayout('hello'), 'en', 'detectLayout English');
-console.log('✅ Test 7: translateKeystroke and dictionary lookup passed');
+// 8. Background search matching test (Works 100% in the background)
+assert.equal(backgroundSearchMatches('ประตูทางเข้าโรงเรียน', 'g-hk'), true, 'Typing "g-hk" matches "เข้า" in the background');
+assert.equal(backgroundSearchMatches('ข้าวมันไก่', '-hk;'), true, 'Typing "-hk;" matches "ข้าว" in the background');
+assert.equal(backgroundSearchMatches('ข้าวผัดกุ้ง', 'ส้มตำ'), false, 'Mismatched words return false');
+assert.equal(backgroundSearchMatches('Admin Settings', 'ฟกทรื'), true, 'Typing "ฟกทรื" matches "Admin Settings" in the background');
+console.log('✅ Test 8: backgroundSearchMatches passed (Seamless background cross-layout matching)');
 
-console.log('\n🎉 ALL 7 KEYSTROKE TRANSLATOR TESTS PASSED SUCCESSFULLY!');
+// 9. attachBackgroundKeystrokeTranslator test
+const fakeInput = {
+  value: 'test ',
+  listeners: {},
+  addEventListener(event, fn) { this.listeners[event] = fn; },
+  removeEventListener(event) { delete this.listeners[event]; },
+  dispatchEvent() { return true; },
+  setSelectionRange() {}
+};
+const cleanup = attachBackgroundKeystrokeTranslator(fakeInput);
+assert.equal(typeof cleanup, 'function', 'attachBackgroundKeystrokeTranslator returns cleanup function');
+cleanup();
+assert.equal(fakeInput.listeners['keydown'], undefined, 'Cleanup removes keydown listener');
+console.log('✅ Test 9: attachBackgroundKeystrokeTranslator passed');
+
+console.log('\n🎉 ALL 9 KEYSTROKE TRANSLATOR TESTS PASSED SUCCESSFULLY!');

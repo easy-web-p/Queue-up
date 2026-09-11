@@ -6,6 +6,7 @@ import ChatModal from "../components/ChatModal.jsx";
 import Footer from "../components/Footer.jsx";
 import { fetchProductsFromFirestore } from "../lib/firebase.js";
 import { FoodGridSkeleton, ErrorState } from "../components/LoadingStates.jsx";
+import { backgroundSearchMatches } from "../utils/keystrokeTranslator.ts";
 import "./SearchResults.css";
 
 
@@ -107,12 +108,12 @@ function SearchResults() {
       else if (q.includes("ยอดนิยม") || q.includes("แนะนำ") || q.includes("ดัง")) {
         if ((item.rating || 0) < 4.8) return false;
       }
-      // Standard Exact / Fuzzy Match on Name, Title, Shop, Category
+      // Standard Exact / Fuzzy Match on Name, Title, Shop, Category (ทำงานเบื้องหลังด้วย backgroundSearchMatches)
       else {
-        const matchTitle = item.title ? item.title.toLowerCase().includes(q) : false;
-        const matchName = item.name ? item.name.toLowerCase().includes(q) : false;
-        const matchCategory = item.categoryLabel ? item.categoryLabel.toLowerCase().includes(q) : false;
-        const matchShop = item.shopName ? item.shopName.toLowerCase().includes(q) : false;
+        const matchTitle = backgroundSearchMatches(item.title, q);
+        const matchName = backgroundSearchMatches(item.name, q);
+        const matchCategory = backgroundSearchMatches(item.categoryLabel, q);
+        const matchShop = backgroundSearchMatches(item.shopName, q);
         if (!matchTitle && !matchName && !matchCategory && !matchShop) {
           return false;
         }
