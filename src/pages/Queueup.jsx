@@ -270,6 +270,148 @@ export default function Queueup() {
     return values.reduce((sum, value) => sum + value, 0) / values.length;
   };
 
+  // 📥 Export KKU Satisfaction Survey Data to Excel-compatible CSV (UTF-8 with BOM)
+  const handleDownloadCanteenCsv = () => {
+    try {
+      const headers = [
+        "ลำดับ",
+        "รหัสแบบประเมิน",
+        "ชั้นปี / กลุ่มตัวอย่าง",
+        "คณะ / สังกัด",
+        "วันที่ประเมิน",
+        "ข้อ 1 (ความง่ายในการใช้งาน)",
+        "ข้อ 2 (ระบบสมาชิก)",
+        "ข้อ 3 (การค้นหา)",
+        "ข้อ 4 (ข้อมูลเมนู)",
+        "ข้อ 5 (ระบบคิวล่วงหน้า)",
+        "ข้อ 6 (ความถูกต้องของคิว)",
+        "ข้อ 7 (การแจ้งเตือน)",
+        "ข้อ 8 (ความรวดเร็ว)",
+        "ข้อ 9 (ความเสถียร)",
+        "ข้อ 10 (ความปลอดภัย & PDPA)",
+        "ข้อ 11 (ระบบชำระเงิน)",
+        "ข้อ 12 (ประโยชน์การใช้งาน)",
+        "ข้อ 13 (ความพึงพอใจโดยรวม)",
+        "ข้อ 14 (ความตั้งใจใช้งานต่อ)",
+        "ข้อ 15 (การบอกต่อแนะนำ)",
+        "คะแนนเฉลี่ย (เต็ม 5.00)",
+        "ร้อยละความพึงพอใจ (%)",
+        "ระดับความพึงพอใจ",
+        "ข้อเสนอแนะเพิ่มเติม",
+      ];
+
+      const rows = surveys.map((s, idx) => {
+        const qScores = Array.from({ length: 15 }, (_, i) => {
+          const val = s.answers?.[`q${i + 1}`];
+          return typeof val === "number" ? val : 5;
+        });
+        const mean = qScores.reduce((a, b) => a + b, 0) / 15;
+        const pct = (mean / 5) * 100;
+        const level =
+          mean >= 4.5
+            ? "มากที่สุด"
+            : mean >= 3.5
+            ? "มาก"
+            : mean >= 2.5
+            ? "ปานกลาง"
+            : mean >= 1.5
+            ? "น้อย"
+            : "น้อยที่สุด";
+
+        return [
+          idx + 1,
+          s.id || `survey_${idx + 1}`,
+          `"${(s.yearLevel || s.userName || "นักศึกษา").replace(/"/g, '""')}"`,
+          `"${(s.faculty || "วิทยาลัยการคอมพิวเตอร์ มข.").replace(/"/g, '""')}"`,
+          s.date || "2026-09-02",
+          ...qScores,
+          mean.toFixed(2),
+          pct.toFixed(1),
+          `"${level}"`,
+          `"${(s.comment || "").replace(/"/g, '""')}"`,
+        ].join(",");
+      });
+
+      const csvContent = "\uFEFF" + [headers.join(","), ...rows].join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `canteen_satisfaction_surveys_${surveys.length}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success(`ดาวน์โหลดไฟล์ CSV ผลประเมิน ${surveys.length} รายการ เรียบร้อยครับ!`);
+    } catch (err) {
+      console.error("Download CSV failed:", err);
+      toast.error("ไม่สามารถดาวน์โหลดไฟล์ CSV ได้");
+    }
+  };
+
+  // 📥 Export System Architecture Evaluation Data to Excel-compatible CSV (UTF-8 with BOM)
+  const handleDownloadArchitectureCsv = () => {
+    try {
+      const headers = [
+        "ลำดับ",
+        "รหัสการประเมิน",
+        "ผู้ประเมิน / บทบาท",
+        "วันที่บันทึก",
+        "🎨 UX/UI Design (เต็ม 10)",
+        "👤 บัญชีเดียว One Account (เต็ม 10)",
+        "📋 Order & Live Queue (เต็ม 10)",
+        "🏪 Merchant CRM (เต็ม 10)",
+        "🛡️ Security & PDPA (เต็ม 10)",
+        "คะแนนเฉลี่ยรวม (เต็ม 10.0)",
+        "ข้อเสนอแนะเกี่ยวกับสถาปัตยกรรมระบบ",
+      ];
+
+      const rows = evaluations.map((e, idx) => {
+        const avg = (
+          (Number(e.uxScore || 0) +
+            Number(e.accountScore || 0) +
+            Number(e.queueScore || 0) +
+            Number(e.merchantScore || 0) +
+            Number(e.securityScore || 0)) /
+          5
+        ).toFixed(2);
+
+        const d = e.createdAt?.seconds
+          ? new Date(e.createdAt.seconds * 1000).toISOString().split("T")[0]
+          : e.createdAt || "2026-09-02";
+
+        return [
+          idx + 1,
+          e.id || `eval_${idx + 1}`,
+          `"${(e.userName || "ผู้ประเมิน").replace(/"/g, '""')}"`,
+          d,
+          e.uxScore ?? 10,
+          e.accountScore ?? 10,
+          e.queueScore ?? 10,
+          e.merchantScore ?? 10,
+          e.securityScore ?? 10,
+          avg,
+          `"${(e.comment || "").replace(/"/g, '""')}"`,
+        ].join(",");
+      });
+
+      const csvContent = "\uFEFF" + [headers.join(","), ...rows].join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `system_architecture_evaluations_${evaluations.length}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success(`ดาวน์โหลดรายงาน CSV สถาปัตยกรรม ${evaluations.length} รายการ เรียบร้อยครับ!`);
+    } catch (err) {
+      console.error("Download CSV failed:", err);
+      toast.error("ไม่สามารถดาวน์โหลดไฟล์ CSV ได้");
+    }
+  };
+
   // Handle User Evaluation Form Submission
   const handleEvalSubmit = async (e) => {
     e.preventDefault();
@@ -717,6 +859,13 @@ export default function Queueup() {
                     >
                       <i className="bi bi-pencil-square me-1" /> ทำแบบประเมิน 15 ข้อ
                     </button>
+                    <button
+                      type="button"
+                      onClick={handleDownloadCanteenCsv}
+                      className="btn btn-outline-light text-slate-200 font-weight-bold btn-sm shadow-sm rounded-pill py-2 text-decoration-none d-inline-flex align-items-center justify-content-center"
+                    >
+                      <i className="bi bi-file-earmark-spreadsheet-fill text-emerald-400 me-1.5" /> ดาวน์โหลดไฟล์ CSV ({surveyStats.totalResponses || 100} รายการ)
+                    </button>
                   </div>
                 </div>
               </div>
@@ -840,12 +989,19 @@ export default function Queueup() {
                   <div className="badge bg-white text-danger mt-2 px-3 py-1">
                     จากผลประเมินจริง {scores.count} รายการ
                   </div>
-                  <div className="mt-3">
+                  <div className="mt-3 d-flex flex-column gap-2">
                     <button
                       className="btn btn-light font-weight-bold btn-sm shadow-sm"
                       onClick={() => setIsEvalModalOpen(true)}
                     >
                       <i className="bi bi-star-fill text-warning me-1" /> ส่งผลประเมินของคุณ
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDownloadArchitectureCsv}
+                      className="btn btn-outline-light text-slate-200 font-weight-bold btn-sm shadow-sm rounded-pill py-2 text-decoration-none d-inline-flex align-items-center justify-content-center text-xs"
+                    >
+                      <i className="bi bi-file-earmark-spreadsheet-fill text-emerald-400 me-1.5" /> ดาวน์โหลดไฟล์ CSV ({scores.count} รายการ)
                     </button>
                   </div>
                 </div>
