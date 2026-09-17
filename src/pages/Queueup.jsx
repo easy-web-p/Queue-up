@@ -52,6 +52,8 @@ export default function Queueup() {
   });
   const [surveyComment, setSurveyComment] = useState("");
   const [isSurveySubmitting, setIsSurveySubmitting] = useState(false);
+  const [showAllSurveys, setShowAllSurveys] = useState(false);
+  const [showAllEvals, setShowAllEvals] = useState(false);
 
   // Dynamic Real Store & Menu Stats from Firestore
   const [shopsCount, setShopsCount] = useState(null);
@@ -672,7 +674,7 @@ export default function Queueup() {
             onClick={() => setEvaluationTab("kku_survey")}
           >
             <i className="bi bi-clipboard2-check-fill" />
-            แบบประเมินความพึงพอใจ 15 ข้อ (GE341511 มข. 10 ตัวอย่าง)
+            แบบประเมินความพึงพอใจ 15 ข้อ (GE341511 มข. {surveyStats.totalResponses || 100} ตัวอย่าง)
           </button>
           <button
             type="button"
@@ -706,7 +708,7 @@ export default function Queueup() {
                     ⭐ ความพึงพอใจระดับ "มากที่สุด" ({((surveyStats.overallMean / 5) * 100).toFixed(1)}%)
                   </div>
                   <p className="text-slate-400 text-xs mt-3 mb-0">
-                    กลุ่มตัวอย่าง {surveyStats.totalResponses} ท่าน (นักศึกษา AI โรงอาหาร มข.)
+                    กลุ่มตัวอย่าง {surveyStats.totalResponses || 100} ท่าน (นักศึกษาและบุคลากร โรงอาหาร มข. N={surveyStats.totalResponses || 100})
                   </p>
                   <div className="mt-4 d-flex flex-column gap-2">
                     <button
@@ -769,7 +771,7 @@ export default function Queueup() {
               <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                 <h4 className="fw-bold text-light mb-0">
                   <i className="bi bi-chat-heart-fill text-danger me-2" />
-                  ความคิดเห็นและข้อเสนอแนะจากกลุ่มตัวอย่าง 10 คน (โรงอาหาร มข.)
+                  ความคิดเห็นและข้อเสนอแนะจากกลุ่มตัวอย่าง ({surveys.length} คน — โรงอาหาร มข.)
                 </h4>
                 <div className="text-slate-400 text-xs">
                   วิทยาลัยการคอมพิวเตอร์ สาขา AI • GE341511 กลุ่ม 23
@@ -777,7 +779,7 @@ export default function Queueup() {
               </div>
 
               <div className="row g-3">
-                {surveys.slice(0, 10).map((s, idx) => {
+                {surveys.slice(0, showAllSurveys ? surveys.length : 12).map((s, idx) => {
                   const qScores = Object.values(s.answers || {}).filter((v) => typeof v === "number");
                   const avg = qScores.length ? (qScores.reduce((a, b) => a + b, 0) / qScores.length).toFixed(1) : "5.0";
                   return (
@@ -808,6 +810,20 @@ export default function Queueup() {
                   );
                 })}
               </div>
+
+              {surveys.length > 12 && (
+                <div className="text-center mt-4">
+                  <button
+                    type="button"
+                    className="btn btn-outline-warning rounded-pill px-4 py-2 text-sm fw-bold shadow-sm"
+                    onClick={() => setShowAllSurveys((prev) => !prev)}
+                  >
+                    {showAllSurveys
+                      ? "ย่อกลับเหลือ 12 รายการ"
+                      : `ดูความคิดเห็นทั้งหมด (${surveys.length} คน) ⬇️`}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -888,7 +904,7 @@ export default function Queueup() {
               )}
 
               <div className="row g-3">
-                {evaluations.slice(0, 4).map((item, idx) => (
+                {evaluations.slice(0, showAllEvals ? evaluations.length : 8).map((item, idx) => (
                   <div key={item.id || idx} className="col-md-6">
                     <div className="p-3 rounded-3 bg-slate-800/60 border border-white/10">
                       <div className="d-flex align-items-center justify-content-between mb-2">
@@ -909,6 +925,20 @@ export default function Queueup() {
                   </div>
                 ))}
               </div>
+
+              {evaluations.length > 8 && (
+                <div className="text-center mt-4">
+                  <button
+                    type="button"
+                    className="btn btn-outline-warning rounded-pill px-4 py-2 text-sm fw-bold shadow-sm"
+                    onClick={() => setShowAllEvals((prev) => !prev)}
+                  >
+                    {showAllEvals
+                      ? "ย่อกลับเหลือ 8 รายการ"
+                      : `ดูผลประเมินทั้งหมด (${evaluations.length} รายการ) ⬇️`}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
