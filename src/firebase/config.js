@@ -123,6 +123,17 @@ if (typeof window !== "undefined" && typeof window.fetch === "function") {
         // Local storage unavailable
       }
 
+      // Sync directly to Cloud Firestore so all devices see the evaluation
+      try {
+        const { setDoc, doc: fsDoc, serverTimestamp: fsServerTimestamp } = await import("firebase/firestore");
+        await setDoc(fsDoc(db, "systemEvaluations", evalId), {
+          ...evaluation,
+          createdAt: fsServerTimestamp(),
+        });
+      } catch (firestoreErr) {
+        console.warn("[config] Could not write evaluation directly to Firestore:", firestoreErr);
+      }
+
       return new Response(
         JSON.stringify({
           result: {
