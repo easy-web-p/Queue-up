@@ -45,7 +45,7 @@ export default function Queueup() {
   const [surveys, setSurveys] = useState(PILOT_STUDENT_SURVEYS);
   const [evaluationTab, setEvaluationTab] = useState("kku_survey"); // "kku_survey" | "system_architecture"
   const [isSurveyModalOpen, setIsSurveyModalOpen] = useState(false);
-  const [surveyUserName, setSurveyUserName] = useState(user ? user.name || user.email : "");
+  const [surveyYearLevel, setSurveyYearLevel] = useState("นักศึกษาชั้นปีที่ 2");
   const [surveyFaculty, setSurveyFaculty] = useState("วิทยาลัยการคอมพิวเตอร์ สาขา AI");
   const [surveyAnswers, setSurveyAnswers] = useState({
     q1: 5, q2: 5, q3: 5, q4: 5, q5: 5, q6: 5, q7: 5, q8: 5, q9: 5, q10: 5, q11: 5, q12: 5, q13: 5, q14: 5, q15: 5,
@@ -329,14 +329,15 @@ export default function Queueup() {
   // 📋 GE341511 15-Question Satisfaction Survey Handlers
   const handleSurveySubmit = async (e) => {
     e.preventDefault();
-    if (!surveyUserName.trim()) {
-      toast.warning("กรุณากรอกชื่อผู้ประเมิน");
+    if (!surveyYearLevel.trim()) {
+      toast.warning("กรุณาเลือกชั้นปี");
       return;
     }
     setIsSurveySubmitting(true);
     try {
       const payload = {
-        userName: surveyUserName.trim(),
+        userName: surveyYearLevel.trim(),
+        yearLevel: surveyYearLevel.trim(),
         faculty: surveyFaculty.trim() || "นักศึกษา มข.",
         answers: surveyAnswers,
         comment: surveyComment.trim(),
@@ -786,8 +787,8 @@ export default function Queueup() {
                           <div className="d-flex align-items-center justify-content-between mb-2">
                             <div>
                               <div className="fw-bold text-white small">
-                                <i className="bi bi-person-badge-fill text-sky-400 me-2" />
-                                {s.userName}
+                                <i className="bi bi-mortarboard-fill text-sky-400 me-2" />
+                                {s.yearLevel || s.userName}
                               </div>
                               <div className="text-slate-400 text-[11px]">
                                 {s.faculty || "วิทยาลัยการคอมพิวเตอร์ มข."} • {s.date || "2026-09-02"}
@@ -1377,15 +1378,23 @@ export default function Queueup() {
 
                   <div className="row g-3 mb-4">
                     <div className="col-md-6">
-                      <label className="form-label font-weight-bold text-sm">ชื่อผู้ประเมิน / รหัสนักศึกษา *</label>
-                      <input
-                        type="text"
-                        className="form-control bg-dark text-white border-secondary text-sm"
-                        placeholder="เช่น นายธนากร (นักศึกษา AI ปี 2 - มข.)"
-                        value={surveyUserName}
-                        onChange={(e) => setSurveyUserName(e.target.value)}
+                      <label className="form-label font-weight-bold text-sm">ชั้นปี *</label>
+                      <select
+                        className="form-select bg-dark text-white border-secondary text-sm"
+                        value={surveyYearLevel}
+                        onChange={(e) => setSurveyYearLevel(e.target.value)}
                         required
-                      />
+                      >
+                        <option value="">-- กรุณาเลือกชั้นปี --</option>
+                        <option value="นักศึกษาชั้นปีที่ 1">นักศึกษาชั้นปีที่ 1 (ปี 1)</option>
+                        <option value="นักศึกษาชั้นปีที่ 2">นักศึกษาชั้นปีที่ 2 (ปี 2)</option>
+                        <option value="นักศึกษาชั้นปีที่ 3">นักศึกษาชั้นปีที่ 3 (ปี 3)</option>
+                        <option value="นักศึกษาชั้นปีที่ 4">นักศึกษาชั้นปีที่ 4 (ปี 4)</option>
+                        <option value="นักศึกษาชั้นปีที่ 5 ขึ้นไป">นักศึกษาชั้นปีที่ 5 ขึ้นไป</option>
+                        <option value="ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)">ระดับบัณฑิตศึกษา (ป.โท / ป.เอก)</option>
+                        <option value="อาจารย์ / บุคลากร">อาจารย์ / บุคลากร</option>
+                        <option value="บุคคลทั่วไป">บุคคลทั่วไป</option>
+                      </select>
                     </div>
                     <div className="col-md-6">
                       <label className="form-label font-weight-bold text-sm">คณะ / สังกัด / กลุ่มตัวอย่าง</label>
