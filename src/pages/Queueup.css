@@ -987,3 +987,264 @@
     justify-content: center;
   }
 }
+
+/* ==========================================================================
+   GE341511 VIBE CODING REPORT SECTION STYLES
+   ========================================================================== */
+.qup-coursework-section {
+  position: relative;
+  z-index: 10;
+  margin-top: 2rem;
+  margin-bottom: 4rem;
+}
+
+.qup-academic-banner {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%);
+  border: 1px solid rgba(255, 122, 26, 0.35);
+  border-radius: 24px;
+  padding: 2.25rem 2rem;
+  box-shadow: 0 16px 40px -12px rgba(255, 122, 26, 0.2);
+  margin-bottom: 2rem;
+  backdrop-filter: blur(12px);
+}
+
+.qup-report-tabs-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.75rem;
+  margin-bottom: 2rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 122, 26, 0.4) transparent;
+}
+
+.qup-report-tabs-nav::-webkit-scrollbar {
+  height: 6px;
+}
+
+.qup-report-tabs-nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 122, 26, 0.4);
+  border-radius: 99px;
+}
+
+.qup-report-tab-btn {
+  white-space: nowrap;
+  padding: 0.65rem 1.2rem;
+  border-radius: 99px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #94a3b8;
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+}
+
+.qup-report-tab-btn:hover {
+  color: #ffffff;
+  background: rgba(51, 65, 85, 0.8);
+  border-color: rgba(255, 122, 26, 0.4);
+}
+
+.qup-report-tab-btn.active {
+  color: #ffffff;
+  background: linear-gradient(135deg, #FF7A1A 0%, #e6680d 100%);
+  border-color: transparent;
+  box-shadow: 0 4px 16px rgba(255, 122, 26, 0.4);
+}
+
+.qup-report-block {
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.qup-report-block-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.qup-part-badge {
+  display: inline-block;
+  padding: 0.3rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  background: rgba(255, 122, 26, 0.2);
+  color: #FF7A1A;
+  border: 1px solid rgba(255, 122, 26, 0.35);
+}
+
+.qup-report-block-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+}
+
+.qup-sheets-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.qup-sheet-card {
+  background: rgba(30, 41, 59, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  overflow: hidden;
+  transition: border-color 0.2s ease;
+}
+
+.qup-sheet-card:hover {
+  border-color: rgba(255, 122, 26, 0.3);
+}
+
+.qup-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  cursor: pointer;
+  user-select: none;
+  background: rgba(30, 41, 59, 0.7);
+  transition: background 0.2s ease;
+}
+
+.qup-sheet-header:hover {
+  background: rgba(51, 65, 85, 0.6);
+}
+
+.qup-sheet-num {
+  font-family: monospace;
+  font-weight: 800;
+  font-size: 0.8rem;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: rgba(255, 122, 26, 0.2);
+  color: #FF7A1A;
+  border: 1px solid rgba(255, 122, 26, 0.4);
+}
+
+.qup-sheet-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+}
+
+.qup-sheet-body {
+  padding: 1.25rem;
+  display: block;
+}
+
+.qup-collections-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+}
+
+@media (max-width: 768px) {
+  .qup-collections-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.qup-col-item {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+}
+
+.qup-col-name {
+  font-weight: 700;
+  font-size: 0.82rem;
+  margin-bottom: 0.35rem;
+}
+
+.qup-cycle-stepper {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+}
+
+@media (max-width: 768px) {
+  .qup-cycle-stepper {
+    grid-template-columns: 1fr;
+  }
+}
+
+.qup-cycle-step {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.qup-cycle-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #FF7A1A;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+/* Print Optimization */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  .qup-navbar,
+  .qup-footer,
+  .qup-report-tabs-nav,
+  .qup-glow-bg,
+  .qup-nav-actions {
+    display: none !important;
+  }
+  .qup-coursework-section,
+  .qup-academic-banner,
+  .qup-report-block,
+  .qup-sheet-card {
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: 1px solid #cccccc !important;
+    box-shadow: none !important;
+    page-break-inside: avoid;
+  }
+  .qup-report-block-title,
+  .qup-sheet-title,
+  h1, h2, h3, h4, h5,
+  .text-white {
+    color: #000000 !important;
+  }
+  .text-slate-300,
+  .text-slate-400 {
+    color: #444444 !important;
+  }
+}
+

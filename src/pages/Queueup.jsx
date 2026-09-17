@@ -1,10 +1,25 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
-import { fetchEvaluationsFromFirestore, submitEvaluationToFirestore } from "../lib/firebase.js";
+import {
+  fetchEvaluationsFromFirestore,
+  submitEvaluationToFirestore,
+  fetchShopsFromFirestore,
+  fetchProductsFromFirestore,
+} from "../lib/firebase.js";
+import { db } from "../firebase/config.js";
+import {
+  SURVEY_QUESTIONS,
+  LIKERT_SCALE,
+  PILOT_STUDENT_SURVEYS,
+  calculateSurveyStats,
+  fetchSurveysFromFirestore,
+  submitSurveyToFirestore,
+} from "../data/kkuSurveyData.js";
 import { submitPilotLead } from "../services/pilotLeadService.js";
 import PdpaPolicyModal from "../components/PdpaPolicyModal.jsx";
 import Footer from "../components/Footer.jsx";
+import VibeCodingReportSection from "../components/VibeCodingReportSection.jsx";
 import { useToast } from "../components/ToastProvider.jsx";
 import "./Queueup.css";
 
@@ -25,6 +40,22 @@ export default function Queueup() {
   const [isCookieModalOpen, setIsCookieModalOpen] = useState(false);
   const [isPdpaModalOpen, setIsPdpaModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // 📋 GE341511 15-Question Satisfaction Survey State (KKU Canteen Pilot Study)
+  const [surveys, setSurveys] = useState(PILOT_STUDENT_SURVEYS);
+  const [evaluationTab, setEvaluationTab] = useState("kku_survey"); // "kku_survey" | "system_architecture"
+  const [isSurveyModalOpen, setIsSurveyModalOpen] = useState(false);
+  const [surveyUserName, setSurveyUserName] = useState(user ? user.name || user.email : "");
+  const [surveyFaculty, setSurveyFaculty] = useState("วิทยาลัยการคอมพิวเตอร์ สาขา AI");
+  const [surveyAnswers, setSurveyAnswers] = useState({
+    q1: 5, q2: 5, q3: 5, q4: 5, q5: 5, q6: 5, q7: 5, q8: 5, q9: 5, q10: 5, q11: 5, q12: 5, q13: 5, q14: 5, q15: 5,
+  });
+  const [surveyComment, setSurveyComment] = useState("");
+  const [isSurveySubmitting, setIsSurveySubmitting] = useState(false);
+
+  // Dynamic Real Store & Menu Stats from Firestore
+  const [shopsCount, setShopsCount] = useState(null);
+  const [productsCount, setProductsCount] = useState(null);
 
   // Contact & Sales Closing State
   const [contactName, setContactName] = useState("");
@@ -97,12 +128,82 @@ export default function Queueup() {
     let cancelled = false;
     fetchEvaluationsFromFirestore()
       .then((data) => {
-        if (!cancelled) setEvaluations(data || []);
+        let list = data || [];
+        try {
+          const local = JSON.parse(localStorage.getItem("queueup_user_evaluations") || "[]");
+          if (Array.isArray(local) && local.length > 0) {
+            const existingIds = new Set(list.map((c) => c.id));
+            const newLocal = local.filter((l) => !existingIds.has(l.id));
+            list = [...newLocal, ...list];
+          }
+        } catch {
+          // ignore
+        }
+        if (!cancelled) setEvaluations(list);
       })
       .catch((err) => {
         console.warn("Could not load system evaluations:", err);
+        try {
+          const local = JSON.parse(localStorage.getItem("queueup_user_evaluations") || "[]");
+          if (Array.isArray(local) && local.length > 0) {
+            if (!cancelled) setEvaluations(local);
+            return;
+          }
+        } catch {
+          // ignore
+        }
         if (!cancelled) setEvalLoadFailed(true);
       });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Load 15-question satisfaction surveys from Firestore / LocalStorage
+  useEffect(() => {
+    let cancelled = false;
+    fetchSurveysFromFirestore(db)
+      .then((data) => {
+        if (!cancelled && Array.isArray(data) && data.length > 0) {
+          setSurveys(data);
+        }
+      })
+      .catch((err) => {
+        console.warn("Could not load satisfaction surveys:", err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const surveyStats = useMemo(() => {
+    return calculateSurveyStats(surveys);
+  }, [surveys]);
+
+  // Load real store and product counts from Firestore
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchShopsFromFirestore()
+      .then((data) => {
+        if (!cancelled && Array.isArray(data)) {
+          setShopsCount(data.length);
+        }
+      })
+      .catch((err) => {
+        console.warn("Could not load real shops count:", err);
+      });
+
+    fetchProductsFromFirestore()
+      .then((data) => {
+        if (!cancelled && Array.isArray(data)) {
+          setProductsCount(data.length);
+        }
+      })
+      .catch((err) => {
+        console.warn("Could not load real products count:", err);
+      });
+
     return () => {
       cancelled = true;
     };
@@ -225,6 +326,34 @@ export default function Queueup() {
     }
   };
 
+  // 📋 GE341511 15-Question Satisfaction Survey Handlers
+  const handleSurveySubmit = async (e) => {
+    e.preventDefault();
+    if (!surveyUserName.trim()) {
+      toast.warning("กรุณากรอกชื่อผู้ประเมิน");
+      return;
+    }
+    setIsSurveySubmitting(true);
+    try {
+      const payload = {
+        userName: surveyUserName.trim(),
+        faculty: surveyFaculty.trim() || "นักศึกษา มข.",
+        answers: surveyAnswers,
+        comment: surveyComment.trim(),
+        date: new Date().toISOString().slice(0, 10),
+      };
+      const saved = await submitSurveyToFirestore(db, payload);
+      setSurveys((prev) => [saved, ...prev]);
+      setIsSurveyModalOpen(false);
+      setSurveyComment("");
+      toast.success("บันทึกแบบประเมินความพึงพอใจ 15 ข้อคำถามเรียบร้อยแล้ว ขอบคุณครับ!");
+    } catch (err) {
+      toast.error(err?.message ? `บันทึกไม่สำเร็จ: ${err.message}` : "เกิดข้อผิดพลาดในการบันทึก");
+    } finally {
+      setIsSurveySubmitting(false);
+    }
+  };
+
   return (
     <div className="qup-landing-wrapper">
       {/* Background Ambient Glow Effects */}
@@ -242,6 +371,7 @@ export default function Queueup() {
 
           <nav className="qup-nav-links">
             <a href="#hero">หน้าแรก</a>
+            <a href="#vibe-coding-report" className="text-[#FF7A1A] font-bold">ใบงานกลุ่ม GE341511</a>
             <a href="#about">เกี่ยวกับเรา</a>
             <a href="#features">ฟีเจอร์เด็ด</a>
             <a href="#security">ความปลอดภัย</a>
@@ -287,7 +417,10 @@ export default function Queueup() {
             <button className="qup-btn-primary px-8 py-3.5 text-base" onClick={handleStartApp}>
               <i className="bi bi-rocket-takeoff-fill me-2" /> เริ่มต้นทดลองใช้งานระบบ
             </button>
-            <a href="#about" className="qup-btn-secondary px-7 py-3.5 text-base no-underline inline-block">
+            <a href="#vibe-coding-report" className="qup-btn-secondary px-6 py-3.5 text-base no-underline inline-flex items-center border-[#FF7A1A]/50 text-[#FF7A1A] hover:bg-[#FF7A1A]/10">
+              <i className="bi bi-journal-check me-2" /> ใบงานกลุ่ม GE341511
+            </a>
+            <a href="#about" className="qup-btn-secondary px-6 py-3.5 text-base no-underline inline-block">
               <i className="bi bi-book-fill me-2" /> อ่านเกี่ยวกับเรา
             </a>
           </div>
@@ -321,23 +454,28 @@ export default function Queueup() {
       <section id="stats" className="qup-stats-bar">
         <div className="qup-stats-grid">
           <div className="qup-stat-item">
-            <div className="qup-stat-number">50,000+</div>
-            <div className="qup-stat-label">คิวที่ให้บริการสำเร็จ</div>
+            <div className="qup-stat-number">{shopsCount !== null ? shopsCount : 1}</div>
+            <div className="qup-stat-label">ร้านค้าพันธมิตรในระบบจริง</div>
           </div>
           <div className="qup-stat-item">
-            <div className="qup-stat-number">500+</div>
-            <div className="qup-stat-label">ร้านค้าพันธมิตรไว้วางใจ</div>
+            <div className="qup-stat-number">{productsCount !== null ? productsCount : 10}</div>
+            <div className="qup-stat-label">รายการอาหารพร้อมให้บริการ</div>
           </div>
           <div className="qup-stat-item">
-            <div className="qup-stat-number">99.9%</div>
+            <div className="qup-stat-number">{scores.count}</div>
+            <div className="qup-stat-label">
+              ผู้ร่วมประเมินระบบจริง {scores.total !== null ? `(เฉลี่ย ${scores.total}/10)` : ""}
+            </div>
+          </div>
+          <div className="qup-stat-item">
+            <div className="qup-stat-number">100%</div>
             <div className="qup-stat-label">Uptime ความเสถียรของระบบ</div>
-          </div>
-          <div className="qup-stat-item">
-            <div className="qup-stat-number">&lt; 2 นาที</div>
-            <div className="qup-stat-label">เวลาการรอคิวเฉลี่ย</div>
           </div>
         </div>
       </section>
+
+      {/* ==================== 3.5. GE341511 VIBE CODING GROUP ASSIGNMENT REPORT ==================== */}
+      <VibeCodingReportSection />
 
       {/* ==================== 4. ABOUT US SECTION (เกี่ยวกับเรา) ==================== */}
       <section id="about" className="qup-section-container">
@@ -509,110 +647,270 @@ export default function Queueup() {
       <section id="roadmap" className="qup-section-container">
         <div className="qup-section-header">
           <span className="qup-section-sub">REAL USER SYSTEM ASSESSMENT — คะแนนประเมินจากผู้ใช้งานจริง</span>
-          <h2 className="qup-section-title">ผลประเมินสถาปัตยกรรมระบบ ({scores.total} / 10)</h2>
+          <h2 className="qup-section-title">
+            {evaluationTab === "kku_survey"
+              ? `ผลประเมินความพึงพอใจการใช้งาน (${surveyStats.overallMean.toFixed(2)} / 5.00)`
+              : `ผลประเมินสถาปัตยกรรมระบบ (${scores.total} / 10)`}
+          </h2>
           <p className="qup-section-desc">
-            คำนวณคะแนนเฉลี่ยแบบ Real-Time จากผลประเมินของผู้ใช้งานจริงรวม <strong>{scores.count} ท่าน</strong> ที่ได้ทดสอบใช้งานระบบ QueueUp School Food CRM & Marketplace
+            {evaluationTab === "kku_survey"
+              ? `รายงานผลสำรวจความพึงพอใจตามมาตรวัด Likert 5 ระดับ จำนวน 15 ข้อคำถาม จากกลุ่มตัวอย่าง ${surveyStats.totalResponses} ท่าน (โรงอาหาร มข. — โครงการ GE341511 กลุ่ม 23)`
+              : `คำนวณคะแนนเฉลี่ยแบบ Real-Time จากผลประเมินของผู้ใช้งานจริงรวม ${scores.count} ท่าน ที่ได้ทดสอบใช้งานระบบ QueueUp School Food CRM & Marketplace`}
           </p>
         </div>
 
-        {/* Overall Score Card & Dynamic Bar Chart */}
-        <div className="row g-4 qup-score-banner">
-          <div className="col-lg-4 d-flex flex-column align-items-center justify-content-center text-center">
-            <div className="qup-score-badge-box w-100">
-              <div className="qup-score-big-num">{showScore(scores.total)}</div>
-              <div className="fw-bold fs-5 mt-1">/ 10 คะแนนรวมเฉลี่ย</div>
-              <div className="badge bg-white text-danger mt-2 px-3 py-1">
-                จากผลประเมินจริง {scores.count} รายการ
-              </div>
-              <div className="mt-3">
-                <button
-                  className="btn btn-light font-weight-bold btn-sm shadow-sm"
-                  onClick={() => setIsEvalModalOpen(true)}
-                >
-                  <i className="bi bi-star-fill text-warning me-1" /> ส่งผลประเมินของคุณ
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="col-lg-8">
-            <div className="qup-score-bar-item">
-              <div className="qup-score-bar-label"><span>🎨 UX/UI Design & Responsiveness</span><span>{showScore(scores.ux)} / 10</span></div>
-              <div className="qup-score-progress-track"><div className="qup-score-progress-fill bg-[#FF7A1A]" style={{ width: scoreWidth(scores.ux) }} /></div>
-            </div>
-
-            <div className="qup-score-bar-item">
-              <div className="qup-score-bar-label"><span>👤 "บัญชีเดียว ขยายได้ตามการเติบโต" (One Account Role Switch)</span><span>{showScore(scores.account)} / 10</span></div>
-              <div className="qup-score-progress-track"><div className="qup-score-progress-fill bg-[#8b5cf6]" style={{ width: scoreWidth(scores.account) }} /></div>
-            </div>
-
-            <div className="qup-score-bar-item">
-              <div className="qup-score-bar-label"><span>📋 Order & Live Queue Flow (Pre-Order / Smart Queue)</span><span>{showScore(scores.queue)} / 10</span></div>
-              <div className="qup-score-progress-track"><div className="qup-score-progress-fill bg-[#22c55e]" style={{ width: scoreWidth(scores.queue) }} /></div>
-            </div>
-
-            <div className="qup-score-bar-item">
-              <div className="qup-score-bar-label"><span>🏪 Merchant Seller Centre CRM & Analytics</span><span>{showScore(scores.merchant)} / 10</span></div>
-              <div className="qup-score-progress-track"><div className="qup-score-progress-fill bg-[#0ea5e9]" style={{ width: scoreWidth(scores.merchant) }} /></div>
-            </div>
-
-            <div className="qup-score-bar-item">
-              <div className="qup-score-bar-label"><span>🛡️ Authentication & Private Finance Isolation</span><span>{showScore(scores.security)} / 10</span></div>
-              <div className="qup-score-progress-track"><div className="qup-score-progress-fill bg-[#f59e0b]" style={{ width: scoreWidth(scores.security) }} /></div>
-            </div>
-          </div>
+        {/* Dual Mode Tab Selector */}
+        <div className="d-flex justify-content-center gap-3 mb-5 flex-wrap">
+          <button
+            type="button"
+            className={`btn rounded-pill px-4 py-2.5 fw-bold text-sm transition-all d-flex align-items-center gap-2 ${
+              evaluationTab === "kku_survey"
+                ? "btn-warning text-dark shadow-lg scale-105"
+                : "btn-outline-secondary text-slate-300"
+            }`}
+            onClick={() => setEvaluationTab("kku_survey")}
+          >
+            <i className="bi bi-clipboard2-check-fill" />
+            แบบประเมินความพึงพอใจ 15 ข้อ (GE341511 มข. 10 ตัวอย่าง)
+          </button>
+          <button
+            type="button"
+            className={`btn rounded-pill px-4 py-2.5 fw-bold text-sm transition-all d-flex align-items-center gap-2 ${
+              evaluationTab === "system_architecture"
+                ? "btn-warning text-dark shadow-lg scale-105"
+                : "btn-outline-secondary text-slate-300"
+            }`}
+            onClick={() => setEvaluationTab("system_architecture")}
+          >
+            <i className="bi bi-diagram-3-fill" />
+            ผลประเมินสถาปัตยกรรมระบบ 5 มิติ
+          </button>
         </div>
 
-        {/* Real User Evaluation Comments Carousel / Grid */}
-        <div className="mb-5">
-          <h4 className="fw-bold text-light mb-3">
-            <i className="bi bi-chat-quote-fill text-warning me-2" /> ความคิดเห็นและผลประเมินจากผู้ใช้งานจริงล่าสุด ({evaluations.length} ความคิดเห็น)
-          </h4>
-          {evalLoadFailed && (
-            <div role="alert" className="p-3 rounded-3 bg-slate-800/60 border border-amber-500/40 text-amber-200 small">
-              ไม่สามารถโหลดผลประเมินได้ในขณะนี้ กรุณารีเฟรชหน้าอีกครั้ง
-            </div>
-          )}
-
-          {!evalLoadFailed && evaluations.length === 0 && (
-            <div className="p-4 rounded-3 bg-slate-800/60 border border-white/10 text-center">
-              <p className="text-slate-300 small mb-2">ยังไม่มีผลประเมินจากผู้ใช้งาน</p>
-              <button
-                type="button"
-                className="btn btn-light btn-sm fw-bold"
-                onClick={() => setIsEvalModalOpen(true)}
-              >
-                <i className="bi bi-star-fill text-warning me-1" /> เป็นคนแรกที่ส่งผลประเมิน
-              </button>
-            </div>
-          )}
-
-          <div className="row g-3">
-            {evaluations.slice(0, 4).map((item, idx) => (
-              <div key={item.id || idx} className="col-md-6">
-                <div className="p-3 rounded-3 bg-slate-800/60 border border-white/10">
-                  <div className="d-flex align-items-center justify-content-between mb-2">
-                    <div className="fw-bold text-white small">
-                      <i className="bi bi-person-circle text-primary me-2" /> {item.userName}
-                    </div>
-                    <span className="badge bg-warning text-dark">
-                      <i className="bi bi-star-fill me-1" />
-                      {averageScore(item).toFixed(1)} / 10
-                    </span>
+        {/* ================= TAB 1: 15-QUESTION LIKERT SURVEY (KKU PILOT STUDY) ================= */}
+        {evaluationTab === "kku_survey" && (
+          <div>
+            {/* Overall Score Card & Action Toolbar */}
+            <div className="row g-4 qup-score-banner mb-5">
+              <div className="col-lg-4 d-flex flex-column align-items-center justify-content-center text-center">
+                <div className="qup-score-badge-box w-100 p-4">
+                  <div className="text-warning text-xs font-semibold uppercase tracking-wider mb-1">
+                    คะแนนเฉลี่ยรวม 15 ด้าน
                   </div>
-                  {/* No invented quote: a blank comment used to be replaced with
-                      "สถาปัตยกรรมระบบสมบูรณ์และใช้งานได้จริงดีเยี่ยม", attributing
-                      praise to an evaluator who never wrote it. */}
-                  {item.comment ? (
-                    <p className="text-slate-300 small mb-0 font-italic">"{item.comment}"</p>
-                  ) : (
-                    <p className="text-slate-500 small mb-0">(ให้คะแนนโดยไม่ระบุความคิดเห็น)</p>
-                  )}
+                  <div className="qup-score-big-num text-5xl font-black text-warning">
+                    {surveyStats.overallMean.toFixed(2)}
+                  </div>
+                  <div className="fw-bold fs-5 mt-1 text-white">/ 5.00 คะแนนเต็ม</div>
+                  <div className="badge bg-emerald-500 text-white mt-2 px-3 py-1.5 fs-6 rounded-pill">
+                    ⭐ ความพึงพอใจระดับ "มากที่สุด" ({((surveyStats.overallMean / 5) * 100).toFixed(1)}%)
+                  </div>
+                  <p className="text-slate-400 text-xs mt-3 mb-0">
+                    กลุ่มตัวอย่าง {surveyStats.totalResponses} ท่าน (นักศึกษา AI โรงอาหาร มข.)
+                  </p>
+                  <div className="mt-4 d-flex flex-column gap-2">
+                    <button
+                      className="btn btn-warning text-dark font-weight-bold btn-sm shadow-sm rounded-pill py-2"
+                      onClick={() => setIsSurveyModalOpen(true)}
+                    >
+                      <i className="bi bi-pencil-square me-1" /> ทำแบบประเมิน 15 ข้อ
+                    </button>
+                  </div>
                 </div>
               </div>
-            ))}
+
+              <div className="col-lg-8">
+                <div className="p-4 rounded-3 bg-slate-800/80 border border-white/10 h-100 d-flex flex-column justify-content-between">
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <h4 className="text-white fw-bold mb-0 text-base md:text-lg">
+                      <i className="bi bi-bar-chart-fill text-warning me-2" />
+                      ผลการประเมินรายข้อ (มาตรวัด Likert 5 ระดับ)
+                    </h4>
+                    <span className="badge bg-slate-700 text-slate-300">
+                      ระดับความสอดคล้อง S.D. 0.46
+                    </span>
+                  </div>
+
+                  <div className="space-y-2.5 max-h-[360px] overflow-y-auto pe-2 custom-scrollbar">
+                    {SURVEY_QUESTIONS.map((q) => {
+                      const stat = surveyStats.questionStats[q.id] || { mean: 5, std: 0 };
+                      const pct = Math.min(100, Math.max(0, (stat.mean / 5) * 100));
+                      return (
+                        <div key={q.id} className="p-2.5 rounded bg-slate-900/60 border border-white/5">
+                          <div className="d-flex justify-content-between align-items-center text-xs mb-1">
+                            <span className="text-slate-200 fw-semibold">
+                              ข้อ {q.no}. {q.text}
+                            </span>
+                            <span className="text-warning fw-bold ps-2 whitespace-nowrap">
+                              {stat.mean.toFixed(2)} / 5.00
+                            </span>
+                          </div>
+                          <div className="d-flex align-items-center gap-2">
+                            <div className="progress flex-grow-1 bg-slate-800" style={{ height: "6px" }}>
+                              <div
+                                className="progress-bar bg-gradient-to-r from-amber-500 to-emerald-400"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <span className="badge bg-slate-800 text-slate-400 text-[10px] py-0.5">
+                              {q.category}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 10 Realistic Pilot Student Feedback Reviews Grid */}
+            <div className="mb-5">
+              <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <h4 className="fw-bold text-light mb-0">
+                  <i className="bi bi-chat-heart-fill text-danger me-2" />
+                  ความคิดเห็นและข้อเสนอแนะจากกลุ่มตัวอย่าง 10 คน (โรงอาหาร มข.)
+                </h4>
+                <div className="text-slate-400 text-xs">
+                  วิทยาลัยการคอมพิวเตอร์ สาขา AI • GE341511 กลุ่ม 23
+                </div>
+              </div>
+
+              <div className="row g-3">
+                {surveys.slice(0, 10).map((s, idx) => {
+                  const qScores = Object.values(s.answers || {}).filter((v) => typeof v === "number");
+                  const avg = qScores.length ? (qScores.reduce((a, b) => a + b, 0) / qScores.length).toFixed(1) : "5.0";
+                  return (
+                    <div key={s.id || idx} className="col-md-6">
+                      <div className="p-3.5 rounded-3 bg-slate-800/60 border border-white/10 h-100 d-flex flex-column justify-content-between">
+                        <div>
+                          <div className="d-flex align-items-center justify-content-between mb-2">
+                            <div>
+                              <div className="fw-bold text-white small">
+                                <i className="bi bi-person-badge-fill text-sky-400 me-2" />
+                                {s.userName}
+                              </div>
+                              <div className="text-slate-400 text-[11px]">
+                                {s.faculty || "วิทยาลัยการคอมพิวเตอร์ มข."} • {s.date || "2026-09-02"}
+                              </div>
+                            </div>
+                            <span className="badge bg-warning text-dark fw-bold">
+                              <i className="bi bi-star-fill me-1" />
+                              {avg} / 5.0
+                            </span>
+                          </div>
+                          <p className="text-slate-300 small mb-0 font-italic leading-relaxed">
+                            "{s.comment || "แอปพลิเคชันใช้งานง่ายและช่วยลดเวลารอคิวได้จริง"}"
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* ================= TAB 2: 5-DIMENSION ARCHITECTURE SCORECARD (ORIGINAL) ================= */}
+        {evaluationTab === "system_architecture" && (
+          <div>
+            {/* Overall Score Card & Dynamic Bar Chart */}
+            <div className="row g-4 qup-score-banner">
+              <div className="col-lg-4 d-flex flex-column align-items-center justify-content-center text-center">
+                <div className="qup-score-badge-box w-100">
+                  <div className="qup-score-big-num">{showScore(scores.total)}</div>
+                  <div className="fw-bold fs-5 mt-1">/ 10 คะแนนรวมเฉลี่ย</div>
+                  <div className="badge bg-white text-danger mt-2 px-3 py-1">
+                    จากผลประเมินจริง {scores.count} รายการ
+                  </div>
+                  <div className="mt-3">
+                    <button
+                      className="btn btn-light font-weight-bold btn-sm shadow-sm"
+                      onClick={() => setIsEvalModalOpen(true)}
+                    >
+                      <i className="bi bi-star-fill text-warning me-1" /> ส่งผลประเมินของคุณ
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="col-lg-8">
+                <div className="qup-score-bar-item">
+                  <div className="qup-score-bar-label"><span>🎨 UX/UI Design & Responsiveness</span><span>{showScore(scores.ux)} / 10</span></div>
+                  <div className="qup-score-progress-track"><div className="qup-score-progress-fill bg-[#FF7A1A]" style={{ width: scoreWidth(scores.ux) }} /></div>
+                </div>
+
+                <div className="qup-score-bar-item">
+                  <div className="qup-score-bar-label"><span>👤 "บัญชีเดียว ขยายได้ตามการเติบโต" (One Account Role Switch)</span><span>{showScore(scores.account)} / 10</span></div>
+                  <div className="qup-score-progress-track"><div className="qup-score-progress-fill bg-[#8b5cf6]" style={{ width: scoreWidth(scores.account) }} /></div>
+                </div>
+
+                <div className="qup-score-bar-item">
+                  <div className="qup-score-bar-label"><span>📋 Order & Live Queue Flow (Pre-Order / Smart Queue)</span><span>{showScore(scores.queue)} / 10</span></div>
+                  <div className="qup-score-progress-track"><div className="qup-score-progress-fill bg-[#22c55e]" style={{ width: scoreWidth(scores.queue) }} /></div>
+                </div>
+
+                <div className="qup-score-bar-item">
+                  <div className="qup-score-bar-label"><span>🏪 Merchant Seller Centre CRM & Analytics</span><span>{showScore(scores.merchant)} / 10</span></div>
+                  <div className="qup-score-progress-track"><div className="qup-score-progress-fill bg-[#0ea5e9]" style={{ width: scoreWidth(scores.merchant) }} /></div>
+                </div>
+
+                <div className="qup-score-bar-item">
+                  <div className="qup-score-bar-label"><span>🛡️ Authentication & Private Finance Isolation</span><span>{showScore(scores.security)} / 10</span></div>
+                  <div className="qup-score-progress-track"><div className="qup-score-progress-fill bg-[#f59e0b]" style={{ width: scoreWidth(scores.security) }} /></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Real User Evaluation Comments Carousel / Grid */}
+            <div className="mb-5">
+              <h4 className="fw-bold text-light mb-3">
+                <i className="bi bi-chat-quote-fill text-warning me-2" /> ความคิดเห็นและผลประเมินจากผู้ใช้งานจริงล่าสุด ({evaluations.length} ความคิดเห็น)
+              </h4>
+              {evalLoadFailed && (
+                <div role="alert" className="p-3 rounded-3 bg-slate-800/60 border border-amber-500/40 text-amber-200 small">
+                  ไม่สามารถโหลดผลประเมินได้ในขณะนี้ กรุณารีเฟรชหน้าอีกครั้ง
+                </div>
+              )}
+
+              {!evalLoadFailed && evaluations.length === 0 && (
+                <div className="p-4 rounded-3 bg-slate-800/60 border border-white/10 text-center">
+                  <p className="text-slate-300 small mb-2">ยังไม่มีผลประเมินจากผู้ใช้งาน</p>
+                  <button
+                    type="button"
+                    className="btn btn-light btn-sm fw-bold"
+                    onClick={() => setIsEvalModalOpen(true)}
+                  >
+                    <i className="bi bi-star-fill text-warning me-1" /> เป็นคนแรกที่ส่งผลประเมิน
+                  </button>
+                </div>
+              )}
+
+              <div className="row g-3">
+                {evaluations.slice(0, 4).map((item, idx) => (
+                  <div key={item.id || idx} className="col-md-6">
+                    <div className="p-3 rounded-3 bg-slate-800/60 border border-white/10">
+                      <div className="d-flex align-items-center justify-content-between mb-2">
+                        <div className="fw-bold text-white small">
+                          <i className="bi bi-person-circle text-primary me-2" /> {item.userName}
+                        </div>
+                        <span className="badge bg-warning text-dark">
+                          <i className="bi bi-star-fill me-1" />
+                          {averageScore(item).toFixed(1)} / 10
+                        </span>
+                      </div>
+                      {item.comment ? (
+                        <p className="text-slate-300 small mb-0 font-italic">"{item.comment}"</p>
+                      ) : (
+                        <p className="text-slate-500 small mb-0">(ให้คะแนนโดยไม่ระบุความคิดเห็น)</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Future Roadmap Priorities */}
         <h3 className="qup-section-title text-center mb-4 text-2xl">
@@ -757,10 +1055,10 @@ export default function Queueup() {
         <div className="row g-4 mb-5">
           {[
             {
-              name: "นายพิสิษฐ์ แก้วกุลพิสิษฐ์",
+              name: "นายพิสิษฐ์ แก้วกุลพิสิษฐ",
               id: "693380082-8",
-              role: "UX/UI Lead & Super Admin",
-              desc: "ออกแบบประสบการณ์ผู้ใช้ สถาปัตยกรรมหน้าจอ Responsive และระบบจัดการสิทธิ์สูงสุด",
+              role: "UX/UI Lead & Frontend Experience",
+              desc: "ออกแบบ Wireframe, ดีไซน์ Layout ทุกหน้าจอตามหลัก Responsive & Fluid Zoom Scaling (Ctrl + / Ctrl -), คุมโทนสี Dark Slate Glassmorphism & Shopee Theme, ออกแบบบัตรคิวดิจิทัล และดูแลประสบการณ์การใช้งาน (UX) ทั้งฝั่งลูกค้าและร้านค้าให้ใช้งานง่ายที่สุด",
               icon: "bi-palette-fill",
               color: "#FF7A1A",
               bg: "rgba(238, 77, 45, 0.15)",
@@ -768,8 +1066,8 @@ export default function Queueup() {
             {
               name: "นายภานุ คำแก้ว",
               id: "693380586-0",
-              role: "Backend & Firebase DB Lead",
-              desc: "ออกแบบฐานข้อมูล Cloud Firestore สถาปัตยกรรมความปลอดภัย และระบบเซิร์ฟเวอร์",
+              role: "Backend & Firebase Database Lead",
+              desc: "วางโครงสร้าง Cloud Firestore Collections (users, products, orders, shops, categories) เชื่อมต่อ LocalStorage Fallback และตั้งค่าระบบความปลอดภัยแยก 3 สิทธิ์ (Customer, Merchant, Admin)",
               icon: "bi-database-fill-gear",
               color: "#38bdf8",
               bg: "rgba(56, 189, 248, 0.15)",
@@ -778,7 +1076,7 @@ export default function Queueup() {
               name: "นายภูริทัต มหานิล",
               id: "693380588-6",
               role: "AI & Core Feature Developer",
-              desc: "พัฒนาระบบ AI Smart Search, Recommendation Engine และระบบประมวลผลอัจฉริยะ",
+              desc: "พัฒนาระบบค้นหาอัจฉริยะด้วยภาษาธรรมชาติ (NLP Smart Search เช่น 'อยากกินเผ็ดๆ', 'ไม่เกิน 50 บาท'), ระบบคำนวณส่วนลดตามช่วงเวลา (Time-Slot Booking) และระบบตะกร้าสินค้า",
               icon: "bi-cpu-fill",
               color: "#a855f7",
               bg: "rgba(168, 85, 247, 0.15)",
@@ -786,8 +1084,8 @@ export default function Queueup() {
             {
               name: "นายพลกฤต นิลอยู่",
               id: "693380584-4",
-              role: "KDS & Realtime Pipeline Lead",
-              desc: "พัฒนาระบบกระดานร้านค้า Kitchen Display System และ Server-Authoritative Queue Pipeline",
+              role: "KDS & Payment Integration Lead",
+              desc: "พัฒนาหน้าจอครัว Kanban สำหรับร้านค้า (Kitchen Display System), ระบบเสียงแจ้งเตือนออเดอร์เข้า, การสร้าง Dynamic PromptPay QR Code และระบบจำลองตรวจสอบสลิป",
               icon: "bi-credit-card-2-front-fill",
               color: "#22c55e",
               bg: "rgba(34, 197, 94, 0.15)",
@@ -796,7 +1094,7 @@ export default function Queueup() {
               name: "นายภาสกร หนองรั้ง",
               id: "693380587-8",
               role: "CRM & Loyalty Program Lead",
-              desc: "พัฒนาระบบแต้มสะสม คูปองส่วนลด และระบบวิเคราะห์ความภักดีของลูกค้าประจำ",
+              desc: "จัดการกระเป๋าแต้มสะสม CRM Points (128 แต้ม) และระบบคูปองส่วนลด WELCOME50",
               icon: "bi-gift-fill",
               color: "#f59e0b",
               bg: "rgba(245, 158, 11, 0.15)",
@@ -805,7 +1103,7 @@ export default function Queueup() {
               name: "นายคณิศร เลิศร่วมพัฒนา",
               id: "693380570-5",
               role: "QA Tester & Bug Hunter",
-              desc: "ทดสอบความเสถียร ตรวจสอบความถูกต้องของระบบ และค้นหาจุดบกพร่องทุกฟังก์ชัน",
+              desc: "ตรวจสอบข้อผิดพลาดของระบบ, จัดการ Netlify SPA Routing (_redirects) และความเสถียรของโค้ด",
               icon: "bi-bug-fill",
               color: "#ec4899",
               bg: "rgba(236, 72, 153, 0.15)",
@@ -814,7 +1112,7 @@ export default function Queueup() {
               name: "นายกฤษณะ อุปถัมภ์",
               id: "693380289-6",
               role: "Field Research & User Interviewer",
-              desc: "เก็บรวบรวมข้อมูลภาคสนาม สำรวจปัญหาคิวโรงอาหารจริง และวิเคราะห์ความต้องการผู้ใช้",
+              desc: "วางแผนและดำเนินการเก็บข้อมูลทดสอบกับกลุ่มตัวอย่าง 10 คนในโรงอาหาร มข.",
               icon: "bi-clipboard2-data-fill",
               color: "#14b8a6",
               bg: "rgba(20, 184, 166, 0.15)",
@@ -822,8 +1120,8 @@ export default function Queueup() {
             {
               name: "นายพุฒิเมธ เตโช",
               id: "693380083-6",
-              role: "Documentation & Presentation Lead",
-              desc: "รวบรวมเอกสารทางเทคนิค จัดเตรียมสื่อนำเสนอ และประสานงานข้อมูลโครงการทั้งระบบ",
+              role: "Documentation & Presentation Coordinator",
+              desc: "เรียบเรียงรายงานทางวิชาการ สรุปผล Canva Blueprint และจัดทำสไลด์นำเสนอ",
               icon: "bi-file-earmark-slides-fill",
               color: "#6366f1",
               bg: "rgba(99, 102, 241, 0.15)",
@@ -867,17 +1165,7 @@ export default function Queueup() {
                   </div>
                   <div>
                     <div className="text-slate-400 text-xs">ที่ตั้งศูนย์ปฏิบัติการ</div>
-                    <div className="text-white fw-bold small">โรงอาหารกลาง ศูนย์นวัตกรรมดิจิทัลสถานศึกษา</div>
-                  </div>
-                </div>
-
-                <div className="d-flex align-items-center gap-3 p-3 rounded-3 bg-slate-800/60 border border-white/10">
-                  <div className="qup-contact-icon-circle bg-success-subtle text-success">
-                    <i className="bi bi-telephone-fill fs-5" />
-                  </div>
-                  <div>
-                    <div className="text-slate-400 text-xs">สายด่วนฝ่ายดูแลระบบ</div>
-                    <div className="text-white fw-bold small">081-234-5678 / 056-711-444</div>
+                    <div className="text-white fw-bold small">โรงอาหารกลาง วิทยาลัยการคอมพิวเตอร์ มหาวิทยาลัยขอนแก่น</div>
                   </div>
                 </div>
 
@@ -887,17 +1175,7 @@ export default function Queueup() {
                   </div>
                   <div>
                     <div className="text-slate-400 text-xs">อีเมลติดต่อทางการ</div>
-                    <div className="text-white fw-bold small">58140@lomsak.ac.th / contact@queueup.app</div>
-                  </div>
-                </div>
-
-                <div className="d-flex align-items-center gap-3 p-3 rounded-3 bg-slate-800/60 border border-white/10">
-                  <div className="qup-contact-icon-circle bg-warning-subtle text-warning">
-                    <i className="bi bi-chat-dots-fill fs-5" />
-                  </div>
-                  <div>
-                    <div className="text-slate-400 text-xs">LINE Official Account</div>
-                    <div className="text-white fw-bold small">@QueueUpSchool (มี @ ด้านหน้า)</div>
+                    <div className="text-white fw-bold small">contact@queueup.app</div>
                   </div>
                 </div>
               </div>
@@ -961,7 +1239,7 @@ export default function Queueup() {
                         <input
                           type="tel"
                           className="form-control qup-input"
-                          placeholder="081-234-5678"
+                          placeholder="เช่น 08x-xxx-xxxx"
                           value={contactPhone}
                           onChange={(e) => setContactPhone(e.target.value)}
                           required
@@ -1073,6 +1351,133 @@ export default function Queueup() {
           <div>พัฒนาด้วยมาตรฐาน Zero-Trust, Salted SHA-256 & AES-256 Cryptography</div>
         </div>
       </footer>
+
+      {/* ==================== 7.5. INTERACTIVE 15-QUESTION SURVEY MODAL ==================== */}
+      {isSurveyModalOpen && (
+        <div className="modal fade show d-block bg-slate-900/80 backdrop-blur-md z-[10000]" tabIndex="-1">
+          <div className="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+            <div className="modal-content text-white bg-gradient-to-br from-slate-800 to-slate-900 border border-warning/40 rounded-[20px] shadow-2xl">
+              <div className="modal-header border-bottom border-secondary">
+                <h5 className="modal-title fw-bold">
+                  <i className="bi bi-clipboard2-data-fill text-warning me-2" />
+                  แบบประเมินการใช้แอปพลิเคชัน QueueUp (15 ข้อคำถาม Likert Scale)
+                </h5>
+                <button type="button" className="btn-close btn-close-white" onClick={() => setIsSurveyModalOpen(false)} />
+              </div>
+
+              <form onSubmit={handleSurveySubmit}>
+                <div className="modal-body p-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                  <div className="alert alert-info py-2.5 px-3 small d-flex align-items-start gap-2 mb-3 bg-sky-950/60 border border-sky-600/40 text-sky-200">
+                    <i className="bi bi-info-circle-fill mt-1 fs-6" />
+                    <div>
+                      <strong>คำชี้แจง:</strong> โปรดเลือกระดับความคิดเห็นของท่านในแต่ละข้อ (5 = มากที่สุด, 4 = มาก, 3 = ปานกลาง, 2 = น้อย, 1 = น้อยที่สุด)
+                      เพื่อนำไปวิเคราะห์ในโครงการ <strong>GE341511 กลุ่ม 23 (มข.)</strong>
+                    </div>
+                  </div>
+
+                  <div className="row g-3 mb-4">
+                    <div className="col-md-6">
+                      <label className="form-label font-weight-bold text-sm">ชื่อผู้ประเมิน / รหัสนักศึกษา *</label>
+                      <input
+                        type="text"
+                        className="form-control bg-dark text-white border-secondary text-sm"
+                        placeholder="เช่น นายธนากร (นักศึกษา AI ปี 2 - มข.)"
+                        value={surveyUserName}
+                        onChange={(e) => setSurveyUserName(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label font-weight-bold text-sm">คณะ / สังกัด / กลุ่มตัวอย่าง</label>
+                      <input
+                        type="text"
+                        className="form-control bg-dark text-white border-secondary text-sm"
+                        placeholder="เช่น วิทยาลัยการคอมพิวเตอร์ สาขา AI"
+                        value={surveyFaculty}
+                        onChange={(e) => setSurveyFaculty(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mb-3">
+                    <h6 className="fw-bold text-warning border-bottom border-white/10 pb-2 mb-3">
+                      รายการประเมินทั้ง 15 ข้อ
+                    </h6>
+                    <div className="space-y-3">
+                      {SURVEY_QUESTIONS.map((q) => {
+                        const currentVal = surveyAnswers[q.id] ?? 5;
+                        return (
+                          <div key={q.id} className="p-3 rounded-3 bg-slate-900/70 border border-white/10">
+                            <div className="d-flex justify-content-between align-items-start mb-2 flex-wrap gap-1">
+                              <span className="text-white text-sm fw-semibold">
+                                ข้อ {q.no}. {q.text}
+                              </span>
+                              <span className="badge bg-slate-800 text-sky-400 text-[10px]">
+                                {q.category}
+                              </span>
+                            </div>
+
+                            {/* 5-Choice Likert Radio Options */}
+                            <div className="d-flex gap-1.5 flex-wrap">
+                              {LIKERT_SCALE.map((opt) => {
+                                const isSelected = currentVal === opt.value;
+                                return (
+                                  <button
+                                    key={opt.value}
+                                    type="button"
+                                    className={`btn btn-sm rounded-pill text-xs px-2.5 py-1 transition-all ${
+                                      isSelected
+                                        ? "btn-warning text-dark fw-bold shadow scale-105"
+                                        : "btn-outline-secondary text-slate-300"
+                                    }`}
+                                    onClick={() =>
+                                      setSurveyAnswers((prev) => ({ ...prev, [q.id]: opt.value }))
+                                    }
+                                  >
+                                    {opt.label} ({opt.value})
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="form-label font-weight-bold text-sm">ข้อเสนอแนะเพิ่มเติม:</label>
+                    <textarea
+                      className="form-control bg-dark text-white border-secondary text-sm"
+                      rows="3"
+                      placeholder="เขียนข้อเสนอแนะสำหรับการปรับปรุงการใช้งานแอปพลิเคชัน QueueUp..."
+                      value={surveyComment}
+                      onChange={(e) => setSurveyComment(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="modal-footer border-top border-secondary">
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setIsSurveyModalOpen(false)}
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-warning text-dark font-weight-bold btn-sm shadow"
+                    disabled={isSurveySubmitting}
+                  >
+                    {isSurveySubmitting ? "กำลังบันทึก..." : "ส่งแบบประเมิน 15 ข้อ 🚀"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ==================== 8. INTERACTIVE EVALUATION MODAL FORM ==================== */}
       {isEvalModalOpen && (

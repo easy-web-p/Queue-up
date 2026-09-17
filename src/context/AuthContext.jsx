@@ -180,7 +180,7 @@ export function AuthProvider({ children }) {
     'auth/operation-not-supported-in-this-environment',
   ];
 
-  const loginWithGoogle = async () => {
+  const loginWithGoogle = async (isRetry = false) => {
     // Proactive In-App Browser check: prevent user from landing on raw missing-initial-state Firebase page
     if (isInAppBrowser()) {
       const browserName = getInAppBrowserName();
@@ -198,23 +198,42 @@ export function AuthProvider({ children }) {
     } catch (err) {
       console.warn('Firebase Google login popup error:', err);
 
-      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+      if (err?.code === 'auth/popup-closed-by-user' || err?.code === 'auth/cancelled-popup-request') {
         // The user dismissed it; nothing is wrong.
         return null;
       }
 
-      if (err.code === 'auth/unauthorized-domain') {
-        const currentHostname = typeof window !== 'undefined' ? window.location.hostname : 'queueup-65e82.web.app';
+      if (err?.code === 'auth/unauthorized-domain') {
+        const currentHostname = typeof window !== 'undefined' ? window.location.hostname : 'queue-up-nu.vercel.app';
         toast.error(`⚠️ โดเมน "${currentHostname}" ยังไม่ถูกเพิ่มใน Authorized Domains ของ Firebase Console\n(กรุณาเพิ่มใน Firebase Console > Authentication > Settings > Authorized domains หรือเข้าสู่ระบบด้วยอีเมล/รหัสผ่าน)`);
         return null;
       }
 
-      if (POPUP_UNAVAILABLE_CODES.includes(err.code)) {
-        // Same-tab redirect instead. It survives storage partitioning provided the
-        // auth handler is same-origin — see resolveAuthDomain in firebase/config.js.
-        // This navigates away, so nothing after it runs; the session is picked up by
-        // getRedirectResult and onAuthStateChanged when the browser comes back.
+      const errMsg = (err?.message || '').toLowerCase();
+      const isClosingOrStorageIssue =
+        errMsg.includes('database is closing') ||
+        errMsg.includes('closing/hidden') ||
+        errMsg.includes('database is closed') ||
+        errMsg.includes('indexeddb') ||
+        errMsg.includes('storage') ||
+        POPUP_UNAVAILABLE_CODES.includes(err?.code);
+
+      // 1. Transient IndexedDB race condition on Safari/iOS: attempt 1 fast retry
+      if (isClosingOrStorageIssue && !isRetry && !POPUP_UNAVAILABLE_CODES.includes(err?.code)) {
+        console.info('[AuthContext] Safari IndexedDB closing/hidden race detected. Retrying popup in 350ms...');
+        await new Promise((resolve) => setTimeout(resolve, 350));
         try {
+          const retryResult = await signInWithPopup(auth, googleProvider);
+          return retryResult.user;
+        } catch (retryErr) {
+          console.warn('[AuthContext] Fast retry failed, falling back to redirect:', retryErr);
+        }
+      }
+
+      // 2. Fallback to same-tab redirect if popup is blocked, partitioned, or closing
+      if (isClosingOrStorageIssue) {
+        try {
+          console.info('[AuthContext] Initiating signInWithRedirect fallback...');
           await signInWithRedirect(auth, googleProvider);
           return null;
         } catch (redirectErr) {
@@ -229,7 +248,7 @@ export function AuthProvider({ children }) {
 
       throw err;
     }
-  }
+  };
 
   const logout = async () => {
     try {

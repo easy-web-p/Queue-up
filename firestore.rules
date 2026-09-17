@@ -657,6 +657,15 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ==========================================
+    // 29. CANTEEN USABILITY & SATISFACTION SURVEYS (GE341511 15-Item Likert Scale)
+    // ==========================================
+    match /canteen_surveys/{surveyId} {
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if isAdmin();
+    }
+
   }
 }
 

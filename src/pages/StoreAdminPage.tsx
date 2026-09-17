@@ -111,7 +111,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
 
   // Staff State
   const [staffList, setStaffList] = useState([
-    { id: 'ST-01', name: 'ป้าแดง ใจดี', role: 'เจ้าของร้าน (Admin)', phone: '081-234-5678', status: 'Active' },
+    { id: 'ST-01', name: 'ป้าแดง ใจดี', role: 'เจ้าของร้าน (Admin)', phone: '082-999-1234', status: 'Active' },
     { id: 'ST-02', name: 'นายสมชาย มีชัย', role: 'พ่อครัวหลัก (Chef)', phone: '089-876-5432', status: 'Active' },
     { id: 'ST-03', name: 'นางสาววิภา เรียนดี', role: 'พนักงานแคชเชียร์ (Cashier)', phone: '086-111-2222', status: 'Active' },
   ]);

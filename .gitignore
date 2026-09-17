@@ -28,3 +28,12 @@ dist-ssr
 .freebuff/
 .vercel
 .env*
+
+# Confidential Research & Survey Reports (PDPA Protection)
+reports/
+public/reports/
+secure-reports/
+*.xlsx
+*.xls
+*.csv
+*.tsv

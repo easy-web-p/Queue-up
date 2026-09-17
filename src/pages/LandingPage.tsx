@@ -788,7 +788,7 @@ export default function LandingPage() {
                         value={form.phone}
                         onChange={handleChange}
                         required
-                        placeholder="เช่น 081-234-5678"
+                        placeholder="เช่น 08x-xxx-xxxx"
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 bg-white"
                       />
                     </div>

@@ -288,7 +288,12 @@ function Login() {
       }
     } catch (error) {
       console.warn("Google Sign-In error:", error);
-      toast.error(`เกิดข้อผิดพลาดในการเข้าสู่ระบบด้วย Google: ${error.message || error}`);
+      const msg = error?.message || String(error);
+      if (msg.includes("Database is closing") || msg.includes("closing/hidden")) {
+        toast.error("ระบบกำลังเตรียมความพร้อมฐานข้อมูล กรุณากดเข้าสู่ระบบด้วย Google ใหม่อีกครั้ง");
+      } else {
+        toast.error(`เกิดข้อผิดพลาดในการเข้าสู่ระบบด้วย Google: ${msg}`);
+      }
     }
 
     if (!gUser) {
