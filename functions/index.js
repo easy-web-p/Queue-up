@@ -5,6 +5,7 @@ import { onRequest, onCall, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
 import { scanOrderForAllergens } from "./allergenGuard.js";
+import { analyzeAndShieldInput } from "./securityShield.js";
 import { resolveLinkDecision, LINK_DECISIONS } from "./linkReview.js";
 import { validatePilotLead, rateLimitKeyForAddress } from "./pilotLead.js";
 import { validateEvaluation } from "./systemEvaluation.js";
@@ -75,7 +76,13 @@ function getBangkokYmd(date = new Date()) {
   return { ymd, ymdClean, dayOfWeekIndex };
 }
 
-export { scanOrderForAllergens, isValidCalendarDate, getBangkokCurrentTime, getBangkokYmd };
+export {
+  scanOrderForAllergens,
+  analyzeAndShieldInput,
+  isValidCalendarDate,
+  getBangkokCurrentTime,
+  getBangkokYmd,
+};
 
 /**
  * Fixed-window per-user quota, applied atomically so parallel calls cannot both read
@@ -826,6 +833,18 @@ export const generateAssistantReply = onCall(
       );
     }
 
+    // 🛡️ Server-Side Security Shield: Reject prompt injection, XSS, and malicious threats
+    // before consuming user quota or making external OpenAI requests.
+    const shield = analyzeAndShieldInput(userMessage);
+    if (!shield.safe) {
+      throw new HttpsError(
+        "permission-denied",
+        `SECURITY_THREAT_DETECTED: ตรวจพบรูปแบบข้อความไม่ปลอดภัยหรือขัดต่อนโยบายระบบ (${shield.threats.join(", ")})`
+      );
+    }
+
+    const cleanUserMessage = shield.sanitized;
+
     const apiKey = OPENAI_API_KEY.value();
     if (!apiKey) {
       return { text: null, source: "NOT_CONFIGURED" };
@@ -860,7 +879,7 @@ ${contextLine}`;
           model: process.env.OPENAI_MODEL || "gpt-3.5-turbo",
           messages: [
             { role: "system", content: systemPrompt },
-            { role: "user", content: userMessage },
+            { role: "user", content: cleanUserMessage },
           ],
           max_tokens: 150,
           temperature: 0.7,

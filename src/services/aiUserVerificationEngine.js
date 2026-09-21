@@ -327,8 +327,17 @@ export function calculateUserTrustScore(profile = {}, orderHistory = []) {
     trustCategory,
     statusText,
     breakdown,
+    // Note: Trust Score is an advisory Profile Health & Completeness score.
+    // Core ordering is authoritative via Firebase Auth / Cloud Functions, not client score.
+    accountReadiness: {
+      isOrderReady: true,
+      isProfileComplete: Boolean(isProfileComplete),
+      isEducationalVerified: Boolean(emailCheck.isEducational || profile?.isStudentVerified),
+      hasPhoneVerified: phoneCheck.valid,
+      hasEmailVerified: emailCheck.valid,
+    },
     privileges: {
-      canOrder: score >= 50,
+      canOrder: true, // Ordering is authoritatively governed by server-side auth, not client trust score
       canReview: score >= 60 && level >= 2,
       canReportStore: score >= 70 && level >= 2,
       maxCouponDiscount: level >= 3 ? "20%" : "10%",

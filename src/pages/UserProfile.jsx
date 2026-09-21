@@ -809,9 +809,9 @@ function UserProfile() {
                     className="btn btn-sm btn-outline-warning rounded-pill px-3"
                     onClick={() => {
                       toast.info(
-                        `🛡️ รายงานคะแนนความน่าเชื่อถือ (Trust Score Breakdown):\n\n` +
+                        `🛡️ รายงานคะแนนความน่าเชื่อถือและความสมบูรณ์ของบัญชี:\n\n` +
                           userTrustReport.breakdown.map((b) => `• ${b.label}`).join("\n") +
-                          `\n\nสิทธิ์การใช้งานของคุณ:\n• สั่งจองอาหาร: ${userTrustReport.privileges.canOrder ? "อนุมัติ ✅" : "ไม่อนุมัติ ❌"}\n• เขียนรีวิวร้านค้า: ${userTrustReport.privileges.canReview ? "อนุมัติ ✅" : "ต้องใช้ Level 2+ ⚠️"}\n• รายงานร้านค้า: ${userTrustReport.privileges.canReportStore ? "อนุมัติ ✅" : "ต้องใช้ Trust Score 70+ ⚠️"}`,
+                          `\n\nสถานะความพร้อมของบัญชี:\n• สั่งจองอาหาร: พร้อมใช้งานปกติ ✅\n• การยืนยันตัวตน: ${userTrustReport.levelName}\n• สิทธิ์รับส่วนลดคูปองพิเศษ: สูงสุด ${userTrustReport.privileges?.maxCouponDiscount || "10%"} ✨\n• ความสมบูรณ์โปรไฟล์: ${userTrustReport.accountReadiness?.isProfileComplete ? "ครบถ้วนสมบูรณ์ 🌟" : "แนะนำกรอกข้อมูลส่วนตัวให้ครบถ้วน 💡"}`,
                         { duration: 15000 }
                       );
                     }}

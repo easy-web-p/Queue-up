@@ -792,24 +792,79 @@ function ProductDetail() {
   // 🔒 Server-Authoritative Product Not Found Guard (Fail-Closed, No Mock Fallback)
   if (productNotFound || !product || !store) {
     return (
-      <div className="queue-pd-container">
+      <div className="queue-pd-container min-h-screen flex flex-col justify-between bg-slate-50 dark:bg-slate-950 font-['Kanit']">
         <ShopeeSearchBar />
-        <div className="container py-5 text-center my-5">
-          <div className="card shadow-sm border-0 p-5 mx-auto" style={{ maxWidth: 520, borderRadius: 16 }}>
-            <div className="text-danger mb-3" style={{ fontSize: "3.5rem" }}>
-              <i className="bi bi-exclamation-octagon-fill" />
+        <div className="container py-8 px-4 my-auto flex items-center justify-center">
+          <div
+            className="w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-10 text-center shadow-xl transition-all"
+            style={{ borderRadius: 24 }}
+          >
+            {/* Distinctive Soft Alert Badge */}
+            <div className="w-20 h-20 mx-auto mb-4 rounded-3xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 flex items-center justify-center shadow-inner">
+              <div className="text-danger" style={{ fontSize: "2.5rem", lineHeight: 1 }}>
+                <i className="bi bi-exclamation-octagon-fill text-rose-500" />
+              </div>
             </div>
-            <h4 className="fw-bold mb-2">ไม่พบเมนูนี้ในระบบร้านค้าจริง</h4>
-            <p className="text-muted mb-4">
+
+            <h4 className="fw-bold mb-2 text-xl sm:text-2xl text-slate-900 dark:text-white">
+              ไม่พบเมนูนี้ในระบบร้านค้าจริง
+            </h4>
+            <p className="text-slate-500 dark:text-slate-400 text-sm sm:text-base mb-6 leading-relaxed">
               เมนูอาหารที่คุณค้นหาไม่มีอยู่ในฐานข้อมูลของร้านค้า หรือร้านค้ายกเลิกรายการอาหารนี้แล้ว
+              คุณสามารถค้นหาเมนูยอดนิยมอื่น ๆ หรือเลือกดูร้านค้าทั้งหมดได้ทันที
             </p>
-            <button
-              className="btn btn-danger px-4 py-2 fw-bold"
-              style={{ borderRadius: 10 }}
-              onClick={() => navigate("/home")}
-            >
-              <i className="bi bi-arrow-left me-2" /> กลับสู่หน้าร้านค้าหลัก
-            </button>
+
+            {/* Action Buttons: Multi-direction UX */}
+            <div className="d-flex flex-column flex-sm-row align-items-center justify-content-center gap-2 mb-6">
+              <button
+                type="button"
+                className="btn btn-danger px-4 py-2.5 fw-bold d-inline-flex align-items-center justify-content-center gap-2 w-100 w-sm-auto shadow-sm"
+                style={{ borderRadius: 12 }}
+                onClick={() => navigate("/search?keyword=โรงอาหาร")}
+              >
+                <i className="bi bi-search" /> ค้นหาเมนูอาหารอื่น
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline-secondary px-4 py-2.5 fw-bold d-inline-flex align-items-center justify-content-center gap-2 w-100 w-sm-auto"
+                style={{ borderRadius: 12 }}
+                onClick={() => navigate(-1)}
+              >
+                <i className="bi bi-arrow-left" /> ย้อนกลับ
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline-primary px-4 py-2.5 fw-bold d-inline-flex align-items-center justify-content-center gap-2 w-100 w-sm-auto"
+                style={{ borderRadius: 12 }}
+                onClick={() => navigate("/home")}
+              >
+                <i className="bi bi-house-door-fill" /> หน้าหลัก
+              </button>
+            </div>
+
+            {/* Quick Keyword Recommendation Chips */}
+            <div className="pt-4 border-top border-slate-100 dark:border-slate-800">
+              <span className="text-xs text-slate-400 block mb-2.5 font-medium">
+                หรือเลือกลองค้นหาหมวดหมู่อาหารยอดนิยม:
+              </span>
+              <div className="d-flex flex-wrap align-items-center justify-content-center gap-2">
+                {[
+                  { label: "🍗 ไก่ทอด", q: "ไก่ทอด" },
+                  { label: "🍛 อาหารจานเดียว", q: "จานเดียว" },
+                  { label: "🍜 ก๋วยเตี๋ยว", q: "ก๋วยเตี๋ยว" },
+                  { label: "🥤 เครื่องดื่ม", q: "เครื่องดื่ม" },
+                ].map((chip) => (
+                  <button
+                    key={chip.q}
+                    type="button"
+                    className="btn btn-sm btn-light border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 rounded-pill px-3 py-1 text-xs hover:border-orange-400 transition-all cursor-pointer"
+                    onClick={() => navigate(`/search?keyword=${encodeURIComponent(chip.q)}`)}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
         <Footer />

@@ -74,7 +74,7 @@ const COMMENTS_SYSTEM_EVAL = [
 ];
 
 function pseudoRandom(seed) {
-  const x = Math.sin(seed++) * 10000;
+  const x = Math.sin(seed) * 10000;
   return x - Math.floor(x);
 }
 

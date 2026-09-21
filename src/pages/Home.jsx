@@ -152,7 +152,7 @@ function Home() {
           language === "en"
             ? "[Pa Daeng Canteen] Order ahead now & claim free 50 CRM bonus points!"
             : "[ร้านป้าแดง ตามสั่ง] เปิดให้สั่งอาหารล่วงหน้ารับแต้มสะสม CRM ฟรีได้ทันที!",
-        targetPath: "/product/m1",
+        targetPath: "/search?keyword=ป้าแดง",
       }
     );
 
@@ -695,7 +695,11 @@ function Home() {
                     className="px-4 py-2 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-['Kanit'] font-bold text-xs rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer shrink-0"
                     onClick={() => {
                       recordUserOrderBehavior(aiInsights.lastOrderedItem);
-                      navigate(`/product/${aiInsights.lastOrderedItem.itemId || "prod-default"}`);
+                      if (aiInsights.lastOrderedItem.itemId) {
+                        navigate(`/product/${aiInsights.lastOrderedItem.itemId}`);
+                      } else {
+                        navigate(`/search?keyword=${encodeURIComponent(aiInsights.lastOrderedItem.itemTitle || "อาหาร")}`);
+                      }
                     }}
                   >
                     <i className="bi bi-bag-plus me-1" />
