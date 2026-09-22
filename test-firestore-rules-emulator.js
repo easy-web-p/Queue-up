@@ -669,6 +669,45 @@ await runTest('🚨 Nobody can post as another user, even in their own chat', as
   );
 });
 
+await runTest('🚨 The shop that owns the chat can now read it', async () => {
+  // Before this, the rule admitted only the customer and admins, so a customer
+  // could "chat with the shop" and the shop could never see a word of it. The
+  // replies came from the customer's own browser.
+  await assertSucceeds(getDoc(doc(asMerchant, 'chats', CHAT_ID)));
+  await assertSucceeds(getDoc(doc(asMerchant, 'chats', CHAT_ID, 'messages', 'm1')));
+});
+
+await runTest('The shop can reply to its own customer', async () => {
+  await assertSucceeds(
+    addDoc(collection(asMerchant, 'chats', CHAT_ID, 'messages'), {
+      sender: 'merchant',
+      senderUid: MERCHANT,
+      text: 'กำลังทำให้ครับ',
+    })
+  );
+});
+
+await runTest('🚨 Widening the rule to the shop did not widen it to everyone', async () => {
+  // The whole risk of adding a second participant: the stranger checks must
+  // still hold afterwards.
+  await assertFails(getDoc(doc(asStranger, 'chats', CHAT_ID)));
+  await assertFails(getDoc(doc(asStranger, 'chats', CHAT_ID, 'messages', 'm1')));
+  await assertFails(
+    addDoc(collection(asStranger, 'chats', CHAT_ID, 'messages'), { sender: 'merchant', text: 'ปลอม' })
+  );
+});
+
+await runTest('🚨 A chat with no storeId admits no merchant at all', async () => {
+  // storeId is what names the second participant. Absent, the rule must fall
+  // back to the customer alone rather than matching an empty shop id.
+  const ORPHAN = `${STUDENT}_shop_missing`;
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'chats', ORPHAN), { customerUid: STUDENT });
+  });
+  await assertFails(getDoc(doc(asMerchant, 'chats', ORPHAN)));
+  await assertSucceeds(getDoc(doc(asStudent, 'chats', ORPHAN)));
+});
+
 console.log('\n🎟️  Coupon redemptions (the record behind "once per account")');
 
 await runTest('🚨 A user cannot reset their own redemption count', async () => {

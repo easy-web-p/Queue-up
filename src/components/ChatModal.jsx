@@ -1,87 +1,30 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { getChatGPTResponse } from "../services/aiChatService.js";
 import { analyzeAndShieldInput, checkRateLimit } from "../services/aiSecurityShield.js";
 import { useToast } from "./ToastProvider.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
+import {
+  SENDER,
+  ensureChat,
+  fetchChatsForCustomer,
+  subscribeToMessages,
+  sendMessage,
+} from "../services/chatService.js";
+import { Skeleton, EmptyState, ErrorState } from "./LoadingStates.jsx";
 import "./ChatModal.css";
 
-const INITIAL_CONVERSATIONS = [
-  {
-    id: "chat_canteen",
-    storeName: "ร้านครัวโรงเรียน QueueUp Canteen",
-    avatar: "/logo.png",
-    online: true,
-    statusText: "ตอบกลับใน 2 นาที",
-    unread: 1,
-    lastTime: "11:42 น.",
-    orderContext: {
-      orderId: "240809QUEUE01",
-      itemTitle: "ชุดข้าวผัดกุ้งกะทะร้อน + ไข่ดาวสด",
-      queueNo: "คิวพร้อมรับ A05",
-      price: 65,
-    },
-    messages: [
-      {
-        id: "m1",
-        sender: "merchant",
-        text: "สวัสดีครับร้านครัวโรงเรียน QueueUp Canteen ยินดีให้บริการครับ! คิวของคุณพร้อมรับแล้วที่เคาน์เตอร์ 1 ครับ 🍳",
-        time: "11:40 น.",
-      },
-      {
-        id: "m2",
-        sender: "user",
-        text: "รับทราบครับ กำลังลงไปที่โรงอาหารครับ!",
-        time: "11:42 น.",
-      },
-    ],
-  },
-  {
-    id: "chat_steak",
-    storeName: "ร้านสเต็กพี่ตั้ม School Food",
-    avatar: "https://images.unsplash.com/photo-1544025162-d76694265947?w=100&auto=format&fit=crop&q=80",
-    online: true,
-    statusText: "กำลังเตรียมคิวอาหาร",
-    unread: 2,
-    lastTime: "11:35 น.",
-    orderContext: {
-      orderId: "240809QUEUE02",
-      itemTitle: "สเต็กหมูพริกไทยดำ + เฟรนช์ฟรายส์กรอบ",
-      queueNo: "กำลังปรุงคิว (10 นาที)",
-      price: 120,
-    },
-    messages: [
-      {
-        id: "s1",
-        sender: "merchant",
-        text: "สวัสดีครับ! ร้านสเต็กพี่ตั้มได้รับออเดอร์แล้วครับ กำลังย่างหมูสดใหม่ฉ่ำๆ ครับ 🥩",
-        time: "11:30 น.",
-      },
-      {
-        id: "s2",
-        sender: "merchant",
-        text: "เพิ่มเฟรนช์ฟรายส์กรอบให้เป็นพิเศษครับเสร็จใน 10 นาทีครับ",
-        time: "11:35 น.",
-      },
-    ],
-  },
-  {
-    id: "chat_boba",
-    storeName: "ร้านชาไข่มุก บราวน์ชูการ์ Express",
-    avatar: "https://images.unsplash.com/photo-1558857563-b371033873b8?w=100&auto=format&fit=crop&q=80",
-    online: false,
-    statusText: "ไม่อยู่ชั่วคราว",
-    unread: 0,
-    lastTime: "เมื่อวาน",
-    orderContext: null,
-    messages: [
-      {
-        id: "b1",
-        sender: "merchant",
-        text: "ขอบคุณที่อุดหนุนร้านชาไข่มุก บราวน์ชูการ์ Express นะครับ 🧋",
-        time: "เมื่อวาน 15:20 น.",
-      },
-    ],
-  },
-];
+/*
+ * This file used to open with INITIAL_CONVERSATIONS: three invented shops —
+ * "ร้านครัวโรงเรียน QueueUp Canteen", "ร้านสเต็กพี่ตั้ม", "ร้านชาไข่มุก
+ * บราวน์ชูการ์ Express" — each carrying an order id, a queue number, a price and
+ * messages announcing status ("คิวของคุณพร้อมรับแล้วที่เคาน์เตอร์ 1 ครับ").
+ * Conversations were kept in localStorage, so nothing a customer typed ever
+ * reached a shop, and a reply arrived one second later from a canned string
+ * stored as `sender: "merchant"` under the shop's own name and avatar.
+ *
+ * Conversations are Firestore documents now, readable by both the customer and
+ * the shop, and the automated reply is labelled as an assistant.
+ */
 
 const QUICK_SUGGESTIONS = [
   "อาหารใกล้เสร็จหรือยังครับ?",
@@ -91,188 +34,186 @@ const QUICK_SUGGESTIONS = [
   "ขอบคุณครับ!",
 ];
 
-function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
-  const toast = useToast();
-  const [conversations, setConversations] = useState(() => {
-    const saved = localStorage.getItem("queueup_chat_conversations");
-    return saved ? JSON.parse(saved) : INITIAL_CONVERSATIONS;
-  });
+const STORE_AVATAR = "/logo.png";
 
+function ChatModal({ isOpen, onClose, storeId, storeName, initialStoreName, initialOrderContext }) {
+  const toast = useToast();
+  const { user } = useAuth();
+  const customerUid = user?.uid || null;
+
+  const [conversations, setConversations] = useState([]);
+  // Messages carry the chat they belong to, and the rendered list is derived
+  // from that. Clearing them in an effect when the conversation changed was a
+  // synchronous setState inside an effect (a cascading render); deriving also
+  // removes the frame where a previous conversation's messages were still on
+  // screen under a different shop's name.
+  const [messageState, setMessageState] = useState({ chatId: null, rows: [] });
   const [activeChatId, setActiveChatId] = useState(null);
   const [inputText, setInputText] = useState("");
+  const [listStatus, setListStatus] = useState("loading");
+  const [listError, setListError] = useState("");
+  const [sending, setSending] = useState(false);
   const messagesEndRef = useRef(null);
 
-  // Dynamic Store Conversation Creation & Selection on "แชทเลย" Click
+  const targetStoreName = storeName || initialStoreName || "";
+
+  // ---- Load this customer's conversations -------------------------------
+  const loadConversations = useCallback(async () => {
+    if (!customerUid) {
+      setConversations([]);
+      setListStatus("ready");
+      return;
+    }
+    try {
+      const rows = await fetchChatsForCustomer(customerUid);
+      rows.sort((a, b) => (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0));
+      setConversations(rows);
+      setListError("");
+      setListStatus("ready");
+    } catch (err) {
+      // A failed read is not an empty inbox. Rendering one as the other is how
+      // a permissions error looks like "you have no conversations".
+      setListError(err instanceof Error ? err.message : String(err));
+      setListStatus("error");
+    }
+  }, [customerUid]);
+
   useEffect(() => {
     if (!isOpen) return;
-
-    if (initialStoreName) {
-      const match = conversations.find((c) =>
-        c.storeName.toLowerCase().includes(initialStoreName.toLowerCase()) ||
-        initialStoreName.toLowerCase().includes(c.storeName.toLowerCase())
-      );
-
-      if (match) {
-        // If chat with store already exists, activate it and update orderContext
-        setTimeout(() => {
-          if (activeChatId !== match.id) {
-            setActiveChatId(match.id);
-          }
-          setConversations((prev) =>
-            prev.map((c) =>
-              c.id === match.id
-                ? {
-                    ...c,
-                    unread: 0,
-                    orderContext: initialOrderContext || c.orderContext,
-                  }
-                : c
-            )
-          );
-        }, 0);
-      } else {
-        // If chat with store does NOT exist yet, create a BRAND NEW store conversation dynamically!
-        const newChatId = "chat_" + Math.random().toString(36).substring(2, 9);
-        const currentTime = new Date().toLocaleTimeString("th-TH", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }) + " น.";
-
-        const newChat = {
-          id: newChatId,
-          storeName: initialStoreName,
-          avatar: "/logo.png",
-          online: true,
-          statusText: "ตอบกลับใน 2 นาที",
-          unread: 0,
-          lastTime: currentTime,
-          orderContext: initialOrderContext || null,
-          messages: [
-            {
-              id: "m_welcome_" + Math.random().toString(36).substring(2, 9),
-              sender: "merchant",
-              text: `สวัสดีครับ! ${initialStoreName} ยินดีให้บริการ สอบถามข้อมูลเมนูอาหารหรือคิวได้เลยครับ 🍳`,
-              time: currentTime,
-            },
-          ],
-        };
-
-        setTimeout(() => {
-          setConversations((prev) => [newChat, ...prev]);
-          setActiveChatId(newChatId);
-        }, 0);
-      }
-    } else if (conversations.length > 0 && !activeChatId) {
-      setTimeout(() => setActiveChatId(conversations[0].id), 0);
+    async function loadOnOpen() {
+      await loadConversations();
     }
-  }, [isOpen, initialStoreName, initialOrderContext, activeChatId, conversations]);
+    void loadOnOpen();
+  }, [isOpen, loadConversations]);
 
-  // Save to LocalStorage whenever conversations change
+  // ---- Open (or create) the conversation this modal was invoked for ------
   useEffect(() => {
-    localStorage.setItem("queueup_chat_conversations", JSON.stringify(conversations));
-  }, [conversations]);
+    if (!isOpen || !customerUid || !storeId) return;
+    async function openRequestedChat() {
+      try {
+        const chatId = await ensureChat({
+          customerUid,
+          storeId,
+          storeName: targetStoreName || storeId,
+          orderContext: initialOrderContext || null,
+        });
+        setActiveChatId(chatId);
+        await loadConversations();
+      } catch (err) {
+        toast.error(`เปิดแชทกับร้านไม่สำเร็จ: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+    void openRequestedChat();
+  }, [isOpen, customerUid, storeId, targetStoreName, initialOrderContext, loadConversations, toast]);
 
-  // Auto scroll to bottom of messages
+  // Fall back to the most recent conversation when none was requested.
+  // Deferred rather than set in the effect body: a synchronous setState there
+  // cascades an extra render, and this only needs to run after the list lands.
+  useEffect(() => {
+    if (!isOpen || activeChatId || conversations.length === 0) return undefined;
+    const id = setTimeout(() => setActiveChatId(conversations[0].id), 0);
+    return () => clearTimeout(id);
+  }, [isOpen, activeChatId, conversations]);
+
+  // ---- Live messages for the open conversation --------------------------
+  useEffect(() => {
+    if (!isOpen || !activeChatId) return undefined;
+    const unsubscribe = subscribeToMessages(
+      activeChatId,
+      (rows) => setMessageState({ chatId: activeChatId, rows }),
+      (err) => toast.error(`โหลดข้อความไม่สำเร็จ: ${err.message}`)
+    );
+    return () => unsubscribe();
+  }, [isOpen, activeChatId, toast]);
+
   useEffect(() => {
     if (isOpen) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [isOpen, activeChatId, conversations]);
+  }, [isOpen, activeChatId, messageState]);
 
   if (!isOpen) return null;
 
-  const activeChat = conversations.find((c) => c.id === activeChatId) || conversations[0];
+  const messages = messageState.chatId === activeChatId ? messageState.rows : [];
 
-  const handleSendMessage = (textToSend) => {
-    const rawText = textToSend || inputText.trim();
+  const activeChat = conversations.find((c) => c.id === activeChatId) || null;
+
+  const handleSendMessage = async (textToSend) => {
+    const rawText = (textToSend || inputText).trim();
     if (!rawText) return;
 
-    // Check Rate Limiting
+    if (!customerUid) {
+      toast.warning("กรุณาเข้าสู่ระบบก่อนส่งข้อความถึงร้านค้า");
+      return;
+    }
+
+    // The conversation has to exist before a message can be written into it —
+    // the security rules read storeId off the chat document to decide whether
+    // the shop may see it.
+    let chatId = activeChatId;
+    if (!chatId) {
+      if (!storeId) {
+        toast.warning('เลือกร้านค้าที่ต้องการติดต่อก่อน โดยกดปุ่ม "แชทเลย" ที่หน้าร้านหรือรายการคำสั่งซื้อ');
+        return;
+      }
+      chatId = await ensureChat({ customerUid, storeId, storeName: targetStoreName || storeId });
+      setActiveChatId(chatId);
+    }
+
     const rateCheck = checkRateLimit("CHAT_MESSAGE", 10, 60000);
     if (!rateCheck.allowed) {
       toast.warning(`🛡️ [AI Security Sentinel] ${rateCheck.message}`);
       return;
     }
 
-    // Shield & Sanitize Input Text
     const shieldResult = analyzeAndShieldInput(rawText);
     if (!shieldResult.safe) {
-      toast.warning(`🛡️ [AI Security Sentinel] ตรวจพบแพทเทิร์นสุ่มเสี่ยง: ${shieldResult.threats[0]} ระบบได้บล็อกข้อความนี้เรียบร้อยแล้ว`);
+      toast.warning(
+        `🛡️ [AI Security Sentinel] ตรวจพบแพทเทิร์นสุ่มเสี่ยง: ${shieldResult.threats[0]} ระบบได้บล็อกข้อความนี้เรียบร้อยแล้ว`
+      );
       setInputText("");
       return;
     }
 
     const messageText = shieldResult.sanitized;
-
-    const currentTime = new Date().toLocaleTimeString("th-TH", {
-      hour: "2-digit",
-      minute: "2-digit",
-    }) + " น.";
-
-    /* eslint-disable-next-line react-hooks/purity */
-    const msgRandomId = Math.random().toString(36).substring(2, 9);
-    const userMsg = {
-      id: "msg_" + msgRandomId,
-      sender: "user",
-      text: messageText,
-      time: currentTime,
-    };
-
-    setConversations((prev) =>
-      prev.map((c) => {
-        if (c.id === activeChatId) {
-          return {
-            ...c,
-            lastTime: currentTime,
-            messages: [...c.messages, userMsg],
-          };
-        }
-        return c;
-      })
-    );
-
+    setSending(true);
     if (!textToSend) setInputText("");
 
-    // ChatGPT Classic / AI Intelligent Merchant Auto-Reply
-    setTimeout(async () => {
-      const replyTime = new Date().toLocaleTimeString("th-TH", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }) + " น.";
+    try {
+      await sendMessage({
+        chatId,
+        sender: SENDER.USER,
+        text: messageText,
+        senderUid: customerUid,
+      });
+    } catch (err) {
+      // The message did not reach the shop. Saying so is the whole point: the
+      // previous version could not fail, because it never sent anything.
+      toast.error(`ส่งข้อความไม่สำเร็จ: ${err instanceof Error ? err.message : String(err)}`);
+      setSending(false);
+      return;
+    }
 
-      const storeName = activeChat?.storeName || "ร้านค้า QueueUp";
-      const orderContext = activeChat?.orderContext || null;
-
-      const autoReplyText = await getChatGPTResponse(messageText, storeName, orderContext);
-
-      const merchantReply = {
-        id: "msg_reply_" + Date.now(),
-        sender: "merchant",
-        text: autoReplyText,
-        time: replyTime,
-      };
-
-      setConversations((prev) =>
-        prev.map((c) => {
-          if (c.id === activeChatId) {
-            return {
-              ...c,
-              lastTime: replyTime,
-              messages: [...c.messages, merchantReply],
-            };
-          }
-          return c;
-        })
+    // The automated assistant answers while the shop is away. It is stored as
+    // `assistant`, never as `merchant`: it does not know this order's status and
+    // must not be mistaken for the kitchen saying it does.
+    try {
+      const replyText = await getChatGPTResponse(
+        messageText,
+        activeChat?.storeName || targetStoreName || "ร้านค้า",
+        activeChat?.orderContext || initialOrderContext || null
       );
-    }, 1000);
+      await sendMessage({ chatId, sender: SENDER.ASSISTANT, text: replyText });
+    } catch {
+      // An assistant that cannot answer is not an error worth interrupting for —
+      // the customer's own message is already delivered, which is what matters.
+    } finally {
+      setSending(false);
+      await loadConversations();
+    }
   };
 
-  const handleSelectChat = (chatId) => {
-    setActiveChatId(chatId);
-    setConversations((prev) =>
-      prev.map((c) => (c.id === chatId ? { ...c, unread: 0 } : c))
-    );
-  };
+  const handleSelectChat = (chatId) => setActiveChatId(chatId);
 
   return (
     <div className="queueup-chat-overlay fixed inset-0 z-[100000] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
@@ -284,12 +225,25 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
               <i className="bi bi-chat-dots-fill text-[#FF7A1A]" />
               <span>แชทติดต่อร้านค้า</span>
             </div>
-            <span className="badge bg-danger-subtle text-danger rounded-pill px-2 py-0.5 text-[11px] font-bold bg-orange-100 text-[#FF7A1A] dark:bg-orange-950/50 dark:text-orange-300">
-              {conversations.reduce((sum, c) => sum + (c.unread || 0), 0)} ใหม่
+            <span className="badge rounded-pill px-2 py-0.5 text-[11px] font-bold bg-orange-100 text-[#FF7A1A] dark:bg-orange-950/50 dark:text-orange-300">
+              {conversations.length} ร้าน
             </span>
           </div>
 
-          {conversations.length === 0 ? (
+          {listStatus === "loading" ? (
+            <div className="p-3 space-y-2">
+              <Skeleton className="h-14 w-full rounded-2xl" />
+              <Skeleton className="h-14 w-full rounded-2xl" />
+            </div>
+          ) : listStatus === "error" ? (
+            <div className="p-3">
+              <ErrorState
+                title="โหลดรายการแชทไม่สำเร็จ"
+                message={listError}
+                onRetry={() => { setListStatus("loading"); void loadConversations(); }}
+              />
+            </div>
+          ) : conversations.length === 0 ? (
             <div className="p-4 text-center text-muted small text-slate-400 text-xs my-auto">
               <i className="bi bi-inbox text-slate-300 dark:text-slate-600 text-3xl block mb-2" />
               ยังไม่มีแชทกับร้านค้า
@@ -307,26 +261,25 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
                   onClick={() => handleSelectChat(chat.id)}
                 >
                   <div className="queueup-chat-item-avatar-wrapper relative w-10 h-10 shrink-0">
+                    {/* Presence used to be a hardcoded `online: true` with
+                        "ตอบกลับใน 2 นาที" beside it. The system has no idea
+                        whether a shop is at the counter, so it no longer says. */}
                     <img loading="lazy" decoding="async"
-                      src={chat.avatar}
-                      alt={chat.storeName}
+                      src={STORE_AVATAR}
+                      alt={chat.storeName || chat.storeId}
                       className="queueup-chat-item-avatar w-full h-full rounded-full object-cover border border-slate-200 dark:border-slate-700"
                     />
-                    {chat.online && <span className="queueup-chat-online-dot absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900" />}
                   </div>
 
                   <div className="queueup-chat-item-info flex-1 min-w-0">
-                    <div className="queueup-chat-item-name font-bold text-xs text-slate-800 dark:text-slate-200 truncate">{chat.storeName}</div>
+                    <div className="queueup-chat-item-name font-bold text-xs text-slate-800 dark:text-slate-200 truncate">{chat.storeName || chat.storeId}</div>
                     <div className="queueup-chat-item-preview text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                      {chat.messages[chat.messages.length - 1]?.text || "เริ่มการสนทนา"}
+                      {chat.lastMessage || "เริ่มการสนทนา"}
                     </div>
                   </div>
 
                   <div className="queueup-chat-item-meta text-right shrink-0 flex flex-col items-end gap-1">
-                    <span className="queueup-chat-item-time text-[10px] text-slate-400">{chat.lastTime}</span>
-                    {chat.unread > 0 && (
-                      <span className="queueup-chat-unread-badge bg-[#FF7A1A] text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center">{chat.unread}</span>
-                    )}
+                    <span className="queueup-chat-item-time text-[10px] text-slate-400">{chat.lastTime || ""}</span>
                   </div>
                 </li>
               ))}
@@ -354,15 +307,14 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
               <div className="queueup-chat-main-header p-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900">
                 <div className="queueup-chat-header-user flex items-center gap-2.5">
                   <img loading="lazy" decoding="async"
-                    src={activeChat.avatar}
-                    alt={activeChat.storeName}
+                    src={STORE_AVATAR}
+                    alt={activeChat.storeName || activeChat.storeId}
                     className="queueup-chat-item-avatar w-9 h-9 rounded-full object-cover border border-slate-200 dark:border-slate-700"
                   />
                   <div>
-                    <div className="queueup-chat-header-title font-bold text-xs text-slate-900 dark:text-white">{activeChat.storeName}</div>
-                    <div className="queueup-chat-header-status text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                      <i className="bi bi-circle-fill text-emerald-500 text-[6px]" />
-                      {activeChat.statusText}
+                    <div className="queueup-chat-header-title font-bold text-xs text-slate-900 dark:text-white">{activeChat.storeName || activeChat.storeId}</div>
+                    <div className="queueup-chat-header-status text-[10px] text-slate-500 dark:text-slate-400">
+                      ข้อความถึงร้านค้าโดยตรง
                     </div>
                   </div>
                 </div>
@@ -394,15 +346,34 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
 
               {/* Messages Body */}
               <div className="queueup-chat-messages-body flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50 dark:bg-slate-950/30">
-                {activeChat.messages.map((msg) => (
+                {messages.length === 0 && (
+                  <EmptyState
+                    icon={<i className="bi bi-chat-dots text-3xl" aria-hidden="true" />}
+                    title="เริ่มการสนทนากับร้านค้า"
+                    message="พิมพ์ข้อความด้านล่างเพื่อส่งถึงร้านโดยตรง ทางร้านจะเห็นข้อความของคุณและตอบกลับได้"
+                  />
+                )}
+                {messages.map((msg) => (
                   <div
                     key={msg.id}
-                    className={`queueup-chat-msg-row flex flex-col ${msg.sender === "user" ? "sent items-end" : "received items-start"}`}
+                    className={`queueup-chat-msg-row flex flex-col ${msg.sender === SENDER.USER ? "sent items-end" : "received items-start"}`}
                   >
-                    <div className={`queueup-chat-msg-bubble max-w-[80%] rounded-2xl p-3 text-xs leading-relaxed ${
-                      msg.sender === "user"
+                    {/* An automated reply is marked as one. It used to be stored
+                        as `sender: "merchant"` and rendered identically to the
+                        shop, so a canned line about order status was
+                        indistinguishable from the kitchen answering. */}
+                    {msg.sender === SENDER.ASSISTANT && (
+                      <span className="text-[10px] font-bold text-violet-600 dark:text-violet-400 mb-1 px-1 flex items-center gap-1">
+                        <i className="bi bi-robot" aria-hidden="true" />
+                        ผู้ช่วยอัตโนมัติ (ไม่ใช่ข้อความจากร้าน)
+                      </span>
+                    )}
+                    <div className={`queueup-chat-msg-bubble max-w-[80%] rounded-2xl p-3 text-xs leading-relaxed whitespace-pre-line ${
+                      msg.sender === SENDER.USER
                         ? "bg-[#FF7A1A] text-white rounded-tr-xs shadow-xs"
-                        : "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-tl-xs border border-slate-200 dark:border-slate-700 shadow-xs"
+                        : msg.sender === SENDER.ASSISTANT
+                          ? "bg-violet-50 dark:bg-violet-950/40 text-slate-800 dark:text-slate-100 rounded-tl-xs border border-violet-200 dark:border-violet-900/50 shadow-xs"
+                          : "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-tl-xs border border-slate-200 dark:border-slate-700 shadow-xs"
                     }`}>
                       {msg.text}
                     </div>
@@ -418,7 +389,8 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
                   <button
                     key={idx}
                     className="queueup-chat-suggest-chip px-3 py-1 rounded-full text-[11px] font-medium bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-orange-400 hover:text-orange-500 whitespace-nowrap transition-all cursor-pointer shadow-2xs"
-                    onClick={() => handleSendMessage(chip)}
+                    onClick={() => void handleSendMessage(chip)}
+                    disabled={sending}
                   >
                     {chip}
                   </button>
@@ -430,7 +402,7 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
                 className="queueup-chat-input-footer p-3 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2 bg-white dark:bg-slate-900 shrink-0"
                 onSubmit={(e) => {
                   e.preventDefault();
-                  handleSendMessage();
+                  void handleSendMessage();
                 }}
               >
                 <input
@@ -440,8 +412,15 @@ function ChatModal({ isOpen, onClose, initialStoreName, initialOrderContext }) {
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                 />
-                <button type="submit" className="queueup-chat-send-btn p-2 w-9 h-9 min-w-[44px] min-h-[44px] rounded-xl bg-[#FF7A1A] hover:bg-[#E6680D] text-white flex items-center justify-center transition-all cursor-pointer border-0 shadow-xs" title="ส่งข้อความ" aria-label="ส่งข้อความ">
-                  <i className="bi bi-send-fill text-xs" />
+                <button
+                  type="submit"
+                  disabled={sending}
+                  aria-busy={sending}
+                  className="queueup-chat-send-btn p-2 w-9 h-9 min-w-[44px] min-h-[44px] rounded-xl bg-[#FF7A1A] hover:bg-[#E6680D] disabled:opacity-60 disabled:cursor-not-allowed text-white flex items-center justify-center transition-all cursor-pointer border-0 shadow-xs"
+                  title="ส่งข้อความ"
+                  aria-label="ส่งข้อความ"
+                >
+                  <i className={sending ? "bi bi-hourglass-split text-xs" : "bi bi-send-fill text-xs"} />
                 </button>
               </form>
             </>

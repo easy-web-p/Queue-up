@@ -2050,7 +2050,7 @@ function ProductDetail() {
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
         storeId={product.storeId}
-        productId={product.id}
+        storeName={store?.name || product.storeName}
       />
 
       {/* 11. INCOMPLETE PROFILE MODAL */}

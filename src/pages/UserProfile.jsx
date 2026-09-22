@@ -51,6 +51,10 @@ function UserProfile() {
   const [couponTab, setCouponTab] = useState("usable"); // 'usable' | 'expired'
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatStoreName, setChatStoreName] = useState("");
+  // The shop the conversation is with. ChatModal needs an id, not just a
+  // name: the chat document is keyed on it, and the security rules read it
+  // to let the shop see its own customers' messages.
+  const [chatStoreId, setChatStoreId] = useState("");
   const [chatOrderContext, setChatOrderContext] = useState(null);
 
   // 🔔 Real-time Booking & Purchase History State (Connected to Firestore /orders)
@@ -751,10 +755,17 @@ function UserProfile() {
                   <button
                     className="btn btn-sm btn-outline-warning rounded-pill px-3"
                     onClick={() => {
+                      // This used to end with "สิทธิ์การใช้งานของคุณ" and a list
+                      // of approvals — none of which any rule or function read.
+                      // What the score actually reflects is how much of this
+                      // account has been verified, so that is what it now says.
                       toast.info(
                         `🛡️ รายงานคะแนนความน่าเชื่อถือ (Trust Score Breakdown):\n\n` +
-                          userTrustReport.breakdown.map((b) => `• ${b.label}`).join("\n") +
-                          `\n\nสิทธิ์การใช้งานของคุณ:\n• สั่งจองอาหาร: ${userTrustReport.privileges.canOrder ? "อนุมัติ ✅" : "ไม่อนุมัติ ❌"}\n• เขียนรีวิวร้านค้า: ${userTrustReport.privileges.canReview ? "อนุมัติ ✅" : "ต้องใช้ Level 2+ ⚠️"}\n• รายงานร้านค้า: ${userTrustReport.privileges.canReportStore ? "อนุมัติ ✅" : "ต้องใช้ Trust Score 70+ ⚠️"}`,
+                          (userTrustReport.breakdown.length > 0
+                            ? userTrustReport.breakdown.map((b) => `• ${b.label}`).join("\n")
+                            : "• ยังไม่มีรายการยืนยันตัวตน") +
+                          `\n\nคะแนนนี้สะท้อนระดับการยืนยันตัวตนของบัญชี เช่น อีเมล เบอร์โทรศัพท์ และประวัติการสั่งซื้อจริง` +
+                          `\nยืนยันข้อมูลเพิ่มเติมเพื่อเพิ่มคะแนนและระดับบัญชีของคุณ`,
                         { duration: 15000 }
                       );
                     }}
@@ -1276,6 +1287,7 @@ function UserProfile() {
                     activeOrder={activeLiveOrder}
                     onOpenChat={(ord) => {
                       setChatStoreName(ord.shopName || ord.storeName || "ร้านค้า");
+                      setChatStoreId(ord.storeId || ord.shopId || "");
                       setChatOrderContext({
                         orderId: ord.id,
                         itemTitle: ord.items?.[0]?.name,
@@ -1332,6 +1344,7 @@ function UserProfile() {
                           className="shopee-btn-chat"
                           onClick={() => {
                             setChatStoreName(order.shopName);
+                            setChatStoreId(order.storeId || order.shopId || "");
                             setChatOrderContext({
                               orderId: order.id,
                               itemTitle: order.items[0]?.name,
@@ -1719,7 +1732,8 @@ function UserProfile() {
       <ChatModal
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
-        initialStoreName={chatStoreName}
+        storeId={chatStoreId}
+        storeName={chatStoreName}
         initialOrderContext={chatOrderContext}
       />
 

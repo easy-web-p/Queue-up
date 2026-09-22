@@ -224,7 +224,20 @@ export function validateProfileAvatarImage(fileOrDataUrl) {
  * 5. Calculate User Trust Score & Verification Level (Levels 0 to 5)
  * @param {object} profile - User profile object { email, phone, gender, birthDate, photo, role, accountId, createdAt, ... }
  * @param {array} orderHistory - Array of completed order objects
- * @returns {object} { trustScore, verificationLevel, levelName, badgeColor, status, breakdown, privileges }
+ * The returned report describes how thoroughly this account has been verified.
+ * It deliberately does NOT describe permissions.
+ *
+ * It used to also return `privileges` — {canOrder, canReview, canReportStore,
+ * maxCouponDiscount} — computed in the browser from a score the browser also
+ * computed, and the profile screen rendered them as "สิทธิ์การใช้งานของคุณ …
+ * อนุมัติ ✅". No security rule and no Cloud Function read any of it, so every
+ * line of that list was a statement about the system that was not true: a user
+ * shown "ไม่อนุมัติ" could order anyway, and one shown "อนุมัติ" had been
+ * granted nothing. Access is decided by custom claims and firestore.rules. If a
+ * trust threshold should ever gate an action, it has to be enforced there — and
+ * then it can be displayed here.
+ *
+ * @returns {object} { trustScore, verificationLevel, levelName, badgeColor, trustCategory, statusText, breakdown }
  */
 export function calculateUserTrustScore(profile = {}, orderHistory = []) {
   let score = 50; // Base Starting Trust Score
@@ -327,12 +340,6 @@ export function calculateUserTrustScore(profile = {}, orderHistory = []) {
     trustCategory,
     statusText,
     breakdown,
-    privileges: {
-      canOrder: score >= 50,
-      canReview: score >= 60 && level >= 2,
-      canReportStore: score >= 70 && level >= 2,
-      maxCouponDiscount: level >= 3 ? "20%" : "10%",
-    },
   };
 }
 

@@ -583,25 +583,53 @@ service cloud.firestore {
       // every other student's conversations with a shop, and post messages into
       // them. Confirmed against the rules engine: a stranger could read a chat
       // containing a phone number and write a message as its owner.
-      allow read, write: if isChatOwner() || isAdmin();
+      // The shop this conversation is with, taken from the chat document rather
+      // than parsed out of the id. The id is `<customerUid>_<storeId>`, but
+      // neither half has a fixed length, so a rule cannot split it safely — the
+      // owner check above can only match a known prefix. Storing storeId as a
+      // field makes the other participant addressable.
+      function chatStoreId() {
+        return resource != null && 'storeId' in resource.data ? resource.data.storeId : '';
+      }
+
+      // `allow read, write: if isAuthenticated()` let any signed-in student read
+      // every other student's conversations with a shop, and post messages into
+      // them. Confirmed against the rules engine: a stranger could read a chat
+      // containing a phone number and write a message as its owner.
+      //
+      // The shop is now a participant too. Before this, a customer could open a
+      // chat with a canteen and the canteen had no way to see it: the rule
+      // admitted only the customer, and the "merchant" replies were generated in
+      // the customer's own browser. A conversation the other party cannot read
+      // is not a conversation.
+      allow read, write: if isChatOwner() || isAdmin() || isStoreOwner(chatStoreId());
 
       match /messages/{msgId} {
-        allow read: if isChatOwner() || isAdmin();
+        // The parent chat holds the storeId, so authorizing the shop costs one
+        // document read per evaluation. Worth it: the alternative is denormalising
+        // storeId onto every message, where a client could write a different one
+        // and address a chat it does not belong to.
+        function parentChat() {
+          return get(/databases/$(database)/documents/chats/$(chatId)).data;
+        }
+        function isChatParticipant() {
+          return isChatOwner()
+            || isAdmin()
+            || (exists(/databases/$(database)/documents/chats/$(chatId))
+                && isStoreOwner(parentChat().storeId));
+        }
+
+        allow read: if isChatParticipant();
         // senderUid, when present, must be the caller — nobody writes as someone
-        // else. The shop's automatic acknowledgement carries no senderUid, which
-        // is why this is conditional rather than required.
-        allow create: if (isChatOwner() || isAdmin()) &&
+        // else. The assistant's acknowledgement carries no senderUid, which is
+        // why this is conditional rather than required.
+        allow create: if isChatParticipant() &&
           (!('senderUid' in request.resource.data) ||
            request.resource.data.senderUid == request.auth.uid ||
            request.resource.data.senderUid == 'guest');
         allow update, delete: if isAdmin();
       }
     }
-
-    // NOTE: merchants cannot read these chats yet, and do not need to — the shop
-    // reply in Chat.tsx is generated client-side by the customer's own browser.
-    // When a real merchant inbox is built, give the chat document a participants
-    // field and widen the rule to it; do not widen it back to isAuthenticated().
 
     // ==========================================
     // 23. QUEUE COUNTERS (Cloud Functions Backend Only)
