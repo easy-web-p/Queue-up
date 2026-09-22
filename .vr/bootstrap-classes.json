@@ -1,0 +1,974 @@
+[
+  {
+    "class": "border",
+    "files": 49
+  },
+  {
+    "class": "text-white",
+    "files": 45
+  },
+  {
+    "class": "bg-white",
+    "files": 39
+  },
+  {
+    "class": "gap-2",
+    "files": 39
+  },
+  {
+    "class": "gap-3",
+    "files": 36
+  },
+  {
+    "class": "p-4",
+    "files": 36
+  },
+  {
+    "class": "px-4",
+    "files": 33
+  },
+  {
+    "class": "text-center",
+    "files": 32
+  },
+  {
+    "class": "px-3",
+    "files": 31
+  },
+  {
+    "class": "py-2",
+    "files": 30
+  },
+  {
+    "class": "py-1",
+    "files": 29
+  },
+  {
+    "class": "shadow-sm",
+    "files": 29
+  },
+  {
+    "class": "flex-wrap",
+    "files": 27
+  },
+  {
+    "class": "p-3",
+    "files": 26
+  },
+  {
+    "class": "mx-auto",
+    "files": 26
+  },
+  {
+    "class": "mt-1",
+    "files": 25
+  },
+  {
+    "class": "mb-1",
+    "files": 24
+  },
+  {
+    "class": "gap-1",
+    "files": 23
+  },
+  {
+    "class": "mb-2",
+    "files": 23
+  },
+  {
+    "class": "bi",
+    "files": 21
+  },
+  {
+    "class": "py-3",
+    "files": 21
+  },
+  {
+    "class": "p-2",
+    "files": 21
+  },
+  {
+    "class": "px-5",
+    "files": 20
+  },
+  {
+    "class": "overflow-hidden",
+    "files": 19
+  },
+  {
+    "class": "gap-4",
+    "files": 18
+  },
+  {
+    "class": "p-5",
+    "files": 17
+  },
+  {
+    "class": "mb-0",
+    "files": 17
+  },
+  {
+    "class": "mb-3",
+    "files": 17
+  },
+  {
+    "class": "pt-2",
+    "files": 17
+  },
+  {
+    "class": "py-4",
+    "files": 16
+  },
+  {
+    "class": "shadow-lg",
+    "files": 16
+  },
+  {
+    "class": "border-0",
+    "files": 15
+  },
+  {
+    "class": "px-2",
+    "files": 15
+  },
+  {
+    "class": "overflow-x-auto",
+    "files": 15
+  },
+  {
+    "class": "mt-2",
+    "files": 15
+  },
+  {
+    "class": "overflow-y-auto",
+    "files": 14
+  },
+  {
+    "class": "me-1",
+    "files": 14
+  },
+  {
+    "class": "top-0",
+    "files": 14
+  },
+  {
+    "class": "mb-4",
+    "files": 14
+  },
+  {
+    "class": "fw-bold",
+    "files": 13
+  },
+  {
+    "class": "btn",
+    "files": 13
+  },
+  {
+    "class": "pb-4",
+    "files": 12
+  },
+  {
+    "class": "rounded",
+    "files": 12
+  },
+  {
+    "class": "pt-3",
+    "files": 11
+  },
+  {
+    "class": "pb-2",
+    "files": 11
+  },
+  {
+    "class": "text-warning",
+    "files": 11
+  },
+  {
+    "class": "mt-4",
+    "files": 11
+  },
+  {
+    "class": "pb-3",
+    "files": 10
+  },
+  {
+    "class": "d-flex",
+    "files": 10
+  },
+  {
+    "class": "badge",
+    "files": 9
+  },
+  {
+    "class": "small",
+    "files": 9
+  },
+  {
+    "class": "align-items-center",
+    "files": 9
+  },
+  {
+    "class": "text-danger",
+    "files": 9
+  },
+  {
+    "class": "pt-4",
+    "files": 9
+  },
+  {
+    "class": "text-dark",
+    "files": 8
+  },
+  {
+    "class": "pt-1",
+    "files": 8
+  },
+  {
+    "class": "border-2",
+    "files": 8
+  },
+  {
+    "class": "btn-sm",
+    "files": 8
+  },
+  {
+    "class": "rounded-pill",
+    "files": 7
+  },
+  {
+    "class": "text-muted",
+    "files": 7
+  },
+  {
+    "class": "justify-content-center",
+    "files": 7
+  },
+  {
+    "class": "text-primary",
+    "files": 7
+  },
+  {
+    "class": "text-success",
+    "files": 7
+  },
+  {
+    "class": "justify-content-between",
+    "files": 7
+  },
+  {
+    "class": "bg-success",
+    "files": 7
+  },
+  {
+    "class": "p-1",
+    "files": 6
+  },
+  {
+    "class": "mb-5",
+    "files": 6
+  },
+  {
+    "class": "me-2",
+    "files": 6
+  },
+  {
+    "class": "fs-5",
+    "files": 6
+  },
+  {
+    "class": "bg-light",
+    "files": 6
+  },
+  {
+    "class": "row",
+    "files": 6
+  },
+  {
+    "class": "g-3",
+    "files": 6
+  },
+  {
+    "class": "rounded-3",
+    "files": 6
+  },
+  {
+    "class": "flex-column",
+    "files": 5
+  },
+  {
+    "class": "btn-primary",
+    "files": 5
+  },
+  {
+    "class": "text-info",
+    "files": 5
+  },
+  {
+    "class": "bg-success-subtle",
+    "files": 5
+  },
+  {
+    "class": "bg-danger",
+    "files": 5
+  },
+  {
+    "class": "bg-warning",
+    "files": 5
+  },
+  {
+    "class": "text-secondary",
+    "files": 5
+  },
+  {
+    "class": "fs-6",
+    "files": 5
+  },
+  {
+    "class": "btn-outline-danger",
+    "files": 5
+  },
+  {
+    "class": "w-100",
+    "files": 5
+  },
+  {
+    "class": "m-0",
+    "files": 4
+  },
+  {
+    "class": "h-100",
+    "files": 4
+  },
+  {
+    "class": "position-absolute",
+    "files": 4
+  },
+  {
+    "class": "end-0",
+    "files": 4
+  },
+  {
+    "class": "px-1",
+    "files": 4
+  },
+  {
+    "class": "p-0",
+    "files": 4
+  },
+  {
+    "class": "pb-1",
+    "files": 4
+  },
+  {
+    "class": "my-2",
+    "files": 4
+  },
+  {
+    "class": "mt-3",
+    "files": 4
+  },
+  {
+    "class": "rounded-4",
+    "files": 4
+  },
+  {
+    "class": "col-md-6",
+    "files": 4
+  },
+  {
+    "class": "fs-2",
+    "files": 4
+  },
+  {
+    "class": "border-secondary",
+    "files": 4
+  },
+  {
+    "class": "position-relative",
+    "files": 4
+  },
+  {
+    "class": "btn-light",
+    "files": 4
+  },
+  {
+    "class": "rounded-circle",
+    "files": 4
+  },
+  {
+    "class": "border-bottom",
+    "files": 4
+  },
+  {
+    "class": "form-label",
+    "files": 4
+  },
+  {
+    "class": "form-control",
+    "files": 4
+  },
+  {
+    "class": "border-top",
+    "files": 4
+  },
+  {
+    "class": "mt-auto",
+    "files": 3
+  },
+  {
+    "class": "ms-1",
+    "files": 3
+  },
+  {
+    "class": "bg-transparent",
+    "files": 3
+  },
+  {
+    "class": "btn-close",
+    "files": 3
+  },
+  {
+    "class": "btn-close-white",
+    "files": 3
+  },
+  {
+    "class": "btn-warning",
+    "files": 3
+  },
+  {
+    "class": "ms-2",
+    "files": 3
+  },
+  {
+    "class": "bg-primary",
+    "files": 3
+  },
+  {
+    "class": "bg-danger-subtle",
+    "files": 3
+  },
+  {
+    "class": "btn-link",
+    "files": 3
+  },
+  {
+    "class": "ms-auto",
+    "files": 3
+  },
+  {
+    "class": "d-block",
+    "files": 3
+  },
+  {
+    "class": "alert",
+    "files": 3
+  },
+  {
+    "class": "my-3",
+    "files": 3
+  },
+  {
+    "class": "bg-secondary-subtle",
+    "files": 3
+  },
+  {
+    "class": "display-6",
+    "files": 3
+  },
+  {
+    "class": "bg-dark",
+    "files": 3
+  },
+  {
+    "class": "form-select",
+    "files": 3
+  },
+  {
+    "class": "fs-3",
+    "files": 3
+  },
+  {
+    "class": "text-decoration-underline",
+    "files": 2
+  },
+  {
+    "class": "bg-warning-subtle",
+    "files": 2
+  },
+  {
+    "class": "opacity-75",
+    "files": 2
+  },
+  {
+    "class": "text-uppercase",
+    "files": 2
+  },
+  {
+    "class": "opacity-50",
+    "files": 2
+  },
+  {
+    "class": "bottom-0",
+    "files": 2
+  },
+  {
+    "class": "border-success-subtle",
+    "files": 2
+  },
+  {
+    "class": "g-4",
+    "files": 2
+  },
+  {
+    "class": "bg-secondary",
+    "files": 2
+  },
+  {
+    "class": "text-light",
+    "files": 2
+  },
+  {
+    "class": "btn-success",
+    "files": 2
+  },
+  {
+    "class": "fs-4",
+    "files": 2
+  },
+  {
+    "class": "g-2",
+    "files": 2
+  },
+  {
+    "class": "col-lg-8",
+    "files": 2
+  },
+  {
+    "class": "col-lg-4",
+    "files": 2
+  },
+  {
+    "class": "col-6",
+    "files": 2
+  },
+  {
+    "class": "col-md-3",
+    "files": 2
+  },
+  {
+    "class": "col-md-4",
+    "files": 2
+  },
+  {
+    "class": "display-4",
+    "files": 2
+  },
+  {
+    "class": "progress",
+    "files": 2
+  },
+  {
+    "class": "progress-bar",
+    "files": 2
+  },
+  {
+    "class": "modal",
+    "files": 2
+  },
+  {
+    "class": "fade",
+    "files": 2
+  },
+  {
+    "class": "show",
+    "files": 2
+  },
+  {
+    "class": "modal-dialog",
+    "files": 2
+  },
+  {
+    "class": "modal-dialog-centered",
+    "files": 2
+  },
+  {
+    "class": "modal-content",
+    "files": 2
+  },
+  {
+    "class": "modal-header",
+    "files": 2
+  },
+  {
+    "class": "modal-title",
+    "files": 2
+  },
+  {
+    "class": "modal-body",
+    "files": 2
+  },
+  {
+    "class": "modal-footer",
+    "files": 2
+  },
+  {
+    "class": "btn-secondary",
+    "files": 2
+  },
+  {
+    "class": "btn-danger",
+    "files": 2
+  },
+  {
+    "class": "my-4",
+    "files": 1
+  },
+  {
+    "class": "my-auto",
+    "files": 1
+  },
+  {
+    "class": "m-3",
+    "files": 1
+  },
+  {
+    "class": "mx-1",
+    "files": 1
+  },
+  {
+    "class": "shadow",
+    "files": 1
+  },
+  {
+    "class": "mx-4",
+    "files": 1
+  },
+  {
+    "class": "border-4",
+    "files": 1
+  },
+  {
+    "class": "nav-link",
+    "files": 1
+  },
+  {
+    "class": "dropdown-toggle",
+    "files": 1
+  },
+  {
+    "class": "dropdown-menu",
+    "files": 1
+  },
+  {
+    "class": "dropdown-menu-end",
+    "files": 1
+  },
+  {
+    "class": "dropdown-item",
+    "files": 1
+  },
+  {
+    "class": "dropdown-header",
+    "files": 1
+  },
+  {
+    "class": "py-5",
+    "files": 1
+  },
+  {
+    "class": "btn-outline-success",
+    "files": 1
+  },
+  {
+    "class": "row-cols-2",
+    "files": 1
+  },
+  {
+    "class": "row-cols-md-3",
+    "files": 1
+  },
+  {
+    "class": "row-cols-lg-4",
+    "files": 1
+  },
+  {
+    "class": "col",
+    "files": 1
+  },
+  {
+    "class": "gap-5",
+    "files": 1
+  },
+  {
+    "class": "alert-info",
+    "files": 1
+  },
+  {
+    "class": "align-baseline",
+    "files": 1
+  },
+  {
+    "class": "btn-outline-light",
+    "files": 1
+  },
+  {
+    "class": "font-monospace",
+    "files": 1
+  },
+  {
+    "class": "alert-success",
+    "files": 1
+  },
+  {
+    "class": "bg-opacity-25",
+    "files": 1
+  },
+  {
+    "class": "rounded-2",
+    "files": 1
+  },
+  {
+    "class": "text-opacity-75",
+    "files": 1
+  },
+  {
+    "class": "col-md-5",
+    "files": 1
+  },
+  {
+    "class": "col-md-2",
+    "files": 1
+  },
+  {
+    "class": "table-responsive",
+    "files": 1
+  },
+  {
+    "class": "table",
+    "files": 1
+  },
+  {
+    "class": "table-hover",
+    "files": 1
+  },
+  {
+    "class": "align-middle",
+    "files": 1
+  },
+  {
+    "class": "table-light",
+    "files": 1
+  },
+  {
+    "class": "bg-primary-subtle",
+    "files": 1
+  },
+  {
+    "class": "border-primary-subtle",
+    "files": 1
+  },
+  {
+    "class": "col-md-7",
+    "files": 1
+  },
+  {
+    "class": "btn-outline-secondary",
+    "files": 1
+  },
+  {
+    "class": "form-text",
+    "files": 1
+  },
+  {
+    "class": "display-2",
+    "files": 1
+  },
+  {
+    "class": "text-start",
+    "files": 1
+  },
+  {
+    "class": "py-0",
+    "files": 1
+  },
+  {
+    "class": "fw-normal",
+    "files": 1
+  },
+  {
+    "class": "text-end",
+    "files": 1
+  },
+  {
+    "class": "text-decoration-line-through",
+    "files": 1
+  },
+  {
+    "class": "border-danger",
+    "files": 1
+  },
+  {
+    "class": "border-danger-subtle",
+    "files": 1
+  },
+  {
+    "class": "text-danger-emphasis",
+    "files": 1
+  },
+  {
+    "class": "col-12",
+    "files": 1
+  },
+  {
+    "class": "col-sm-7",
+    "files": 1
+  },
+  {
+    "class": "form-control-sm",
+    "files": 1
+  },
+  {
+    "class": "col-sm-5",
+    "files": 1
+  },
+  {
+    "class": "text-decoration-none",
+    "files": 1
+  },
+  {
+    "class": "btn-outline-primary",
+    "files": 1
+  },
+  {
+    "class": "d-none",
+    "files": 1
+  },
+  {
+    "class": "d-sm-inline-block",
+    "files": 1
+  },
+  {
+    "class": "bg-opacity-75",
+    "files": 1
+  },
+  {
+    "class": "col-md-8",
+    "files": 1
+  },
+  {
+    "class": "flex-grow-1",
+    "files": 1
+  },
+  {
+    "class": "text-truncate",
+    "files": 1
+  },
+  {
+    "class": "pb-0",
+    "files": 1
+  },
+  {
+    "class": "pt-0",
+    "files": 1
+  },
+  {
+    "class": "object-fit-cover",
+    "files": 1
+  },
+  {
+    "class": "btn-dark",
+    "files": 1
+  },
+  {
+    "class": "top-50",
+    "files": 1
+  },
+  {
+    "class": "start-50",
+    "files": 1
+  },
+  {
+    "class": "translate-middle",
+    "files": 1
+  },
+  {
+    "class": "btn-lg",
+    "files": 1
+  },
+  {
+    "class": "start-0",
+    "files": 1
+  },
+  {
+    "class": "ps-3",
+    "files": 1
+  },
+  {
+    "class": "bg-info-subtle",
+    "files": 1
+  },
+  {
+    "class": "bg-info",
+    "files": 1
+  },
+  {
+    "class": "text-lg-end",
+    "files": 1
+  },
+  {
+    "class": "col-lg-3",
+    "files": 1
+  },
+  {
+    "class": "g-5",
+    "files": 1
+  },
+  {
+    "class": "col-lg-5",
+    "files": 1
+  },
+  {
+    "class": "col-lg-7",
+    "files": 1
+  },
+  {
+    "class": "modal-lg",
+    "files": 1
+  },
+  {
+    "class": "alert-warning",
+    "files": 1
+  },
+  {
+    "class": "align-items-start",
+    "files": 1
+  },
+  {
+    "class": "form-range",
+    "files": 1
+  },
+  {
+    "class": "col-md-12",
+    "files": 1
+  },
+  {
+    "class": "d-inline-flex",
+    "files": 1
+  },
+  {
+    "class": "btn-outline-warning",
+    "files": 1
+  },
+  {
+    "class": "col-4",
+    "files": 1
+  },
+  {
+    "class": "progress-bar-striped",
+    "files": 1
+  },
+  {
+    "class": "progress-bar-animated",
+    "files": 1
+  }
+]

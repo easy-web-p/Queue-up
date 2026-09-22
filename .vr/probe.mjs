@@ -1,0 +1,14 @@
+import { chromium } from 'playwright';
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const p = await b.newPage({ viewport: { width: 1280, height: 900 } });
+const errors = [];
+p.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 140)); });
+p.on('pageerror', (e) => errors.push('PAGEERROR: ' + String(e).slice(0, 140)));
+await p.goto('http://localhost:4173/', { waitUntil: 'networkidle', timeout: 20000 }).catch((e) => errors.push('GOTO: ' + e.message.slice(0,100)));
+await p.waitForTimeout(2500);
+const text = (await p.textContent('body').catch(() => '')) || '';
+console.log('visible text length:', text.trim().length);
+console.log('first 200 chars:', JSON.stringify(text.trim().slice(0, 200)));
+console.log('errors:', errors.slice(0, 6));
+await p.screenshot({ path: '/tmp/vr/landing.png', fullPage: false });
+await b.close();

@@ -1,0 +1,548 @@
+{
+  "alert": [
+    "background-color",
+    "border",
+    "border-radius",
+    "color",
+    "margin-bottom",
+    "padding",
+    "position"
+  ],
+  "alert-info": [],
+  "alert-success": [],
+  "alert-warning": [],
+  "align-items-center": [
+    "align-items"
+  ],
+  "align-items-start": [
+    "align-items"
+  ],
+  "badge": [
+    "border-radius",
+    "color",
+    "display",
+    "font-size",
+    "font-weight",
+    "line-height",
+    "padding",
+    "text-align",
+    "vertical-align",
+    "white-space"
+  ],
+  "bg-danger": [
+    "background-color"
+  ],
+  "bg-danger-subtle": [
+    "background-color"
+  ],
+  "bg-dark": [
+    "background-color"
+  ],
+  "bg-info": [
+    "background-color"
+  ],
+  "bg-info-subtle": [
+    "background-color"
+  ],
+  "bg-opacity-25": [],
+  "bg-opacity-75": [],
+  "bg-primary": [
+    "background-color"
+  ],
+  "bg-primary-subtle": [
+    "background-color"
+  ],
+  "bg-secondary": [
+    "background-color"
+  ],
+  "bg-secondary-subtle": [
+    "background-color"
+  ],
+  "bg-success": [
+    "background-color"
+  ],
+  "bg-success-subtle": [
+    "background-color"
+  ],
+  "bg-warning": [
+    "background-color"
+  ],
+  "bg-warning-subtle": [
+    "background-color"
+  ],
+  "bi": [],
+  "border-bottom": [
+    "border-bottom"
+  ],
+  "border-danger": [
+    "border-color"
+  ],
+  "border-danger-subtle": [
+    "border-color"
+  ],
+  "border-primary-subtle": [
+    "border-color"
+  ],
+  "border-secondary": [
+    "border-color"
+  ],
+  "border-success-subtle": [
+    "border-color"
+  ],
+  "border-top": [
+    "border-top"
+  ],
+  "btn": [
+    "-moz-user-select",
+    "-webkit-user-select",
+    "background-color",
+    "border",
+    "border-radius",
+    "color",
+    "cursor",
+    "display",
+    "font-family",
+    "font-size",
+    "font-weight",
+    "line-height",
+    "padding",
+    "text-align",
+    "text-decoration",
+    "transition",
+    "user-select",
+    "vertical-align"
+  ],
+  "btn-close": [
+    "background",
+    "border",
+    "border-radius",
+    "box-sizing",
+    "color",
+    "data",
+    "filter",
+    "height",
+    "http",
+    "opacity",
+    "padding",
+    "width"
+  ],
+  "btn-close-white": [],
+  "btn-danger": [],
+  "btn-dark": [],
+  "btn-lg": [],
+  "btn-light": [],
+  "btn-link": [
+    "text-decoration"
+  ],
+  "btn-outline-danger": [],
+  "btn-outline-light": [],
+  "btn-outline-primary": [],
+  "btn-outline-secondary": [],
+  "btn-outline-success": [],
+  "btn-outline-warning": [],
+  "btn-secondary": [],
+  "btn-sm": [],
+  "btn-success": [],
+  "btn-warning": [],
+  "col": [
+    "flex"
+  ],
+  "col-lg-3": [
+    "flex",
+    "width"
+  ],
+  "col-lg-4": [
+    "flex",
+    "width"
+  ],
+  "col-lg-5": [
+    "flex",
+    "width"
+  ],
+  "col-lg-7": [
+    "flex",
+    "width"
+  ],
+  "col-lg-8": [
+    "flex",
+    "width"
+  ],
+  "col-md-12": [
+    "flex",
+    "width"
+  ],
+  "col-md-2": [
+    "flex",
+    "width"
+  ],
+  "col-md-3": [
+    "flex",
+    "width"
+  ],
+  "col-md-4": [
+    "flex",
+    "width"
+  ],
+  "col-md-5": [
+    "flex",
+    "width"
+  ],
+  "col-md-6": [
+    "flex",
+    "width"
+  ],
+  "col-md-7": [
+    "flex",
+    "width"
+  ],
+  "col-md-8": [
+    "flex",
+    "width"
+  ],
+  "col-sm-5": [
+    "flex",
+    "width"
+  ],
+  "col-sm-7": [
+    "flex",
+    "width"
+  ],
+  "d-block": [
+    "display"
+  ],
+  "d-flex": [
+    "display"
+  ],
+  "d-inline-flex": [
+    "display"
+  ],
+  "d-none": [
+    "display"
+  ],
+  "d-sm-inline-block": [
+    "display"
+  ],
+  "display-2": [
+    "font-size",
+    "font-weight",
+    "line-height"
+  ],
+  "display-4": [
+    "font-size",
+    "font-weight",
+    "line-height"
+  ],
+  "display-6": [
+    "font-size",
+    "font-weight",
+    "line-height"
+  ],
+  "dropdown-header": [
+    "color",
+    "display",
+    "font-size",
+    "margin-bottom",
+    "padding",
+    "white-space"
+  ],
+  "dropdown-item": [
+    "background-color",
+    "border",
+    "border-radius",
+    "clear",
+    "color",
+    "display",
+    "font-weight",
+    "padding",
+    "text-align",
+    "text-decoration",
+    "white-space",
+    "width"
+  ],
+  "dropdown-menu": [
+    "background-clip",
+    "background-color",
+    "border",
+    "border-radius",
+    "color",
+    "display",
+    "font-size",
+    "list-style",
+    "margin",
+    "min-width",
+    "padding",
+    "position",
+    "text-align",
+    "z-index"
+  ],
+  "dropdown-menu-end": [],
+  "dropdown-toggle": [
+    "white-space"
+  ],
+  "fade": [
+    "transition"
+  ],
+  "flex-column": [
+    "flex-direction"
+  ],
+  "font-monospace": [
+    "font-family"
+  ],
+  "form-control-sm": [
+    "border-radius",
+    "font-size",
+    "min-height",
+    "padding"
+  ],
+  "form-label": [
+    "margin-bottom"
+  ],
+  "form-range": [
+    "-moz-appearance",
+    "-webkit-appearance",
+    "appearance",
+    "background-color",
+    "height",
+    "padding",
+    "width"
+  ],
+  "form-select": [
+    "-moz-appearance",
+    "-webkit-appearance",
+    "appearance",
+    "background-color",
+    "background-image",
+    "background-position",
+    "background-repeat",
+    "background-size",
+    "border",
+    "border-radius",
+    "color",
+    "data",
+    "display",
+    "font-size",
+    "font-weight",
+    "http",
+    "line-height",
+    "padding",
+    "transition",
+    "width"
+  ],
+  "form-text": [
+    "color",
+    "font-size",
+    "margin-top"
+  ],
+  "fs-2": [
+    "font-size"
+  ],
+  "fs-3": [
+    "font-size"
+  ],
+  "fs-4": [
+    "font-size"
+  ],
+  "fs-5": [
+    "font-size"
+  ],
+  "fs-6": [
+    "font-size"
+  ],
+  "fw-bold": [
+    "font-weight"
+  ],
+  "fw-normal": [
+    "font-weight"
+  ],
+  "g-2": [],
+  "g-3": [],
+  "g-4": [],
+  "g-5": [],
+  "justify-content-between": [
+    "justify-content"
+  ],
+  "justify-content-center": [
+    "justify-content"
+  ],
+  "modal": [
+    "display",
+    "height",
+    "left",
+    "outline",
+    "overflow-x",
+    "overflow-y",
+    "position",
+    "top",
+    "width",
+    "z-index"
+  ],
+  "modal-body": [
+    "flex",
+    "padding",
+    "position"
+  ],
+  "modal-dialog": [
+    "margin",
+    "margin-left",
+    "margin-right",
+    "max-width",
+    "pointer-events",
+    "position",
+    "width"
+  ],
+  "modal-dialog-centered": [
+    "align-items",
+    "display",
+    "min-height"
+  ],
+  "modal-footer": [
+    "align-items",
+    "background-color",
+    "border-bottom-left-radius",
+    "border-bottom-right-radius",
+    "border-top",
+    "display",
+    "flex-shrink",
+    "flex-wrap",
+    "justify-content",
+    "padding"
+  ],
+  "modal-header": [
+    "align-items",
+    "border-bottom",
+    "border-top-left-radius",
+    "border-top-right-radius",
+    "display",
+    "flex-shrink",
+    "padding"
+  ],
+  "modal-lg": [],
+  "modal-title": [
+    "line-height",
+    "margin-bottom"
+  ],
+  "nav-link": [
+    "background",
+    "border",
+    "color",
+    "display",
+    "font-size",
+    "font-weight",
+    "padding",
+    "text-decoration",
+    "transition"
+  ],
+  "object-fit-cover": [
+    "-o-object-fit",
+    "object-fit"
+  ],
+  "position-absolute": [
+    "position"
+  ],
+  "position-relative": [
+    "position"
+  ],
+  "progress": [
+    "background-color",
+    "border-radius",
+    "display",
+    "font-size",
+    "height",
+    "overflow"
+  ],
+  "progress-bar": [
+    "background-color",
+    "color",
+    "display",
+    "flex-direction",
+    "justify-content",
+    "overflow",
+    "text-align",
+    "transition",
+    "white-space"
+  ],
+  "progress-bar-animated": [
+    "animation"
+  ],
+  "progress-bar-striped": [
+    "background-image",
+    "background-size"
+  ],
+  "rounded-2": [
+    "border-radius"
+  ],
+  "rounded-3": [
+    "border-radius"
+  ],
+  "rounded-circle": [
+    "border-radius"
+  ],
+  "rounded-pill": [
+    "border-radius"
+  ],
+  "row": [
+    "display",
+    "flex-wrap",
+    "margin-left",
+    "margin-right",
+    "margin-top"
+  ],
+  "row-cols-2": [],
+  "row-cols-lg-4": [],
+  "row-cols-md-3": [],
+  "show": [],
+  "small": [
+    "font-size"
+  ],
+  "table-hover": [],
+  "table-light": [
+    "border-color",
+    "color"
+  ],
+  "table-responsive": [
+    "-webkit-overflow-scrolling",
+    "overflow-x"
+  ],
+  "text-danger-emphasis": [
+    "color"
+  ],
+  "text-decoration-line-through": [
+    "text-decoration"
+  ],
+  "text-decoration-none": [
+    "text-decoration"
+  ],
+  "text-decoration-underline": [
+    "text-decoration"
+  ],
+  "text-info": [
+    "color"
+  ],
+  "text-lg-end": [
+    "text-align"
+  ],
+  "text-light": [
+    "color"
+  ],
+  "text-opacity-75": [],
+  "text-primary": [
+    "color"
+  ],
+  "text-success": [
+    "color"
+  ],
+  "text-truncate": [
+    "overflow",
+    "text-overflow",
+    "white-space"
+  ],
+  "text-uppercase": [
+    "text-transform"
+  ],
+  "text-warning": [
+    "color"
+  ],
+  "translate-middle": [
+    "transform"
+  ]
+}

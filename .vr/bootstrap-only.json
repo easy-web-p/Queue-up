@@ -1,0 +1,2825 @@
+[
+  {
+    "class": "border",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/ChatModal.jsx",
+      "src/components/ClientCartModal.jsx",
+      "src/components/ClientLoyaltyDrawer.jsx",
+      "src/components/ClientQueueTicket.jsx",
+      "src/components/CookieConsentBanner.jsx",
+      "src/components/DailyMenuBoard.jsx",
+      "src/components/ErrorBoundary.jsx",
+      "src/components/FoodCard.jsx",
+      "src/components/Footer.jsx",
+      "src/components/LoadingStates.jsx",
+      "src/components/MerchantCRMAnalytics.tsx",
+      "src/components/MerchantKDS.tsx",
+      "src/components/MerchantMenuManager.tsx",
+      "src/components/MerchantModifierManager.tsx",
+      "src/components/PageRouteLoader.jsx",
+      "src/components/PdpaPolicyModal.jsx",
+      "src/components/ProtectedRoute.jsx",
+      "src/components/QueueUpLogo.tsx",
+      "src/components/SellerAssistantModal.jsx",
+      "src/components/ShopReelsFeed.jsx",
+      "src/components/ShopeeSearchBar.jsx",
+      "src/components/StaffRoleManager.tsx",
+      "src/components/ToastProvider.jsx",
+      "src/pages/About.jsx",
+      "src/pages/AllergyAlertSetting.tsx",
+      "src/pages/CampusQueueMonitor.tsx",
+      "src/pages/Chat.tsx",
+      "src/pages/ChildOrderHistory.tsx",
+      "src/pages/EmergencyLookup.tsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/GuardianLinkApproval.tsx",
+      "src/pages/Home.jsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/Loading.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/NotFound.jsx",
+      "src/pages/PdpaPolicy.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/SpendingLimitSetting.tsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/StudentVendorEarnings.tsx",
+      "src/pages/StudentVendorOnboarding.tsx",
+      "src/pages/UserProfile.jsx",
+      "src/pages/VendorApprovalPanel.tsx"
+    ]
+  },
+  {
+    "class": "text-white",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/ChatModal.jsx",
+      "src/components/ClientCartModal.jsx",
+      "src/components/ClientLoyaltyDrawer.jsx",
+      "src/components/ClientQueueTicket.jsx",
+      "src/components/CookieConsentBanner.jsx",
+      "src/components/DailyMenuBoard.jsx",
+      "src/components/ErrorBoundary.jsx",
+      "src/components/FoodCard.jsx",
+      "src/components/Footer.jsx",
+      "src/components/LoadingStates.jsx",
+      "src/components/MerchantCRMAnalytics.tsx",
+      "src/components/MerchantKDS.tsx",
+      "src/components/MerchantMenuManager.tsx",
+      "src/components/MerchantModifierManager.tsx",
+      "src/components/PageRouteLoader.jsx",
+      "src/components/PdpaPolicyModal.jsx",
+      "src/components/ProtectedRoute.jsx",
+      "src/components/QueueUpLogo.tsx",
+      "src/components/SellerAssistantModal.jsx",
+      "src/components/ShopReelsFeed.jsx",
+      "src/components/ShopeeSearchBar.jsx",
+      "src/components/StaffRoleManager.tsx",
+      "src/pages/About.jsx",
+      "src/pages/AllergyAlertSetting.tsx",
+      "src/pages/Chat.tsx",
+      "src/pages/ChildOrderHistory.tsx",
+      "src/pages/EmergencyLookup.tsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/GuardianLinkApproval.tsx",
+      "src/pages/Home.jsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/NotFound.jsx",
+      "src/pages/PdpaPolicy.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/SpendingLimitSetting.tsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/StudentVendorEarnings.tsx",
+      "src/pages/StudentVendorOnboarding.tsx",
+      "src/pages/UserProfile.jsx",
+      "src/pages/VendorApprovalPanel.tsx"
+    ]
+  },
+  {
+    "class": "gap-2",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/ChatModal.jsx",
+      "src/components/ClientCartModal.jsx",
+      "src/components/ClientLoyaltyDrawer.jsx",
+      "src/components/ClientQueueTicket.jsx",
+      "src/components/CookieConsentBanner.jsx",
+      "src/components/DailyMenuBoard.jsx",
+      "src/components/Footer.jsx",
+      "src/components/MerchantCRMAnalytics.tsx",
+      "src/components/MerchantKDS.tsx",
+      "src/components/MerchantMenuManager.tsx",
+      "src/components/MerchantModifierManager.tsx",
+      "src/components/ProtectedRoute.jsx",
+      "src/components/SellerAssistantModal.jsx",
+      "src/components/ShopReelsFeed.jsx",
+      "src/components/StaffRoleManager.tsx",
+      "src/components/ToastProvider.jsx",
+      "src/pages/About.jsx",
+      "src/pages/AllergyAlertSetting.tsx",
+      "src/pages/CampusQueueMonitor.tsx",
+      "src/pages/Chat.tsx",
+      "src/pages/ChildOrderHistory.tsx",
+      "src/pages/EmergencyLookup.tsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/GuardianLinkApproval.tsx",
+      "src/pages/Home.jsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/NotFound.jsx",
+      "src/pages/PdpaPolicy.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/SpendingLimitSetting.tsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/StudentVendorEarnings.tsx",
+      "src/pages/StudentVendorOnboarding.tsx",
+      "src/pages/UserProfile.jsx",
+      "src/pages/VendorApprovalPanel.tsx"
+    ]
+  },
+  {
+    "class": "bg-white",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/ChatModal.jsx",
+      "src/components/ClientCartModal.jsx",
+      "src/components/ClientLoyaltyDrawer.jsx",
+      "src/components/ClientQueueTicket.jsx",
+      "src/components/DailyMenuBoard.jsx",
+      "src/components/FoodCard.jsx",
+      "src/components/LoadingStates.jsx",
+      "src/components/MerchantCRMAnalytics.tsx",
+      "src/components/MerchantKDS.tsx",
+      "src/components/MerchantMenuManager.tsx",
+      "src/components/MerchantModifierManager.tsx",
+      "src/components/QueueUpLogo.tsx",
+      "src/components/SellerAssistantModal.jsx",
+      "src/components/ShopReelsFeed.jsx",
+      "src/components/StaffRoleManager.tsx",
+      "src/components/ToastProvider.jsx",
+      "src/pages/AllergyAlertSetting.tsx",
+      "src/pages/CampusQueueMonitor.tsx",
+      "src/pages/Chat.tsx",
+      "src/pages/ChildOrderHistory.tsx",
+      "src/pages/EmergencyLookup.tsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/GuardianLinkApproval.tsx",
+      "src/pages/Home.jsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/NotFound.jsx",
+      "src/pages/PdpaPolicy.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/SpendingLimitSetting.tsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/StudentVendorEarnings.tsx",
+      "src/pages/StudentVendorOnboarding.tsx",
+      "src/pages/UserProfile.jsx",
+      "src/pages/VendorApprovalPanel.tsx"
+    ]
+  },
+  {
+    "class": "p-4",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/ChatModal.jsx",
+      "src/components/ClientCartModal.jsx",
+      "src/components/ClientLoyaltyDrawer.jsx",
+      "src/components/ClientQueueTicket.jsx",
+      "src/components/CookieConsentBanner.jsx",
+      "src/components/DailyMenuBoard.jsx",
+      "src/components/MerchantKDS.tsx",
+      "src/components/MerchantMenuManager.tsx",
+      "src/components/MerchantModifierManager.tsx",
+      "src/components/PdpaPolicyModal.jsx",
+      "src/components/ProtectedRoute.jsx",
+      "src/components/SellerAssistantModal.jsx",
+      "src/components/ShopReelsFeed.jsx",
+      "src/components/ToastProvider.jsx",
+      "src/pages/About.jsx",
+      "src/pages/AllergyAlertSetting.tsx",
+      "src/pages/CampusQueueMonitor.tsx",
+      "src/pages/Chat.tsx",
+      "src/pages/ChildOrderHistory.tsx",
+      "src/pages/EmergencyLookup.tsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/GuardianLinkApproval.tsx",
+      "src/pages/Home.jsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/NotFound.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/SpendingLimitSetting.tsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/StudentVendorEarnings.tsx",
+      "src/pages/StudentVendorOnboarding.tsx",
+      "src/pages/UserProfile.jsx",
+      "src/pages/VendorApprovalPanel.tsx"
+    ]
+  },
+  {
+    "class": "gap-3",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/ClientCartModal.jsx",
+      "src/components/ClientLoyaltyDrawer.jsx",
+      "src/components/CookieConsentBanner.jsx",
+      "src/components/DailyMenuBoard.jsx",
+      "src/components/ErrorBoundary.jsx",
+      "src/components/Footer.jsx",
+      "src/components/LoadingStates.jsx",
+      "src/components/MerchantKDS.tsx",
+      "src/components/MerchantMenuManager.tsx",
+      "src/components/MerchantModifierManager.tsx",
+      "src/components/PdpaPolicyModal.jsx",
+      "src/components/ProtectedRoute.jsx",
+      "src/components/ShopReelsFeed.jsx",
+      "src/components/StaffRoleManager.tsx",
+      "src/components/ToastProvider.jsx",
+      "src/pages/About.jsx",
+      "src/pages/AllergyAlertSetting.tsx",
+      "src/pages/CampusQueueMonitor.tsx",
+      "src/pages/Chat.tsx",
+      "src/pages/ChildOrderHistory.tsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/GuardianLinkApproval.tsx",
+      "src/pages/Home.jsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/NotFound.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/SpendingLimitSetting.tsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/StudentVendorOnboarding.tsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "text-center",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/ChatModal.jsx",
+      "src/components/ClientCartModal.jsx",
+      "src/components/ClientQueueTicket.jsx",
+      "src/components/ErrorBoundary.jsx",
+      "src/components/Footer.jsx",
+      "src/components/LoadingStates.jsx",
+      "src/components/MerchantKDS.tsx",
+      "src/components/MerchantModifierManager.tsx",
+      "src/components/PageRouteLoader.jsx",
+      "src/components/ProtectedRoute.jsx",
+      "src/pages/About.jsx",
+      "src/pages/AllergyAlertSetting.tsx",
+      "src/pages/CampusQueueMonitor.tsx",
+      "src/pages/ChildOrderHistory.tsx",
+      "src/pages/EmergencyLookup.tsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/GuardianLinkApproval.tsx",
+      "src/pages/Home.jsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/Loading.jsx",
+      "src/pages/Login.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/NotFound.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/SpendingLimitSetting.tsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/UserProfile.jsx",
+      "src/pages/VendorApprovalPanel.tsx"
+    ]
+  },
+  {
+    "class": "px-4",
+    "files": [
+      "src/components/ChatModal.jsx",
+      "src/components/ClientQueueTicket.jsx",
+      "src/components/CookieConsentBanner.jsx",
+      "src/components/Footer.jsx",
+      "src/components/LoadingStates.jsx",
+      "src/components/MerchantCRMAnalytics.tsx",
+      "src/components/MerchantKDS.tsx",
+      "src/components/MerchantMenuManager.tsx",
+      "src/components/MerchantModifierManager.tsx",
+      "src/components/SellerAssistantModal.jsx",
+      "src/components/StaffRoleManager.tsx",
+      "src/components/ToastProvider.jsx",
+      "src/pages/AllergyAlertSetting.tsx",
+      "src/pages/Chat.tsx",
+      "src/pages/ChildOrderHistory.tsx",
+      "src/pages/EmergencyLookup.tsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/GuardianLinkApproval.tsx",
+      "src/pages/Home.jsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/NotFound.jsx",
+      "src/pages/PdpaPolicy.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/SpendingLimitSetting.tsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/StudentVendorEarnings.tsx",
+      "src/pages/StudentVendorOnboarding.tsx",
+      "src/pages/UserProfile.jsx",
+      "src/pages/VendorApprovalPanel.tsx"
+    ]
+  },
+  {
+    "class": "shadow-sm",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/ClientLoyaltyDrawer.jsx",
+      "src/components/DailyMenuBoard.jsx",
+      "src/components/FoodCard.jsx",
+      "src/components/Footer.jsx",
+      "src/components/MerchantCRMAnalytics.tsx",
+      "src/components/MerchantKDS.tsx",
+      "src/components/MerchantMenuManager.tsx",
+      "src/components/MerchantModifierManager.tsx",
+      "src/components/SellerAssistantModal.jsx",
+      "src/components/ShopReelsFeed.jsx",
+      "src/components/StaffRoleManager.tsx",
+      "src/pages/CampusQueueMonitor.tsx",
+      "src/pages/Chat.tsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/GuardianLinkApproval.tsx",
+      "src/pages/Home.jsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/NotFound.jsx",
+      "src/pages/PdpaPolicy.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/UserProfile.jsx",
+      "src/pages/VendorApprovalPanel.tsx"
+    ]
+  },
+  {
+    "class": "px-3",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/ChatModal.jsx",
+      "src/components/ClientQueueTicket.jsx",
+      "src/components/DailyMenuBoard.jsx",
+      "src/components/SellerAssistantModal.jsx",
+      "src/components/ShopReelsFeed.jsx",
+      "src/components/ShopeeSearchBar.jsx",
+      "src/components/StaffRoleManager.tsx",
+      "src/pages/About.jsx",
+      "src/pages/AllergyAlertSetting.tsx",
+      "src/pages/CampusQueueMonitor.tsx",
+      "src/pages/Chat.tsx",
+      "src/pages/ChildOrderHistory.tsx",
+      "src/pages/EmergencyLookup.tsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/Home.jsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/Login.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/SpendingLimitSetting.tsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/StudentVendorEarnings.tsx",
+      "src/pages/StudentVendorOnboarding.tsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "mt-1",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/ChatModal.jsx",
+      "src/components/ClientCartModal.jsx",
+      "src/components/CookieConsentBanner.jsx",
+      "src/components/LoadingStates.jsx",
+      "src/components/MerchantKDS.tsx",
+      "src/components/MerchantModifierManager.tsx",
+      "src/components/ShopeeSearchBar.jsx",
+      "src/components/ToastProvider.jsx",
+      "src/pages/About.jsx",
+      "src/pages/AllergyAlertSetting.tsx",
+      "src/pages/CampusQueueMonitor.tsx",
+      "src/pages/Chat.tsx",
+      "src/pages/EmergencyLookup.tsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/GuardianLinkApproval.tsx",
+      "src/pages/Home.jsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SpendingLimitSetting.tsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/StudentVendorEarnings.tsx",
+      "src/pages/StudentVendorOnboarding.tsx",
+      "src/pages/UserProfile.jsx",
+      "src/pages/VendorApprovalPanel.tsx"
+    ]
+  },
+  {
+    "class": "py-1",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/ChatModal.jsx",
+      "src/components/CookieConsentBanner.jsx",
+      "src/components/DailyMenuBoard.jsx",
+      "src/components/MerchantCRMAnalytics.tsx",
+      "src/components/MerchantKDS.tsx",
+      "src/components/MerchantMenuManager.tsx",
+      "src/components/MerchantModifierManager.tsx",
+      "src/components/SellerAssistantModal.jsx",
+      "src/components/ShopReelsFeed.jsx",
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/About.jsx",
+      "src/pages/AllergyAlertSetting.tsx",
+      "src/pages/CampusQueueMonitor.tsx",
+      "src/pages/ChildOrderHistory.tsx",
+      "src/pages/EmergencyLookup.tsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/Home.jsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SpendingLimitSetting.tsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/StudentVendorOnboarding.tsx",
+      "src/pages/UserProfile.jsx",
+      "src/pages/VendorApprovalPanel.tsx"
+    ]
+  },
+  {
+    "class": "flex-wrap",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/ClientCartModal.jsx",
+      "src/components/DailyMenuBoard.jsx",
+      "src/components/FoodCard.jsx",
+      "src/components/Footer.jsx",
+      "src/components/MerchantMenuManager.tsx",
+      "src/components/PdpaPolicyModal.jsx",
+      "src/components/ProtectedRoute.jsx",
+      "src/components/SellerAssistantModal.jsx",
+      "src/components/ToastProvider.jsx",
+      "src/pages/About.jsx",
+      "src/pages/AllergyAlertSetting.tsx",
+      "src/pages/ChildOrderHistory.tsx",
+      "src/pages/EmergencyLookup.tsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/GuardianLinkApproval.tsx",
+      "src/pages/Home.jsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/NotFound.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/SpendingLimitSetting.tsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/StudentVendorOnboarding.tsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "mb-1",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/ChatModal.jsx",
+      "src/components/ClientCartModal.jsx",
+      "src/components/ClientQueueTicket.jsx",
+      "src/components/CookieConsentBanner.jsx",
+      "src/components/DailyMenuBoard.jsx",
+      "src/components/FoodCard.jsx",
+      "src/components/MerchantMenuManager.tsx",
+      "src/components/MerchantModifierManager.tsx",
+      "src/components/PdpaPolicyModal.jsx",
+      "src/components/ProtectedRoute.jsx",
+      "src/components/SellerAssistantModal.jsx",
+      "src/pages/EmergencyLookup.tsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/GuardianLinkApproval.tsx",
+      "src/pages/Home.jsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/Login.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/PdpaPolicy.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx",
+      "src/pages/VendorApprovalPanel.tsx"
+    ]
+  },
+  {
+    "class": "mx-auto",
+    "files": [
+      "src/components/ClientCartModal.jsx",
+      "src/components/ClientQueueTicket.jsx",
+      "src/components/ErrorBoundary.jsx",
+      "src/components/Footer.jsx",
+      "src/components/LoadingStates.jsx",
+      "src/components/MerchantModifierManager.tsx",
+      "src/components/ProtectedRoute.jsx",
+      "src/pages/About.jsx",
+      "src/pages/AllergyAlertSetting.tsx",
+      "src/pages/CampusQueueMonitor.tsx",
+      "src/pages/Chat.tsx",
+      "src/pages/ChildOrderHistory.tsx",
+      "src/pages/EmergencyLookup.tsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/GuardianLinkApproval.tsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/PdpaPolicy.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/SpendingLimitSetting.tsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/StudentVendorEarnings.tsx",
+      "src/pages/StudentVendorOnboarding.tsx",
+      "src/pages/VendorApprovalPanel.tsx"
+    ]
+  },
+  {
+    "class": "p-3",
+    "files": [
+      "src/components/ChatModal.jsx",
+      "src/components/ClientCartModal.jsx",
+      "src/components/FoodCard.jsx",
+      "src/components/LoadingStates.jsx",
+      "src/components/MerchantCRMAnalytics.tsx",
+      "src/components/MerchantModifierManager.tsx",
+      "src/components/PdpaPolicyModal.jsx",
+      "src/components/SellerAssistantModal.jsx",
+      "src/components/StaffRoleManager.tsx",
+      "src/pages/Chat.tsx",
+      "src/pages/EmergencyLookup.tsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/Home.jsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/SpendingLimitSetting.tsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/StudentVendorEarnings.tsx",
+      "src/pages/UserProfile.jsx",
+      "src/pages/VendorApprovalPanel.tsx"
+    ]
+  },
+  {
+    "class": "py-2",
+    "files": [
+      "src/components/ChatModal.jsx",
+      "src/components/ClientLoyaltyDrawer.jsx",
+      "src/components/ClientQueueTicket.jsx",
+      "src/components/CookieConsentBanner.jsx",
+      "src/components/Footer.jsx",
+      "src/components/MerchantMenuManager.tsx",
+      "src/components/MerchantModifierManager.tsx",
+      "src/components/PdpaPolicyModal.jsx",
+      "src/components/SellerAssistantModal.jsx",
+      "src/pages/About.jsx",
+      "src/pages/EmergencyLookup.tsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/Home.jsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/Login.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/StudentVendorEarnings.tsx",
+      "src/pages/StudentVendorOnboarding.tsx",
+      "src/pages/UserProfile.jsx",
+      "src/pages/VendorApprovalPanel.tsx"
+    ]
+  },
+  {
+    "class": "mb-2",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/ChatModal.jsx",
+      "src/components/ClientQueueTicket.jsx",
+      "src/components/DailyMenuBoard.jsx",
+      "src/components/FoodCard.jsx",
+      "src/components/MerchantModifierManager.tsx",
+      "src/components/PdpaPolicyModal.jsx",
+      "src/components/SellerAssistantModal.jsx",
+      "src/components/ShopReelsFeed.jsx",
+      "src/pages/About.jsx",
+      "src/pages/EmergencyLookup.tsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/GuardianLinkApproval.tsx",
+      "src/pages/Home.jsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/StudentVendorEarnings.tsx",
+      "src/pages/StudentVendorOnboarding.tsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "gap-1",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/ChatModal.jsx",
+      "src/components/ClientCartModal.jsx",
+      "src/components/ClientQueueTicket.jsx",
+      "src/components/DailyMenuBoard.jsx",
+      "src/components/FoodCard.jsx",
+      "src/components/MerchantCRMAnalytics.tsx",
+      "src/components/MerchantKDS.tsx",
+      "src/components/MerchantMenuManager.tsx",
+      "src/components/MerchantModifierManager.tsx",
+      "src/components/SellerAssistantModal.jsx",
+      "src/components/ShopReelsFeed.jsx",
+      "src/pages/Chat.tsx",
+      "src/pages/EmergencyLookup.tsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/Home.jsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/StudentVendorEarnings.tsx",
+      "src/pages/UserProfile.jsx",
+      "src/pages/VendorApprovalPanel.tsx"
+    ]
+  },
+  {
+    "class": "shadow-lg",
+    "files": [
+      "src/components/ClientCartModal.jsx",
+      "src/components/ClientQueueTicket.jsx",
+      "src/components/MerchantCRMAnalytics.tsx",
+      "src/components/MerchantKDS.tsx",
+      "src/components/PdpaPolicyModal.jsx",
+      "src/components/ProtectedRoute.jsx",
+      "src/components/ToastProvider.jsx",
+      "src/pages/AllergyAlertSetting.tsx",
+      "src/pages/CampusQueueMonitor.tsx",
+      "src/pages/ChildOrderHistory.tsx",
+      "src/pages/EmergencyLookup.tsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/NotFound.jsx",
+      "src/pages/PdpaPolicy.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/SpendingLimitSetting.tsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/StudentVendorEarnings.tsx",
+      "src/pages/StudentVendorOnboarding.tsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "bi",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/ChatModal.jsx",
+      "src/components/CookieConsentBanner.jsx",
+      "src/components/DailyMenuBoard.jsx",
+      "src/components/FoodCard.jsx",
+      "src/components/Footer.jsx",
+      "src/components/PdpaPolicyModal.jsx",
+      "src/components/SellerAssistantModal.jsx",
+      "src/components/ShopReelsFeed.jsx",
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/About.jsx",
+      "src/pages/Home.jsx",
+      "src/pages/Login.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/NotFound.jsx",
+      "src/pages/PdpaPolicy.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "py-3",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/ClientCartModal.jsx",
+      "src/components/LoadingStates.jsx",
+      "src/components/ProtectedRoute.jsx",
+      "src/components/ToastProvider.jsx",
+      "src/pages/About.jsx",
+      "src/pages/AllergyAlertSetting.tsx",
+      "src/pages/EmergencyLookup.tsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/GuardianLinkApproval.tsx",
+      "src/pages/Home.jsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SpendingLimitSetting.tsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/StudentVendorEarnings.tsx",
+      "src/pages/StudentVendorOnboarding.tsx",
+      "src/pages/VendorApprovalPanel.tsx"
+    ]
+  },
+  {
+    "class": "p-2",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/ChatModal.jsx",
+      "src/components/ClientCartModal.jsx",
+      "src/components/MerchantKDS.tsx",
+      "src/components/MerchantModifierManager.tsx",
+      "src/pages/AllergyAlertSetting.tsx",
+      "src/pages/CampusQueueMonitor.tsx",
+      "src/pages/Chat.tsx",
+      "src/pages/ChildOrderHistory.tsx",
+      "src/pages/EmergencyLookup.tsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/GuardianLinkApproval.tsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/SpendingLimitSetting.tsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/StudentVendorEarnings.tsx",
+      "src/pages/StudentVendorOnboarding.tsx",
+      "src/pages/UserProfile.jsx",
+      "src/pages/VendorApprovalPanel.tsx"
+    ]
+  },
+  {
+    "class": "overflow-hidden",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/ChatModal.jsx",
+      "src/components/ClientCartModal.jsx",
+      "src/components/ClientQueueTicket.jsx",
+      "src/components/CookieConsentBanner.jsx",
+      "src/components/FoodCard.jsx",
+      "src/components/LoadingStates.jsx",
+      "src/components/MerchantMenuManager.tsx",
+      "src/components/PageRouteLoader.jsx",
+      "src/components/PdpaPolicyModal.jsx",
+      "src/components/SellerAssistantModal.jsx",
+      "src/components/ShopReelsFeed.jsx",
+      "src/pages/About.jsx",
+      "src/pages/Chat.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/Home.jsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/Loading.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "px-5",
+    "files": [
+      "src/components/ClientCartModal.jsx",
+      "src/components/CookieConsentBanner.jsx",
+      "src/components/ErrorBoundary.jsx",
+      "src/components/LoadingStates.jsx",
+      "src/components/MerchantCRMAnalytics.tsx",
+      "src/components/MerchantMenuManager.tsx",
+      "src/components/MerchantModifierManager.tsx",
+      "src/components/PdpaPolicyModal.jsx",
+      "src/components/ProtectedRoute.jsx",
+      "src/pages/About.jsx",
+      "src/pages/AllergyAlertSetting.tsx",
+      "src/pages/Chat.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/Home.jsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/NotFound.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/SpendingLimitSetting.tsx",
+      "src/pages/StoreAdminPage.tsx"
+    ]
+  },
+  {
+    "class": "mb-0",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/ChatModal.jsx",
+      "src/components/ClientCartModal.jsx",
+      "src/components/ClientLoyaltyDrawer.jsx",
+      "src/components/CookieConsentBanner.jsx",
+      "src/components/DailyMenuBoard.jsx",
+      "src/components/MerchantKDS.tsx",
+      "src/components/PdpaPolicyModal.jsx",
+      "src/components/SellerAssistantModal.jsx",
+      "src/components/ShopReelsFeed.jsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/Home.jsx",
+      "src/pages/Loading.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/PdpaPolicy.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "gap-4",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/ClientQueueTicket.jsx",
+      "src/components/DailyMenuBoard.jsx",
+      "src/components/Footer.jsx",
+      "src/components/MerchantCRMAnalytics.tsx",
+      "src/components/MerchantKDS.tsx",
+      "src/components/MerchantModifierManager.tsx",
+      "src/pages/About.jsx",
+      "src/pages/CampusQueueMonitor.tsx",
+      "src/pages/EmergencyLookup.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/Home.jsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/PdpaPolicy.jsx",
+      "src/pages/SpendingLimitSetting.tsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/StudentVendorEarnings.tsx",
+      "src/pages/StudentVendorOnboarding.tsx"
+    ]
+  },
+  {
+    "class": "p-5",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/ClientLoyaltyDrawer.jsx",
+      "src/components/MerchantCRMAnalytics.tsx",
+      "src/components/MerchantKDS.tsx",
+      "src/components/MerchantMenuManager.tsx",
+      "src/components/MerchantModifierManager.tsx",
+      "src/components/PdpaPolicyModal.jsx",
+      "src/pages/CampusQueueMonitor.tsx",
+      "src/pages/EmergencyLookup.tsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/GuardianLinkApproval.tsx",
+      "src/pages/Home.jsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/SpendingLimitSetting.tsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/StudentVendorEarnings.tsx"
+    ]
+  },
+  {
+    "class": "mb-3",
+    "files": [
+      "src/components/ChatModal.jsx",
+      "src/components/DailyMenuBoard.jsx",
+      "src/components/Footer.jsx",
+      "src/components/PageRouteLoader.jsx",
+      "src/components/PdpaPolicyModal.jsx",
+      "src/components/ShopReelsFeed.jsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/Home.jsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/NotFound.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx",
+      "src/pages/VendorApprovalPanel.tsx"
+    ]
+  },
+  {
+    "class": "pt-2",
+    "files": [
+      "src/components/ClientQueueTicket.jsx",
+      "src/components/ErrorBoundary.jsx",
+      "src/components/FoodCard.jsx",
+      "src/components/MerchantKDS.tsx",
+      "src/components/MerchantMenuManager.tsx",
+      "src/components/MerchantModifierManager.tsx",
+      "src/components/ProtectedRoute.jsx",
+      "src/components/SellerAssistantModal.jsx",
+      "src/pages/About.jsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/GuardianLinkApproval.tsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/StudentVendorEarnings.tsx",
+      "src/pages/VendorApprovalPanel.tsx"
+    ]
+  },
+  {
+    "class": "py-4",
+    "files": [
+      "src/components/ClientCartModal.jsx",
+      "src/components/CookieConsentBanner.jsx",
+      "src/pages/About.jsx",
+      "src/pages/AllergyAlertSetting.tsx",
+      "src/pages/ChildOrderHistory.tsx",
+      "src/pages/EmergencyLookup.tsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/GuardianLinkApproval.tsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/SpendingLimitSetting.tsx",
+      "src/pages/StudentVendorEarnings.tsx",
+      "src/pages/StudentVendorOnboarding.tsx",
+      "src/pages/UserProfile.jsx",
+      "src/pages/VendorApprovalPanel.tsx"
+    ]
+  },
+  {
+    "class": "mt-2",
+    "files": [
+      "src/components/ClientCartModal.jsx",
+      "src/components/ClientLoyaltyDrawer.jsx",
+      "src/components/ClientQueueTicket.jsx",
+      "src/components/ProtectedRoute.jsx",
+      "src/pages/CampusQueueMonitor.tsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/Login.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/StudentVendorEarnings.tsx",
+      "src/pages/StudentVendorOnboarding.tsx",
+      "src/pages/UserProfile.jsx",
+      "src/pages/VendorApprovalPanel.tsx"
+    ]
+  },
+  {
+    "class": "px-2",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/ChatModal.jsx",
+      "src/components/FoodCard.jsx",
+      "src/components/MerchantKDS.tsx",
+      "src/components/MerchantMenuManager.tsx",
+      "src/components/MerchantModifierManager.tsx",
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/Chat.tsx",
+      "src/pages/EmergencyLookup.tsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/StudentVendorEarnings.tsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "border-0",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/ChatModal.jsx",
+      "src/components/DailyMenuBoard.jsx",
+      "src/components/FoodCard.jsx",
+      "src/components/Footer.jsx",
+      "src/components/PdpaPolicyModal.jsx",
+      "src/components/SellerAssistantModal.jsx",
+      "src/components/ShopReelsFeed.jsx",
+      "src/pages/About.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/PdpaPolicy.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "overflow-x-auto",
+    "files": [
+      "src/components/ChatModal.jsx",
+      "src/components/MerchantCRMAnalytics.tsx",
+      "src/components/MerchantKDS.tsx",
+      "src/components/MerchantMenuManager.tsx",
+      "src/components/PdpaPolicyModal.jsx",
+      "src/components/SellerAssistantModal.jsx",
+      "src/components/StaffRoleManager.tsx",
+      "src/pages/AllergyAlertSetting.tsx",
+      "src/pages/Chat.tsx",
+      "src/pages/ChildOrderHistory.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/PdpaPolicy.jsx",
+      "src/pages/SpendingLimitSetting.tsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/VendorApprovalPanel.tsx"
+    ]
+  },
+  {
+    "class": "overflow-y-auto",
+    "files": [
+      "src/components/ChatModal.jsx",
+      "src/components/ClientCartModal.jsx",
+      "src/components/ClientLoyaltyDrawer.jsx",
+      "src/components/ClientQueueTicket.jsx",
+      "src/components/CookieConsentBanner.jsx",
+      "src/components/MerchantKDS.tsx",
+      "src/components/MerchantMenuManager.tsx",
+      "src/components/MerchantModifierManager.tsx",
+      "src/components/SellerAssistantModal.jsx",
+      "src/components/ToastProvider.jsx",
+      "src/pages/Chat.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/VendorApprovalPanel.tsx"
+    ]
+  },
+  {
+    "class": "me-1",
+    "files": [
+      "src/components/ChatModal.jsx",
+      "src/components/CookieConsentBanner.jsx",
+      "src/components/DailyMenuBoard.jsx",
+      "src/components/FoodCard.jsx",
+      "src/components/PdpaPolicyModal.jsx",
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/Home.jsx",
+      "src/pages/Login.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/NotFound.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "top-0",
+    "files": [
+      "src/components/ChatModal.jsx",
+      "src/components/ClientQueueTicket.jsx",
+      "src/pages/AllergyAlertSetting.tsx",
+      "src/pages/ChildOrderHistory.tsx",
+      "src/pages/EmergencyLookup.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/GuardianLinkApproval.tsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/SpendingLimitSetting.tsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/StudentVendorEarnings.tsx",
+      "src/pages/StudentVendorOnboarding.tsx",
+      "src/pages/VendorApprovalPanel.tsx"
+    ]
+  },
+  {
+    "class": "mb-4",
+    "files": [
+      "src/components/ClientLoyaltyDrawer.jsx",
+      "src/components/ClientQueueTicket.jsx",
+      "src/components/DailyMenuBoard.jsx",
+      "src/components/Footer.jsx",
+      "src/components/PageRouteLoader.jsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/Home.jsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/NotFound.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "fw-bold",
+    "files": [
+      "src/components/ChatModal.jsx",
+      "src/components/DailyMenuBoard.jsx",
+      "src/components/PdpaPolicyModal.jsx",
+      "src/components/ShopReelsFeed.jsx",
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/Home.jsx",
+      "src/pages/Login.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/PdpaPolicy.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "btn",
+    "files": [
+      "src/components/DailyMenuBoard.jsx",
+      "src/components/PdpaPolicyModal.jsx",
+      "src/components/ShopReelsFeed.jsx",
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/Home.jsx",
+      "src/pages/Login.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/PdpaPolicy.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "pb-4",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/DailyMenuBoard.jsx",
+      "src/components/ShopReelsFeed.jsx",
+      "src/pages/AllergyAlertSetting.tsx",
+      "src/pages/CampusQueueMonitor.tsx",
+      "src/pages/EmergencyLookup.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/SpendingLimitSetting.tsx",
+      "src/pages/StudentVendorOnboarding.tsx",
+      "src/pages/VendorApprovalPanel.tsx"
+    ]
+  },
+  {
+    "class": "rounded",
+    "files": [
+      "src/components/ChatModal.jsx",
+      "src/components/ClientCartModal.jsx",
+      "src/components/FoodCard.jsx",
+      "src/components/MerchantMenuManager.tsx",
+      "src/components/MerchantModifierManager.tsx",
+      "src/pages/EmergencyLookup.tsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "mt-4",
+    "files": [
+      "src/components/DailyMenuBoard.jsx",
+      "src/components/PdpaPolicyModal.jsx",
+      "src/pages/CampusQueueMonitor.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/Home.jsx",
+      "src/pages/Login.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/StudentVendorOnboarding.tsx",
+      "src/pages/UserProfile.jsx",
+      "src/pages/VendorApprovalPanel.tsx"
+    ]
+  },
+  {
+    "class": "pt-3",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/MerchantMenuManager.tsx",
+      "src/components/ShopReelsFeed.jsx",
+      "src/pages/ChildOrderHistory.tsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx",
+      "src/pages/VendorApprovalPanel.tsx"
+    ]
+  },
+  {
+    "class": "pb-2",
+    "files": [
+      "src/components/ClientQueueTicket.jsx",
+      "src/components/MerchantKDS.tsx",
+      "src/components/SellerAssistantModal.jsx",
+      "src/pages/AllergyAlertSetting.tsx",
+      "src/pages/ChildOrderHistory.tsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/PdpaPolicy.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/SpendingLimitSetting.tsx",
+      "src/pages/StoreAdminPage.tsx"
+    ]
+  },
+  {
+    "class": "text-warning",
+    "files": [
+      "src/components/CookieConsentBanner.jsx",
+      "src/components/PdpaPolicyModal.jsx",
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/Home.jsx",
+      "src/pages/Login.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/PdpaPolicy.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "pb-3",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/ClientQueueTicket.jsx",
+      "src/components/MerchantCRMAnalytics.tsx",
+      "src/components/MerchantMenuManager.tsx",
+      "src/components/MerchantModifierManager.tsx",
+      "src/pages/ChildOrderHistory.tsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/pages/StudentVendorEarnings.tsx"
+    ]
+  },
+  {
+    "class": "d-flex",
+    "files": [
+      "src/components/ChatModal.jsx",
+      "src/components/CookieConsentBanner.jsx",
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/Home.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "text-danger",
+    "files": [
+      "src/components/ChatModal.jsx",
+      "src/components/FoodCard.jsx",
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/Home.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "active",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/ChatModal.jsx",
+      "src/components/DailyMenuBoard.jsx",
+      "src/pages/Home.jsx",
+      "src/pages/PdpaPolicy.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/StoreAdminPage.tsx",
+      "src/services/couponService.ts"
+    ]
+  },
+  {
+    "class": "badge",
+    "files": [
+      "src/components/ChatModal.jsx",
+      "src/components/ShopReelsFeed.jsx",
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/Home.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "small",
+    "files": [
+      "src/components/ChatModal.jsx",
+      "src/components/Footer.jsx",
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/Home.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "align-items-center",
+    "files": [
+      "src/components/ChatModal.jsx",
+      "src/components/CookieConsentBanner.jsx",
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/Home.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "pt-4",
+    "files": [
+      "src/components/MerchantModifierManager.tsx",
+      "src/pages/AllergyAlertSetting.tsx",
+      "src/pages/GuardianDashboard.tsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/SpendingLimitSetting.tsx",
+      "src/pages/StudentVendorEarnings.tsx",
+      "src/pages/StudentVendorOnboarding.tsx",
+      "src/pages/UserProfile.jsx",
+      "src/pages/VendorApprovalPanel.tsx"
+    ]
+  },
+  {
+    "class": "text-muted",
+    "files": [
+      "src/components/ChatModal.jsx",
+      "src/components/FoodCard.jsx",
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/Home.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "text-dark",
+    "files": [
+      "src/components/ChatModal.jsx",
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/Home.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "alert",
+    "files": [
+      "src/components/ClientCartModal.jsx",
+      "src/components/LoadingStates.jsx",
+      "src/components/ToastProvider.jsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/Login.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "pt-1",
+    "files": [
+      "src/components/ClientQueueTicket.jsx",
+      "src/components/LoadingStates.jsx",
+      "src/components/MerchantMenuManager.tsx",
+      "src/components/SellerAssistantModal.jsx",
+      "src/components/ToastProvider.jsx",
+      "src/pages/GuardianLinkApproval.tsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/StoreAdminPage.tsx"
+    ]
+  },
+  {
+    "class": "border-2",
+    "files": [
+      "src/components/ClientQueueTicket.jsx",
+      "src/components/ToastProvider.jsx",
+      "src/pages/CampusQueueMonitor.tsx",
+      "src/pages/EmergencyLookup.tsx",
+      "src/pages/FoodBooking.tsx",
+      "src/pages/GuardianLinkApproval.tsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "btn-sm",
+    "files": [
+      "src/components/DailyMenuBoard.jsx",
+      "src/components/ShopReelsFeed.jsx",
+      "src/pages/Home.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "rounded-pill",
+    "files": [
+      "src/components/ChatModal.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "justify-content-center",
+    "files": [
+      "src/components/ChatModal.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "text-primary",
+    "files": [
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/Home.jsx",
+      "src/pages/Login.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "text-success",
+    "files": [
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/Home.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "justify-content-between",
+    "files": [
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/Home.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "bg-success",
+    "files": [
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/Home.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "mb-5",
+    "files": [
+      "src/components/DailyMenuBoard.jsx",
+      "src/components/Footer.jsx",
+      "src/components/ShopReelsFeed.jsx",
+      "src/pages/LandingPage.tsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SearchResults.jsx"
+    ]
+  },
+  {
+    "class": "text-info",
+    "files": [
+      "src/components/PdpaPolicyModal.jsx",
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/Login.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "me-2",
+    "files": [
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/Home.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "fs-5",
+    "files": [
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "bg-light",
+    "files": [
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/Home.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "row",
+    "files": [
+      "src/pages/Home.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "g-3",
+    "files": [
+      "src/pages/Home.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "rounded-3",
+    "files": [
+      "src/pages/Home.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "p-1",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/ClientQueueTicket.jsx",
+      "src/components/MerchantMenuManager.tsx",
+      "src/components/QueueUpLogo.tsx",
+      "src/components/ToastProvider.jsx"
+    ]
+  },
+  {
+    "class": "flex-column",
+    "files": [
+      "src/components/ChatModal.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "btn-primary",
+    "files": [
+      "src/components/DailyMenuBoard.jsx",
+      "src/components/ShopReelsFeed.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/PdpaPolicy.jsx",
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "bg-success-subtle",
+    "files": [
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "bg-danger",
+    "files": [
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/Home.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "bg-warning",
+    "files": [
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "text-secondary",
+    "files": [
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "fs-6",
+    "files": [
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "btn-outline-danger",
+    "files": [
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "w-100",
+    "files": [
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SearchResults.jsx"
+    ]
+  },
+  {
+    "class": "m-0",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/ChatModal.jsx",
+      "src/components/Footer.jsx",
+      "src/pages/Login.jsx"
+    ]
+  },
+  {
+    "class": "bg-transparent",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/Footer.jsx",
+      "src/components/SellerAssistantModal.jsx",
+      "src/pages/About.jsx"
+    ]
+  },
+  {
+    "class": "h-100",
+    "files": [
+      "src/components/ChatModal.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "position-absolute",
+    "files": [
+      "src/components/ChatModal.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "end-0",
+    "files": [
+      "src/components/ChatModal.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "px-1",
+    "files": [
+      "src/components/ChatModal.jsx",
+      "src/components/ClientCartModal.jsx",
+      "src/components/ClientQueueTicket.jsx",
+      "src/pages/Chat.tsx"
+    ]
+  },
+  {
+    "class": "p-0",
+    "files": [
+      "src/components/ClientCartModal.jsx",
+      "src/components/Footer.jsx",
+      "src/pages/Login.jsx",
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "pb-1",
+    "files": [
+      "src/components/ClientQueueTicket.jsx",
+      "src/components/MerchantKDS.tsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "my-2",
+    "files": [
+      "src/components/ClientQueueTicket.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "mt-3",
+    "files": [
+      "src/components/PdpaPolicyModal.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/SearchResults.jsx",
+      "src/pages/StudentVendorOnboarding.tsx"
+    ]
+  },
+  {
+    "class": "rounded-4",
+    "files": [
+      "src/pages/Home.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "col-md-6",
+    "files": [
+      "src/pages/Home.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "fs-2",
+    "files": [
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "border-secondary",
+    "files": [
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "position-relative",
+    "files": [
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "btn-light",
+    "files": [
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "rounded-circle",
+    "files": [
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "border-bottom",
+    "files": [
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "form-label",
+    "files": [
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "form-control",
+    "files": [
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "border-top",
+    "files": [
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "mt-auto",
+    "files": [
+      "src/components/BookingCalendar.jsx",
+      "src/components/FoodCard.jsx",
+      "src/components/ShopReelsFeed.jsx"
+    ]
+  },
+  {
+    "class": "ms-1",
+    "files": [
+      "src/components/CookieConsentBanner.jsx",
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "btn-close",
+    "files": [
+      "src/components/PdpaPolicyModal.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "btn-close-white",
+    "files": [
+      "src/components/PdpaPolicyModal.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "btn-warning",
+    "files": [
+      "src/components/PdpaPolicyModal.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "ms-2",
+    "files": [
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/Home.jsx",
+      "src/pages/MerchantDashboard.jsx"
+    ]
+  },
+  {
+    "class": "bg-primary",
+    "files": [
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "bg-danger-subtle",
+    "files": [
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "btn-link",
+    "files": [
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/Login.jsx",
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "ms-auto",
+    "files": [
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/Home.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "col",
+    "files": [
+      "src/components/StaffRoleManager.tsx",
+      "src/pages/Home.jsx",
+      "src/pages/StoreAdminPage.tsx"
+    ]
+  },
+  {
+    "class": "d-block",
+    "files": [
+      "src/pages/Login.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "my-3",
+    "files": [
+      "src/pages/Login.jsx",
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "bg-secondary-subtle",
+    "files": [
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "display-6",
+    "files": [
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "bg-dark",
+    "files": [
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "form-select",
+    "files": [
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/MerchantOnboarding.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "fs-3",
+    "files": [
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "text-decoration-underline",
+    "files": [
+      "src/components/CookieConsentBanner.jsx",
+      "src/pages/Login.jsx"
+    ]
+  },
+  {
+    "class": "bg-warning-subtle",
+    "files": [
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "opacity-75",
+    "files": [
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "text-uppercase",
+    "files": [
+      "src/components/ShopeeSearchBar.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "opacity-50",
+    "files": [
+      "src/pages/ChildOrderHistory.tsx",
+      "src/pages/LandingPage.tsx"
+    ]
+  },
+  {
+    "class": "bottom-0",
+    "files": [
+      "src/pages/FoodBooking.tsx",
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "border-success-subtle",
+    "files": [
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "g-4",
+    "files": [
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "bg-secondary",
+    "files": [
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "text-light",
+    "files": [
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "btn-success",
+    "files": [
+      "src/pages/MerchantDashboard.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "fs-4",
+    "files": [
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "g-2",
+    "files": [
+      "src/pages/ProductDetail.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "col-lg-8",
+    "files": [
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "col-lg-4",
+    "files": [
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "col-6",
+    "files": [
+      "src/pages/ProductDetail.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "col-md-3",
+    "files": [
+      "src/pages/ProductDetail.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "col-md-4",
+    "files": [
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "display-4",
+    "files": [
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "progress",
+    "files": [
+      "src/pages/ProductDetail.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "progress-bar",
+    "files": [
+      "src/pages/ProductDetail.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "modal",
+    "files": [
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "fade",
+    "files": [
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "show",
+    "files": [
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "modal-dialog",
+    "files": [
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "modal-dialog-centered",
+    "files": [
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "modal-content",
+    "files": [
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "modal-header",
+    "files": [
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "modal-title",
+    "files": [
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "modal-body",
+    "files": [
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "modal-footer",
+    "files": [
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "btn-secondary",
+    "files": [
+      "src/pages/ProductDetail.jsx",
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "btn-danger",
+    "files": [
+      "src/pages/Queueup.jsx",
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "my-4",
+    "files": [
+      "src/components/BookingCalendar.jsx"
+    ]
+  },
+  {
+    "class": "my-auto",
+    "files": [
+      "src/components/ChatModal.jsx"
+    ]
+  },
+  {
+    "class": "m-3",
+    "files": [
+      "src/components/ChatModal.jsx"
+    ]
+  },
+  {
+    "class": "mx-1",
+    "files": [
+      "src/components/ClientCartModal.jsx"
+    ]
+  },
+  {
+    "class": "shadow",
+    "files": [
+      "src/components/ClientQueueTicket.jsx"
+    ]
+  },
+  {
+    "class": "mx-4",
+    "files": [
+      "src/components/PageRouteLoader.jsx"
+    ]
+  },
+  {
+    "class": "border-4",
+    "files": [
+      "src/components/PageRouteLoader.jsx"
+    ]
+  },
+  {
+    "class": "nav-link",
+    "files": [
+      "src/components/ShopeeSearchBar.jsx"
+    ]
+  },
+  {
+    "class": "dropdown-toggle",
+    "files": [
+      "src/components/ShopeeSearchBar.jsx"
+    ]
+  },
+  {
+    "class": "dropdown-menu",
+    "files": [
+      "src/components/ShopeeSearchBar.jsx"
+    ]
+  },
+  {
+    "class": "dropdown-menu-end",
+    "files": [
+      "src/components/ShopeeSearchBar.jsx"
+    ]
+  },
+  {
+    "class": "dropdown-item",
+    "files": [
+      "src/components/ShopeeSearchBar.jsx"
+    ]
+  },
+  {
+    "class": "dropdown-header",
+    "files": [
+      "src/components/ShopeeSearchBar.jsx"
+    ]
+  },
+  {
+    "class": "py-5",
+    "files": [
+      "src/pages/CampusQueueMonitor.tsx"
+    ]
+  },
+  {
+    "class": "btn-outline-success",
+    "files": [
+      "src/pages/Home.jsx"
+    ]
+  },
+  {
+    "class": "row-cols-2",
+    "files": [
+      "src/pages/Home.jsx"
+    ]
+  },
+  {
+    "class": "row-cols-md-3",
+    "files": [
+      "src/pages/Home.jsx"
+    ]
+  },
+  {
+    "class": "row-cols-lg-4",
+    "files": [
+      "src/pages/Home.jsx"
+    ]
+  },
+  {
+    "class": "gap-5",
+    "files": [
+      "src/pages/Loading.jsx"
+    ]
+  },
+  {
+    "class": "alert-info",
+    "files": [
+      "src/pages/Login.jsx"
+    ]
+  },
+  {
+    "class": "align-baseline",
+    "files": [
+      "src/pages/Login.jsx"
+    ]
+  },
+  {
+    "class": "btn-outline-light",
+    "files": [
+      "src/pages/MerchantDashboard.jsx"
+    ]
+  },
+  {
+    "class": "font-monospace",
+    "files": [
+      "src/pages/MerchantDashboard.jsx"
+    ]
+  },
+  {
+    "class": "alert-success",
+    "files": [
+      "src/pages/MerchantDashboard.jsx"
+    ]
+  },
+  {
+    "class": "bg-opacity-25",
+    "files": [
+      "src/pages/MerchantDashboard.jsx"
+    ]
+  },
+  {
+    "class": "rounded-2",
+    "files": [
+      "src/pages/MerchantDashboard.jsx"
+    ]
+  },
+  {
+    "class": "text-opacity-75",
+    "files": [
+      "src/pages/MerchantDashboard.jsx"
+    ]
+  },
+  {
+    "class": "col-md-5",
+    "files": [
+      "src/pages/MerchantDashboard.jsx"
+    ]
+  },
+  {
+    "class": "col-md-2",
+    "files": [
+      "src/pages/MerchantDashboard.jsx"
+    ]
+  },
+  {
+    "class": "table-responsive",
+    "files": [
+      "src/pages/MerchantDashboard.jsx"
+    ]
+  },
+  {
+    "class": "table",
+    "files": [
+      "src/pages/MerchantDashboard.jsx"
+    ]
+  },
+  {
+    "class": "table-hover",
+    "files": [
+      "src/pages/MerchantDashboard.jsx"
+    ]
+  },
+  {
+    "class": "align-middle",
+    "files": [
+      "src/pages/MerchantDashboard.jsx"
+    ]
+  },
+  {
+    "class": "table-light",
+    "files": [
+      "src/pages/MerchantDashboard.jsx"
+    ]
+  },
+  {
+    "class": "bg-primary-subtle",
+    "files": [
+      "src/pages/MerchantDashboard.jsx"
+    ]
+  },
+  {
+    "class": "border-primary-subtle",
+    "files": [
+      "src/pages/MerchantDashboard.jsx"
+    ]
+  },
+  {
+    "class": "col-md-7",
+    "files": [
+      "src/pages/MerchantDashboard.jsx"
+    ]
+  },
+  {
+    "class": "btn-outline-secondary",
+    "files": [
+      "src/pages/MerchantOnboarding.jsx"
+    ]
+  },
+  {
+    "class": "form-text",
+    "files": [
+      "src/pages/MerchantOnboarding.jsx"
+    ]
+  },
+  {
+    "class": "display-2",
+    "files": [
+      "src/pages/MerchantOnboarding.jsx"
+    ]
+  },
+  {
+    "class": "text-start",
+    "files": [
+      "src/pages/MerchantOnboarding.jsx"
+    ]
+  },
+  {
+    "class": "py-0",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "fw-normal",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "text-end",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "text-decoration-line-through",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "border-danger",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "border-danger-subtle",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "text-danger-emphasis",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "col-12",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "col-sm-7",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "form-control-sm",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "col-sm-5",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "text-decoration-none",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "btn-outline-primary",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "d-none",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "d-sm-inline-block",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "bg-opacity-75",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "col-md-8",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "flex-grow-1",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "text-truncate",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "opacity-25",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "pb-0",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "pt-0",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "object-fit-cover",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "btn-dark",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "top-50",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "start-50",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "translate-middle",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "btn-lg",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "start-0",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "ps-3",
+    "files": [
+      "src/pages/ProductDetail.jsx"
+    ]
+  },
+  {
+    "class": "bg-info-subtle",
+    "files": [
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "bg-info",
+    "files": [
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "text-lg-end",
+    "files": [
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "col-lg-3",
+    "files": [
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "g-5",
+    "files": [
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "col-lg-5",
+    "files": [
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "col-lg-7",
+    "files": [
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "modal-lg",
+    "files": [
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "alert-warning",
+    "files": [
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "align-items-start",
+    "files": [
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "form-range",
+    "files": [
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "col-md-12",
+    "files": [
+      "src/pages/Queueup.jsx"
+    ]
+  },
+  {
+    "class": "d-inline-flex",
+    "files": [
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "btn-outline-warning",
+    "files": [
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "col-4",
+    "files": [
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "progress-bar-striped",
+    "files": [
+      "src/pages/UserProfile.jsx"
+    ]
+  },
+  {
+    "class": "progress-bar-animated",
+    "files": [
+      "src/pages/UserProfile.jsx"
+    ]
+  }
+]

@@ -26,3 +26,9 @@ dist-ssr
 *.sln
 *.sw?
 .freebuff/
+
+# Visual-regression working files (browser-generated, environment-specific)
+.vr/.render.html
+.vr/pages-*.json
+.vr/last-diff.json
+.vr/gallery.html

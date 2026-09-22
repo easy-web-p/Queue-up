@@ -55,7 +55,27 @@ function collect(dir, pattern) {
 }
 
 const SRC = join(ROOT, 'src');
-const cssFiles = collect(SRC, /\.css$/);
+
+/**
+ * Stylesheets that express this project's design decisions.
+ *
+ * src/styles/bootstrap-compat.css is excluded, and the reason matters: it is a
+ * generated transcription of Bootstrap's own rules, not a decision anyone made
+ * here. It carries Bootstrap's palette — #dc3545, #fd7e14 and the rest —
+ * because Bootstrap does.
+ *
+ * Those colours are not new. The app has always shipped them through
+ * text-danger, bg-warning and their neighbours, which the code uses; they were
+ * simply invisible to this check while Bootstrap sat in node_modules, which is
+ * not scanned. Vendoring the parts we use is what made them visible.
+ *
+ * So this exclusion admits a pre-existing fact rather than hiding a new one —
+ * and it is worth knowing: those classes put a red and an orange on screen that
+ * are not in docs/design_system.md. Replacing their use with the --qu-* tokens
+ * is a real piece of work, and a separate one from removing 161 KB of CSS.
+ */
+const GENERATED_VENDOR_CSS = /[\\/]styles[\\/]bootstrap-compat\.css$/;
+const cssFiles = collect(SRC, /\.css$/).filter((f) => !GENERATED_VENDOR_CSS.test(f));
 const componentFiles = collect(SRC, /\.(jsx|tsx)$/);
 const indexCss = read(join(SRC, 'index.css'));
 
