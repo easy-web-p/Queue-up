@@ -246,7 +246,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  box-shadow: 0 4px 15px rgba(255, 82, 38, 0.4);
+  box-shadow: 0 4px 15px rgba(255, 122, 26, 0.4);
   transition: all 0.25s ease;
 }
 
@@ -322,7 +322,7 @@
 
 .queue-category-item.active .queue-category-circle {
   border-color: var(--qu-accent);
-  box-shadow: 0 0 0 3px rgba(255, 107, 0, 0.25);
+  box-shadow: 0 0 0 3px rgba(255, 122, 26, 0.25);
   transform: scale(1.08);
 }
 
@@ -462,14 +462,14 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  box-shadow: 0 8px 24px rgba(255, 82, 38, 0.3);
+  box-shadow: 0 8px 24px rgba(255, 122, 26, 0.3);
   cursor: pointer;
   transition: all 0.25s ease;
 }
 
 .queue-floating-chat-btn:hover {
   transform: scale(1.05);
-  box-shadow: 0 12px 28px rgba(255, 82, 38, 0.4);
+  box-shadow: 0 12px 28px rgba(255, 122, 26, 0.4);
 }
 
 .queue-chat-badge {

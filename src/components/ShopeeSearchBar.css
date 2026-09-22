@@ -19,7 +19,7 @@
 html[data-theme="dark"] .shopee-header-container,
 body.dark-mode .shopee-header-container {
   background: linear-gradient(135deg, #0d152a 0%, #152244 50%, #1a2a54 100%) !important;
-  border-bottom: 1px solid rgba(238, 77, 45, 0.3) !important;
+  border-bottom: 1px solid rgba(255, 122, 26, 0.3) !important;
 }
 
 /* 1. Top Sub-Navigation Bar */

@@ -56,26 +56,7 @@ function collect(dir, pattern) {
 
 const SRC = join(ROOT, 'src');
 
-/**
- * Stylesheets that express this project's design decisions.
- *
- * src/styles/bootstrap-compat.css is excluded, and the reason matters: it is a
- * generated transcription of Bootstrap's own rules, not a decision anyone made
- * here. It carries Bootstrap's palette — #dc3545, #fd7e14 and the rest —
- * because Bootstrap does.
- *
- * Those colours are not new. The app has always shipped them through
- * text-danger, bg-warning and their neighbours, which the code uses; they were
- * simply invisible to this check while Bootstrap sat in node_modules, which is
- * not scanned. Vendoring the parts we use is what made them visible.
- *
- * So this exclusion admits a pre-existing fact rather than hiding a new one —
- * and it is worth knowing: those classes put a red and an orange on screen that
- * are not in docs/design_system.md. Replacing their use with the --qu-* tokens
- * is a real piece of work, and a separate one from removing 161 KB of CSS.
- */
-const GENERATED_VENDOR_CSS = /[\\/]styles[\\/]bootstrap-compat\.css$/;
-const cssFiles = collect(SRC, /\.css$/).filter((f) => !GENERATED_VENDOR_CSS.test(f));
+const cssFiles = collect(SRC, /\.css$/);
 const componentFiles = collect(SRC, /\.(jsx|tsx)$/);
 const indexCss = read(join(SRC, 'index.css'));
 
@@ -102,14 +83,68 @@ console.log('1. One accent, from the design system');
  * Warm, saturated colours that are neither of the design system's accent stops
  * nor its amber or red. Each one of these is a second brand colour.
  */
+const PALETTE = ['#ff7a1a', '#e6680d', '#f59e0b', '#ef4444', '#10b981'];
+
+/**
+ * Is this hex a tint or shade of a palette colour?
+ *
+ * An interface needs more than five literal values: a button's hover state is
+ * its base darkened, a subtle background is its base mixed with white. Those
+ * are the palette, not a departure from it, and the ratios below are the ones
+ * Bootstrap's own theming uses — which is what src/styles/bootstrap-compat.css
+ * is generated with.
+ *
+ * Deliberately narrow. #ee4d2d, the old accent this check was written to keep
+ * out, is not a tint or shade of #ff7a1a at any of these ratios, so it is still
+ * caught — see the test below, which proves exactly that.
+ */
+function isDerivedFromPalette(hex) {
+  const target = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const ratios = [0.1, 0.15, 0.2, 0.4, 0.6, 0.8];
+  for (const base of PALETTE) {
+    const c = [1, 3, 5].map((i) => parseInt(base.slice(i, i + 2), 16));
+    for (const p of ratios) {
+      const tinted = c.map((v) => Math.round(v + (255 - v) * p));
+      const shaded = c.map((v) => Math.round(v * (1 - p)));
+      const near = (x) => x.every((v, i) => Math.abs(v - target[i]) <= 1);
+      if (near(tinted) || near(shaded)) return true;
+    }
+  }
+  return false;
+}
+
+const toHex = ([r, g, b]) =>
+  '#' + [r, g, b].map((v) => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join('');
+
+/**
+ * Every colour in the text, whatever notation it is written in.
+ *
+ * Hex alone is not enough. Bootstrap's text-* and bg-* utilities paint through
+ * `rgba(var(--bs-danger-rgb), …)`, and that variable holds a bare triplet —
+ * `220,53,69`. A stale one puts Bootstrap's crimson on screen while every hex
+ * in the file looks correct, which is exactly what happened when this check
+ * was hex-only and a re-colouring pass missed the triplet form.
+ */
+function coloursIn(text) {
+  const out = [];
+  for (const raw of text.match(/#[0-9a-fA-F]{6}/g) || []) out.push(raw.toLowerCase());
+  // `--bs-danger-rgb:220,53,69` and `rgb(220, 53, 69)` alike.
+  for (const m of text.matchAll(/(?:rgba?\(|-rgb\s*:\s*)\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/g)) {
+    out.push(toHex([Number(m[1]), Number(m[2]), Number(m[3])]));
+  }
+  return out;
+}
+
 function offPaletteAccents(text) {
-  const allowed = new Set(['#ff7a1a', '#e6680d', '#f59e0b', '#ef4444', '#10b981']);
+  const allowed = new Set(PALETTE);
   const found = new Map();
-  for (const raw of text.match(/#[0-9a-fA-F]{6}/g) || []) {
-    const hex = raw.toLowerCase();
+  for (const hex of coloursIn(text)) {
     if (allowed.has(hex)) continue;
     const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-    if (r > 200 && g > 40 && g < 150 && b < 90) found.set(hex, (found.get(hex) || 0) + 1);
+    if (r > 200 && g > 40 && g < 150 && b < 90) {
+      if (isDerivedFromPalette(hex)) continue;
+      found.set(hex, (found.get(hex) || 0) + 1);
+    }
   }
   return found;
 }
@@ -137,6 +172,43 @@ runTest('The detector recognises the family it was built for', () => {
   assert(offPaletteAccents('color: #ee4d2d;').size === 1, 'the old accent must be detected');
   assert(offPaletteAccents('color: #FF7A1A;').size === 0, 'the real accent must pass');
   assert(offPaletteAccents('color: #EF4444;').size === 0, 'the design system red must pass');
+});
+
+runTest('🚨 Allowing derived shades did not blunt the detector', () => {
+  // Accepting tints and shades is what lets a hover state and a subtle
+  // background exist. It must not become a loophole wide enough for a second
+  // accent family to walk through.
+  for (const intruder of ['#ee4d2d', '#f4511e', '#e64a19', '#ff5722', '#d84315']) {
+    assert(
+      offPaletteAccents(`color: ${intruder};`).size === 1,
+      `${intruder} is a competing accent and must still be caught`
+    );
+  }
+
+  // And the shades that make the real palette usable must pass.
+  for (const derived of ['#cc6215', '#d96816', '#cb3a3a']) {
+    assert(
+      offPaletteAccents(`color: ${derived};`).size === 0,
+      `${derived} is a shade of the accent and must be allowed`
+    );
+  }
+});
+
+runTest('🚨 A competing accent written as rgb is caught too', () => {
+  // text-danger and bg-danger paint through rgba(var(--bs-danger-rgb), …), so
+  // a colour can reach the screen without ever appearing as a hex.
+  assert(
+    offPaletteAccents('--bs-danger-rgb:220,53,69').size === 1,
+    "Bootstrap's crimson as an --bs-*-rgb triplet must be caught"
+  );
+  assert(
+    offPaletteAccents('color: rgb(238, 77, 45)').size === 1,
+    'the old accent written as rgb() must be caught'
+  );
+  assert(
+    offPaletteAccents('--bs-danger-rgb:239,68,68').size === 0,
+    'the design system red as a triplet must pass'
+  );
 });
 
 // ===========================================================================

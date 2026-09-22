@@ -85,7 +85,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 10px 30px rgba(255, 82, 38, 0.4);
+  box-shadow: 0 10px 30px rgba(255, 122, 26, 0.4);
   animation: pageLoaderBounce 1.4s ease-in-out infinite alternate;
 }
 
@@ -151,5 +151,5 @@
   background: linear-gradient(90deg, var(--qu-accent), var(--qu-accent), #fbbf24);
   border-radius: 10px;
   transition: width 0.15s ease-out;
-  box-shadow: 0 0 12px rgba(255, 82, 38, 0.8);
+  box-shadow: 0 0 12px rgba(255, 122, 26, 0.8);
 }

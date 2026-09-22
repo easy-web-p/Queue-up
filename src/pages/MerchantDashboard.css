@@ -177,7 +177,7 @@
 
 .merchant-order-card:hover {
   border-color: var(--qu-accent);
-  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.08);
+  box-shadow: 0 4px 12px rgba(255, 122, 26, 0.08);
 }
 
 .merchant-order-card-header {

@@ -763,7 +763,7 @@ export default function Queueup() {
               desc: "ออกแบบประสบการณ์ผู้ใช้ สถาปัตยกรรมหน้าจอ Responsive และระบบจัดการสิทธิ์สูงสุด",
               icon: "bi-palette-fill",
               color: "#FF7A1A",
-              bg: "rgba(238, 77, 45, 0.15)",
+              bg: "rgba(255, 122, 26, 0.15)",
             },
             {
               name: "นายภานุ คำแก้ว",

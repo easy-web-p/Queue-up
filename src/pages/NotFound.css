@@ -92,7 +92,7 @@
   font-weight: 700;
   text-decoration: none;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 14px rgba(255, 90, 54, 0.35);
+  box-shadow: 0 4px 14px rgba(255, 122, 26, 0.35);
   display: inline-flex;
   align-items: center;
 }
@@ -101,7 +101,7 @@
   background: var(--qu-accent);
   color: #ffffff;
   transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(255, 90, 54, 0.45);
+  box-shadow: 0 6px 18px rgba(255, 122, 26, 0.45);
 }
 
 .queue-notfound-footer {

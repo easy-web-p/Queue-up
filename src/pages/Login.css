@@ -38,7 +38,7 @@
   right: 6%;
   width: 420px;
   height: 160px;
-  background: rgba(255, 107, 0, 0.25); /* ส้ม Orange */
+  background: rgba(255, 122, 26, 0.25); /* ส้ม Orange */
   animation-duration: 30s;
   animation-delay: -5s;
 }
@@ -69,8 +69,8 @@
 .yeti-card {
   background: var(--qu-surface); /* ขาว White */
   border-radius: 24px;
-  box-shadow: 0 20px 50px -10px rgba(255, 82, 38, 0.2), 0 10px 25px rgba(0, 0, 0, 0.06);
-  border: 1.5px solid rgba(255, 107, 0, 0.15);
+  box-shadow: 0 20px 50px -10px rgba(255, 122, 26, 0.2), 0 10px 25px rgba(0, 0, 0, 0.06);
+  border: 1.5px solid rgba(255, 122, 26, 0.15);
   width: 100%;
   max-width: 860px;
   display: grid;
@@ -265,7 +265,7 @@
   width: auto;
   object-fit: contain;
   margin-bottom: 6px;
-  filter: drop-shadow(0 4px 10px rgba(255, 107, 0, 0.25));
+  filter: drop-shadow(0 4px 10px rgba(255, 122, 26, 0.25));
 }
 
 .yeti-logo-text {
@@ -331,7 +331,7 @@
 .yeti-input:focus {
   background: var(--qu-surface);
   border-color: var(--qu-accent); /* ส้ม Orange Focus */
-  box-shadow: 0 0 0 3px rgba(255, 82, 38, 0.18);
+  box-shadow: 0 0 0 3px rgba(255, 122, 26, 0.18);
 }
 
 .yeti-pwd-toggle {
@@ -406,13 +406,13 @@
   cursor: pointer;
   transition: all 0.2s ease;
   margin-bottom: 10px;
-  box-shadow: 0 4px 14px rgba(255, 82, 38, 0.35);
+  box-shadow: 0 4px 14px rgba(255, 122, 26, 0.35);
 }
 
 .yeti-btn-primary:hover {
   background: linear-gradient(135deg, var(--qu-accent-hover) 0%, #c2410c 100%);
   transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(255, 82, 38, 0.45);
+  box-shadow: 0 6px 18px rgba(255, 122, 26, 0.45);
 }
 
 .yeti-btn-primary:active {
@@ -524,7 +524,7 @@
 
 .avatar-option.selected {
   border-color: var(--qu-accent);
-  box-shadow: 0 0 0 4px rgba(255, 82, 38, 0.25);
+  box-shadow: 0 0 0 4px rgba(255, 122, 26, 0.25);
   transform: scale(1.1);
 }
 

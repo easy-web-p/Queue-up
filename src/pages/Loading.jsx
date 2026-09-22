@@ -54,7 +54,7 @@ function Loading() {
         {/* Animated Circle Container */}
         <div className="relative flex h-44 w-44 items-center justify-center">
           <div className="absolute inset-0 rounded-full border border-orange-200/70 dark:border-orange-500/30" />
-          <div className="loading-orbit absolute left-1/2 top-1/2 h-2 w-2 rounded-full bg-orange-500 shadow-[0_0_16px_4px_rgba(249,115,22,0.35)]" />
+          <div className="loading-orbit absolute left-1/2 top-1/2 h-2 w-2 rounded-full bg-orange-500 shadow-[0_0_16px_4px_rgba(255, 122, 26,0.35)]" />
           <img
             data-template-id="loading-logo"
             src="/logo.png"

@@ -45,7 +45,7 @@
     "test:order-item": "node test-order-item-shape.js",
     "build:bootstrap-shim": "node .vr/enumerate.mjs && node .vr/generate-shim.mjs && node .vr/build-gallery.mjs",
     "test:bootstrap-shim": "node test-bootstrap-shim.js",
-    "test:bootstrap-shim:browser": "node .vr/compare.mjs node_modules/bootstrap/dist/css/bootstrap.min.css src/styles/bootstrap-compat.css"
+    "test:bootstrap-shim:browser": "node .vr/compare.mjs node_modules/bootstrap/dist/css/bootstrap.min.css src/styles/bootstrap-compat.css --colour-only"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.12.0",

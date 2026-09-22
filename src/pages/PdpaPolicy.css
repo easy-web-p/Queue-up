@@ -37,7 +37,7 @@
   justify-content: center;
   font-size: 1.75rem;
   flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(255, 90, 54, 0.3);
+  box-shadow: 0 4px 12px rgba(255, 122, 26, 0.3);
 }
 
 .pdpa-page-title {
@@ -89,7 +89,7 @@
   background: var(--qu-accent);
   color: #ffffff;
   border-color: var(--qu-accent);
-  box-shadow: 0 4px 14px rgba(255, 90, 54, 0.3);
+  box-shadow: 0 4px 14px rgba(255, 122, 26, 0.3);
 }
 
 .pdpa-page-content-card {

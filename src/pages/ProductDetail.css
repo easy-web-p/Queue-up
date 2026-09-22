@@ -94,7 +94,7 @@
 .queue-pd-thumb-box.active,
 .queue-pd-thumb-box:hover {
   border-color: var(--qu-accent);
-  box-shadow: 0 2px 8px rgba(238, 77, 45, 0.3);
+  box-shadow: 0 2px 8px rgba(255, 122, 26, 0.3);
   transform: translateY(-2px);
 }
 
@@ -390,7 +390,7 @@ html[data-theme="dark"] .queue-pd-input-select {
   font-weight: 700;
   padding: 4px 10px;
   border-radius: 9999px;
-  box-shadow: 0 2px 6px rgba(253, 88, 55, 0.4);
+  box-shadow: 0 2px 6px rgba(255, 122, 26, 0.4);
 }
 
 .queue-pd-badge-halal {

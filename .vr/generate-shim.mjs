@@ -86,6 +86,144 @@ root.each((node) => {
   }
 });
 
+/**
+ * Drops --bs-* variables nothing in the layer reads.
+ *
+ * Bootstrap's :root declares its whole colour scale — blue, indigo, purple,
+ * pink, teal, orange and the rest — whether a rule uses them or not. Carrying
+ * those into a file scoped to what this project needs is dead weight, and one
+ * of them (--bs-orange, #fd7e14) is a second orange competing with the brand
+ * accent that the design-system check exists to catch.
+ *
+ * Resolved repeatedly, because a variable can be read by another variable:
+ * --bs-btn-border-width reads --bs-border-width, which nothing else does.
+ */
+function pruneUnusedVariables(sheet) {
+  for (let pass = 0; pass < 12; pass++) {
+    const text = sheet.toString();
+    const read = new Set([...text.matchAll(/var\(\s*(--[\w-]+)/g)].map((m) => m[1]));
+    let removed = 0;
+    sheet.walkDecls((decl) => {
+      if (!decl.prop.startsWith('--')) return;
+      if (read.has(decl.prop)) return;
+      decl.remove();
+      removed++;
+    });
+    if (removed === 0) break;
+  }
+  // A :root left with no declarations is noise.
+  sheet.walkRules((rule) => {
+    if (rule.nodes.length === 0) rule.remove();
+  });
+}
+
+/**
+ * Re-colours Bootstrap's semantic palette to this project's design system.
+ *
+ * docs/design_system.md names one accent and three status colours. Bootstrap
+ * ships its own — a blue primary, a crimson danger, an amber warning, a forest
+ * success — and the classes the app uses (text-danger, bg-warning, btn-danger
+ * and their neighbours) paint with those. The result is a second red-orange
+ * family competing with #FF7A1A on the same screens, which is precisely what
+ * test-design-system.js exists to catch and could not see while Bootstrap sat
+ * in node_modules.
+ *
+ * Substituted at the hex level rather than by overriding variables, because
+ * Bootstrap's minified stylesheet inlines the literal: .btn-danger sets
+ * --bs-btn-bg:#dc3545 directly and never reads --bs-danger. Overriding the
+ * variable would have changed nothing and looked like it worked.
+ *
+ * `info` and `secondary` are deliberately left alone. The design system defines
+ * no informational or secondary colour, and inventing one here would be a
+ * design decision made in a code generator. Neither is a red-orange, so neither
+ * competes with the accent.
+ */
+const PALETTE = {
+  // Bootstrap base → design-system base
+  '#0d6efd': '#ff7a1a', // primary  → --qu-accent
+  '#dc3545': '#ef4444', // danger   → --qu-red
+  '#ffc107': '#f59e0b', // warning  → --qu-amber
+  '#198754': '#10b981', // success  → --qu-green
+};
+
+/** Bootstrap's own tint/shade, which is how it derives every subtle variant. */
+const channels = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+const toHex = (c) => '#' + c.map((v) => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0')).join('');
+const tint = (hex, p) => toHex(channels(hex).map((c) => c + (255 - c) * p));
+const shade = (hex, p) => toHex(channels(hex).map((c) => c * (1 - p)));
+
+/**
+ * The full derived set for one colour, in the same proportions Bootstrap uses.
+ *   light: bg-subtle = tint 80%, border-subtle = tint 60%, text-emphasis = shade 60%
+ *   dark:  bg-subtle = shade 80%, border-subtle = shade 60%, text-emphasis = tint 40%
+ * Also the hover and active shades a button steps through (15% and 20%).
+ */
+function derivedPairs(from, to) {
+  return [
+    [tint(from, 0.8), tint(to, 0.8)],
+    [tint(from, 0.6), tint(to, 0.6)],
+    [tint(from, 0.4), tint(to, 0.4)],
+    [shade(from, 0.8), shade(to, 0.8)],
+    [shade(from, 0.6), shade(to, 0.6)],
+    [shade(from, 0.2), shade(to, 0.2)],
+    [shade(from, 0.15), shade(to, 0.15)],
+    [shade(from, 0.1), shade(to, 0.1)],
+  ];
+}
+
+function recolour(sheet) {
+  const map = new Map();
+  for (const [from, to] of Object.entries(PALETTE)) {
+    map.set(from, to);
+    for (const [f, t] of derivedPairs(from, to)) if (!map.has(f)) map.set(f, t);
+  }
+
+  // The same colour reaches the page in three different spellings, and missing
+  // any one of them leaves part of the palette un-migrated:
+  //
+  //   #dc3545        a plain hex, as in .btn-danger's --bs-btn-bg
+  //   220,53,69      an --bs-*-rgb triplet, which is what .text-danger and
+  //                  .bg-danger actually read, through rgba(var(...), opacity)
+  //   %23dc3545      URL-encoded inside a data: URI, for the validation icon
+  //
+  // The triplet is the one that matters most and is easiest to overlook: the
+  // text-* and bg-* utilities never touch the hex at all.
+  const rgbMap = new Map();
+  const asTriplet = (hex) => channels(hex).join(',');
+  for (const [from, to] of map) rgbMap.set(asTriplet(from), asTriplet(to));
+
+  let replaced = 0;
+  sheet.walkDecls((decl) => {
+    let value = decl.value;
+
+    // An explicit prefix is required. Matching a bare six-character run needs a
+    // word boundary in front of it, and there is none inside "%23dc3545" —
+    // between the "3" and the "d" both sides are word characters, so every
+    // colour embedded in a data: URI was silently skipped.
+    value = value.replace(/(%23|#)([0-9a-fA-F]{6})\b/g, (whole, prefix, hex) => {
+      const to = map.get(('#' + hex).toLowerCase());
+      if (!to) return whole;
+      replaced++;
+      return prefix === '%23' ? '%23' + to.slice(1) : to;
+    });
+
+    value = value.replace(/\b(\d{1,3}) *, *(\d{1,3}) *, *(\d{1,3})\b/g, (whole, r, g, b) => {
+      const to = rgbMap.get(`${Number(r)},${Number(g)},${Number(b)}`);
+      if (!to) return whole;
+      replaced++;
+      return to;
+    });
+
+    decl.value = value;
+  });
+  return { replaced, mapped: map.size };
+}
+
+pruneUnusedVariables(out);
+const recoloured = recolour(out);
+console.log(`re-coloured ${recoloured.replaced} value(s) across ${recoloured.mapped} mapped hex codes`);
+
+
 const header = `/*
  * ============================================================================
  * BOOTSTRAP COMPATIBILITY LAYER — GENERATED, DO NOT EDIT

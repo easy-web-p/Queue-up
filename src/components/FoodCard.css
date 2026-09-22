@@ -254,5 +254,5 @@
 .shopee-food-add-btn:hover {
   background: var(--qu-accent);
   transform: scale(1.1);
-  box-shadow: 0 4px 10px rgba(238, 77, 45, 0.4);
+  box-shadow: 0 4px 10px rgba(255, 122, 26, 0.4);
 }

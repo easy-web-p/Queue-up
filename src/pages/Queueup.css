@@ -16,7 +16,7 @@
   --qup-text-light: #f8fafc;
   --qup-text-muted: #94a3b8;
   --qup-border-glass: rgba(255, 255, 255, 0.12);
-  --qup-shadow-glow: 0 10px 30px -10px rgba(238, 77, 45, 0.4);
+  --qup-shadow-glow: 0 10px 30px -10px rgba(255, 122, 26, 0.4);
 }
 
 .qup-landing-wrapper {
@@ -43,7 +43,7 @@
   left: -100px;
   width: 500px;
   height: 500px;
-  background: rgba(238, 77, 45, 0.25);
+  background: rgba(255, 122, 26, 0.25);
 }
 
 .qup-glow-2 {
@@ -101,7 +101,7 @@
 .qup-logo-img {
   height: 42px;
   width: auto;
-  filter: drop-shadow(0 2px 8px rgba(238, 77, 45, 0.5));
+  filter: drop-shadow(0 2px 8px rgba(255, 122, 26, 0.5));
 }
 
 .qup-logo-text {
@@ -175,7 +175,7 @@
 
 .qup-btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 14px 35px -5px rgba(238, 77, 45, 0.6);
+  box-shadow: 0 14px 35px -5px rgba(255, 122, 26, 0.6);
 }
 
 /* ==================== 2. HERO SECTION ==================== */
@@ -197,8 +197,8 @@
   gap: 8px;
   padding: 6px 16px;
   border-radius: 99px;
-  background: rgba(238, 77, 45, 0.12);
-  border: 1px solid rgba(238, 77, 45, 0.3);
+  background: rgba(255, 122, 26, 0.12);
+  border: 1px solid rgba(255, 122, 26, 0.3);
   color: #ff8c73;
   font-size: 0.85rem;
   font-weight: 600;
@@ -404,7 +404,7 @@
 }
 
 .qup-about-card:hover {
-  border-color: rgba(238, 77, 45, 0.4);
+  border-color: rgba(255, 122, 26, 0.4);
   transform: translateY(-4px);
 }
 
@@ -412,7 +412,7 @@
   width: 60px;
   height: 60px;
   border-radius: 18px;
-  background: rgba(238, 77, 45, 0.15);
+  background: rgba(255, 122, 26, 0.15);
   color: var(--qup-primary);
   display: flex;
   align-items: center;
@@ -487,7 +487,7 @@
 .qup-feature-card:hover {
   transform: translateY(-6px);
   box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
-  border-color: rgba(238, 77, 45, 0.5);
+  border-color: rgba(255, 122, 26, 0.5);
 }
 
 .qup-feature-icon {
@@ -519,7 +519,7 @@
 /* ==================== 6. ZERO-TRUST SECURITY SHOWCASE ==================== */
 .qup-security-banner {
   background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%);
-  border: 1px solid rgba(238, 77, 45, 0.3);
+  border: 1px solid rgba(255, 122, 26, 0.3);
   border-radius: 28px;
   padding: 3.5rem 3rem;
   display: grid;
@@ -617,7 +617,7 @@
 /* ==================== 8. ARCHITECTURE SCORECARD & ROADMAP ==================== */
 .qup-score-banner {
   background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%);
-  border: 1px solid rgba(238, 77, 45, 0.3);
+  border: 1px solid rgba(255, 122, 26, 0.3);
   border-radius: 20px;
   padding: 32px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
@@ -630,7 +630,7 @@
   border-radius: 16px;
   padding: 24px;
   text-align: center;
-  box-shadow: 0 10px 25px rgba(238, 77, 45, 0.4);
+  box-shadow: 0 10px 25px rgba(255, 122, 26, 0.4);
 }
 
 .qup-score-big-num {
@@ -678,7 +678,7 @@
 
 .qup-roadmap-card:hover {
   transform: translateY(-4px);
-  border-color: rgba(238, 77, 45, 0.5);
+  border-color: rgba(255, 122, 26, 0.5);
 }
 
 .qup-roadmap-priority-tag {
@@ -793,7 +793,7 @@
 
 .qup-pricing-banner {
   background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-  border: 1px solid rgba(238, 77, 45, 0.3);
+  border: 1px solid rgba(255, 122, 26, 0.3);
   border-radius: 24px;
   padding: 36px 32px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
@@ -811,7 +811,7 @@
 
 .qup-team-card:hover {
   transform: translateY(-5px);
-  border-color: rgba(238, 77, 45, 0.4);
+  border-color: rgba(255, 122, 26, 0.4);
   box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
 }
 
@@ -890,7 +890,7 @@
 
 .qup-input:focus {
   border-color: var(--qu-accent) !important;
-  box-shadow: 0 0 0 3px rgba(238, 77, 45, 0.25) !important;
+  box-shadow: 0 0 0 3px rgba(255, 122, 26, 0.25) !important;
 }
 
 .qup-input option {
