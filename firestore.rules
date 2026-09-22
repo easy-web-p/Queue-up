@@ -372,6 +372,20 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // 🔒 Coupon redemptions: the record that makes "once per account" mean
+    // something. Backend-only writes — a client that could increment or clear
+    // its own redemption count could use a one-per-account coupon forever, which
+    // is the exact hole this collection was added to close (the previous
+    // mechanism was a localStorage flag). Readable by the owner so the app can
+    // show which offers they have already used.
+    match /coupon_redemptions/{redemptionId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        redemptionId.matches('^' + request.auth.uid + '_.*')
+      );
+      allow write: if false;
+    }
+
     // ==========================================
     // 10. IDEMPOTENCY KEYS (Internal & Owner Read)
     // ==========================================

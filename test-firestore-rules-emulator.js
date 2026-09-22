@@ -669,6 +669,56 @@ await runTest('🚨 Nobody can post as another user, even in their own chat', as
   );
 });
 
+console.log('\n🎟️  Coupon redemptions (the record behind "once per account")');
+
+await runTest('🚨 A user cannot reset their own redemption count', async () => {
+  // The whole point of moving this out of localStorage. If the browser can write
+  // it, "once per account" means "once per account until you clear it".
+  await assertFails(
+    setDoc(doc(asStudent, 'coupon_redemptions', `${STUDENT}_WELCOME50`), { count: 0 })
+  );
+});
+
+await runTest('🚨 A user cannot create a redemption record at all', async () => {
+  await assertFails(
+    setDoc(doc(asStudent, 'coupon_redemptions', `${STUDENT}_HAPPY15`), {
+      userId: STUDENT,
+      couponCode: 'HAPPY15',
+      count: 0,
+    })
+  );
+});
+
+await runTest('🚨 A stranger cannot read what coupons someone else has used', async () => {
+  await assertFails(getDoc(doc(asStranger, 'coupon_redemptions', `${STUDENT}_WELCOME50`)));
+});
+
+await runTest('A user can read their own redemption record', async () => {
+  await assertSucceeds(getDoc(doc(asStudent, 'coupon_redemptions', `${STUDENT}_WELCOME50`)));
+});
+
+await runTest('🚨 A coupon cannot be created or retuned from a browser', async () => {
+  // Coupons are money. Admin-only write, per the rules.
+  await assertFails(
+    setDoc(doc(asStudent, 'coupons', 'FREEFOOD'), { type: 'FIXED', amountSatang: 999999, active: true })
+  );
+  await assertFails(
+    setDoc(doc(asStranger, 'coupons', 'WELCOME50'), { maxPerUser: 9999 })
+  );
+});
+
+await runTest('An admin can create and retire a coupon', async () => {
+  await assertSucceeds(
+    setDoc(doc(asAdmin, 'coupons', 'STAFFTREAT'), {
+      title: 'ทดสอบ',
+      type: 'FIXED',
+      amountSatang: 1000,
+      active: true,
+    })
+  );
+  await assertSucceeds(setDoc(doc(asAdmin, 'coupons', 'STAFFTREAT'), { active: false }, { merge: true }));
+});
+
 await testEnv.cleanup();
 
 console.log(`\n${'='.repeat(60)}`);

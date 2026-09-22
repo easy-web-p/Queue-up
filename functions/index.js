@@ -8,6 +8,12 @@ import { resolveWalletAuthority, isStaffOrAdmin, MAX_TOPUP_SATANG } from "./wall
 import { resolveSpendingCounters, resolveMissingLimitDefaults } from "./walletLimits.js";
 import { isBootstrapSuperAdmin } from "./superAdmins.js";
 import {
+  evaluateCoupon,
+  normalizeCouponCode,
+  describeCouponRefusal,
+} from "./couponRules.js";
+import { BUILTIN_COUPONS } from "./builtinCoupons.js";
+import {
   buildClaimPatch,
   canGrantRoles,
   isCallerAdmin,
@@ -74,7 +80,36 @@ function getBangkokYmd(date = new Date()) {
   const weekdayMap = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
   const dayOfWeekIndex = weekdayMap[weekdayShort] ?? 0;
 
-  return { ymd, ymdClean, dayOfWeekIndex };
+  // Carried alongside the date so a rule that needs the time of day (a happy
+  // hour window) reads it from the same resolved instant as the date, rather
+  // than calling the clock a second time and landing on the other side of a
+  // midnight boundary.
+  const hhmm = getBangkokCurrentTime(date);
+
+  return { ymd, ymdClean, dayOfWeekIndex, hhmm };
+}
+
+/**
+ * The roles a coupon's audience rule may match against.
+ *
+ * Verified claims only, plus the baseline every signed-in user has. A role
+ * written into the user's own profile document is not evidence of anything —
+ * that document is attacker-controlled on first write — so an audience check
+ * built on it would be a discount anyone could claim by editing their profile.
+ */
+function resolveOrderUserRoles(auth) {
+  const claims = (auth && auth.token) || {};
+  const roles = new Set(["customer"]);
+  if (typeof claims.role === "string" && claims.role) roles.add(claims.role);
+  if (claims.admin === true) roles.add("admin");
+  if (claims.staffSupervisor === true) roles.add("staff_supervisor");
+  // An @*.ac.th address is how the campus identifies its own students, and it
+  // is verified by the identity provider rather than self-declared.
+  const email = typeof claims.email === "string" ? claims.email.toLowerCase() : "";
+  if (claims.email_verified === true && /\.ac\.th$/.test(email.split("@")[1] || "")) {
+    roles.add("student");
+  }
+  return Array.from(roles);
 }
 
 /**
@@ -410,6 +445,27 @@ export const createOrderAuthoritative = onCall(
         const counterRef = db.collection("queue_counters").doc(counterDocId);
         const counterSnap = await tx.get(counterRef);
 
+        // Read the coupon and this user's redemption record.
+        //
+        // Both belong in the read phase, and the redemption record has to be read
+        // inside the transaction rather than before it: checking "has this user
+        // used the coupon?" outside the transaction and writing the redemption
+        // inside it is a TOCTOU window, and two orders placed at once would each
+        // see zero redemptions and both succeed. Read here, written in phase 4,
+        // so the count a decision is made on is the count the commit is
+        // conditioned on.
+        const cleanCoupon = normalizeCouponCode(couponCode);
+        let couponSnap = null;
+        let redemptionSnap = null;
+        let redemptionRef = null;
+        if (cleanCoupon) {
+          couponSnap = await tx.get(db.collection("coupons").doc(cleanCoupon));
+          redemptionRef = db
+            .collection("coupon_redemptions")
+            .doc(`${effectiveUserId}_${cleanCoupon}`);
+          redemptionSnap = await tx.get(redemptionRef);
+        }
+
         // ===================================================================
         // PHASE 2: VALIDATE BUSINESS RULES & CALCULATE AMOUNTS
         // ===================================================================
@@ -599,27 +655,47 @@ export const createOrderAuthoritative = onCall(
         }
 
         // 2.2c 🎟️ Server-Authoritative Coupon Validation & Discount Calculation
-        const cleanCoupon = couponCode && typeof couponCode === "string" ? couponCode.trim().toUpperCase() : null;
+        //
+        // This was an if/else chain over three hardcoded codes, and each one
+        // enforced less than its name promised: WELCOME50 had neither a
+        // once-per-user nor a new-member check (the claim was tracked in
+        // localStorage, which the user clears), HAPPY15 had no happy hour, and
+        // STUDENT10 never checked the buyer was a student. A code that failed
+        // its minimum spend also fell through to a silent zero discount rather
+        // than saying why. The rules now live in coupon documents and in
+        // couponRules.js, which the client calls too, so a preview cannot
+        // promise a discount this will refuse.
         let discountSatang = 0;
         let couponTitle = "";
 
         if (cleanCoupon) {
-          if (cleanCoupon === "WELCOME50") {
-            if (calculatedTotalSatang >= 10000) { // min spend 100 THB
-              discountSatang = Math.min(5000, calculatedTotalSatang); // 50 THB discount
-              couponTitle = "ต้อนรับสมาชิกใหม่ ลด ฿50 (WELCOME50)";
+          const verdict = evaluateCoupon(
+            couponSnap && couponSnap.exists ? { id: cleanCoupon, ...couponSnap.data() } : null,
+            {
+              subtotalSatang: calculatedTotalSatang,
+              nowYmd: currentBangkok.ymd,
+              nowHhmm: currentBangkok.hhmm,
+              timesUsedByUser:
+                redemptionSnap && redemptionSnap.exists
+                  ? Number(redemptionSnap.data().count) || 0
+                  : 0,
+              userRoles: resolveOrderUserRoles(request.auth),
+              storeId,
             }
-          } else if (cleanCoupon === "HAPPY15") {
-            if (calculatedTotalSatang >= 5000) { // min spend 50 THB
-              discountSatang = Math.min(5000, Math.round(calculatedTotalSatang * 0.15)); // 15% discount
-              couponTitle = "Happy Hour พิเศษ ลด 15% (HAPPY15)";
-            }
-          } else if (cleanCoupon === "STUDENT10") {
-            if (calculatedTotalSatang >= 4000) { // min spend 40 THB
-              discountSatang = Math.min(3000, Math.round(calculatedTotalSatang * 0.10)); // 10% discount
-              couponTitle = "ส่วนลดนักเรียนนักศึกษา ลด 10% (STUDENT10)";
-            }
+          );
+
+          if (!verdict.ok) {
+            // Refused out loud. Falling through to a zero discount let the app
+            // charge full price with the coupon still shown as applied.
+            throw new HttpsError(
+              "failed-precondition",
+              `COUPON_REJECTED: ${describeCouponRefusal(verdict.reason, verdict.detail)}`,
+              { code: "COUPON_REJECTED", reason: verdict.reason, detail: verdict.detail || {} }
+            );
           }
+
+          discountSatang = verdict.discountSatang;
+          couponTitle = verdict.title;
         }
 
         const finalAmountSatang = Math.max(0, calculatedTotalSatang - discountSatang);
@@ -738,6 +814,7 @@ export const createOrderAuthoritative = onCall(
           { merge: true }
         );
 
+
         // Create authoritative Order
         const orderDocRef = db.collection("orders").doc();
         const orderId = orderDocRef.id;
@@ -775,6 +852,26 @@ export const createOrderAuthoritative = onCall(
         };
 
         tx.set(orderDocRef, orderPayload);
+        // Record the redemption, in the same transaction that grants the
+        // discount. This is what makes "once per account" true: the count was
+        // read in the read phase, so the commit is conditioned on it not having
+        // changed, and two simultaneous orders cannot both spend the last use.
+        // The previous mechanism was a localStorage flag, which survives exactly
+        // as long as the user wants it to.
+        if (cleanCoupon && discountSatang > 0 && redemptionRef) {
+          tx.set(
+            redemptionRef,
+            {
+              userId: effectiveUserId,
+              couponCode: cleanCoupon,
+              count: FieldValue.increment(1),
+              lastDiscountSatang: discountSatang,
+              lastOrderId: orderId,
+              lastRedeemedAt: FieldValue.serverTimestamp(),
+            },
+            { merge: true }
+          );
+        }
 
         // An order placed over an allergen warning is recorded in the same atomic
         // write as the order itself, so an override can never exist without its
@@ -1273,6 +1370,66 @@ export const reviewParentChildLink = onCall(
               : "บันทึกการปฏิเสธคำขอผูกบัญชีเรียบร้อย",
       };
     });
+  }
+);
+
+/**
+ * 🎟️ Install the built-in coupons as documents (Admin only)
+ *
+ * The three promotional codes lived as an if/else chain inside the order
+ * transaction, a second chain in the booking page, and marketing copy in two
+ * more files — while the admin console wrote coupons into a `coupons` collection
+ * that nothing read. Creating a coupon there did nothing; retiring WELCOME50 was
+ * impossible without a deploy.
+ *
+ * This seeds the three as real documents so the console's coupon screen governs
+ * them. Merges rather than overwrites, so running it twice cannot undo an
+ * administrator's later edits — only fill in a coupon that is missing.
+ */
+export const seedBuiltinCoupons = onCall(
+  { region: "asia-southeast1", cors: true },
+  async (request) => {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "กรุณาเข้าสู่ระบบก่อนติดตั้งคูปองเริ่มต้น");
+    }
+    if (!isCallerAdmin(request.auth.token, isBootstrapSuperAdmin)) {
+      throw new HttpsError(
+        "permission-denied",
+        "COUPON_SEED_FORBIDDEN: เฉพาะผู้ดูแลระบบเท่านั้นที่ติดตั้งคูปองเริ่มต้นได้"
+      );
+    }
+
+    const batch = db.batch();
+    const installed = [];
+    const skipped = [];
+
+    for (const coupon of BUILTIN_COUPONS) {
+      const ref = db.collection("coupons").doc(coupon.id);
+      const existing = await ref.get();
+      if (existing.exists) {
+        // Already there, possibly retuned by an administrator. Leave it alone.
+        skipped.push(coupon.id);
+        continue;
+      }
+      batch.set(ref, {
+        ...coupon,
+        builtin: true,
+        createdBy: request.auth.uid,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      installed.push(coupon.id);
+    }
+
+    if (installed.length > 0) await batch.commit();
+
+    return {
+      success: true,
+      installed,
+      skipped,
+      message: installed.length
+        ? `ติดตั้งคูปองเริ่มต้น ${installed.length} รายการ: ${installed.join(", ")}`
+        : "คูปองเริ่มต้นทั้งหมดมีอยู่ในระบบแล้ว",
+    };
   }
 );
 

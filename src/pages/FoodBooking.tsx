@@ -13,6 +13,8 @@ import {
 } from '../services/orderCreationService';
 import { soundManager } from '../utils/audioNotification.js';
 import { ClientQueueTicket } from '../components/ClientQueueTicket.jsx';
+import { previewCoupon } from '../services/couponService';
+import { getEffectiveRoles } from '../utils/authRoles.js';
 
 interface FoodBookingPageProps {
   currentUser?: CustomerProfile | null;
@@ -124,52 +126,57 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
   } | null>(null);
   const [couponError, setCouponError] = useState<string | null>(null);
 
-  const handleApplyCoupon = (codeOverride?: string) => {
+  const [couponChecking, setCouponChecking] = useState(false);
+
+  /**
+   * Asks the shared evaluator what this code is worth.
+   *
+   * This used to be a local if/else over three hardcoded codes with their own
+   * copy of the discount maths, sitting beside a second copy on the server. Now
+   * both read the same coupon document through the same function, so the
+   * discount shown here is the discount the order transaction will apply — and
+   * a coupon an administrator retires or retunes takes effect without a deploy.
+   */
+  const handleApplyCoupon = async (codeOverride?: string) => {
     const targetCode = (codeOverride || couponInput).trim().toUpperCase();
     if (!targetCode) {
       setCouponError('กรุณากรอกโค้ดส่วนลด');
       return;
     }
     setCouponError(null);
-    const grossTotal = calculateTotal();
+    setCouponChecking(true);
+    try {
+      const result = await previewCoupon({
+        rawCode: targetCode,
+        subtotalSatang: Math.round(calculateTotal() * 100),
+        storeId,
+        userId: currentUser?.uid || currentUser?.id || '',
+        userRoles: getEffectiveRoles(currentUser),
+      });
 
-    if (targetCode === 'WELCOME50') {
-      if (grossTotal < 100) {
-        setCouponError('โค้ด WELCOME50 ต้องมียอดสั่งซื้อขั้นต่ำ ฿100');
+      // `in` rather than `!result.ok`: strictNullChecks is off in this project,
+      // which widens a true/false discriminant and stops the union narrowing.
+      if ('refusal' in result) {
+        setAppliedCoupon(null);
+        setCouponError(result.refusal.message);
         return;
       }
+
       setAppliedCoupon({
-        code: 'WELCOME50',
-        title: 'ต้อนรับสมาชิกใหม่ ลด ฿50',
-        discountAmount: Math.min(50, grossTotal),
+        code: result.preview.code,
+        title: result.preview.title,
+        discountAmount: result.preview.discountSatang / 100,
       });
-      setCouponInput('WELCOME50');
-    } else if (targetCode === 'HAPPY15') {
-      if (grossTotal < 50) {
-        setCouponError('โค้ด HAPPY15 ต้องมียอดสั่งซื้อขั้นต่ำ ฿50');
-        return;
-      }
-      const disc = Math.min(50, Math.round(grossTotal * 0.15));
-      setAppliedCoupon({
-        code: 'HAPPY15',
-        title: 'Happy Hour ลด 15%',
-        discountAmount: disc,
-      });
-      setCouponInput('HAPPY15');
-    } else if (targetCode === 'STUDENT10') {
-      if (grossTotal < 40) {
-        setCouponError('โค้ด STUDENT10 ต้องมียอดสั่งซื้อขั้นต่ำ ฿40');
-        return;
-      }
-      const disc = Math.min(30, Math.round(grossTotal * 0.10));
-      setAppliedCoupon({
-        code: 'STUDENT10',
-        title: 'ส่วนลดนักเรียน ลด 10%',
-        discountAmount: disc,
-      });
-      setCouponInput('STUDENT10');
-    } else {
-      setCouponError(`ไม่พบคูปอง "${targetCode}" หรือหมดอายุแล้ว`);
+      setCouponInput(result.preview.code);
+    } catch (err) {
+      // A failed lookup is not "no discount" — saying so would quietly charge
+      // full price while the user believes the code was simply wrong.
+      setAppliedCoupon(null);
+      setCouponError(
+        `ตรวจสอบโค้ดส่วนลดไม่สำเร็จ กรุณาลองใหม่: ${err instanceof Error ? err.message : String(err)}`
+      );
+    } finally {
+      setCouponChecking(false);
     }
   };
 
@@ -555,10 +562,12 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
                       </div>
                       <button
                         type="button"
-                        onClick={() => handleApplyCoupon()}
-                        className="px-4 py-2 bg-[#8B0000] hover:bg-[#700000] dark:bg-[#FF7A1A] dark:hover:bg-[#E6680D] text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer whitespace-nowrap"
+                        onClick={() => void handleApplyCoupon()}
+                        disabled={couponChecking}
+                        aria-busy={couponChecking}
+                        className="px-4 py-2 bg-[#8B0000] hover:bg-[#700000] dark:bg-[#FF7A1A] dark:hover:bg-[#E6680D] disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer whitespace-nowrap"
                       >
-                        ใช้โค้ด
+                        {couponChecking ? 'กำลังตรวจสอบ...' : 'ใช้โค้ด'}
                       </button>
                     </div>
 
@@ -571,21 +580,24 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
                       <span className="text-slate-400 font-medium">โค้ดยอดนิยม:</span>
                       <button
                         type="button"
-                        onClick={() => handleApplyCoupon('WELCOME50')}
+                        onClick={() => void handleApplyCoupon('WELCOME50')}
+                        disabled={couponChecking}
                         className="bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 px-2 py-0.5 rounded-lg border border-amber-300 dark:border-amber-700/50 font-bold transition-all cursor-pointer"
                       >
                         WELCOME50 (ลด ฿50)
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleApplyCoupon('HAPPY15')}
+                        onClick={() => void handleApplyCoupon('HAPPY15')}
+                        disabled={couponChecking}
                         className="bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-950/50 text-emerald-900 dark:text-emerald-200 px-2 py-0.5 rounded-lg border border-emerald-300 dark:border-emerald-700/50 font-bold transition-all cursor-pointer"
                       >
                         HAPPY15 (ลด 15%)
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleApplyCoupon('STUDENT10')}
+                        onClick={() => void handleApplyCoupon('STUDENT10')}
+                        disabled={couponChecking}
                         className="bg-sky-100 hover:bg-sky-200 dark:bg-sky-950/50 text-sky-900 dark:text-sky-200 px-2 py-0.5 rounded-lg border border-sky-300 dark:border-sky-700/50 font-bold transition-all cursor-pointer"
                       >
                         STUDENT10 (ลด 10%)
