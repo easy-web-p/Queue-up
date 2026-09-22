@@ -53,6 +53,28 @@ function describeAuditAction(data: Record<string, unknown>): string {
   return detail ? `${label}: ${String(detail)}` : label;
 }
 
+/**
+ * A row in `coupons`, in the shape couponRules.js actually reads.
+ *
+ * The admin screen used to write {code, discount, minSpend, status}. None of
+ * those are fields the evaluator looks at: it reads `type`, `amountSatang`,
+ * `minSpendSatang` and `active`. A coupon created here therefore resolved to a
+ * ฿0 discount that applied silently — the customer typed a valid code, the
+ * order went through at full price, and the screen still showed it as applied.
+ */
+interface AdminCoupon {
+  id: string;
+  title: string;
+  type: 'FIXED' | 'PERCENT';
+  amountSatang?: number;
+  percent?: number;
+  maxDiscountSatang?: number;
+  minSpendSatang: number;
+  maxPerUser?: number;
+  active: boolean;
+  builtin?: boolean;
+}
+
 /** A row in audit_logs — written only by Cloud Functions, read here for display. */
 interface AuditLogEntry {
   id: string;
@@ -171,11 +193,14 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
   const [newStaffPhone, setNewStaffPhone] = useState('');
 
   // CRM Coupons State
-  const [coupons, setCoupons] = useState([
-    { id: 'CP-1', code: 'WELCOME10', discount: 10, minSpend: 50, status: 'Active' },
-    { id: 'CP-2', code: 'LUNCH5', discount: 5, minSpend: 40, status: 'Active' },
-    { id: 'CP-3', code: 'STUDENT20', discount: 20, minSpend: 100, status: 'Active' }
-  ]);
+  //
+  // Read from the coupons collection, which is what createOrderAuthoritative
+  // now evaluates. This list used to open with three invented codes —
+  // WELCOME10, LUNCH5, STUDENT20 — that existed nowhere and were not even the
+  // three the app actually advertised.
+  const [coupons, setCoupons] = useState<AdminCoupon[]>([]);
+  const [couponStatus, setCouponStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [couponError, setCouponError] = useState('');
   const [showAddCouponModal, setShowAddCouponModal] = useState(false);
   const [newCouponCode, setNewCouponCode] = useState('');
   const [newCouponDiscount, setNewCouponDiscount] = useState(10);
@@ -310,6 +335,25 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
     }
   };
 
+  const loadCoupons = useCallback(async () => {
+    try {
+      const snap = await getDocs(collection(db, 'coupons'));
+      setCoupons(snap.docs.map((d) => ({ ...(d.data() as AdminCoupon), id: d.id })));
+      setCouponError('');
+      setCouponStatus('ready');
+    } catch (err) {
+      setCouponError(err instanceof Error ? err.message : String(err));
+      setCouponStatus('error');
+    }
+  }, []);
+
+  useEffect(() => {
+    async function loadOnMount() {
+      await loadCoupons();
+    }
+    void loadOnMount();
+  }, [loadCoupons]);
+
   const loadAuditLogs = useCallback(async () => {
     try {
       const snap = await getDocs(
@@ -396,20 +440,32 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
 
   const handleAddCouponSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCouponCode.trim()) return;
-    const newCoupon = {
-      id: `CP-${coupons.length + 1}`,
-      code: newCouponCode.toUpperCase(),
-      discount: Number(newCouponDiscount),
-      minSpend: Number(newCouponMinSpend),
-      status: 'Active'
+    const code = newCouponCode.trim().toUpperCase();
+    if (!code) return;
+    // The code is the document id, so it has to be one. This also keeps a "/"
+    // from addressing a different collection path.
+    if (!/^[A-Z0-9_-]{3,32}$/.test(code)) {
+      toast.warning('รหัสโค้ดต้องเป็น A-Z, 0-9, _ หรือ - ความยาว 3-32 ตัวอักษร');
+      return;
+    }
+
+    // Written in the shape couponRules.js reads. The previous shape
+    // ({discount, minSpend, status}) shared no field with the evaluator, so
+    // every coupon created here applied a silent ฿0 discount.
+    const newCoupon: AdminCoupon = {
+      id: code,
+      title: `ส่วนลด ฿${Number(newCouponDiscount)}`,
+      type: 'FIXED',
+      amountSatang: Math.round(Number(newCouponDiscount) * 100),
+      minSpendSatang: Math.round(Number(newCouponMinSpend) * 100),
+      active: true,
     };
     try {
-      await setDoc(doc(db, "coupons", newCoupon.code), newCoupon, { merge: true });
-      setCoupons(prev => [...prev, newCoupon]);
+      await setDoc(doc(db, "coupons", code), newCoupon, { merge: true });
+      setCoupons(prev => [...prev.filter((c) => c.id !== code), newCoupon]);
       setShowAddCouponModal(false);
       setNewCouponCode('');
-      setToastMsg(`สร้างคูปอง ${newCoupon.code} สำเร็จ`);
+      setToastMsg(`สร้างคูปอง ${code} สำเร็จ`);
       setTimeout(() => setToastMsg(null), 2500);
     } catch (e) {
       console.error("Firestore save coupon error:", e);
@@ -1303,6 +1359,49 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
             </div>
 
             {/* Coupons Table */}
+            {couponStatus === 'loading' && (
+              <div className="space-y-2">
+                <Skeleton className="h-11 w-full rounded-xl" />
+                <Skeleton className="h-11 w-full rounded-xl" />
+              </div>
+            )}
+
+            {couponStatus === 'error' && (
+              <ErrorState
+                title="โหลดรายการคูปองไม่สำเร็จ"
+                message={couponError}
+                onRetry={() => { setCouponStatus('loading'); void loadCoupons(); }}
+              />
+            )}
+
+            {couponStatus === 'ready' && coupons.length === 0 && (
+              <EmptyState
+                icon={<Sparkles className="w-8 h-8" aria-hidden="true" />}
+                title="ยังไม่มีคูปองในระบบ"
+                message="ติดตั้งคูปองเริ่มต้น (WELCOME50, HAPPY15, STUDENT10) หรือสร้างคูปองใหม่เอง"
+                action={
+                  <button
+                    onClick={async () => {
+                      try {
+                        const callable = httpsCallable(functions, 'seedBuiltinCoupons');
+                        const res = await callable({});
+                        toast.success((res.data as { message: string }).message);
+                        await loadCoupons();
+                      } catch (err) {
+                        toast.error(
+                          `ติดตั้งคูปองเริ่มต้นไม่สำเร็จ: ${err instanceof Error ? err.message : String(err)}`
+                        );
+                      }
+                    }}
+                    className="min-h-[44px] px-5 py-3 bg-[#FF7A1A] hover:bg-[#E6680D] text-white font-bold text-xs rounded-xl shadow-md transition-colors cursor-pointer"
+                  >
+                    ติดตั้งคูปองเริ่มต้น
+                  </button>
+                }
+              />
+            )}
+
+            {couponStatus === 'ready' && coupons.length > 0 && (
             <div className="overflow-x-auto border border-slate-200 rounded-xl">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
@@ -1317,23 +1416,56 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                 <tbody className="divide-y divide-slate-100 font-medium">
                   {coupons.map((cp) => (
                     <tr key={cp.id} className="hover:bg-slate-50/80">
-                      <td className="p-3 font-mono font-extrabold text-[#FF7A1A]">{cp.code}</td>
-                      <td className="p-3 font-bold text-emerald-600">ลด ฿{cp.discount}</td>
-                      <td className="p-3 text-slate-600">ขั้นต่ำ ฿{cp.minSpend}</td>
+                      <td className="p-3 font-mono font-extrabold text-[#FF7A1A]">{cp.id}</td>
+                      <td className="p-3 font-bold text-emerald-600">
+                        {cp.type === 'PERCENT'
+                          ? `ลด ${cp.percent}%${cp.maxDiscountSatang ? ` (สูงสุด ฿${cp.maxDiscountSatang / 100})` : ''}`
+                          : `ลด ฿${(cp.amountSatang || 0) / 100}`}
+                      </td>
+                      <td className="p-3 text-slate-600">ขั้นต่ำ ฿{(cp.minSpendSatang || 0) / 100}</td>
                       <td className="p-3">
-                        <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold text-[10px]">
-                          {cp.status}
+                        <span
+                          className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${
+                            cp.active
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-slate-200 text-slate-600'
+                          }`}
+                        >
+                          {cp.active ? 'Active' : 'Inactive'}
                         </span>
                       </td>
                       <td className="p-3 text-right">
                         <button
-                          onClick={() => {
-                            setCoupons((prev) => prev.filter((c) => c.id !== cp.id));
-                            setToastMsg(`ลบคูปอง ${cp.code} สำเร็จ`);
-                            setTimeout(() => setToastMsg(null), 2500);
+                          onClick={async () => {
+                            const ok = await toast.confirm({
+                              title: 'ปิดใช้งานคูปอง',
+                              message: `ปิดใช้งานคูปอง ${cp.id}?\n\nลูกค้าจะใช้โค้ดนี้ไม่ได้อีก แต่ประวัติการใช้งานเดิมจะยังคงอยู่`,
+                              confirmLabel: 'ปิดใช้งาน',
+                              tone: 'error',
+                            });
+                            if (!ok) return;
+                            try {
+                              // Deactivated, not deleted, and really written.
+                              // The old handler filtered the local array and
+                              // announced success while the document — and the
+                              // discount it grants at checkout — survived
+                              // untouched. Deactivating rather than deleting
+                              // keeps the redemption records meaningful.
+                              await setDoc(doc(db, 'coupons', cp.id), { active: false }, { merge: true });
+                              setCoupons((prev) =>
+                                prev.map((c) => (c.id === cp.id ? { ...c, active: false } : c))
+                              );
+                              toast.success(`ปิดใช้งานคูปอง ${cp.id} เรียบร้อยแล้ว`);
+                            } catch (err) {
+                              toast.error(
+                                `ปิดใช้งานคูปองไม่สำเร็จ: ${err instanceof Error ? err.message : String(err)}`
+                              );
+                            }
                           }}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
-                          title="ลบคูปอง"
+                          disabled={!cp.active}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                          title={cp.active ? `ปิดใช้งานคูปอง ${cp.id}` : 'ปิดใช้งานแล้ว'}
+                          aria-label={`ปิดใช้งานคูปอง ${cp.id}`}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -1343,6 +1475,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                 </tbody>
               </table>
             </div>
+            )}
           </div>
         )}
 

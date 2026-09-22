@@ -248,6 +248,47 @@ runTest('The built-in coupons are installable as documents', () => {
   }
 });
 
+console.log('\n🖥️  The admin console writes coupons the engine can read');
+
+const admin = readFileSync(new URL('./src/pages/StoreAdminPage.tsx', import.meta.url), 'utf8');
+const liveAdmin = admin.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+runTest('🚨 The three invented admin coupons are gone', () => {
+  // WELCOME10, LUNCH5 and STUDENT20 existed nowhere, and were not even the
+  // three codes the app advertised.
+  for (const ghost of ['WELCOME10', 'LUNCH5', 'STUDENT20']) {
+    assert(!liveAdmin.includes(ghost), `the fabricated coupon ${ghost} is still seeded`);
+  }
+});
+
+runTest('🚨 A coupon created in the console is in the shape the evaluator reads', () => {
+  // The old shape — {code, discount, minSpend, status} — shared no field with
+  // evaluateCoupon, so every coupon made here resolved to a silent zero
+  // discount: a valid code, a full-price order, and "applied" on screen.
+  for (const field of ['amountSatang', 'minSpendSatang', 'active:', "type: 'FIXED'"]) {
+    assert(liveAdmin.includes(field), `the console does not write ${field}`);
+  }
+  assert(!/discount:\s*Number\(newCouponDiscount\)/.test(liveAdmin), 'the old inert shape is still written');
+});
+
+runTest('🚨 Retiring a coupon really stops it working', () => {
+  // The delete used to filter the local array and report success while the
+  // document — and the discount it grants at checkout — survived.
+  const at = liveAdmin.indexOf('ปิดใช้งานคูปอง');
+  assert(at > 0, 'there is no way to retire a coupon');
+  const around = liveAdmin.slice(at, at + 1500);
+  assert(around.includes("setDoc(doc(db, 'coupons'"), 'retiring a coupon never reaches Firestore');
+  assert(around.includes('active: false'), 'the coupon is not deactivated');
+});
+
+runTest('The console reads coupons from Firestore', () => {
+  assert(liveAdmin.includes("getDocs(collection(db, 'coupons'))"), 'the list is never fetched');
+});
+
+runTest('A code typed in the console is validated as a document id', () => {
+  assert(/\[A-Z0-9_-\]\{3,32\}/.test(liveAdmin), 'an arbitrary code could address another path');
+});
+
 console.log(`\n${'='.repeat(60)}`);
 console.log(`RESULT: ${passed} passed, ${failed} failed`);
 console.log('='.repeat(60));
