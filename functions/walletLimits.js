@@ -56,6 +56,54 @@ export function getIsoWeekKey(ymd) {
 }
 
 /**
+ * Is this stored value a limit a human actually chose?
+ *
+ * The one definition of "configured", used both by the spend check below and by
+ * the bootstrap patch above it. Written down once because the two must agree:
+ * if the bootstrap thought a limit was missing while the spend check thought it
+ * was present, a wallet would be reseeded to the default on every order.
+ *
+ * Zero counts as configured. A guardian who sets the daily limit to 0 is
+ * freezing the wallet on purpose, and treating that as "unset" would quietly
+ * replace the freeze with a 200 THB allowance.
+ */
+export function isConfiguredLimit(value) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+/**
+ * The limit fields a wallet still needs before it can be spent from.
+ *
+ * Spending is fail-closed: with no limits stored, resolveSpendingCounters
+ * returns null and createOrderAuthoritative refuses the order. Nothing in the
+ * app was writing limits, so every wallet ever created sat in that state and
+ * no campus-wallet order could ever complete. The guardian screen that sets
+ * limits is itself reachable only after the school verifies the link, so
+ * "the guardian will set them first" was never a path a student could walk.
+ *
+ * So a wallet is born with the defaults instead, and the guardian tightens or
+ * relaxes them afterwards. Returns only the fields that are missing, so
+ * applying it can never overwrite a limit someone chose — including a
+ * deliberate 0.
+ *
+ * @param {object|null} walletData - the wallet document, or null if it has none yet
+ * @returns {{dailyLimitSatang?: number, weeklyLimitSatang?: number}} possibly empty
+ */
+export function resolveMissingLimitDefaults(walletData) {
+  const wallet = walletData || {};
+  const patch = {};
+
+  if (!isConfiguredLimit(wallet.dailyLimitSatang)) {
+    patch.dailyLimitSatang = DEFAULT_DAILY_LIMIT_SATANG;
+  }
+  if (!isConfiguredLimit(wallet.weeklyLimitSatang)) {
+    patch.weeklyLimitSatang = DEFAULT_WEEKLY_LIMIT_SATANG;
+  }
+
+  return patch;
+}
+
+/**
  * Resolves the spending counters and limits that apply right now.
  *
  * A stored counter counts only when its stored key matches the current key;
@@ -77,17 +125,15 @@ export function resolveSpendingCounters(walletData, todayYmd) {
     wallet.lastSpentWeek === weekKey ? Math.max(0, Number(wallet.spentThisWeekSatang) || 0) : 0;
 
   // Fail-Closed: unset limits resolve to null. The caller (createOrderAuthoritative)
-  // must reject the transaction with WALLET_LIMITS_NOT_CONFIGURED until a guardian
-  // explicitly sets them. A limit of 0 remains valid as a deliberate spending freeze.
-  const dailyLimitSatang =
-    typeof wallet.dailyLimitSatang === "number" && wallet.dailyLimitSatang >= 0
-      ? wallet.dailyLimitSatang
-      : null;
+  // must reject the transaction with WALLET_LIMITS_NOT_CONFIGURED until a limit
+  // exists. A limit of 0 remains valid as a deliberate spending freeze.
+  const dailyLimitSatang = isConfiguredLimit(wallet.dailyLimitSatang)
+    ? wallet.dailyLimitSatang
+    : null;
 
-  const weeklyLimitSatang =
-    typeof wallet.weeklyLimitSatang === "number" && wallet.weeklyLimitSatang >= 0
-      ? wallet.weeklyLimitSatang
-      : null;
+  const weeklyLimitSatang = isConfiguredLimit(wallet.weeklyLimitSatang)
+    ? wallet.weeklyLimitSatang
+    : null;
 
   return { todayYmd, weekKey, spentToday, spentThisWeek, dailyLimitSatang, weeklyLimitSatang };
 }

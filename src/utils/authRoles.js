@@ -7,12 +7,18 @@
  * 2. Super Admin & Merchant roles are granted ONLY when `user.isVerifiedAuth === true` (officially verified by Firebase Auth).
  */
 
-export const SUPER_ADMIN_EMAIL = "58140@lomsak.ac.th";
-export const SUPER_ADMIN_EMAILS = [
-  "58140@lomsak.ac.th",
-  "hi00000087@gmail.com",
-  "easy.web.p@gmail.com",
-];
+// The bootstrap root of trust, imported from the one file that holds it.
+// firestore.rules and functions/superAdmins.js carry generated copies of this
+// same list, because neither can import anything — see scripts-sync-admins.js.
+// This module reads the source directly, so it cannot drift from it at all.
+import { SUPER_ADMIN_EMAILS as CONFIGURED_SUPER_ADMINS } from "../../config/super-admins.js";
+
+export const SUPER_ADMIN_EMAILS = Object.freeze(
+  CONFIGURED_SUPER_ADMINS.map((email) => email.toLowerCase().trim())
+);
+
+/** @deprecated Use SUPER_ADMIN_EMAILS — there has been more than one since this was added. */
+export const SUPER_ADMIN_EMAIL = SUPER_ADMIN_EMAILS[0];
 
 /**
  * 🔒 Roles that may NEVER be granted by the user's own Firestore profile document.

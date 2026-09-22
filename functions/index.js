@@ -5,7 +5,15 @@ import { onRequest, onCall, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
 import { resolveWalletAuthority, isStaffOrAdmin, MAX_TOPUP_SATANG } from "./walletAuthority.js";
-import { resolveSpendingCounters } from "./walletLimits.js";
+import { resolveSpendingCounters, resolveMissingLimitDefaults } from "./walletLimits.js";
+import { isBootstrapSuperAdmin } from "./superAdmins.js";
+import {
+  buildClaimPatch,
+  canGrantRoles,
+  isCallerAdmin,
+  validateGrantRequest,
+  GRANTABLE_ROLES,
+} from "./campusClaims.js";
 import { scanOrderForAllergens } from "./allergenGuard.js";
 import { resolveLinkDecision, LINK_DECISIONS } from "./linkReview.js";
 import { validatePilotLead, rateLimitKeyForAddress } from "./pilotLead.js";
@@ -863,7 +871,16 @@ export const recordMerchantAuditLog = onCall(
 
     const { action, storeId, metadata = {} } = request.data || {};
 
-    const ALLOWED_ACTIONS = ["REGISTER_MERCHANT", "UPDATE_STORE_PROFILE"];
+    // Staff changes belong in the audit trail: a shops/{id}/staff record is what
+    // grants access to a shop's orders, so adding or removing one is a permission
+    // change. The admin screen used to note these in a local array that vanished
+    // on refresh — visible for a moment, recorded nowhere.
+    const ALLOWED_ACTIONS = [
+      "REGISTER_MERCHANT",
+      "UPDATE_STORE_PROFILE",
+      "ADD_SHOP_STAFF",
+      "REMOVE_SHOP_STAFF",
+    ];
     if (!action || typeof action !== "string" || !ALLOWED_ACTIONS.includes(action)) {
       throw new HttpsError("invalid-argument", `Action '${action}' is not permitted for merchant audit logging.`);
     }
@@ -882,14 +899,16 @@ export const recordMerchantAuditLog = onCall(
     const isOwner = shopData.ownerUid === request.auth.uid;
 
     if (!isOwner) {
-      // Check if caller is admin
-      const callerUserSnap = await db.collection("users").doc(request.auth.uid).get();
-      const isAdmin =
-        callerUserSnap.exists &&
-        (callerUserSnap.data().role === "admin" ||
-          callerUserSnap.data().admin === true ||
-          request.auth.token?.role === "admin");
-      if (!isAdmin) {
+      // Admin status comes from the verified token, never from users/{uid}.
+      //
+      // This check used to read `role`/`admin` straight off the caller's own
+      // profile document — a document the caller creates and owns. firestore.rules
+      // does refuse a self-assigned admin flag, so the escalation was not live,
+      // but the Admin SDK bypasses those rules entirely: the only thing standing
+      // between a user and admin here was a rule enforced somewhere else. The
+      // rules in this file have already regressed once. Every other function in
+      // this project authorizes off claims; this one now does too.
+      if (!isCallerAdmin(request.auth.token, isBootstrapSuperAdmin)) {
         throw new HttpsError("permission-denied", "Only the store owner or admin can record audit logs for this store.");
       }
     }
@@ -1029,13 +1048,19 @@ export const reviewVendorApprovalRequest = onCall(
       });
 
       // 2. Set Custom User Claims for student vendor role
-      try {
-        await authAdmin.setCustomUserClaims(studentVendorId, {
-          role: "student_vendor",
-        });
-      } catch (err) {
-        console.warn("[reviewVendorApprovalRequest] Warning setting custom claims:", err);
-      }
+      //
+      // Two bugs lived in these six lines. setCustomUserClaims REPLACES the
+      // claim set, so passing {role} alone erased everything else the user had —
+      // approving a shop for someone who also supervised the canteen quietly
+      // stripped their supervisor role. And the catch only warned, so an
+      // approval could report success, create the shop and set the profile role
+      // while the claim that actually authorizes the vendor was never written:
+      // the one part that matters was the one part allowed to fail silently.
+      const existingClaims = (await authAdmin.getUser(studentVendorId)).customClaims || {};
+      await authAdmin.setCustomUserClaims(
+        studentVendorId,
+        buildClaimPatch(existingClaims, "student_vendor", true)
+      );
 
       // 3. Ensure Shop Document is created and linked
       const shopDocRef = db.collection("shops").doc(`shop_${studentVendorId}`);
@@ -1163,6 +1188,12 @@ export const reviewParentChildLink = onCall(
       const studentRef = db.collection("students").doc(studentId);
       const walletRef = db.collection("wallets").doc(studentId);
 
+      // Read before any write: this is the transaction's second read and every
+      // mutation below it is a write. Only the approval path touches limits, so
+      // a rejection does not take the wallet into its read set and contend with
+      // a concurrent top-up.
+      const walletSnapForLimits = outcome.grantsAccess ? await tx.get(walletRef) : null;
+
       if (outcome.grantsAccess) {
         tx.update(linkRef, {
           status: outcome.nextStatus,
@@ -1175,9 +1206,22 @@ export const reviewParentChildLink = onCall(
 
         // arrayUnion is idempotent, so a re-link after a revocation is safe.
         tx.set(studentRef, { guardianIds: FieldValue.arrayUnion(guardianId) }, { merge: true });
+
+        // This is where a student's wallet is born. Spending is fail-closed on
+        // the limit fields, so a wallet created without them can never be spent
+        // from — and until now nothing wrote them, which meant no campus-wallet
+        // order could complete at all. Seed the defaults here, and only the
+        // fields that are still missing, so a re-link never resets limits the
+        // guardian has since chosen.
         tx.set(
           walletRef,
-          { studentId, guardianIds: FieldValue.arrayUnion(guardianId) },
+          {
+            studentId,
+            guardianIds: FieldValue.arrayUnion(guardianId),
+            ...resolveMissingLimitDefaults(
+              walletSnapForLimits && walletSnapForLimits.exists ? walletSnapForLimits.data() : null
+            ),
+          },
           { merge: true }
         );
       } else if (outcome.revokesAccess) {
@@ -1233,6 +1277,143 @@ export const reviewParentChildLink = onCall(
 );
 
 /**
+ * 🎖️ Appoint or remove a campus staff supervisor (Admin only)
+ *
+ * Until this existed, nothing in the entire project could create a
+ * staff_supervisors record or set a staff_supervisor claim — setCustomUserClaims
+ * was called in exactly one place, granting student_vendor. Meanwhile eight
+ * routes and four Cloud Functions required staff_supervisor. Vendor approvals,
+ * guardian-link approvals, the emergency lookup and the campus queue monitor
+ * were all unreachable by anyone, and the only way to appoint a teacher was to
+ * open the Firebase console and edit claims by hand.
+ *
+ * Grants are admin-only on purpose. A supervisor who could appoint supervisors
+ * is an escalation path with no ceiling; admin itself stays anchored to
+ * config/super-admins.js and cannot be granted from inside the app at all.
+ *
+ * Writes both halves of the role, because each covers a gap in the other:
+ *   • the custom claim is what firestore.rules reads, but the user's existing
+ *     token keeps the old claims until it refreshes (up to an hour, or the next
+ *     sign-in);
+ *   • the staff_supervisors document is what the Cloud Functions fall back to
+ *     in the meantime.
+ * Writing one without the other leaves a supervisor who can pass the backend
+ * checks but fails every Firestore read, or the reverse.
+ */
+export const setCampusStaffRole = onCall(
+  { region: "asia-southeast1", cors: true },
+  async (request) => {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "กรุณาเข้าสู่ระบบก่อนจัดการสิทธิ์เจ้าหน้าที่");
+    }
+
+    const actorClaims = request.auth.token || {};
+    const actorEmail = actorClaims.email || "";
+    if (!canGrantRoles(actorClaims, actorEmail, isBootstrapSuperAdmin)) {
+      throw new HttpsError(
+        "permission-denied",
+        "ROLE_GRANT_FORBIDDEN: เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่กำหนดสิทธิ์เจ้าหน้าที่ได้"
+      );
+    }
+
+    const { targetUid, targetEmail, role, enabled, note } = request.data || {};
+
+    // Resolve an email to a uid so an admin can appoint a teacher by the address
+    // the school already knows them by, instead of hunting for a uid.
+    let resolvedUid = typeof targetUid === "string" ? targetUid.trim() : "";
+    if (!resolvedUid && typeof targetEmail === "string" && targetEmail.trim()) {
+      try {
+        const record = await authAdmin.getUserByEmail(targetEmail.trim().toLowerCase());
+        resolvedUid = record.uid;
+      } catch {
+        throw new HttpsError(
+          "not-found",
+          `USER_NOT_FOUND: ไม่พบผู้ใช้อีเมล ${targetEmail} ในระบบ (ผู้ใช้ต้องเข้าสู่ระบบอย่างน้อยหนึ่งครั้งก่อน)`
+        );
+      }
+    }
+
+    const check = validateGrantRequest({ targetUid: resolvedUid, role, enabled }, request.auth.uid);
+    if (!check.ok) {
+      const messages = {
+        TARGET_REQUIRED: "กรุณาระบุ targetUid หรือ targetEmail ของผู้ใช้",
+        ROLE_NOT_GRANTABLE: `กรุณาระบุ role ที่กำหนดได้ (${GRANTABLE_ROLES.join(", ")})`,
+        ENABLED_REQUIRED: "กรุณาระบุ enabled เป็น true (ให้สิทธิ์) หรือ false (ถอนสิทธิ์)",
+        SELF_GRANT_FORBIDDEN: "SELF_GRANT_FORBIDDEN: ไม่สามารถกำหนดสิทธิ์ให้ตัวเองได้",
+      };
+      throw new HttpsError("invalid-argument", messages[check.reason] || check.reason);
+    }
+
+    let targetRecord;
+    try {
+      targetRecord = await authAdmin.getUser(resolvedUid);
+    } catch {
+      throw new HttpsError("not-found", `USER_NOT_FOUND: ไม่พบผู้ใช้ ${resolvedUid} ในระบบ`);
+    }
+
+    // Merge rather than replace, or this grant erases every other claim the
+    // user holds — see campusClaims.js.
+    const nextClaims = buildClaimPatch(targetRecord.customClaims || {}, check.role, check.enabled);
+    await authAdmin.setCustomUserClaims(resolvedUid, nextClaims);
+
+    const actorName = actorClaims.name || actorEmail || "ผู้ดูแลระบบ";
+    const staffRef = db.collection("staff_supervisors").doc(resolvedUid);
+    const auditRef = db.collection("audit_logs").doc();
+    const batch = db.batch();
+
+    if (check.role === "staff_supervisor" && check.enabled) {
+      batch.set(
+        staffRef,
+        {
+          staffUid: resolvedUid,
+          email: targetRecord.email || null,
+          displayName: targetRecord.displayName || null,
+          canApproveVendors: true,
+          canReviewGuardianLinks: true,
+          grantedBy: request.auth.uid,
+          grantedByName: actorName,
+          grantedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    } else if (check.role === "staff_supervisor") {
+      // Revocation deletes the fallback record too. Leaving it behind would let
+      // the backend keep honouring a role the claim no longer carries.
+      batch.delete(staffRef);
+    }
+
+    batch.set(auditRef, {
+      id: auditRef.id,
+      action: check.enabled ? "CAMPUS_ROLE_GRANTED" : "CAMPUS_ROLE_REVOKED",
+      actorUid: request.auth.uid,
+      actorName,
+      targetUid: resolvedUid,
+      targetEmail: targetRecord.email || null,
+      role: check.role,
+      note: typeof note === "string" ? note.slice(0, 500) : "",
+      timestamp: FieldValue.serverTimestamp(),
+    });
+
+    await batch.commit();
+
+    return {
+      success: true,
+      targetUid: resolvedUid,
+      targetEmail: targetRecord.email || null,
+      role: check.role,
+      enabled: check.enabled,
+      // The claim is live on the server but the user is still holding a token
+      // that predates it. Saying so is the difference between "it did not work"
+      // and "sign out and back in".
+      requiresReauth: true,
+      message: check.enabled
+        ? `กำหนดสิทธิ์ ${check.role} ให้ ${targetRecord.email || resolvedUid} เรียบร้อย — ผู้ใช้ต้องออกจากระบบและเข้าใหม่จึงจะใช้สิทธิ์ได้`
+        : `ถอนสิทธิ์ ${check.role} จาก ${targetRecord.email || resolvedUid} เรียบร้อย — ผู้ใช้ต้องออกจากระบบและเข้าใหม่`,
+    };
+  }
+);
+
+/**
  * 💳 Top-up Campus Wallet (Staff or Guardian)
  */
 export const topupCampusWallet = onCall(
@@ -1278,6 +1459,11 @@ export const topupCampusWallet = onCall(
         {
           studentId,
           balanceSatang: newBal,
+          // A top-up can also be the first thing that creates a wallet, and a
+          // wallet with no limits cannot be spent from. Crediting a balance the
+          // student then cannot use is the worst of both outcomes, so the same
+          // defaults are seeded here — again only where a limit is missing.
+          ...resolveMissingLimitDefaults(walletSnap.exists ? walletSnap.data() : null),
           updatedAt: FieldValue.serverTimestamp(),
         },
         { merge: true }

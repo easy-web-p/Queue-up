@@ -22,7 +22,9 @@ service cloud.firestore {
       return isAuthenticated() && (
         request.auth.token.get('admin', false) == true ||
         request.auth.token.get('role', '') == 'admin' ||
+        // <<< GENERATED super-admins — edit config/super-admins.js, then: npm run sync:admins
         (request.auth.token.get('email', '') in ['58140@lomsak.ac.th', 'hi00000087@gmail.com', 'easy.web.p@gmail.com'])
+        // >>> END GENERATED super-admins
       );
     }
 

@@ -74,7 +74,7 @@ export function FoodGridSkeleton({ count = 8, className = '' }) {
  * `action` is what the person can do about it — an empty screen with no way
  * forward is where a session ends.
  */
-export function EmptyState({ icon, title, message, action }) {
+export function EmptyState({ icon, title, message, action = null }) {
   return (
     <div className="text-center py-12 px-4 space-y-3">
       {icon && (

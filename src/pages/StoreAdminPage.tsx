@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
@@ -26,6 +26,49 @@ import {
   Download
 } from 'lucide-react';
 import { MenuItem, Order, MerchantShop } from '../types';
+
+/**
+ * Turns a stored audit row into a line a person can read.
+ *
+ * Falls through to the raw action code rather than inventing a description, so
+ * a new action type shows up as itself instead of silently reading as something
+ * it is not.
+ */
+function describeAuditAction(data: Record<string, unknown>): string {
+  const action = String(data.action ?? 'UNKNOWN');
+  const meta = (data.metadata as Record<string, unknown>) || {};
+  const labels: Record<string, string> = {
+    REGISTER_MERCHANT: 'ลงทะเบียนร้านค้าใหม่',
+    UPDATE_STORE_PROFILE: 'แก้ไขข้อมูลร้านค้า',
+    ADD_SHOP_STAFF: 'เพิ่มพนักงานประจำร้าน',
+    REMOVE_SHOP_STAFF: 'ถอนสิทธิ์พนักงานประจำร้าน',
+    CAMPUS_ROLE_GRANTED: 'กำหนดสิทธิ์เจ้าหน้าที่',
+    CAMPUS_ROLE_REVOKED: 'ถอนสิทธิ์เจ้าหน้าที่',
+    PARENT_CHILD_LINK_VERIFIED: 'ยืนยันการผูกบัญชีผู้ปกครอง',
+    PARENT_CHILD_LINK_REJECTED: 'ปฏิเสธคำขอผูกบัญชีผู้ปกครอง',
+    PARENT_CHILD_LINK_REVOKED: 'เพิกถอนสิทธิ์ผู้ปกครอง',
+  };
+  const label = labels[action] ?? action;
+  const detail = meta.staffName || meta.storeName || data.targetEmail || data.role;
+  return detail ? `${label}: ${String(detail)}` : label;
+}
+
+/** A row in audit_logs — written only by Cloud Functions, read here for display. */
+interface AuditLogEntry {
+  id: string;
+  time: string;
+  action: string;
+  user: string;
+}
+
+/** A row in shops/{id}/staff — the record the security rules read for shop access. */
+interface ShopStaffMember {
+  id: string;
+  name: string;
+  role: string;
+  phone: string;
+  status: string;
+}
 import {
   fetchMenuItemsFromFirestore,
   fetchOrdersFromFirestore,
@@ -33,9 +76,13 @@ import {
   saveProductsToFirestore,
 } from '../lib/firebase';
 import { db, doc, setDoc, INITIAL_PRODUCTS } from '../firebase/config.js';
+import { functions } from '../firebase/config.js';
+import { httpsCallable } from 'firebase/functions';
 import { buildSeedProducts } from '../lib/seedCatalog.js';
-import { writeBatch } from 'firebase/firestore';
+import { writeBatch, collection, getDocs, deleteDoc, query, orderBy, limit } from 'firebase/firestore';
 import { useToast } from '../components/ToastProvider.jsx';
+import { Skeleton, EmptyState, ErrorState } from '../components/LoadingStates.jsx';
+import StaffRoleManager from '../components/StaffRoleManager';
 
 interface StoreAdminPageProps {
   menuItems?: MenuItem[];
@@ -110,11 +157,14 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
 
 
   // Staff State
-  const [staffList, setStaffList] = useState([
-    { id: 'ST-01', name: 'ป้าแดง ใจดี', role: 'เจ้าของร้าน (Admin)', phone: '081-234-5678', status: 'Active' },
-    { id: 'ST-02', name: 'นายสมชาย มีชัย', role: 'พ่อครัวหลัก (Chef)', phone: '089-876-5432', status: 'Active' },
-    { id: 'ST-03', name: 'นางสาววิภา เรียนดี', role: 'พนักงานแคชเชียร์ (Cashier)', phone: '086-111-2222', status: 'Active' },
-  ]);
+  //
+  // Seeded empty, not with invented people. This list used to open with three
+  // fabricated staff — a shop owner, a chef and a cashier, complete with phone
+  // numbers — and never read Firestore at all, so the roster on screen had no
+  // relationship to the roster that actually holds access to the shop.
+  const [staffList, setStaffList] = useState<ShopStaffMember[]>([]);
+  const [staffStatus, setStaffStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [staffError, setStaffError] = useState('');
   const [showAddStaffModal, setShowAddStaffModal] = useState(false);
   const [newStaffName, setNewStaffName] = useState('');
   const [newStaffRole, setNewStaffRole] = useState('พนักงานแคชเชียร์ (Cashier)');
@@ -132,12 +182,16 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
   const [newCouponMinSpend, setNewCouponMinSpend] = useState(50);
 
   // System Logs State
-  const [logs, setLogs] = useState([
-    { id: 'L-101', time: '10:14 น.', action: 'อัปเดตราคาเมนู ข้าวผัดกะเพราหมูกรอบ เป็น 55 บาท', user: 'ป้าแดง ใจดี' },
-    { id: 'L-102', time: '10:05 น.', action: 'ตรวจสอบสลิปชำระเงิน ออเดอร์ #ORD-1002 สำเร็จ', user: 'ระบบอัตโนมัติ' },
-    { id: 'L-103', time: '09:45 น.', action: 'เปิดร้านค้าประจำวัน รับออเดอร์ปกติ', user: 'ป้าแดง ใจดี' },
-    { id: 'L-104', time: '09:30 น.', action: 'เติมสต็อกวัตถุดิบไก่ทอด +50 จาน', user: 'นายสมชาย มีชัย' },
-  ]);
+  //
+  // Read from audit_logs, the backend-only collection the Cloud Functions write
+  // to. This tab used to open with four invented entries — a price change, a
+  // slip verification, a stock top-up, each attributed to a person who did not
+  // exist — and appended more to the same array as the session went on. An audit
+  // trail is the one screen consulted after something goes wrong, which makes it
+  // the worst possible place for a plausible-looking fiction.
+  const [logs, setLogs] = useState<AuditLogEntry[]>([]);
+  const [logStatus, setLogStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [logError, setLogError] = useState('');
 
   /**
    * Writes the sample dishes into this store's menu as real, orderable products.
@@ -188,34 +242,146 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
     }
   };
 
+  /**
+   * Loads the shop's real staff roster.
+   *
+   * Both mirrors are written on add, so either would do; shops/ is the one the
+   * security rules read when deciding who may see the shop's orders, which
+   * makes it the roster that matters.
+   */
+  // As in StaffRoleManager: no state is touched before the first await, because
+  // this runs from an effect and a synchronous setState there cascades a render.
+  const loadShopStaff = useCallback(async () => {
+    const targetStoreId = shopInfo?.id || user?.storeId;
+    try {
+      // No shop selected is a settled answer ("none"), not a pending one — and
+      // it still resolves through the async path so nothing is set synchronously.
+      const rows = targetStoreId
+        ? (await getDocs(collection(db, 'shops', targetStoreId, 'staff'))).docs.map(
+            (d) => ({ ...(d.data() as ShopStaffMember), id: d.id })
+          )
+        : await Promise.resolve([] as ShopStaffMember[]);
+      setStaffList(rows);
+      setStaffError('');
+      setStaffStatus('ready');
+    } catch (err) {
+      setStaffError(err instanceof Error ? err.message : String(err));
+      setStaffStatus('error');
+    }
+  }, [shopInfo?.id, user?.storeId]);
+
+  useEffect(() => {
+    // Declared inside the effect, following the pattern used elsewhere in this
+    // codebase: the fetch resolves asynchronously, so no state is set during
+    // the effect body itself.
+    async function loadOnMount() {
+      await loadShopStaff();
+    }
+    void loadOnMount();
+  }, [loadShopStaff]);
+
+  /**
+   * Writes a staff change to the audit trail.
+   *
+   * Best-effort on purpose, and loudly so: the staff record is already committed
+   * by the time this runs, so failing the whole operation here would leave the
+   * caller believing nothing happened when the permission change did. A warning
+   * toast is the honest middle — the change went through, the log entry did not.
+   */
+  const recordShopStaffAudit = async (
+    action: 'ADD_SHOP_STAFF' | 'REMOVE_SHOP_STAFF',
+    storeId: string,
+    staff: ShopStaffMember
+  ) => {
+    try {
+      const callable = httpsCallable(functions, 'recordMerchantAuditLog');
+      await callable({
+        action,
+        storeId,
+        metadata: { staffName: staff.name, staffRole: staff.role, staffId: staff.id },
+      });
+      await loadAuditLogs();
+    } catch (err) {
+      toast.warning(
+        `บันทึกประวัติไม่สำเร็จ (การเปลี่ยนแปลงสิทธิ์สำเร็จแล้ว): ${
+          err instanceof Error ? err.message : String(err)
+        }`
+      );
+    }
+  };
+
+  const loadAuditLogs = useCallback(async () => {
+    try {
+      const snap = await getDocs(
+        query(collection(db, 'audit_logs'), orderBy('serverTimestamp', 'desc'), limit(50))
+      );
+      setLogs(
+        snap.docs.map((d) => {
+          const data = d.data() as Record<string, unknown>;
+          const at =
+            typeof data.createdAt === 'string'
+              ? new Date(data.createdAt)
+              : typeof data.timestamp === 'number'
+                ? new Date(data.timestamp)
+                : null;
+          return {
+            id: d.id,
+            time: at
+              ? at.toLocaleString('th-TH', {
+                  day: '2-digit', month: '2-digit',
+                  hour: '2-digit', minute: '2-digit',
+                }) + ' น.'
+              : '—',
+            action: describeAuditAction(data),
+            user: (data.actorName as string) || (data.actorUid as string) || 'ระบบ',
+          };
+        })
+      );
+      setLogError('');
+      setLogStatus('ready');
+    } catch (err) {
+      setLogError(err instanceof Error ? err.message : String(err));
+      setLogStatus('error');
+    }
+  }, []);
+
+  useEffect(() => {
+    async function loadOnMount() {
+      await loadAuditLogs();
+    }
+    void loadOnMount();
+  }, [loadAuditLogs]);
+
   const handleAddStaffSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newStaffName.trim()) return;
-    const newStaff = {
-      id: `ST-${staffList.length + 1}`,
-      name: newStaffName,
-      role: newStaffRole,
-      phone: newStaffPhone || '080-000-0000',
-      status: 'Active'
-    };
     try {
       const targetStoreId = shopInfo?.id || user?.storeId;
       if (!targetStoreId) {
         setToastMsg("ไม่พบรหัสร้านค้า (Store ID Required)");
         return;
       }
+      // The id used to be `ST-${staffList.length + 1}`: remove one of three staff
+      // and the next add produces ST-3 again, where `set(..., merge)` overwrites
+      // whoever already holds it — silently replacing one person's access record
+      // with another's. Firestore's own generated id cannot collide.
+      const newStaff: ShopStaffMember = {
+        id: doc(collection(db, 'shops', targetStoreId, 'staff')).id,
+        name: newStaffName,
+        role: newStaffRole,
+        phone: newStaffPhone || '080-000-0000',
+        status: 'Active'
+      };
       const batch = writeBatch(db);
       batch.set(doc(db, "shops", targetStoreId, "staff", newStaff.id), newStaff, { merge: true });
       batch.set(doc(db, "merchantProfiles", targetStoreId, "staff", newStaff.id), newStaff, { merge: true });
       await batch.commit();
 
       setStaffList(prev => [...prev, newStaff]);
-      setLogs(prev => [{
-        id: `L-${Date.now().toString().slice(-4)}`,
-        time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-        action: `เพิ่มพนักงานใหม่: ${newStaffName} (${newStaffRole})`,
-        user: user?.name || 'Admin'
-      }, ...prev]);
+      // Record it where it survives a refresh. This used to prepend a line to a
+      // local array — visible until the page reloaded, then gone, in a view whose
+      // whole purpose is to still be there afterwards.
+      await recordShopStaffAudit('ADD_SHOP_STAFF', targetStoreId, newStaff);
       setShowAddStaffModal(false);
       setNewStaffName('');
       setNewStaffPhone('');
@@ -241,12 +407,6 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
     try {
       await setDoc(doc(db, "coupons", newCoupon.code), newCoupon, { merge: true });
       setCoupons(prev => [...prev, newCoupon]);
-      setLogs(prev => [{
-        id: `L-${Date.now().toString().slice(-4)}`,
-        time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-        action: `สร้างโค้ดส่วนลดใหม่: ${newCouponCode.toUpperCase()} (ลด ฿${newCouponDiscount})`,
-        user: user?.name || 'Admin'
-      }, ...prev]);
       setShowAddCouponModal(false);
       setNewCouponCode('');
       setToastMsg(`สร้างคูปอง ${newCoupon.code} สำเร็จ`);
@@ -992,69 +1152,121 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
 
         {/* TAB 5: STAFF & PERMISSIONS */}
         {activeTab === 'staff' && (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-extrabold text-slate-900">พนักงาน & สิทธิ์เข้าถึงระบบ</h3>
-                <p className="text-xs text-slate-500">จัดการรายชื่อผู้ช่วย พ่อครัว และแคชเชียร์ในร้าน</p>
-              </div>
-              <button
-                onClick={() => setShowAddStaffModal(true)}
-                className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
-              >
-                <UserPlus className="w-4 h-4" />
-                <span>เพิ่มพนักงาน</span>
-              </button>
-            </div>
+          <div className="space-y-6">
+            {/* ---- Campus-wide roles: the ones firestore.rules actually reads ---- */}
+            <StaffRoleManager />
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
-                    <th className="p-3">รหัส</th>
-                    <th className="p-3">ชื่อ-นามสกุล</th>
-                    <th className="p-3">บทบาทสิทธิ์</th>
-                    <th className="p-3">เบอร์ติดต่อ</th>
-                    <th className="p-3">สถานะ</th>
-                    <th className="p-3 text-right">จัดการ</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-medium">
-                  {staffList.map((st) => (
-                    <tr key={st.id} className="hover:bg-slate-50/80">
-                      <td className="p-3 font-mono font-bold text-slate-500">{st.id}</td>
-                      <td className="p-3 font-extrabold text-slate-900">{st.name}</td>
-                      <td className="p-3 font-bold text-[#FF7A1A]">{st.role}</td>
-                      <td className="p-3 text-slate-600">{st.phone}</td>
-                      <td className="p-3">
-                        <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold text-[10px]">
-                          {st.status}
-                        </span>
-                      </td>
-                      <td className="p-3 text-right">
-                        <button
-                          onClick={async () => {
-                            const ok = await toast.confirm({
-                              title: 'ลบพนักงาน',
-                              message: `ต้องการลบพนักงาน ${st.name} ออกจากระบบหรือไม่?`,
-                              confirmLabel: 'ลบพนักงาน',
-                              tone: 'error',
-                            });
-                            if (!ok) return;
-                            setStaffList((prev) => prev.filter((s) => s.id !== st.id));
-                            setToastMsg(`ลบพนักงาน ${st.name} เรียบร้อยแล้ว`);
-                            setTimeout(() => setToastMsg(null), 2500);
-                          }}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
-                          title="ลบพนักงาน"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            {/* ---- Shop-level roster: who works this stall ---- */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="text-base font-extrabold text-slate-900">พนักงานประจำร้าน</h3>
+                  <p className="text-xs text-slate-500">ผู้ช่วย พ่อครัว และแคชเชียร์ที่เข้าถึงออเดอร์ของร้านนี้ได้</p>
+                </div>
+                <button
+                  onClick={() => setShowAddStaffModal(true)}
+                  className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm transition-all shrink-0"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>เพิ่มพนักงาน</span>
+                </button>
+              </div>
+
+              {staffStatus === 'loading' && (
+                <div className="space-y-2">
+                  <Skeleton className="h-11 w-full rounded-xl" />
+                  <Skeleton className="h-11 w-full rounded-xl" />
+                </div>
+              )}
+
+              {staffStatus === 'error' && (
+                <ErrorState
+                  title="โหลดรายชื่อพนักงานไม่สำเร็จ"
+                  message={staffError}
+                  onRetry={() => { setStaffStatus('loading'); void loadShopStaff(); }}
+                />
+              )}
+
+              {staffStatus === 'ready' && staffList.length === 0 && (
+                <EmptyState
+                  icon={<Users className="w-8 h-8" aria-hidden="true" />}
+                  title="ยังไม่มีพนักงานในร้านนี้"
+                  message="เพิ่มพนักงานเพื่อให้เข้าถึงออเดอร์และหน้าจอครัวของร้านได้"
+                />
+              )}
+
+              {staffStatus === 'ready' && staffList.length > 0 && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
+                        <th scope="col" className="p-3">รหัส</th>
+                        <th scope="col" className="p-3">ชื่อ-นามสกุล</th>
+                        <th scope="col" className="p-3">บทบาทสิทธิ์</th>
+                        <th scope="col" className="p-3">เบอร์ติดต่อ</th>
+                        <th scope="col" className="p-3">สถานะ</th>
+                        <th scope="col" className="p-3 text-right">จัดการ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium">
+                      {staffList.map((st) => (
+                        <tr key={st.id} className="hover:bg-slate-50/80">
+                          <td className="p-3 font-mono font-bold text-slate-500">{st.id}</td>
+                          <td className="p-3 font-extrabold text-slate-900">{st.name}</td>
+                          <td className="p-3 font-bold text-[#FF7A1A]">{st.role}</td>
+                          <td className="p-3 text-slate-600">{st.phone}</td>
+                          <td className="p-3">
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold text-[10px]">
+                              {st.status}
+                            </span>
+                          </td>
+                          <td className="p-3 text-right">
+                            <button
+                              onClick={async () => {
+                                const ok = await toast.confirm({
+                                  title: 'ลบพนักงาน',
+                                  message: `ต้องการลบพนักงาน ${st.name} ออกจากระบบหรือไม่?\n\nพนักงานจะเข้าถึงออเดอร์ของร้านนี้ไม่ได้อีก`,
+                                  confirmLabel: 'ลบพนักงาน',
+                                  tone: 'error',
+                                });
+                                if (!ok) return;
+
+                                // This used to filter the local array and report
+                                // success. The Firestore record survived, and that
+                                // record is what grants access to the shop's orders —
+                                // so "removing" a cashier removed nothing at all.
+                                const targetStoreId = shopInfo?.id || user?.storeId;
+                                if (!targetStoreId) {
+                                  toast.error('ไม่พบรหัสร้านค้า (Store ID Required)');
+                                  return;
+                                }
+                                try {
+                                  await Promise.all([
+                                    deleteDoc(doc(db, 'shops', targetStoreId, 'staff', st.id)),
+                                    deleteDoc(doc(db, 'merchantProfiles', targetStoreId, 'staff', st.id)),
+                                  ]);
+                                  setStaffList((prev) => prev.filter((s) => s.id !== st.id));
+                                  await recordShopStaffAudit('REMOVE_SHOP_STAFF', targetStoreId, st);
+                                  toast.success(`ลบพนักงาน ${st.name} และถอนสิทธิ์เข้าถึงร้านเรียบร้อยแล้ว`);
+                                } catch (err) {
+                                  toast.error(
+                                    `ลบพนักงานไม่สำเร็จ: ${err instanceof Error ? err.message : String(err)}`
+                                  );
+                                }
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                              title={`ลบพนักงาน ${st.name}`}
+                              aria-label={`ลบพนักงาน ${st.name}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1142,22 +1354,48 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
               <p className="text-xs text-slate-500">ประวัติการปรับปรุงสต็อก แก้ไขราคา และการตรวจสอบสลิป</p>
             </div>
 
-            <div className="space-y-2">
-              {logs.map((log) => (
-                <div
-                  key={log.id}
-                  className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono font-bold text-slate-400">{log.time}</span>
-                    <span className="font-bold text-slate-800">{log.action}</span>
+            {logStatus === 'loading' && (
+              <div className="space-y-2">
+                <Skeleton className="h-12 w-full rounded-xl" />
+                <Skeleton className="h-12 w-full rounded-xl" />
+                <Skeleton className="h-12 w-full rounded-xl" />
+              </div>
+            )}
+
+            {logStatus === 'error' && (
+              <ErrorState
+                title="โหลดบันทึกกิจกรรมไม่สำเร็จ"
+                message={logError}
+                onRetry={() => { setLogStatus('loading'); void loadAuditLogs(); }}
+              />
+            )}
+
+            {logStatus === 'ready' && logs.length === 0 && (
+              <EmptyState
+                icon={<FileText className="w-8 h-8" aria-hidden="true" />}
+                title="ยังไม่มีบันทึกกิจกรรม"
+                message="เมื่อมีการลงทะเบียนร้านค้า แก้ไขข้อมูลร้าน หรือเปลี่ยนแปลงสิทธิ์พนักงาน รายการจะปรากฏที่นี่"
+              />
+            )}
+
+            {logStatus === 'ready' && logs.length > 0 && (
+              <div className="space-y-2">
+                {logs.map((log) => (
+                  <div
+                    key={log.id}
+                    className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs flex items-center justify-between gap-3"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="font-mono font-bold text-slate-400 shrink-0">{log.time}</span>
+                      <span className="font-bold text-slate-800 truncate">{log.action}</span>
+                    </div>
+                    <span className="px-2.5 py-0.5 rounded-md bg-slate-200 text-slate-700 font-bold text-[10px] shrink-0">
+                      โดย {log.user}
+                    </span>
                   </div>
-                  <span className="px-2.5 py-0.5 rounded-md bg-slate-200 text-slate-700 font-bold text-[10px]">
-                    โดย {log.user}
-                  </span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

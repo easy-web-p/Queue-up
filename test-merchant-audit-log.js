@@ -14,6 +14,8 @@
  */
 
 import assert from 'node:assert';
+import { isCallerAdmin } from './functions/campusClaims.js';
+import { isBootstrapSuperAdmin } from './functions/superAdmins.js';
 
 let passed = 0;
 let failed = 0;
@@ -48,7 +50,10 @@ function sanitizeMetadata(metadata) {
   return safeMetadata;
 }
 
-function emulateRecordMerchantAuditLog({ auth, data, mockShops = {}, mockUsers = {} }) {
+// `mockUsers` is intentionally not destructured. Callers still pass a profile
+// document so the suite can prove that a self-assigned admin flag there grants
+// nothing — the point being that this function no longer reads it at all.
+function emulateRecordMerchantAuditLog({ auth, data, mockShops = {} }) {
   if (!auth || !auth.uid) {
     throw new Error('unauthenticated: User must be authenticated to record audit log.');
   }
@@ -70,9 +75,11 @@ function emulateRecordMerchantAuditLog({ auth, data, mockShops = {}, mockUsers =
 
   const isOwner = shopData.ownerUid === auth.uid;
   if (!isOwner) {
-    const callerUser = mockUsers[auth.uid] || {};
-    const isAdmin = callerUser.role === 'admin' || callerUser.admin === true || auth.token?.role === 'admin';
-    if (!isAdmin) {
+    // Calls the real decision rather than restating it. This line used to read
+    // the caller's own users/{uid} profile — and when the function stopped doing
+    // that, this model kept the old logic and the suite kept passing, proving
+    // nothing about the code that actually ships.
+    if (!isCallerAdmin(auth.token, isBootstrapSuperAdmin)) {
       throw new Error('permission-denied: Only the store owner or admin can record audit logs for this store.');
     }
   }
@@ -176,6 +183,28 @@ runTest('Admin caller succeeds even if not store owner', () => {
 
   assert.strictEqual(result.success, true);
   assert.strictEqual(result.entry.actorUid, 'admin_user');
+});
+
+runTest('🚨 A self-assigned admin flag in the profile doc grants nothing', () => {
+  // The escalation this function was one rules-regression away from. The Admin
+  // SDK bypasses firestore.rules, so a profile field is not an authorization.
+  assert.throws(() => {
+    emulateRecordMerchantAuditLog({
+      auth: { uid: 'attacker_uid', token: { role: 'customer' } },
+      data: { action: 'UPDATE_STORE_PROFILE', storeId: 'STORE-001', metadata: {} },
+      mockShops: { 'STORE-001': { ownerUid: 'legit_owner_uid' } },
+      mockUsers: { attacker_uid: { role: 'admin', admin: true, isSuperAdmin: true } },
+    });
+  }, /permission-denied/);
+});
+
+runTest('A bootstrap super admin is still recognised', () => {
+  const result = emulateRecordMerchantAuditLog({
+    auth: { uid: 'boss', token: { email: '58140@lomsak.ac.th' } },
+    data: { action: 'UPDATE_STORE_PROFILE', storeId: 'STORE-001', metadata: {} },
+    mockShops: { 'STORE-001': { ownerUid: 'someone_else' } },
+  });
+  assert.strictEqual(result.success, true);
 });
 
 runTest('Metadata bounds and sanitization truncate oversized strings and drop invalid types', () => {
