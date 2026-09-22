@@ -532,18 +532,6 @@ service cloud.firestore {
     }
 
     // ==========================================
-    // 20. PILOT PROPOSAL LEADS (Admin Read, Backend Only Writes)
-    // ==========================================
-    match /pilot_leads/{leadId} {
-      allow read: if isAdmin();
-      allow write: if false;
-    }
-
-    match /pilot_lead_rate_limits/{key} {
-      allow read, write: if false;
-    }
-
-    // ==========================================
     // 21. PRODUCT & STORE REVIEWS
     // ==========================================
     match /reviews/{reviewId} {
