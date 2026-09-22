@@ -7,6 +7,7 @@
  */
 
 import assert from 'assert';
+import { calculateCartItemUnitPrice, calculateCartTotal } from './src/store/cartPricing.js';
 
 // Simple In-Memory Mock of LocalStorage
 class MockLocalStorage {
@@ -138,17 +139,15 @@ function runTestSuite() {
     };
   }
 
-  function calculateCartItemUnitPrice(item) {
-    const basePrice = item.menuItem?.price || 0;
-    let modifierTotal = 0;
-    if (Array.isArray(item.selectedModifiers)) {
-      modifierTotal = item.selectedModifiers.reduce((sum, mod) => sum + (mod.priceModifier || 0), 0);
-    }
-    return basePrice + modifierTotal;
-  }
-
+  // Priced by the real rule, not a copy of it.
+  //
+  // The copy that stood here handled only `priceModifier` and ignored
+  // `priceModifierSatang` — which is the precise disagreement cartPricing.js
+  // was written to end, when the cart and the checkout screen each computed a
+  // different total for the same basket. A replica that predates the fix tests
+  // the bug rather than the behaviour.
   function selectCartTotalAmount(cartState) {
-    return cartState.items.reduce((sum, item) => sum + calculateCartItemUnitPrice(item) * (item.quantity || 1), 0);
+    return calculateCartTotal(cartState.items);
   }
 
   function selectCartTotalAmountSatang(cartState) {

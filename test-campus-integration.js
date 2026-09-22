@@ -9,6 +9,7 @@
  */
 
 import assert from 'assert';
+import { resolveSpendingCounters, getIsoWeekKey } from './functions/walletLimits.js';
 
 console.log('\x1b[36m%s\x1b[0m', '🧪 Starting QueueUp for Campus Integration Test Matrix...\n');
 
@@ -107,6 +108,20 @@ runTest('Staff Supervisor rejecting application records rejectionReason and pres
 // -------------------------------------------------------------
 // 2. Campus Wallet Spending Rules & Validation (Phase 0)
 // -------------------------------------------------------------
+/**
+ * Wallet spending, decided by the real rules.
+ *
+ * This used to re-implement resolveSpendingCounters by hand — and its copy was
+ * the version from BEFORE the weekly-reset fix: it read spentThisWeekSatang
+ * with no lastSpentWeek key, so the weekly total never rolled over and grew
+ * until it locked the student out permanently. The suite was therefore asserting
+ * that a fixed bug was still correct behaviour, and would have gone green again
+ * if anyone reintroduced it.
+ *
+ * Only the ordering of the checks and their error names live here now; what the
+ * counters and limits actually resolve to comes from functions/walletLimits.js,
+ * the module createOrderAuthoritative itself calls.
+ */
 function validateWalletSpending(wallet, orderAmountSatang, itemCategories = [], targetYmd = '2026-09-05') {
   if (!wallet) throw new Error('CAMPUS_WALLET_NOT_FOUND');
   if (wallet.isLocked) throw new Error('CAMPUS_WALLET_LOCKED');
@@ -115,25 +130,18 @@ function validateWalletSpending(wallet, orderAmountSatang, itemCategories = [], 
     throw new Error('INSUFFICIENT_WALLET_BALANCE');
   }
 
-  // Daily & Weekly limits (Fail-Closed: must be explicitly configured)
-  if (
-    wallet.dailyLimitSatang === undefined ||
-    wallet.dailyLimitSatang === null ||
-    wallet.weeklyLimitSatang === undefined ||
-    wallet.weeklyLimitSatang === null
-  ) {
+  const { spentToday, spentThisWeek, dailyLimitSatang, weeklyLimitSatang } =
+    resolveSpendingCounters(wallet, targetYmd);
+
+  // Fail-Closed: limits must be configured before a wallet can be spent from.
+  if (dailyLimitSatang === null || weeklyLimitSatang === null) {
     throw new Error('WALLET_LIMITS_NOT_CONFIGURED');
   }
 
-  const dailyLimitSatang = wallet.dailyLimitSatang;
-  const spentToday = wallet.lastSpentDate === targetYmd ? (wallet.spentTodaySatang || 0) : 0;
   if (spentToday + orderAmountSatang > dailyLimitSatang) {
     throw new Error('DAILY_LIMIT_EXCEEDED');
   }
-
-  const weeklyLimitSatang = wallet.weeklyLimitSatang;
-  const spentWeek = wallet.spentThisWeekSatang || 0;
-  if (spentWeek + orderAmountSatang > weeklyLimitSatang) {
+  if (spentThisWeek + orderAmountSatang > weeklyLimitSatang) {
     throw new Error('WEEKLY_LIMIT_EXCEEDED');
   }
 
@@ -219,6 +227,63 @@ runTest('Exceeding daily spending limit throws DAILY_LIMIT_EXCEEDED', () => {
   assert.throws(() => {
     validateWalletSpending(wallet, 3000, ['Snacks'], '2026-09-05'); // 30 THB order -> Total 210 THB
   }, /DAILY_LIMIT_EXCEEDED/);
+});
+
+runTest('🚨 Exceeding the weekly limit throws WEEKLY_LIMIT_EXCEEDED', () => {
+  // This suite's own header claims "Daily / Weekly Spending Limits
+  // Enforcement", and no scenario in it had ever reached the weekly branch.
+  const wallet = {
+    studentId: 'STU1001',
+    balanceSatang: 200000,
+    dailyLimitSatang: 50000,
+    weeklyLimitSatang: 100000, // 1,000 THB per week
+    spentTodaySatang: 0,
+    lastSpentDate: '2026-09-05',
+    spentThisWeekSatang: 95000, // 950 THB already spent this week
+    lastSpentWeek: getIsoWeekKey('2026-09-05'),
+    isLocked: false,
+  };
+
+  assert.throws(() => {
+    validateWalletSpending(wallet, 10000, ['Snacks'], '2026-09-05'); // +100 THB -> 1,050
+  }, /WEEKLY_LIMIT_EXCEEDED/);
+});
+
+runTest('🚨 The weekly total rolls over into the next ISO week', () => {
+  // Before the fix, spentThisWeekSatang had no reset path at all: it grew
+  // forever until it crossed the weekly limit and locked the student out of
+  // their own money permanently. The replica this suite used to carry still
+  // encoded that behaviour, so it would have passed on the broken version.
+  const wallet = {
+    studentId: 'STU1001',
+    balanceSatang: 200000,
+    dailyLimitSatang: 50000,
+    weeklyLimitSatang: 100000,
+    spentThisWeekSatang: 99000, // last week's total, at the limit
+    lastSpentWeek: getIsoWeekKey('2026-09-05'),
+    isLocked: false,
+  };
+
+  // Same wallet, a week later: the stored key no longer matches, so the total
+  // reads as zero and the student can spend again.
+  assert.doesNotThrow(() => {
+    validateWalletSpending(wallet, 10000, ['Snacks'], '2026-09-14');
+  }, 'a new ISO week must start clean');
+});
+
+runTest('A wallet written before lastSpentWeek existed is not locked out', () => {
+  const legacy = {
+    studentId: 'STU1001',
+    balanceSatang: 200000,
+    dailyLimitSatang: 50000,
+    weeklyLimitSatang: 100000,
+    spentThisWeekSatang: 250000, // inflated past the limit, with no week key
+    isLocked: false,
+  };
+
+  assert.doesNotThrow(() => {
+    validateWalletSpending(legacy, 5000, ['Snacks'], '2026-09-05');
+  }, 'an un-keyed legacy total must not bar the student forever');
 });
 
 runTest('Purchasing food from Guardian-blocked category throws BLOCKED_CATEGORY_VIOLATION', () => {
