@@ -15,6 +15,14 @@
  */
 
 import assert from 'node:assert/strict';
+// The rules under test, imported from the modules the Cloud Function uses.
+import {
+  validateOrderRequest,
+  checkStoreAvailability,
+  checkSlotCapacity,
+  nextQueueNumber,
+} from './functions/orderRequest.js';
+import { checkProductAvailability, priceOrder } from './functions/orderPricing.js';
 
 console.log('🧪 Starting QueueUp Pure Zero-Payment & Instant Queue Test Matrix...\n');
 
@@ -127,13 +135,6 @@ class AdvancedFirestoreEngine {
   }
 }
 
-// Helpers
-function isValidCalendarDate(year, month, day) {
-  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return false;
-  if (month < 1 || month > 12 || day < 1 || day > 31) return false;
-  const d = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
-  return d.getUTCFullYear() === year && (d.getUTCMonth() + 1) === month && d.getUTCDate() === day;
-}
 
 function getBangkokYmd(date = new Date()) {
   const formatter = new Intl.DateTimeFormat('en-CA', {
@@ -161,75 +162,51 @@ function getBangkokCurrentTime(date = new Date()) {
 }
 
 /**
- * Authoritative Order Creation Business Logic Simulation
+ * The server's current instant, in the shape the rule modules expect.
+ * Mirrors what index.js passes, so the tests exercise the same input.
+ */
+function currentBangkokFor(date) {
+  const { ymd, ymdClean, dayOfWeekIndex } = getBangkokYmd(date);
+  return { ymd, ymdClean, dayOfWeekIndex, hhmm: getBangkokCurrentTime(date) };
+}
+
+/**
+ * Authoritative Order Creation — the transaction plumbing only.
+ *
+ * The business rules are imported from the modules the Cloud Function itself
+ * uses; what remains here is the in-memory Firestore double and the ordering of
+ * reads and writes, which is what these scenarios are actually about.
  */
 async function executeOrderCreation(dbEngine, request, customNow = new Date()) {
-  const { storeId, userId, customerName, customerPhone, items, pickupTime, pickupDate } = request;
+  const { storeId, userId, customerName, customerPhone, items } = request;
 
+  // Authentication is the one check this harness still owns: it belongs to the
+  // callable wrapper, not to the rules.
   if (!userId || userId === 'guest_user') {
     throw new Error('AUTHENTICATION_REQUIRED: กรุณาเข้าสู่ระบบก่อนทำการสั่งจองอาหาร');
   }
-  if (!customerPhone || !customerPhone.trim()) {
-    throw new Error('CUSTOMER_PHONE_REQUIRED: กรุณาระบุเบอร์โทรศัพท์สำหรับรับการแจ้งเตือนคิว');
-  }
-  if (!storeId || !storeId.trim()) {
-    throw new Error('STORE_ID_REQUIRED: ไม่พบรหัสร้านค้า');
-  }
-  if (!items || !Array.isArray(items) || items.length === 0) {
-    throw new Error('ORDER_ITEMS_EMPTY: รายการอาหารในคำสั่งซื้อว่างเปล่า');
-  }
-  if (!pickupTime || !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(pickupTime).trim())) {
-    throw new Error('INVALID_PICKUP_TIME_FORMAT: รูปแบบเวลารับอาหารไม่ถูกต้อง (ต้องเป็น HH:mm)');
-  }
 
-  const cleanPickupTime = String(pickupTime).trim();
-  const now = customNow;
-  const currentBangkok = getBangkokYmd(now);
+  // Everything below is the REAL rule, not a restatement of it.
+  //
+  // This file used to re-implement the whole transaction — 1,258 lines of
+  // hand-written copy — and its 24 passing scenarios said nothing whatsoever
+  // about functions/index.js. A copy drifts the moment the original changes,
+  // and a green suite over a drifted copy is worse than no suite: it reports
+  // that the shipped behaviour is correct without ever having run it.
+  const validated = validateOrderRequest(request, currentBangkokFor(customNow));
+  if (!validated.ok) throw new Error(validated.message);
 
-  let targetYmd = currentBangkok.ymd;
-  let targetYmdClean = currentBangkok.ymdClean;
-
-  if (pickupDate) {
-    const rawDate = String(pickupDate).trim();
-    const isIsoDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDate);
-    const isCleanDate = /^\d{8}$/.test(rawDate);
-    if (!isIsoDate && !isCleanDate) {
-      throw new Error('INVALID_DATE_FORMAT: รูปแบบวันที่ไม่ถูกต้อง (ต้องเป็น YYYY-MM-DD)');
-    }
-    const clean = rawDate.replace(/-/g, '');
-    if (clean < currentBangkok.ymdClean) {
-      throw new Error('PAST_DATE_NOT_ALLOWED: ไม่สามารถเลือกวันที่ย้อนหลังได้');
-    }
-    targetYmd = isIsoDate ? rawDate : `${rawDate.slice(0, 4)}-${rawDate.slice(4, 6)}-${rawDate.slice(6, 8)}`;
-    targetYmdClean = clean;
-  }
+  const {
+    cleanPickupTime,
+    targetYmd,
+    targetYmdClean,
+    productTotalQuantityMap,
+    totalOrderItemsCount,
+  } = validated;
 
   const [pYear, pMonth, pDay] = targetYmd.split('-').map(Number);
-  if (!isValidCalendarDate(pYear, pMonth, pDay)) {
-    throw new Error('INVALID_CALENDAR_DATE: วันที่ระบุไม่มีอยู่จริงในปฏิทิน');
-  }
   const targetPickupDateObj = new Date(Date.UTC(pYear, pMonth - 1, pDay, 12, 0, 0));
   const targetBangkok = getBangkokYmd(targetPickupDateObj);
-
-  if (targetYmdClean === currentBangkok.ymdClean) {
-    const currentBangkokTime = getBangkokCurrentTime(now);
-    if (cleanPickupTime <= currentBangkokTime) {
-      throw new Error(`PAST_PICKUP_TIME_NOT_ALLOWED: เวลารับอาหาร (${cleanPickupTime} น.) ผ่านไปแล้วสำหรับวันนี้ (เวลาปัจจุบัน ${currentBangkokTime} น.)`);
-    }
-  }
-
-  // Aggregate item quantities
-  const productTotalQuantityMap = new Map();
-  let totalOrderItemsCount = 0;
-  for (const it of items) {
-    if (!it.productId) throw new Error('PRODUCT_ID_REQUIRED: ทุกรายการต้องระบุ productId');
-    const qty = Number(it.quantity);
-    if (!Number.isInteger(qty) || qty <= 0) {
-      throw new Error('INVALID_QUANTITY: จำนวนสินค้าต้องเป็นจำนวนเต็มบวก');
-    }
-    totalOrderItemsCount += qty;
-    productTotalQuantityMap.set(it.productId, (productTotalQuantityMap.get(it.productId) || 0) + qty);
-  }
 
   return await dbEngine.runTransaction(async (tx) => {
     // PHASE 1: READ ALL
@@ -277,149 +254,38 @@ async function executeOrderCreation(dbEngine, request, customNow = new Date()) {
     const counterSnap = await tx.get({ path: `queue_counters/${counterDocId}` });
 
     // PHASE 2: VALIDATE BUSINESS INVARIANTS
-    if (shopData.isOpen === false || shopData.status === 'closed') {
-      throw new Error('STORE_CLOSED: ร้านค้าปิดให้บริการชั่วคราว');
-    }
-    if (shopData.operationalOverride === 'FORCE_CLOSE' || shopData.operationalOverride === 'EMERGENCY_STOP') {
-      throw new Error('STORE_PAUSED: ร้านค้าหยุดรับออเดอร์ชั่วคราว');
-    }
+    const availability = checkStoreAvailability(shopData, targetBangkok, targetYmd, cleanPickupTime);
+    if (!availability.ok) throw new Error(availability.message);
 
-    if (shopData.operatingHours) {
-      const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-      const targetDayName = days[targetBangkok.dayOfWeekIndex];
-      const targetDaySchedule = shopData.operatingHours[targetDayName];
-      if (targetDaySchedule) {
-        if (!targetDaySchedule.isOpen) {
-          throw new Error(`STORE_CLOSED_ON_DATE: ร้านค้าปิดทำการในวัน${targetDayName} (${targetYmd})`);
-        }
-        const { open, close } = targetDaySchedule;
-        const isPickupAllowed =
-          open <= close
-            ? cleanPickupTime >= open && cleanPickupTime <= close
-            : cleanPickupTime >= open || cleanPickupTime <= close;
-        if (!isPickupAllowed) {
-          throw new Error(`INVALID_PICKUP_TIME: เวลารับอาหาร ${cleanPickupTime} น. อยู่นอกเวลาทำการ (${open} - ${close})`);
-        }
-      }
-    }
+    const productDataMap = new Map(
+      Array.from(productSnapMap.entries()).map(([id, snap]) => [id, snap.data()])
+    );
+    const modifierGroupDataMap = new Map(
+      Array.from(modifierGroupSnapMap.entries())
+        .filter(([, snap]) => snap && snap.exists)
+        .map(([id, snap]) => [id, snap.data()])
+    );
 
-    for (const [prodId, requiredQty] of productTotalQuantityMap.entries()) {
-      const prodData = productSnapMap.get(prodId).data();
-      if (prodData.storeId !== storeId) {
-        throw new Error(`CROSS_STORE_PRODUCT_VIOLATION: สินค้า ${prodData.name} ไม่ได้เป็นของร้าน ${storeId}`);
-      }
-      if (prodData.isAvailable === false) {
-        throw new Error(`PRODUCT_UNAVAILABLE: สินค้า ${prodData.name} ปิดรับออเดอร์ชั่วคราว`);
-      }
-      const currentStock = typeof prodData.stock === 'number' ? prodData.stock : 0;
-      if (currentStock < requiredQty) {
-        throw new Error(`INSUFFICIENT_STOCK: สินค้า "${prodData.name}" คงเหลือเพียง ${currentStock} ชุด (ต้องการ ${requiredQty})`);
-      }
-    }
+    const availabilityCheck = checkProductAvailability(productTotalQuantityMap, productDataMap, storeId);
+    if (!availabilityCheck.ok) throw new Error(availabilityCheck.message);
 
-    let calculatedTotalSatang = 0;
-    const validatedOrderItems = [];
+    const priced = priceOrder(items, productDataMap, modifierGroupDataMap, storeId);
+    if (!priced.ok) throw new Error(priced.message);
+    const { calculatedTotalSatang, validatedOrderItems } = priced;
 
-    for (const itemReq of items) {
-      const prodData = productSnapMap.get(itemReq.productId).data();
-      const basePriceSatang = prodData.priceSatang ?? Math.round((Number(prodData.price) || 0) * 100);
-      let itemModifierSatang = 0;
+    const capacity = checkSlotCapacity(
+      shopData,
+      slotSnap.exists ? slotSnap.data() : null,
+      targetYmd,
+      cleanPickupTime
+    );
+    if (!capacity.ok) throw new Error(capacity.message);
+    const authoritativeCapacity = capacity.capacity;
+    const currentSlotOrders = capacity.currentSlotOrders;
 
-      const selectedModifiers = itemReq.selectedModifiers || [];
-      const allowedGroupIds = new Set(prodData.modifierGroupIds || []);
-
-      if (Array.isArray(prodData.modifierGroupIds)) {
-        for (const mgId of prodData.modifierGroupIds) {
-          const modSnap = modifierGroupSnapMap.get(mgId);
-          if (!modSnap || !modSnap.exists) {
-            throw new Error(`MODIFIER_GROUP_NOT_FOUND: ไม่พบกลุ่มตัวเลือก ${mgId} สำหรับเมนู "${prodData.name}"`);
-          }
-          const modData = modSnap.data();
-          if (modData.storeId !== storeId) {
-            throw new Error(`CROSS_STORE_MODIFIER_VIOLATION: กลุ่มตัวเลือก ${mgId} ไม่ได้เป็นของร้าน ${storeId}`);
-          }
-          const groupSelections = selectedModifiers.filter((m) => m.modifierGroupId === mgId);
-          const minSelections = modData.minSelections ?? modData.minSelect ?? (modData.required || modData.isRequired ? 1 : 0);
-          const maxSelections = modData.maxSelections ?? modData.maxSelect ?? (modData.selectionType === 'single' ? 1 : null);
-          const isSingle = modData.selectionType === 'single' || modData.type === 'single';
-
-          // Duplicate option check
-          const optionIdsInGroup = groupSelections.map((m) => m.optionId);
-          if (new Set(optionIdsInGroup).size !== optionIdsInGroup.length) {
-            throw new Error(`DUPLICATE_MODIFIER_OPTION: กลุ่มตัวเลือก "${modData.name || mgId}" มีตัวเลือกซ้ำกัน`);
-          }
-
-          if (groupSelections.length < minSelections) {
-            throw new Error(`REQUIRED_MODIFIER_MISSING: กรุณาเลือก ${modData.name || 'ตัวเลือกที่จำเป็น'} อย่างน้อย ${minSelections} รายการ สำหรับเมนู "${prodData.name}"`);
-          }
-          if (maxSelections !== null && groupSelections.length > maxSelections) {
-            throw new Error(`MAX_SELECTIONS_EXCEEDED: กลุ่มตัวเลือก "${modData.name}" เลือกได้สูงสุดไม่เกิน ${maxSelections} รายการ`);
-          }
-          if (isSingle && groupSelections.length > 1) {
-            throw new Error(`SINGLE_SELECTION_VIOLATED: กลุ่มตัวเลือก "${modData.name}" สามารถเลือกได้เพียง 1 ตัวเลือกเท่านั้น`);
-          }
-        }
-      }
-
-      if (selectedModifiers.length > 0) {
-        for (const selMod of selectedModifiers) {
-          if (!allowedGroupIds.has(selMod.modifierGroupId)) {
-            throw new Error(`INVALID_PRODUCT_MODIFIER: กลุ่มตัวเลือก ${selMod.modifierGroupId} ไม่ได้เป็นของสินค้า "${prodData.name}"`);
-          }
-          const modSnap = modifierGroupSnapMap.get(selMod.modifierGroupId);
-          if (!modSnap || !modSnap.exists) {
-            throw new Error(`MODIFIER_GROUP_NOT_FOUND: ไม่พบกลุ่มตัวเลือก ${selMod.modifierGroupId}`);
-          }
-          const modData = modSnap.data();
-          const opt = (modData.options || []).find((o) => o.id === selMod.optionId);
-          if (!opt) {
-            throw new Error(`OPTION_NOT_FOUND: ไม่พบตัวเลือก ${selMod.optionId}`);
-          }
-          if (opt.isOutOfStock) {
-            throw new Error(`OPTION_OUT_OF_STOCK: ตัวเลือก "${opt.name}" หมดชั่วคราว`);
-          }
-          const optPriceSatang = opt.priceModifierSatang ?? Math.round((Number(opt.priceModifier) || 0) * 100);
-          itemModifierSatang += optPriceSatang;
-        }
-      }
-
-      const unitPriceSatang = basePriceSatang + itemModifierSatang;
-      const subtotalSatang = unitPriceSatang * Number(itemReq.quantity);
-      calculatedTotalSatang += subtotalSatang;
-
-      validatedOrderItems.push({
-        productId: itemReq.productId,
-        name: prodData.name,
-        quantity: Number(itemReq.quantity),
-        unitPriceSatang,
-        unitPrice: unitPriceSatang / 100,
-        subtotalSatang,
-        subtotal: subtotalSatang / 100,
-        customNotes: itemReq.customNotes || '',
-        selectedModifiers,
-      });
-    }
-
-    // Fail-Closed Slot Capacity check
-    if (typeof shopData.maxOrdersPerSlot !== 'number' || shopData.maxOrdersPerSlot <= 0) {
-      throw new Error('STORE_CAPACITY_NOT_CONFIGURED: ร้านค้ายังไม่ได้กำหนดขีดจำกัดโควตาคิวรับอาหาร');
-    }
-    const authoritativeCapacity = shopData.maxOrdersPerSlot;
-    let currentSlotOrders = 0;
-    if (slotSnap.exists) {
-      const slotData = slotSnap.data();
-      currentSlotOrders = Number(slotData.currentOrders) || 0;
-    }
-    if (currentSlotOrders + 1 > authoritativeCapacity) {
-      throw new Error(`SLOT_CAPACITY_EXCEEDED: รอบเวลารับอาหาร ${cleanPickupTime} น. ของวันที่ ${targetYmd} คิวเต็มแล้ว (${currentSlotOrders}/${authoritativeCapacity})`);
-    }
-
-    // Queue Number Generation
-    let sequenceNumber = 1;
-    if (counterSnap.exists) {
-      sequenceNumber = (Number(counterSnap.data().lastSequence) || 0) + 1;
-    }
-    const queueNumber = `Q${String(sequenceNumber).padStart(3, '0')}`;
+    const { sequenceNumber, queueNumber } = nextQueueNumber(
+      counterSnap.exists ? counterSnap.data() : null
+    );
 
     // PHASE 3: WRITE ALL
     for (const [prodId, requiredQty] of productTotalQuantityMap.entries()) {

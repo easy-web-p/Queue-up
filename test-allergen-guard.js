@@ -313,6 +313,11 @@ console.log('\n4. Enforcement is wired into createOrderAuthoritative');
 // ===========================================================================
 
 const fnSrc = fs.readFileSync(path.resolve(process.cwd(), 'functions/index.js'), 'utf8');
+// The scan input is built in orderPricing.js, which is where the product
+// documents are turned into order lines. Asserting against index.js alone
+// started failing the moment that logic moved, although the property it checks
+// — that the text comes from Firestore and not the request — never changed.
+const pricingSrc = fs.readFileSync(path.resolve(process.cwd(), 'functions/orderPricing.js'), 'utf8');
 
 runTest('The order function runs the scan', () => {
   assert(fnSrc.includes('scanOrderForAllergens('), 'createOrderAuthoritative must scan');
@@ -327,18 +332,27 @@ runTest('A match blocks the order unless explicitly acknowledged', () => {
 });
 
 runTest('The scan reads the authoritative product docs, not client-supplied text', () => {
-  // The scan entry is built from prodData inside the transaction.
+  // The scan entry is built from the product document, never from the request.
   assert(
-    fnSrc.includes('name: prodData.name || ""'),
+    pricingSrc.includes('name: prodData.name || ""'),
     'menu text must come from Firestore, not from the request'
+  );
+  assert(
+    fnSrc.includes('allergenScanItems'),
+    'the order function must still feed those entries to the scan'
   );
 });
 
 runTest('🚨 Declared tags are read from Firestore, not from the request', () => {
   // Taking them from the caller would let a client clear the tags to dodge the check.
   assert(
-    fnSrc.includes('Array.isArray(prodData.allergens) ? prodData.allergens : []'),
+    pricingSrc.includes('Array.isArray(prodData.allergens) ? prodData.allergens : []'),
     'tags must come from the product document'
+  );
+  // And nothing may read them off the request instead.
+  assert(
+    !/declaredAllergens:\s*itemReq\./.test(pricingSrc),
+    'declared tags must never be taken from the caller'
   );
 });
 

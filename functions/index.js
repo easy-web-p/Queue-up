@@ -14,6 +14,27 @@ import {
 } from "./couponRules.js";
 import { BUILTIN_COUPONS } from "./builtinCoupons.js";
 import {
+  validateOrderRequest,
+  checkStoreAvailability,
+  checkSlotCapacity,
+  nextQueueNumber,
+} from "./orderRequest.js";
+import { checkProductAvailability, priceOrder } from "./orderPricing.js";
+
+/**
+ * Turns a refusal from one of the pure rule modules into an HttpsError.
+ *
+ * Those modules return {ok:false, status, code, message} rather than throwing,
+ * so they carry no firebase-functions import and can be tested directly. This is
+ * the single place that translation happens.
+ */
+function throwIfRefused(result) {
+  if (!result.ok) {
+    throw new HttpsError(result.status, result.message, { code: result.code });
+  }
+  return result;
+}
+import {
   buildClaimPatch,
   canGrantRoles,
   isCallerAdmin,
@@ -49,12 +70,6 @@ const authAdmin = getAuth();
  * ============================================================================
  */
 
-function isValidCalendarDate(year, month, day) {
-  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return false;
-  if (month < 1 || month > 12 || day < 1 || day > 31) return false;
-  const d = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
-  return d.getUTCFullYear() === year && (d.getUTCMonth() + 1) === month && d.getUTCDate() === day;
-}
 
 function getBangkokCurrentTime(date = new Date()) {
   return new Intl.DateTimeFormat("en-GB", {
@@ -275,8 +290,8 @@ export const createOrderAuthoritative = onCall(
       customerName,
       customerPhone,
       items,
-      pickupTime,
-      pickupDate,
+      // pickupTime / pickupDate are read by validateOrderRequest from the raw
+      // payload; they are not destructured here because nothing else uses them.
       paymentMode, // 'CAMPUS_WALLET' | 'DIRECT_ZERO_PAYMENT'
       studentId,   // Required if paymentMode === 'CAMPUS_WALLET'
       acknowledgeAllergenWarning, // set after the caller confirms an ALLERGEN_ALERT
@@ -290,71 +305,25 @@ export const createOrderAuthoritative = onCall(
     const effectiveUserId = authUid;
 
     // 2. Strict Input Validation
-    if (!storeId || typeof storeId !== "string" || !storeId.trim()) {
-      throw new HttpsError("invalid-argument", "STORE_ID_REQUIRED: ไม่พบรหัสร้านค้า");
-    }
-    if (!customerPhone || typeof customerPhone !== "string" || !customerPhone.trim()) {
-      throw new HttpsError("invalid-argument", "CUSTOMER_PHONE_REQUIRED: กรุณาระบุเบอร์โทรศัพท์สำหรับรับการแจ้งเตือนคิว");
-    }
-    if (!Array.isArray(items) || items.length === 0) {
-      throw new HttpsError("invalid-argument", "ORDER_ITEMS_EMPTY: รายการอาหารในคำสั่งซื้อว่างเปล่า");
-    }
-    if (!pickupTime || !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(pickupTime).trim())) {
-      throw new HttpsError("invalid-argument", "INVALID_PICKUP_TIME_FORMAT: รูปแบบเวลารับอาหารไม่ถูกต้อง (ต้องเป็น HH:mm)");
-    }
-
-    const cleanPickupTime = String(pickupTime).trim();
+    //
+    // The rules themselves live in orderRequest.js: shape, calendar date, past
+    // pickup, and the per-product quantity aggregation that keeps two cart lines
+    // for the same dish from each passing a stock check the pair would fail.
     const now = new Date();
     const currentBangkok = getBangkokYmd(now);
 
-    let targetYmd = currentBangkok.ymd;
-    let targetYmdClean = currentBangkok.ymdClean;
-
-    if (pickupDate) {
-      const rawDate = String(pickupDate).trim();
-      const isIsoDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDate);
-      const isCleanDate = /^\d{8}$/.test(rawDate);
-      if (!isIsoDate && !isCleanDate) {
-        throw new HttpsError("invalid-argument", "INVALID_DATE_FORMAT: รูปแบบวันที่ไม่ถูกต้อง (ต้องเป็น YYYY-MM-DD)");
-      }
-      const clean = rawDate.replace(/-/g, "");
-      if (clean < currentBangkok.ymdClean) {
-        throw new HttpsError("invalid-argument", "PAST_DATE_NOT_ALLOWED: ไม่สามารถเลือกวันที่ย้อนหลังได้");
-      }
-      targetYmd = isIsoDate ? rawDate : `${rawDate.slice(0, 4)}-${rawDate.slice(4, 6)}-${rawDate.slice(6, 8)}`;
-      targetYmdClean = clean;
-    }
+    const validated = throwIfRefused(validateOrderRequest(request.data || {}, currentBangkok));
+    const {
+      cleanPickupTime,
+      targetYmd,
+      targetYmdClean,
+      productTotalQuantityMap,
+      totalOrderItemsCount,
+    } = validated;
 
     const [pYear, pMonth, pDay] = targetYmd.split("-").map(Number);
-    if (!isValidCalendarDate(pYear, pMonth, pDay)) {
-      throw new HttpsError("invalid-argument", "INVALID_CALENDAR_DATE: วันที่ระบุไม่มีอยู่จริงในปฏิทิน");
-    }
     const targetPickupDateObj = new Date(Date.UTC(pYear, pMonth - 1, pDay, 12, 0, 0));
     const targetBangkok = getBangkokYmd(targetPickupDateObj);
-
-    // Strict same-day past pickup time validation
-    if (targetYmdClean === currentBangkok.ymdClean) {
-      const currentBangkokTime = getBangkokCurrentTime(now);
-      if (cleanPickupTime <= currentBangkokTime) {
-        throw new HttpsError("failed-precondition", `PAST_PICKUP_TIME_NOT_ALLOWED: เวลารับอาหาร (${cleanPickupTime} น.) ผ่านไปแล้วสำหรับวันนี้ (เวลาปัจจุบัน ${currentBangkokTime} น.)`);
-      }
-    }
-
-    // Aggregate Product Quantities
-    const productTotalQuantityMap = new Map();
-    let totalOrderItemsCount = 0;
-
-    for (const it of items) {
-      if (!it.productId) {
-        throw new HttpsError("invalid-argument", "PRODUCT_ID_REQUIRED: ทุกรายการต้องระบุ productId");
-      }
-      const qty = Number(it.quantity);
-      if (!Number.isInteger(qty) || qty <= 0) {
-        throw new HttpsError("invalid-argument", "INVALID_QUANTITY: จำนวนสินค้าต้องเป็นจำนวนเต็มบวก");
-      }
-      totalOrderItemsCount += qty;
-      productTotalQuantityMap.set(it.productId, (productTotalQuantityMap.get(it.productId) || 0) + qty);
-    }
 
     const isCampusWallet = paymentMode === "CAMPUS_WALLET";
 
@@ -469,153 +438,35 @@ export const createOrderAuthoritative = onCall(
         // ===================================================================
         // PHASE 2: VALIDATE BUSINESS RULES & CALCULATE AMOUNTS
         // ===================================================================
-        // 2.1 Store Availability & Operating Hours
-        if (shopData.isOpen === false || shopData.status === "closed") {
-          throw new HttpsError("failed-precondition", "STORE_CLOSED: ร้านค้าปิดให้บริการชั่วคราว");
-        }
-        if (shopData.operationalOverride === "FORCE_CLOSE" || shopData.operationalOverride === "EMERGENCY_STOP") {
-          throw new HttpsError("failed-precondition", "STORE_PAUSED: ร้านค้าหยุดรับออเดอร์ชั่วคราว");
-        }
+        // 2.1 Store Availability & Operating Hours — see orderRequest.js
+        throwIfRefused(checkStoreAvailability(shopData, targetBangkok, targetYmd, cleanPickupTime));
 
-        if (shopData.operatingHours) {
-          const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-          const targetDayName = days[targetBangkok.dayOfWeekIndex];
-          const targetDaySchedule = shopData.operatingHours[targetDayName];
+        // 2.2 Product Stock, Modifier Integrity & Pricing — see orderPricing.js
+        //
+        // Documents are read above and passed in; the rules themselves touch no
+        // Firestore, so they can be exercised without the emulator. Every price
+        // comes from the product document — nothing the client sent about money
+        // is used.
+        const productDataMap = new Map(
+          Array.from(productSnapMap.entries()).map(([id, snap]) => [id, snap.data()])
+        );
+        const modifierGroupDataMap = new Map(
+          Array.from(modifierGroupSnapMap.entries())
+            .filter(([, snap]) => snap && snap.exists)
+            .map(([id, snap]) => [id, snap.data()])
+        );
 
-          if (targetDaySchedule) {
-            if (!targetDaySchedule.isOpen) {
-              throw new HttpsError("failed-precondition", `STORE_CLOSED_ON_DATE: ร้านค้าปิดทำการในวัน${targetDayName} (${targetYmd})`);
-            }
-            const { open, close } = targetDaySchedule;
-            const isPickupAllowed =
-              open <= close
-                ? cleanPickupTime >= open && cleanPickupTime <= close
-                : cleanPickupTime >= open || cleanPickupTime <= close;
-            if (!isPickupAllowed) {
-              throw new HttpsError("failed-precondition", `INVALID_PICKUP_TIME: เวลารับอาหาร ${cleanPickupTime} น. อยู่นอกเวลาทำการ (${open} - ${close})`);
-            }
-          }
-        }
+        throwIfRefused(checkProductAvailability(productTotalQuantityMap, productDataMap, storeId));
 
-        // 2.2 Product Stock & Modifier Integrity
-        for (const [prodId, requiredTotalQty] of productTotalQuantityMap.entries()) {
-          const prodData = productSnapMap.get(prodId).data();
-          if (prodData.storeId !== storeId) {
-            throw new HttpsError("invalid-argument", `CROSS_STORE_PRODUCT_VIOLATION: สินค้า ${prodData.name} ไม่ได้เป็นของร้าน ${storeId}`);
-          }
-          if (prodData.isAvailable === false) {
-            throw new HttpsError("failed-precondition", `PRODUCT_UNAVAILABLE: สินค้า ${prodData.name} ปิดรับออเดอร์ชั่วคราว`);
-          }
-          const currentStock = typeof prodData.stock === "number" ? prodData.stock : 0;
-          if (currentStock < requiredTotalQty) {
-            throw new HttpsError("failed-precondition", `INSUFFICIENT_STOCK: สินค้า "${prodData.name}" คงเหลือเพียง ${currentStock} ชุด (ต้องการ ${requiredTotalQty})`);
-          }
-        }
-
-        let calculatedTotalSatang = 0;
-        const validatedOrderItems = [];
-        const itemCategories = new Set();
-        // Menu text gathered for the allergen scan below. Built from the authoritative
-        // product documents, not from anything the client sent.
-        const allergenScanItems = [];
-
-        for (const itemReq of items) {
-          const prodData = productSnapMap.get(itemReq.productId).data();
-          if (prodData.category) itemCategories.add(prodData.category);
-
-          const basePriceSatang = prodData.priceSatang ?? Math.round((Number(prodData.price) || 0) * 100);
-          let itemModifierSatang = 0;
-
-          const selectedModifiers = itemReq.selectedModifiers || [];
-          const allowedGroupIds = new Set(prodData.modifierGroupIds || []);
-          const selectedModifierNames = [];
-
-          // Validate linked required modifier groups
-          if (Array.isArray(prodData.modifierGroupIds)) {
-            for (const mgId of prodData.modifierGroupIds) {
-              const modSnap = modifierGroupSnapMap.get(mgId);
-              if (!modSnap || !modSnap.exists) {
-                throw new HttpsError("not-found", `MODIFIER_GROUP_NOT_FOUND: ไม่พบกลุ่มตัวเลือก ${mgId} สำหรับเมนู "${prodData.name}"`);
-              }
-              const modData = modSnap.data();
-              if (modData.storeId !== storeId) {
-                throw new HttpsError("invalid-argument", `CROSS_STORE_MODIFIER_VIOLATION: กลุ่มตัวเลือก ${mgId} ไม่ได้เป็นของร้าน ${storeId}`);
-              }
-              const groupSelections = selectedModifiers.filter((m) => m.modifierGroupId === mgId);
-              const minSelections = modData.minSelections ?? modData.minSelect ?? (modData.required || modData.isRequired ? 1 : 0);
-              const maxSelections = modData.maxSelections ?? modData.maxSelect ?? (modData.selectionType === "single" ? 1 : null);
-              const isSingle = modData.selectionType === "single" || modData.type === "single";
-
-              // Check duplicate optionIds within group
-              const optionIdsInGroup = groupSelections.map((m) => m.optionId);
-              if (new Set(optionIdsInGroup).size !== optionIdsInGroup.length) {
-                throw new HttpsError("invalid-argument", `DUPLICATE_MODIFIER_OPTION: กลุ่มตัวเลือก "${modData.name || mgId}" มีตัวเลือกซ้ำกัน`);
-              }
-
-              if (groupSelections.length < minSelections) {
-                throw new HttpsError("invalid-argument", `REQUIRED_MODIFIER_MISSING: กรุณาเลือก ${modData.name || "ตัวเลือกที่จำเป็น"} อย่างน้อย ${minSelections} รายการ สำหรับเมนู "${prodData.name}"`);
-              }
-              if (maxSelections !== null && groupSelections.length > maxSelections) {
-                throw new HttpsError("invalid-argument", `MAX_SELECTIONS_EXCEEDED: กลุ่มตัวเลือก "${modData.name}" เลือกได้สูงสุดไม่เกิน ${maxSelections} รายการ`);
-              }
-              if (isSingle && groupSelections.length > 1) {
-                throw new HttpsError("invalid-argument", `SINGLE_SELECTION_VIOLATED: กลุ่มตัวเลือก "${modData.name}" สามารถเลือกได้เพียง 1 ตัวเลือกเท่านั้น`);
-              }
-            }
-          }
-
-          // Validate chosen modifier options
-          if (selectedModifiers.length > 0) {
-            for (const selMod of selectedModifiers) {
-              if (!allowedGroupIds.has(selMod.modifierGroupId)) {
-                throw new HttpsError("invalid-argument", `INVALID_PRODUCT_MODIFIER: กลุ่มตัวเลือก ${selMod.modifierGroupId} ไม่ได้เป็นของสินค้า "${prodData.name}"`);
-              }
-              const modSnap = modifierGroupSnapMap.get(selMod.modifierGroupId);
-              if (!modSnap || !modSnap.exists) {
-                throw new HttpsError("not-found", `MODIFIER_GROUP_NOT_FOUND: ไม่พบกลุ่มตัวเลือก ${selMod.modifierGroupId}`);
-              }
-              const modData = modSnap.data();
-              const opt = (modData.options || []).find((o) => o.id === selMod.optionId);
-              if (!opt) {
-                throw new HttpsError("not-found", `OPTION_NOT_FOUND: ไม่พบตัวเลือก ${selMod.optionId}`);
-              }
-              if (opt.isOutOfStock) {
-                throw new HttpsError("failed-precondition", `OPTION_OUT_OF_STOCK: ตัวเลือก "${opt.name}" หมดชั่วคราว`);
-              }
-              const optPriceSatang = opt.priceModifierSatang ?? Math.round((Number(opt.priceModifier) || 0) * 100);
-              itemModifierSatang += optPriceSatang;
-              if (opt.name) selectedModifierNames.push(String(opt.name));
-            }
-          }
-
-          allergenScanItems.push({
-            productId: itemReq.productId,
-            name: prodData.name || "",
-            category: prodData.category || "",
-            description: prodData.description || "",
-            modifierNames: selectedModifierNames,
-            // Ingredients the store declared on the product. Read from Firestore, not
-            // from the request, so a caller cannot clear the tags to dodge the check.
-            declaredAllergens: Array.isArray(prodData.allergens) ? prodData.allergens : [],
-          });
-
-          const unitPriceSatang = basePriceSatang + itemModifierSatang;
-          const subtotalSatang = unitPriceSatang * Number(itemReq.quantity);
-          calculatedTotalSatang += subtotalSatang;
-
-          validatedOrderItems.push({
-            productId: itemReq.productId,
-            name: prodData.name,
-            category: prodData.category || "General",
-            quantity: Number(itemReq.quantity),
-            unitPriceSatang,
-            unitPrice: unitPriceSatang / 100,
-            subtotalSatang,
-            subtotal: subtotalSatang / 100,
-            customNotes: itemReq.customNotes || "",
-            selectedModifiers,
-          });
-        }
+        const priced = throwIfRefused(
+          priceOrder(items, productDataMap, modifierGroupDataMap, storeId)
+        );
+        const {
+          calculatedTotalSatang,
+          validatedOrderItems,
+          itemCategories,
+          allergenScanItems,
+        } = priced;
 
         // 2.2b 🛡️ Allergen Guard
         //
@@ -751,26 +602,21 @@ export const createOrderAuthoritative = onCall(
           }
         }
 
-        // 2.4 Slot Capacity (Fail-Closed)
-        if (typeof shopData.maxOrdersPerSlot !== "number" || shopData.maxOrdersPerSlot <= 0) {
-          throw new HttpsError("failed-precondition", "STORE_CAPACITY_NOT_CONFIGURED: ร้านค้ายังไม่ได้กำหนดขีดจำกัดโควตาคิวรับอาหาร");
-        }
-        const authoritativeCapacity = shopData.maxOrdersPerSlot;
-        let currentSlotOrders = 0;
-        if (slotSnap.exists) {
-          const slotData = slotSnap.data();
-          currentSlotOrders = Number(slotData.currentOrders) || 0;
-        }
-        if (currentSlotOrders + 1 > authoritativeCapacity) {
-          throw new HttpsError("resource-exhausted", `SLOT_CAPACITY_EXCEEDED: รอบเวลารับอาหาร ${cleanPickupTime} น. ของวันที่ ${targetYmd} คิวเต็มแล้ว (${currentSlotOrders}/${authoritativeCapacity})`);
-        }
+        // 2.4 Slot Capacity & 2.5 Queue Number — see orderRequest.js
+        const capacity = throwIfRefused(
+          checkSlotCapacity(
+            shopData,
+            slotSnap.exists ? slotSnap.data() : null,
+            targetYmd,
+            cleanPickupTime
+          )
+        );
+        const authoritativeCapacity = capacity.capacity;
+        const currentSlotOrders = capacity.currentSlotOrders;
 
-        // 2.5 Queue Number Generation
-        let sequenceNumber = 1;
-        if (counterSnap.exists) {
-          sequenceNumber = (Number(counterSnap.data().lastSequence) || 0) + 1;
-        }
-        const queueNumber = `Q${String(sequenceNumber).padStart(3, "0")}`;
+        const { sequenceNumber, queueNumber } = nextQueueNumber(
+          counterSnap.exists ? counterSnap.data() : null
+        );
 
         // ===================================================================
         // PHASE 3 & 4: WRITE ALL MUTATIONS ATOMICALLY (Including Wallet Deduction)
