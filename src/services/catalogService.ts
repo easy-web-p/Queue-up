@@ -17,6 +17,7 @@ import {
   type Firestore
 } from 'firebase/firestore';
 import type { MenuItem, MenuCategory, ModifierGroup } from '../types';
+import type { ModifierOption } from '../types';
 
 /**
  * 🏪 1. STORE PROFILE & OPERATING HOURS
@@ -440,13 +441,13 @@ export async function toggleStoreModifierOptionStock(
       throw new Error('Unauthorized: Modifier group does not belong to this store');
     }
 
-    const existingOptions = modData.options || [];
-    const optionIndex = existingOptions.findIndex((opt: any) => opt.id === optionId);
+    const existingOptions: ModifierOption[] = modData.options || [];
+    const optionIndex = existingOptions.findIndex((opt) => opt.id === optionId);
     if (optionIndex === -1) {
       throw new Error(`Option ${optionId} not found in modifier group`);
     }
 
-    const updatedOptions = existingOptions.map((opt: any) => {
+    const updatedOptions = existingOptions.map((opt) => {
       if (opt.id === optionId) {
         return { ...opt, isOutOfStock: !opt.isOutOfStock };
       }

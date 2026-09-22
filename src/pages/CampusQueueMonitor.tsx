@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
+import type { QueryDocumentSnapshot } from 'firebase/firestore';
 import { collection, query, where, onSnapshot, limit } from 'firebase/firestore';
 import { db } from '../firebase/config.js';
 import { Tv, CheckCircle2, Flame, ArrowLeft, Volume2, VolumeX } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getBangkokYmd } from '../services/orderCreationService';
 import { soundManager } from '../utils/audioNotification.js';
+import type { FirestoreTimestamp } from '../types';
 
 interface MonitorOrder {
   id: string;
@@ -16,7 +18,7 @@ interface MonitorOrder {
   storeId: string;
   pickupTime: string;
   pickupDate?: string;
-  updatedAt?: any;
+  updatedAt?: FirestoreTimestamp;
 }
 
 export default function CampusQueueMonitor() {
@@ -48,7 +50,7 @@ export default function CampusQueueMonitor() {
     let fallbackUnsub: (() => void) | null = null;
     let cancelled = false;
 
-    const applySnapshot = (docs: any[]) => {
+    const applySnapshot = (docs: QueryDocumentSnapshot[]) => {
       if (cancelled) return;
       setOrders(docs.map((d) => ({ id: d.id, ...d.data() })) as MonitorOrder[]);
     };

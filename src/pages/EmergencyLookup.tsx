@@ -3,12 +3,13 @@ import { emergencyMedicalLookup } from '../services/campusWalletService';
 import { AlertOctagon, Search, ShieldAlert, ArrowLeft, HeartPulse, User, Phone, FileText, Utensils, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { StudentProfile } from '../types/campus';
+import type { EmergencyLookupOrder } from '../services/campusWalletService';
 
 export default function EmergencyLookup() {
   const [studentCodeInput, setStudentCodeInput] = useState('');
   const [lookupReason, setLookupReason] = useState('อุบัติเหตุ / การปฐมพยาบาลฉุกเฉินในโรงอาหาร');
   const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(null);
-  const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [recentOrders, setRecentOrders] = useState<EmergencyLookupOrder[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
   const [notFound, setNotFound] = useState(false);
@@ -198,7 +199,7 @@ export default function EmergencyLookup() {
                             {ord.queueNumber || 'Q---'}
                           </span>
                           <span className="font-semibold text-slate-900 dark:text-white">
-                            {ord.storeName || `ร้านค้า (${ord.storeId})`}
+                            {`ร้านค้า (${ord.storeId})`}
                           </span>
                           <span className="text-slate-500 dark:text-[#9CA3AF]">
                             รอบ {ord.pickupTime} น. ({ord.pickupDate || 'วันนี้'})
@@ -206,7 +207,7 @@ export default function EmergencyLookup() {
                         </div>
                         {/* Dishes & Modifiers */}
                         <div className="text-slate-700 dark:text-[#E5E7EB] mt-1 space-x-2">
-                          {ord.items?.map((item: any, idx: number) => (
+                          {ord.items?.map((item, idx) => (
                             <span key={idx} className="inline-block bg-slate-100 dark:bg-[#241C16] px-2 py-0.5 rounded border border-slate-200 dark:border-white/10 text-[11px]">
                               {item.quantity}x {item.name}
                               {item.customNotes ? ` [${item.customNotes}]` : ''}
@@ -215,11 +216,15 @@ export default function EmergencyLookup() {
                         </div>
                       </div>
 
+                      {/* The amount used to be shown here as
+                          ฿{ord.totalAmount || 0}. emergencyMedicalLookup does
+                          not return an amount — deliberately: it is an audited
+                          read of a student's medical history for a first
+                          responder, and what the meal cost is none of that. So
+                          every row rendered ฿0.00, a wrong number on the one
+                          screen where a wrong number is least acceptable. */}
                       <div className="text-right shrink-0">
-                        <span className="font-['JetBrains_Mono'] font-bold text-amber-600 dark:text-amber-400">
-                          ฿{Number(ord.totalAmount || 0).toFixed(2)}
-                        </span>
-                        <span className="block text-[10px] text-slate-500 dark:text-[#9CA3AF]">
+                        <span className="block text-[10px] font-bold text-slate-500 dark:text-[#9CA3AF]">
                           {ord.status}
                         </span>
                       </div>

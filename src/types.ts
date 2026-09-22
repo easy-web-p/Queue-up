@@ -13,6 +13,35 @@ export type FirestoreTimestamp =
   | string
   | null;
 
+/**
+ * A FirestoreTimestamp as milliseconds since the epoch, or 0 when it has none.
+ *
+ * All four shapes, not just the Firestore Timestamp object. A sort written as
+ * `ts?.toMillis ? ts.toMillis() : 0` scores a Date, an ISO string and a raw
+ * {seconds} pair all as zero — so in a list holding a mix, every order that is
+ * not a Timestamp object collapses to the end in arbitrary order. Firestore
+ * hands back a Timestamp, but a locally-created or cached record often does
+ * not.
+ */
+export function timestampToMillis(ts: FirestoreTimestamp): number {
+  if (!ts) return 0;
+  if (typeof ts === 'string') {
+    const parsed = Date.parse(ts);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+  if (ts instanceof Date) {
+    const time = ts.getTime();
+    return Number.isNaN(time) ? 0 : time;
+  }
+  if ('toMillis' in ts && typeof ts.toMillis === 'function') return ts.toMillis();
+  if ('toDate' in ts && typeof ts.toDate === 'function') {
+    const time = ts.toDate().getTime();
+    return Number.isNaN(time) ? 0 : time;
+  }
+  if ('seconds' in ts && typeof ts.seconds === 'number') return ts.seconds * 1000;
+  return 0;
+}
+
 /** Renders a FirestoreTimestamp as a short local time string. */
 export function formatTimestamp(ts: FirestoreTimestamp, locale = 'th-TH'): string {
   if (!ts) return '';
@@ -79,6 +108,8 @@ export interface MenuItem {
   popular?: boolean;
   storeId?: string;
   shopName?: string;
+  /** Alias of shopName carried by some catalogue writers. */
+  storeName?: string;
   modifierGroupIds?: string[]; // 🔒 Normalized Modifier References
   /**
    * Allergens the store declares this dish contains, as ALLERGEN_PRESET_DICTIONARY
@@ -126,6 +157,33 @@ export interface CartItem {
   selectedModifiers?: SelectedModifierOption[] | Record<string, string | string[]>;
 }
 
+/**
+ * One line of a placed order, as createOrderAuthoritative stores it.
+ *
+ * Deliberately NOT CartItem. A cart line holds a whole `menuItem` object that
+ * the browser assembled; an order line holds a flat snapshot the server priced
+ * from the product document, so that what the kitchen cooks and what the
+ * customer was charged cannot drift from each other — or be changed by editing
+ * the product afterwards.
+ *
+ * `Order.items` was typed as CartItem[] regardless, which is why every screen
+ * reading an order had to reach through `(it as any).name`: the field is there
+ * at runtime, and the type said it was not.
+ */
+export interface OrderItem {
+  productId: string;
+  name: string;
+  category?: string;
+  quantity: number;
+  /** 🔒 Authoritative. The baht fields below are these divided by 100, for display. */
+  unitPriceSatang: number;
+  subtotalSatang: number;
+  unitPrice: number;
+  subtotal: number;
+  customNotes?: string;
+  selectedModifiers?: SelectedModifierOption[];
+}
+
 export interface Order {
   id: string;
   orderId?: string;
@@ -143,7 +201,7 @@ export interface Order {
   discountAppliedSatang?: number;
   discountApplied?: number;
   pointsEarned?: number;
-  items: CartItem[];
+  items: OrderItem[];
   pickupTime: string;
   pickupDate?: string;
   slotId?: string;
@@ -154,6 +212,22 @@ export interface Order {
   shopName?: string;
   storeName?: string;
   customInstructions?: string;
+
+  // Fields createOrderAuthoritative writes that this type did not declare.
+  // MerchantKDS reached them through `(order as any).paymentMode`, which is a
+  // cast admitting the type is wrong rather than fixing it — and a cast that
+  // would keep compiling after the field was renamed on the server.
+  /** 'CAMPUS_WALLET' | 'DIRECT_ZERO_PAYMENT' — how the order was paid for. */
+  paymentMode?: string;
+  paymentStatus?: string;
+  /** Set only for campus-wallet orders: whose wallet was debited. */
+  studentId?: string;
+  couponCode?: string | null;
+  couponTitle?: string | null;
+  discountAppliedBaht?: number;
+  /** True when the customer confirmed an order over a recorded allergy. */
+  allergenWarningAcknowledged?: boolean;
+  acknowledgedAllergenNames?: string[];
 }
 
 /**

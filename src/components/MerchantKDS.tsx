@@ -31,8 +31,8 @@ export const MerchantKDS: React.FC<Props> = ({
   const readyOrders = orders.filter((o) => o.status === 'READY' || o.queueStatus === 'ready');
 
   const renderOrderCard = (order: Order, nextStatus: QueueStatus, btnLabel: string, btnIcon: React.ReactNode, btnClass: string, soundAction: () => void) => {
-    const isCampusWallet = (order as any).paymentMode === 'CAMPUS_WALLET';
-    const isPaid = isCampusWallet || (order as any).paymentStatus === 'PAID';
+    const isCampusWallet = order.paymentMode === 'CAMPUS_WALLET';
+    const isPaid = isCampusWallet || order.paymentStatus === 'PAID';
 
     return (
       <div
@@ -69,14 +69,14 @@ export const MerchantKDS: React.FC<Props> = ({
 
         {/* Item list */}
         <div className="space-y-1.5 text-xs text-slate-700 py-1 max-h-32 overflow-y-auto">
-          {(order.items || []).map((it: any, idx: number) => (
+          {(order.items || []).map((it, idx) => (
             <div key={idx} className="flex justify-between items-start border-b border-slate-50 pb-1">
               <div>
                 <span className="font-bold text-slate-900">{it.name}</span>
                 <span className="text-slate-500 font-semibold ml-1">x{it.quantity}</span>
                 {Array.isArray(it.selectedModifiers) && it.selectedModifiers.length > 0 && (
                   <div className="text-[10px] text-slate-500">
-                    {it.selectedModifiers.map((m: any) => m.name || m.optionId).join(', ')}
+                    {it.selectedModifiers.map((m) => m.name || m.optionId).join(', ')}
                   </div>
                 )}
                 {it.customNotes && (

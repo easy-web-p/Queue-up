@@ -303,24 +303,35 @@ export async function reviewVendorApproval(
   return res.data;
 }
 
+/**
+ * One meal as the emergency lookup returns it.
+ *
+ * Deliberately narrower than Order: the lookup is an audited read of a
+ * student's medical history, so it returns what a first responder needs to know
+ * about what the student ate, and nothing about money, coupons or who paid.
+ * Typing it as Order would invite a screen to display fields the Cloud Function
+ * does not send.
+ */
+export interface EmergencyLookupOrder {
+  id: string;
+  queueNumber: string | null;
+  status: string | null;
+  storeId: string | null;
+  pickupDate: string | null;
+  pickupTime: string | null;
+  createdAt: string | null;
+  items: Array<{
+    name: string;
+    quantity: number;
+    customNotes?: string;
+    selectedModifiers?: Array<{ modifierGroupId?: string; optionId?: string; name?: string }>;
+  }>;
+}
+
 export interface EmergencyLookupResult {
   found: boolean;
   profile: StudentProfile | null;
-  recentOrders: Array<{
-    id: string;
-    queueNumber: string | null;
-    status: string | null;
-    storeId: string | null;
-    pickupDate: string | null;
-    pickupTime: string | null;
-    createdAt: string | null;
-    items: Array<{
-      name: string;
-      quantity: number;
-      customNotes?: string;
-      selectedModifiers?: Array<{ modifierGroupId?: string; optionId?: string; name?: string }>;
-    }>;
-  }>;
+  recentOrders: EmergencyLookupOrder[];
 }
 
 /**

@@ -6,6 +6,7 @@ import { db } from '../firebase/config.js';
 import { History, ArrowLeft, Utensils, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { ParentChildLink } from '../types/campus';
+import { timestampToMillis, type FirestoreTimestamp } from '../types';
 
 interface OrderItem {
   name: string;
@@ -26,7 +27,7 @@ interface ChildOrder {
   totalAmount: number;
   paymentMode?: string;
   items: OrderItem[];
-  createdAt?: any;
+  createdAt?: FirestoreTimestamp;
 }
 
 export default function ChildOrderHistory() {
@@ -82,8 +83,8 @@ export default function ChildOrderHistory() {
 
         // Sort descending by createdAt or id
         ords.sort((a, b) => {
-          const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
-          const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+          const timeA = timestampToMillis(a.createdAt ?? null);
+          const timeB = timestampToMillis(b.createdAt ?? null);
           return timeB - timeA;
         });
 

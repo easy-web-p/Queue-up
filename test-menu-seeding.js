@@ -230,6 +230,61 @@ runTest('The button is offered only while the menu is empty', () => {
   assert(admin.includes('menuItems.length === 0 && ('), 'it must be conditional');
 });
 
+console.log('\n✍️  Adding a menu item by hand');
+
+// The seeding path was covered; the manual "เพิ่มเมนู" form beside it was not,
+// and it was getting the same two things wrong that seedCatalog.js exists to
+// get right.
+
+const adminSrc = readFileSync(new URL('./src/pages/StoreAdminPage.tsx', import.meta.url), 'utf8');
+const liveAdmin = adminSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+const addItemBody = (() => {
+  // The whole handler, not just the object literal — the no-store guard runs
+  // before it, and slicing from the literal missed it.
+  const at = liveAdmin.indexOf('const handleAddNewItemSubmit');
+  assert(at > 0, 'the add-item handler is gone or renamed');
+  const end = liveAdmin.indexOf('handleExportCSV', at);
+  assert(end > at, 'could not find the end of the add-item handler');
+  return liveAdmin.slice(at, end);
+})();
+
+runTest('🚨 A hand-added dish carries a storeId, or it can never be ordered', () => {
+  // checkProductAvailability refuses any product whose storeId does not match
+  // the store being ordered from — CROSS_STORE_PRODUCT_VIOLATION. A dish saved
+  // without one appears on the menu and is unorderable forever.
+  assert(/storeId:\s*targetStoreId/.test(addItemBody), 'the new dish is saved without a storeId');
+  assert(
+    /ไม่พบรหัสร้านค้า|Store ID Required/.test(addItemBody),
+    'saving is not refused when no store is selected'
+  );
+});
+
+runTest('🚨 A hand-added dish carries priceSatang', () => {
+  // Satang is what the order function prices from; without it, it rounds the
+  // baht field on every single order instead.
+  assert(/priceSatang:\s*Math\.round/.test(addItemBody), 'the new dish has no satang price');
+});
+
+runTest('🚨 Two dishes added seconds apart cannot collide', () => {
+  // `ITEM-${Date.now().toString().slice(-4)}` is the last four digits of a
+  // millisecond clock — it repeats every ten seconds, and the write uses
+  // `merge: true`, so the second dish silently overwrote the first.
+  assert(!/Date\.now\(\)\.toString\(\)\.slice/.test(liveAdmin), 'the colliding id scheme is back');
+  assert(
+    /id:\s*doc\(collection\(db, 'products'\)\)\.id/.test(addItemBody),
+    'the id does not come from Firestore'
+  );
+});
+
+runTest('🚨 The CSV export does not invent orders for an empty shop', () => {
+  // A CSV is downloaded and sent on. A shop with no sales used to export three
+  // fabricated ones, attributed to named people.
+  for (const ghost of ['น้องน้ำหวาน', 'อาจารย์สมชาย', 'นายพิสิษฐ์', 'ORD-1001']) {
+    assert(!liveAdmin.includes(ghost), `the export still falls back to the invented order ${ghost}`);
+  }
+});
+
 console.log(`\n${'='.repeat(60)}`);
 console.log(`RESULT: ${passed} passed, ${failed} failed`);
 console.log('='.repeat(60));

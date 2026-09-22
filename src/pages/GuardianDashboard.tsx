@@ -768,7 +768,7 @@ export default function GuardianDashboard() {
                 <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-1">ความสัมพันธ์</label>
                 <select
                   value={relationship}
-                  onChange={(e) => setRelationship(e.target.value as any)}
+                  onChange={(e) => setRelationship(e.target.value as 'FATHER' | 'MOTHER' | 'GUARDIAN')}
                   className="w-full px-4 py-3 bg-slate-50 dark:bg-[#16100C] border border-slate-300 dark:border-[#FF7A1A]/30 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none focus:border-[#FF7A1A]"
                 >
                   <option value="FATHER">บิดา (Father)</option>

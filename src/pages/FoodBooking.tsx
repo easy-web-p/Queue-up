@@ -101,7 +101,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
   } | null>(null);
 
   const storeId = locationState?.storeId || cartItems[0]?.menuItem?.storeId || '';
-  const storeName = locationState?.storeName || (cartItems[0]?.menuItem as any)?.storeName || (storeId ? `ร้านค้า (${storeId})` : 'ร้านค้า');
+  const storeName = locationState?.storeName || cartItems[0]?.menuItem?.storeName || (storeId ? `ร้านค้า (${storeId})` : 'ร้านค้า');
   const storeLocation = locationState?.storeLocation || 'จุดรับอาหารของร้านค้า';
 
   const onBack = propOnBack || (() => {

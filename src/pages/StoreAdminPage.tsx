@@ -106,6 +106,7 @@ import { useToast } from '../components/ToastProvider.jsx';
 import { Skeleton, EmptyState, ErrorState } from '../components/LoadingStates.jsx';
 import StaffRoleManager from '../components/StaffRoleManager';
 import type { RootState } from '../store/store';
+import { errorMessage } from '../utils/errorMessage';
 
 interface StoreAdminPageProps {
   menuItems?: MenuItem[];
@@ -434,7 +435,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
       setTimeout(() => setToastMsg(null), 2500);
     } catch (e) {
       console.error("Firestore save staff error:", e);
-      setToastMsg(`เกิดข้อผิดพลาดในการบันทึกพนักงาน: ${(e as any)?.message || e}`);
+      setToastMsg(`เกิดข้อผิดพลาดในการบันทึกพนักงาน: ${errorMessage(e)}`);
       setTimeout(() => setToastMsg(null), 3500);
     }
   };
@@ -470,7 +471,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
       setTimeout(() => setToastMsg(null), 2500);
     } catch (e) {
       console.error("Firestore save coupon error:", e);
-      setToastMsg(`เกิดข้อผิดพลาดในการสร้างคูปอง: ${(e as any)?.message || e}`);
+      setToastMsg(`เกิดข้อผิดพลาดในการสร้างคูปอง: ${errorMessage(e)}`);
       setTimeout(() => setToastMsg(null), 3500);
     }
   };
@@ -494,7 +495,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
       setTimeout(() => setToastMsg(null), 2500);
     } catch (e) {
       console.error("Firestore toggle stock error:", e);
-      setToastMsg(`ไม่สามารถอัปเดตสถานะสินค้าได้: ${(e as any)?.message || e}`);
+      setToastMsg(`ไม่สามารถอัปเดตสถานะสินค้าได้: ${errorMessage(e)}`);
       setTimeout(() => setToastMsg(null), 3500);
     }
   };
@@ -515,7 +516,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
       setTimeout(() => setToastMsg(null), 2500);
     } catch (e) {
       console.error("Firestore update price error:", e);
-      setToastMsg(`ไม่สามารถอัปเดตราคาได้: ${(e as any)?.message || e}`);
+      setToastMsg(`ไม่สามารถอัปเดตราคาได้: ${errorMessage(e)}`);
       setTimeout(() => setToastMsg(null), 3500);
     }
   };
@@ -535,11 +536,30 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
     e.preventDefault();
     if (!newItemName.trim()) return;
 
+    const targetStoreId = shopInfo?.id || user?.storeId;
+    if (!targetStoreId) {
+      toast.error('ไม่พบรหัสร้านค้า (Store ID Required) — เลือกร้านก่อนเพิ่มเมนู');
+      return;
+    }
+
+    const price = Number(newItemPrice);
     const item: MenuItem = {
-      id: `ITEM-${Date.now().toString().slice(-4)}`,
+      // Firestore's own id. `ITEM-${Date.now().toString().slice(-4)}` is the
+      // last four digits of a millisecond clock, so it repeats every ten
+      // seconds — and the write below uses `merge: true`, so the second dish
+      // added inside that window silently overwrote the first.
+      id: doc(collection(db, 'products')).id,
       name: newItemName,
-      price: Number(newItemPrice),
-      category: newItemCategory as any,
+      price,
+      // 🔒 Satang is what the order function prices from; without it, it falls
+      // back to rounding the baht field on every order.
+      priceSatang: Math.round(price * 100),
+      // Without a storeId, checkProductAvailability refuses the item with
+      // CROSS_STORE_PRODUCT_VIOLATION — so every dish added through this screen
+      // appeared on the menu and could never be ordered. seedCatalog.js says
+      // exactly this in its own header; the manual path did not follow it.
+      storeId: targetStoreId,
+      category: newItemCategory,
       image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80',
       isAvailable: true,
       stock: 30,
@@ -562,24 +582,27 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
       setTimeout(() => setToastMsg(null), 2500);
     } catch (e) {
       console.error("Firestore add new product error:", e);
-      setToastMsg(`เกิดข้อผิดพลาดในการเพิ่มเมนู: ${(e as any)?.message || e}`);
+      setToastMsg(`เกิดข้อผิดพลาดในการเพิ่มเมนู: ${errorMessage(e)}`);
       setTimeout(() => setToastMsg(null), 3500);
     }
   };
 
   const handleExportCSV = () => {
     const headers = ['OrderID', 'Customer', 'Items', 'TotalAmount', 'Status', 'CreatedAt'];
-    const rows = (orders.length > 0 ? orders : [
-      { id: 'ORD-1001', customerName: 'น้องน้ำหวาน', items: [{ name: 'ข้าวกะเพราหมูกรอบ', quantity: 1, price: 55 }], totalAmount: 55, status: 'completed', createdAt: '2026-09-02 10:15' },
-      { id: 'ORD-1002', customerName: 'อาจารย์สมชาย', items: [{ name: 'ก๋วยเตี๋ยวต้มยำ', quantity: 2, price: 90 }], totalAmount: 90, status: 'completed', createdAt: '2026-09-02 10:30' },
-      { id: 'ORD-1003', customerName: 'นายพิสิษฐ์', items: [{ name: 'ชาเขียวนมสด', quantity: 1, price: 35 }], totalAmount: 35, status: 'ready', createdAt: '2026-09-02 10:45' }
-    ]).map((o: any) => [
+    // Exports what the shop actually has.
+    //
+    // This used to fall back to three invented orders — "น้องน้ำหวาน",
+    // "อาจารย์สมชาย", "นายพิสิษฐ์", with dishes and prices — whenever the shop
+    // had none. A CSV is a file someone downloads and sends on, so a shop with
+    // no sales exported a day of fictional ones. An empty shop exports headers
+    // and nothing else, which is the truthful answer.
+    const rows = orders.map((o) => [
       o.id,
       `"${o.customerName || 'ลูกค้า'}"`,
-      `"${o.items?.map((i: any) => `${i.name}x${i.quantity}`).join('; ') || ''}"`,
-      o.totalAmount || o.price || 0,
+      `"${(o.items || []).map((i) => `${i.name}x${i.quantity}`).join('; ')}"`,
+      o.finalAmount ?? o.totalAmount ?? 0,
       o.status,
-      o.createdAt || new Date().toISOString()
+      o.createdAt ? String(o.createdAt) : '',
     ]);
     const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -692,7 +715,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
         
         {/* Navigation Admin Tabs */}
         <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-1 overflow-x-auto scrollbar-none">
-          {[
+          {([
             { id: 'overview', label: 'ภาพรวมระบบ', icon: BarChart3 },
             { id: 'menu_admin', label: 'จัดการรายการอาหาร & สต็อก', icon: Utensils },
             { id: 'orders', label: 'ออเดอร์ & KDS หน้าครัว', icon: ChefHat },
@@ -700,13 +723,13 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
             { id: 'staff', label: 'พนักงาน & สิทธิ์เข้าถึง', icon: Users },
             { id: 'crm', label: 'ระบบ CRM & แต้มสะสม', icon: Sparkles },
             { id: 'logs', label: 'บันทึกกิจกรรมระบบ', icon: FileText },
-          ].map((tab) => {
+          ] as const).map((tab) => {
             const IconComp = tab.icon;
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id)}
                 className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
                   isActive
                     ? 'bg-[#FF7A1A] text-white shadow-md shadow-orange-500/20'
@@ -1109,10 +1132,19 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                   </div>
 
                   <div className="bg-white p-2.5 rounded-lg border border-slate-200 text-xs space-y-1">
-                    {order.items.map((it, idx) => (
+                    {/* A stored order line has no `menuItem` — that is the cart's
+                        shape. These read `it.menuItem.name`, which is undefined
+                        on a real order document, so this list threw a TypeError
+                        and took the orders tab down as soon as the shop had a
+                        single order. The server writes the name and the price
+                        onto the line itself, precisely so the record cannot
+                        drift from the menu it was ordered from. */}
+                    {(order.items || []).map((it, idx) => (
                       <div key={idx} className="flex justify-between font-medium">
-                        <span>{it.quantity}x {it.menuItem.name}</span>
-                        <span className="font-bold">{it.menuItem.price * it.quantity} ฿</span>
+                        <span>{it.quantity}x {it.name}</span>
+                        <span className="font-bold">
+                          {(it.subtotal ?? (it.unitPrice || 0) * it.quantity).toLocaleString()} ฿
+                        </span>
                       </div>
                     ))}
                   </div>

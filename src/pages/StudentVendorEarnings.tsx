@@ -6,6 +6,7 @@ import { TrendingUp, Users, ShieldCheck, ArrowLeft, Calculator, Save } from 'luc
 import { Link } from 'react-router-dom';
 import { useToast } from '../components/ToastProvider.jsx';
 import { errorMessage } from '../utils/errorMessage';
+import type { Order } from '../types';
 
 interface TeamMember {
   name: string;
@@ -18,7 +19,7 @@ export default function StudentVendorEarnings() {
   const { user, currentUser } = useAuth();
   const uid = currentUser?.uid || user?.uid;
 
-  const [orders, setOrders] = useState<any[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([
     { name: user?.displayName || 'หัวหน้าร้าน (ตัวคุณ)', role: 'จัดเตรียม & ปรุงอาหาร', sharePercent: 60 },
     { name: 'เพื่อนร่วมทีม 1', role: 'จัดคิว & บัญชี', sharePercent: 40 }
@@ -61,7 +62,8 @@ export default function StudentVendorEarnings() {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const ords = snapshot.docs.map((d) => d.data());
+      // The document id is part of the order and is not inside data().
+      const ords = snapshot.docs.map((d) => ({ ...(d.data() as Order), id: d.id }));
       setOrders(ords);
     }, (err) => {
       console.warn('[StudentVendorEarnings] Error loading orders:', err);
