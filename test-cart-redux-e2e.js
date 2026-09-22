@@ -199,6 +199,45 @@ function runTestSuite() {
     assert.strictEqual(selectCartTotalAmountSatang(cart.getState()), 14000);
   });
 
+  test('Test 3b: 🚨 An option priced in satang is charged, not silently dropped', () => {
+    // Modifier options arrive in two shapes: priceModifier (baht, the older
+    // field) and priceModifierSatang (the authoritative one). Every scenario in
+    // this suite used the baht field, so nothing here ever exercised the satang
+    // branch — and the copy of the pricing rule that used to live in this file
+    // did not have that branch at all. A basket priced by the cart and by the
+    // checkout screen would then disagree, which is what cartPricing.js exists
+    // to prevent.
+    const item = {
+      menuItem: { id: 'prod_3', name: 'ชาไทยเย็น', price: 35, storeId: 'shop_1' },
+      quantity: 2,
+      selectedModifiers: [
+        { modifierGroupId: 'mg_1', optionId: 'opt_boba', name: 'ไข่มุก', priceModifierSatang: 1000 },
+        { modifierGroupId: 'mg_2', optionId: 'opt_extra', name: 'หวานน้อย', priceModifierSatang: 0 },
+      ],
+    };
+
+    // ฿35 + ฿10 = ฿45 per cup.
+    assert.strictEqual(calculateCartItemUnitPrice(item), 45);
+    assert.strictEqual(calculateCartTotal([item]), 90);
+
+    const cart = createCartReducer();
+    cart.dispatch({ type: 'cart/addItem', payload: item });
+    assert.strictEqual(selectCartTotalAmount(cart.getState()), 90);
+    assert.strictEqual(selectCartTotalAmountSatang(cart.getState()), 9000);
+  });
+
+  test('Test 3c: A malformed modifier contributes nothing rather than NaN', () => {
+    // One bad option must not turn the whole basket total into NaN, which would
+    // render as "฿NaN" and pass straight through to the order payload.
+    const item = {
+      menuItem: { id: 'prod_4', name: 'ข้าวเปล่า', price: 10, storeId: 'shop_1' },
+      quantity: 1,
+      selectedModifiers: [{ modifierGroupId: 'mg_1', optionId: 'x', name: 'ไม่มีราคา' }],
+    };
+    assert.strictEqual(calculateCartItemUnitPrice(item), 10);
+    assert.ok(Number.isFinite(calculateCartTotal([item])), 'the total must stay a number');
+  });
+
   test('Test 4: Adding identical item increments quantity instead of creating duplicate line', () => {
     const cart = createCartReducer();
     const item = {
