@@ -28,6 +28,7 @@ import { db } from '../firebase/config.js';
 import { Link } from 'react-router-dom';
 import type { ParentChildLink, StudentWallet, WalletTransaction, StudentProfile } from '../types/campus';
 import { useToast } from '../components/ToastProvider.jsx';
+import { errorMessage } from '../utils/errorMessage';
 
 export default function GuardianDashboard() {
   const toast = useToast();
@@ -109,9 +110,15 @@ export default function GuardianDashboard() {
       return;
     }
 
+    const child = selectedChild;
+
     async function loadChildWalletAndProfile() {
+      // Captured into a const so the null check above narrows inside the async
+      // function below. TypeScript will not carry a narrowing across a closure,
+      // and reaching for `selectedChild!` there would assert away the one thing
+      // the check exists to establish.
       try {
-        const w = await fetchStudentWallet(selectedChild.studentId);
+        const w = await fetchStudentWallet(child.studentId);
         setWallet(w);
         if (w) {
           setDailyLimitBaht((w.dailyLimitSatang || 20000) / 100);
@@ -119,11 +126,11 @@ export default function GuardianDashboard() {
           setBlockedCategories(w.blockedCategories || []);
           setIsLocked(w.isLocked || false);
         }
-        const txs = await fetchWalletTransactions(selectedChild.studentId);
+        const txs = await fetchWalletTransactions(child.studentId);
         setTransactions(txs);
 
         // Load student medical profile
-        const stuSnap = await getDoc(doc(db, 'students', selectedChild.studentId));
+        const stuSnap = await getDoc(doc(db, 'students', child.studentId));
         if (stuSnap.exists()) {
           const sData = stuSnap.data() as StudentProfile;
           setAllergies(sData.allergyInfo || []);
@@ -153,8 +160,8 @@ export default function GuardianDashboard() {
       setSaveStatus('บันทึกการตั้งค่าวงเงินและหมวดหมู่ที่จำกัดสำเร็จ');
       const w = await fetchStudentWallet(selectedChild.studentId);
       setWallet(w);
-    } catch (err: any) {
-      setSaveStatus('เกิดข้อผิดพลาดในการบันทึก: ' + (err.message || 'Unknown'));
+    } catch (err) {
+      setSaveStatus('เกิดข้อผิดพลาดในการบันทึก: ' + errorMessage(err));
     } finally {
       setIsSaving(false);
     }
@@ -179,8 +186,8 @@ export default function GuardianDashboard() {
         { merge: true }
       );
       setHealthSaveMessage('บันทึกข้อมูลภูมิแพ้และสุขภาพสำเร็จ พร้อมเชื่อมโยงกับระบบแจ้งเตือนและระบบฉุกเฉิน');
-    } catch (err: any) {
-      setHealthSaveMessage('เกิดข้อผิดพลาด: ' + (err.message || 'Unknown'));
+    } catch (err) {
+      setHealthSaveMessage('เกิดข้อผิดพลาด: ' + errorMessage(err));
     } finally {
       setIsSavingHealth(false);
     }
@@ -230,8 +237,8 @@ export default function GuardianDashboard() {
       setWallet(w);
       const txs = await fetchWalletTransactions(selectedChild.studentId);
       setTransactions(txs);
-    } catch (err: any) {
-      toast.error('เติมเงินไม่สำเร็จ: ' + (err.message || 'Unknown'));
+    } catch (err) {
+      toast.error('เติมเงินไม่สำเร็จ: ' + errorMessage(err));
     } finally {
       setIsTopupProcessing(false);
     }
@@ -254,8 +261,8 @@ export default function GuardianDashboard() {
       const links = await fetchParentChildLinks(uid);
       setChildren(links);
       if (links.length === 1) setSelectedChild(links[0]);
-    } catch (err: any) {
-      toast.error('ผูกบัญชีไม่สำเร็จ: ' + (err.message || 'Unknown'));
+    } catch (err) {
+      toast.error('ผูกบัญชีไม่สำเร็จ: ' + errorMessage(err));
     }
   };
 

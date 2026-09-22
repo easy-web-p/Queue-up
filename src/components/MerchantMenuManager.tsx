@@ -89,7 +89,10 @@ export const MerchantMenuManager: React.FC<Props> = ({
   const startEdit = (item: MenuItem) => {
     setEditingItemId(item.id);
     setTempPrice(item.price);
-    setTempStock(item.stock);
+    // `stock` is optional on MenuItem, and a missing value is zero rather than
+    // unlimited — the same reading createOrderAuthoritative takes, where
+    // `typeof stock === "number" ? stock : 0` refuses the order.
+    setTempStock(item.stock ?? 0);
   };
 
   const saveEdit = (itemId: string) => {
@@ -240,12 +243,15 @@ export const MerchantMenuManager: React.FC<Props> = ({
                     ) : (
                       <span
                         className={`font-bold px-2 py-0.5 rounded-md ${
-                          item.stock > 0
+                          (item.stock ?? 0) > 0
                             ? 'bg-emerald-50 text-emerald-700'
                             : 'bg-rose-50 text-rose-700'
                         }`}
                       >
-                        {item.stock} / {item.maxStock || item.stock} จาน
+                        {/* An item with no stock field rendered as a blank
+                            number beside a blank maximum. It is zero — which is
+                            also how the order function reads it. */}
+                        {item.stock ?? 0} / {item.maxStock || item.stock || 0} จาน
                       </span>
                     )}
                   </td>
@@ -255,12 +261,12 @@ export const MerchantMenuManager: React.FC<Props> = ({
                     <button
                       onClick={() => onToggleAvailability(item.id)}
                       className={`flex items-center gap-1.5 font-bold text-xs px-3 py-1 rounded-full transition-all ${
-                        item.isAvailable && item.stock > 0
+                        item.isAvailable && (item.stock ?? 0) > 0
                           ? 'bg-emerald-100 text-emerald-800'
                           : 'bg-rose-100 text-rose-800'
                       }`}
                     >
-                      {item.isAvailable && item.stock > 0 ? (
+                      {item.isAvailable && (item.stock ?? 0) > 0 ? (
                         <>
                           <ToggleRight className="w-5 h-5 text-emerald-600" />
                           <span>เปิดขาย</span>

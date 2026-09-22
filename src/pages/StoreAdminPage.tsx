@@ -105,6 +105,7 @@ import { writeBatch, collection, getDocs, deleteDoc, query, orderBy, limit } fro
 import { useToast } from '../components/ToastProvider.jsx';
 import { Skeleton, EmptyState, ErrorState } from '../components/LoadingStates.jsx';
 import StaffRoleManager from '../components/StaffRoleManager';
+import type { RootState } from '../store/store';
 
 interface StoreAdminPageProps {
   menuItems?: MenuItem[];
@@ -126,7 +127,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
 }) => {
   const toast = useToast();
   const navigate = useNavigate();
-  const { user } = useSelector((state: any) => state.auth);
+  const { user } = useSelector((state: RootState) => state.auth);
 
   const [activeTab, setActiveTab] = useState<
     'overview' | 'menu_admin' | 'orders' | 'payments' | 'staff' | 'crm' | 'logs'

@@ -215,6 +215,11 @@ export function useToast() {
   const ctx = useContext(ToastContext);
   return (
     ctx || {
+      // Callers may pass options (a duration, a confirmLabel); this degraded
+      // path cannot honour them and simply ignores the extra argument. The
+      // signature callers are checked against is the one in ToastProvider.d.ts,
+      // not this fallback — inferring it from here is what made every call that
+      // passed options a type error.
       success: (m) => window.alert(m),
       error: (m) => window.alert(m),
       warning: (m) => window.alert(m),

@@ -4,6 +4,7 @@ import { fetchParentChildLinks, fetchStudentWallet, updateCampusWalletLimits } f
 import { Shield, Lock, Unlock, ArrowLeft, Save, Check, Sliders } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { ParentChildLink, StudentWallet } from '../types/campus';
+import { errorMessage } from '../utils/errorMessage';
 
 export default function SpendingLimitSetting() {
   const { user, currentUser } = useAuth();
@@ -46,9 +47,15 @@ export default function SpendingLimitSetting() {
 
   useEffect(() => {
     if (!selectedChild) return;
+    // Captured into a const so the null check above narrows inside the async
+    // function below. TypeScript will not carry a narrowing across a closure,
+    // and `selectedChild!` there would assert away the one thing the check
+    // exists to establish.
+    const child = selectedChild;
+
     async function loadWallet() {
       try {
-        const w = await fetchStudentWallet(selectedChild.studentId);
+        const w = await fetchStudentWallet(child.studentId);
         setWallet(w);
         if (w) {
           setDailyLimitBaht(w.dailyLimitSatang ? w.dailyLimitSatang / 100 : 200);
@@ -83,9 +90,9 @@ export default function SpendingLimitSetting() {
       });
       setSaveStatus('บันทึกการตั้งค่าวงเงินและความปลอดภัยเรียบร้อยแล้ว');
       setTimeout(() => setSaveStatus(null), 4000);
-    } catch (err: any) {
+    } catch (err) {
       console.error('[SpendingLimitSetting] Error saving limits:', err);
-      setSaveStatus(err.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+      setSaveStatus(errorMessage(err, 'เกิดข้อผิดพลาดในการบันทึกข้อมูล'));
     } finally {
       setIsSaving(false);
     }

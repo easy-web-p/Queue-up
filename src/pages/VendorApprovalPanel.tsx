@@ -5,6 +5,7 @@ import { db } from '../firebase/config.js';
 import { ShieldCheck, Check, X, Clock, AlertCircle, ArrowLeft, UserCheck, Utensils } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { VendorApprovalRequest } from '../types/campus';
+import { errorMessage } from '../utils/errorMessage';
 
 export default function VendorApprovalPanel() {
   const [requests, setRequests] = useState<VendorApprovalRequest[]>([]);
@@ -43,8 +44,8 @@ export default function VendorApprovalPanel() {
       const res = await reviewVendorApproval(req.id, 'APPROVED');
       setActionMessage({ type: 'success', text: res.message || `อนุมัติร้าน "${req.shopName}" สำเร็จ` });
       setSelectedRequest(null);
-    } catch (err: any) {
-      setActionMessage({ type: 'error', text: err.message || 'เกิดข้อผิดพลาดในการอนุมัติ' });
+    } catch (err) {
+      setActionMessage({ type: 'error', text: errorMessage(err, 'เกิดข้อผิดพลาดในการอนุมัติ') });
     } finally {
       setIsProcessing(false);
     }
@@ -58,8 +59,8 @@ export default function VendorApprovalPanel() {
       setActionMessage({ type: 'success', text: res.message || `ปฏิเสธร้าน "${req.shopName}" เรียบร้อยแล้ว` });
       setSelectedRequest(null);
       setRejectionReason('');
-    } catch (err: any) {
-      setActionMessage({ type: 'error', text: err.message || 'เกิดข้อผิดพลาดในการปฏิเสธคำขอ' });
+    } catch (err) {
+      setActionMessage({ type: 'error', text: errorMessage(err, 'เกิดข้อผิดพลาดในการปฏิเสธคำขอ') });
     } finally {
       setIsProcessing(false);
     }

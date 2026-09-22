@@ -15,6 +15,8 @@ import { soundManager } from '../utils/audioNotification.js';
 import { ClientQueueTicket } from '../components/ClientQueueTicket.jsx';
 import { previewCoupon } from '../services/couponService';
 import { getEffectiveRoles } from '../utils/authRoles.js';
+import { errorMessage } from '../utils/errorMessage';
+import type { RootState } from '../store/store';
 
 interface FoodBookingPageProps {
   currentUser?: CustomerProfile | null;
@@ -50,7 +52,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch();
-  const reduxUser = useSelector((state: any) => state.auth?.user);
+  const reduxUser = useSelector((state: RootState) => state.auth?.user);
   const reduxCartItems = useSelector(selectCartItems);
 
   // Fallback to router state or local storage if props are not provided
@@ -263,7 +265,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
       if (onBookingSuccess) {
         onBookingSuccess(orderData);
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Order creation failed:', err);
       if (err instanceof AllergenAlertError) {
         setAllergenAlert({
@@ -273,7 +275,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
           hasDeclaredMatch: err.hasDeclaredMatch,
         });
       } else {
-        setOrderError(err?.message || 'เกิดข้อผิดพลาดในการสร้างคำสั่งซื้อ กรุณาลองใหม่อีกครั้ง');
+        setOrderError(errorMessage(err, 'เกิดข้อผิดพลาดในการสร้างคำสั่งซื้อ กรุณาลองใหม่อีกครั้ง'));
       }
     } finally {
       isSubmittingRef.current = false;

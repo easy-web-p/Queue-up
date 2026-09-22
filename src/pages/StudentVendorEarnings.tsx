@@ -5,6 +5,7 @@ import { db } from '../firebase/config.js';
 import { TrendingUp, Users, ShieldCheck, ArrowLeft, Calculator, Save } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useToast } from '../components/ToastProvider.jsx';
+import { errorMessage } from '../utils/errorMessage';
 
 interface TeamMember {
   name: string;
@@ -83,9 +84,9 @@ export default function StudentVendorEarnings() {
         updatedAt: serverTimestamp(),
       }, { merge: true });
       toast.success('บันทึกข้อมูลทีมและสัดส่วนการแบ่งปันผลกำไรเรียบร้อยแล้ว!');
-    } catch (err: any) {
+    } catch (err) {
       console.error('[StudentVendorEarnings] Save error:', err);
-      toast.error(`ไม่สามารถบันทึกข้อมูลได้: ${err.message || err}`);
+      toast.error(`ไม่สามารถบันทึกข้อมูลได้: ${errorMessage(err)}`);
     } finally {
       setIsSaving(false);
     }

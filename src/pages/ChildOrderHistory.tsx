@@ -59,13 +59,19 @@ export default function ChildOrderHistory() {
 
   useEffect(() => {
     if (!selectedChild) return;
+    // Captured into a const so the null check above narrows inside the async
+    // function below. TypeScript will not carry a narrowing across a closure,
+    // and `selectedChild!` there would assert away the one thing the check
+    // exists to establish.
+    const child = selectedChild;
+
     async function loadOrders() {
       setIsLoading(true);
       try {
         // Query child's orders by studentId or userId
         const q = query(
           collection(db, 'orders'),
-          where('studentId', '==', selectedChild.studentId),
+          where('studentId', '==', child.studentId),
           limit(30)
         );
         const snap = await getDocs(q);

@@ -48,8 +48,15 @@ function collectSources(dir) {
   const found = [];
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
-    if (statSync(full).isDirectory()) found.push(...collectSources(full));
-    else if (/\.(jsx|tsx|js|ts)$/.test(entry)) found.push(full);
+    if (statSync(full).isDirectory()) {
+      found.push(...collectSources(full));
+    } else if (/\.(jsx|tsx|js|ts)$/.test(entry) && !entry.endsWith('.d.ts')) {
+      // Declaration files carry no executable code. Scanning them flagged
+      // ToastProvider.d.ts for "raising" alert() and confirm() because its
+      // doc comment names them, and for calling useToast() without importing
+      // it — while declaring the very function in question.
+      found.push(full);
+    }
   }
   return found;
 }

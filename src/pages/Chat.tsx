@@ -5,6 +5,7 @@ import { ChatMessage, MerchantShop, CustomerProfile, formatTimestamp } from '../
 import { fetchShopsFromFirestore } from '../lib/firebase';
 import { db } from '../firebase/config.js';
 import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import type { RootState } from '../store/store';
 
 interface ChatPageProps {
   currentUser?: CustomerProfile | null;
@@ -17,7 +18,7 @@ export const Chat: React.FC<ChatPageProps> = ({
   activeShop: propShop,
   onBack
 }) => {
-  const reduxUser = useSelector((state: any) => state.auth?.user);
+  const reduxUser = useSelector((state: RootState) => state.auth?.user);
   const activeUser = propUser || reduxUser;
 
   const [shops, setShops] = useState<MerchantShop[]>([]);

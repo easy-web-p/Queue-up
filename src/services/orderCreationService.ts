@@ -10,6 +10,7 @@
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase/config.js';
 import type { Order, OrderStatus } from '../types';
+import { errorMessage, errorDetails } from '../utils/errorMessage';
 
 export interface SelectedModifierOption {
   modifierGroupId: string;
@@ -229,14 +230,14 @@ export async function createAuthoritativeStoreOrder(
         return response.data;
       }
       throw new Error('ORDER_CREATION_FAILED: ไม่สามารถสร้างคำสั่งซื้อได้');
-    } catch (callableErr: any) {
+    } catch (callableErr) {
       // Direct pass-through of authoritative server error message
-      const serverMessage = callableErr?.message || 'เกิดข้อผิดพลาดในการสร้างคำสั่งซื้อ';
+      const serverMessage = errorMessage(callableErr, 'เกิดข้อผิดพลาดในการสร้างคำสั่งซื้อ');
 
       // Preserve the structured payload of an allergen block so the UI can render
       // the warning instead of a bare error string.
-      const details = callableErr?.details;
-      if (details && typeof details === 'object' && details.code === 'ALLERGEN_ALERT') {
+      const details = errorDetails(callableErr);
+      if (details && details.code === 'ALLERGEN_ALERT') {
         throw new AllergenAlertError(
           serverMessage,
           Array.isArray(details.matchedAllergenNames) ? details.matchedAllergenNames : [],

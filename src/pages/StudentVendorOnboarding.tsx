@@ -6,6 +6,7 @@ import { db } from '../firebase/config.js';
 import { Store, Send, CheckCircle2, Clock, XCircle, Plus, Trash2, ArrowLeft } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { VendorApprovalRequest } from '../types/campus';
+import { errorMessage } from '../utils/errorMessage';
 
 export default function StudentVendorOnboarding() {
   const { user, currentUser } = useAuth();
@@ -52,9 +53,14 @@ export default function StudentVendorOnboarding() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       if (!snapshot.empty) {
         const docData = snapshot.docs[0].data() as VendorApprovalRequest;
+        // Spread first, then the document id. Written the other way round, a
+        // stored `id` field silently overwrote the id of the document it came
+        // from — which is the authoritative one. They happen to match today
+        // because the Cloud Function writes both, so this was latent rather
+        // than live; TypeScript pointed straight at it.
         setExistingRequest({
+          ...docData,
           id: snapshot.docs[0].id,
-          ...docData
         });
       } else {
         setExistingRequest(null);
@@ -117,9 +123,9 @@ export default function StudentVendorOnboarding() {
       });
 
       setStatusMessage({ type: 'success', text: res.message || 'ส่งคำขอเปิดร้านค้าสำเร็จ' });
-    } catch (err: any) {
+    } catch (err) {
       console.error('[StudentVendorOnboarding] Submit Error:', err);
-      setStatusMessage({ type: 'error', text: err.message || 'เกิดข้อผิดพลาดในการยื่นคำขอ' });
+      setStatusMessage({ type: 'error', text: errorMessage(err, 'เกิดข้อผิดพลาดในการยื่นคำขอ') });
     } finally {
       setIsSubmitting(false);
     }

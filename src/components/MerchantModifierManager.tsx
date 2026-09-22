@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import type { ModifierGroup, ModifierOption } from '../types';
 import { Plus, Trash2, Layers, AlertCircle, ToggleLeft, ToggleRight } from 'lucide-react';
+import { errorMessage } from '../utils/errorMessage';
 
 interface Props {
   storeId: string;
@@ -88,8 +89,8 @@ export const MerchantModifierManager: React.FC<Props> = ({
       setIsRequired(false);
       setOptions([{ name: 'ปกติ', price: 0 }]);
       setShowAddModal(false);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'ไม่สามารถสร้างกลุ่มตัวเลือกได้');
+    } catch (err) {
+      setErrorMsg(errorMessage(err, 'ไม่สามารถสร้างกลุ่มตัวเลือกได้'));
     } finally {
       setIsSubmitting(false);
     }

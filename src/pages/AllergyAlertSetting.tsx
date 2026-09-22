@@ -6,6 +6,7 @@ import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase/config.js';
 import { Link } from 'react-router-dom';
 import type { ParentChildLink, StudentProfile } from '../types/campus';
+import { errorMessage } from '../utils/errorMessage';
 
 export default function AllergyAlertSetting() {
   const { user, currentUser } = useAuth();
@@ -53,9 +54,15 @@ export default function AllergyAlertSetting() {
 
   useEffect(() => {
     if (!selectedChild) return;
+    // Captured into a const so the null check above narrows inside the async
+    // function below. TypeScript will not carry a narrowing across a closure,
+    // and `selectedChild!` there would assert away the one thing the check
+    // exists to establish.
+    const child = selectedChild;
+
     async function loadStudentProfile() {
       try {
-        const snap = await getDoc(doc(db, 'students', selectedChild.studentId));
+        const snap = await getDoc(doc(db, 'students', child.studentId));
         if (snap.exists()) {
           const data = snap.data() as StudentProfile;
           setAllergies(data.allergyInfo || []);
@@ -110,9 +117,9 @@ export default function AllergyAlertSetting() {
       );
       setSaveMessage('บันทึกข้อมูลการแพ้อาหารและคำแนะนำสุขภาพสำเร็จ');
       setTimeout(() => setSaveMessage(null), 4000);
-    } catch (err: any) {
+    } catch (err) {
       console.error('[AllergyAlertSetting] Error saving health info:', err);
-      setSaveMessage(err.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+      setSaveMessage(errorMessage(err, 'เกิดข้อผิดพลาดในการบันทึกข้อมูล'));
     } finally {
       setIsSaving(false);
     }

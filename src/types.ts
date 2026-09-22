@@ -156,8 +156,72 @@ export interface Order {
   customInstructions?: string;
 }
 
+/**
+ * The signed-in user as the Redux auth slice holds it.
+ *
+ * Distinct from CustomerProfile, which is the customer *record* a merchant sees
+ * (id, points, tier, order history). The slice holds a session: who is signed
+ * in, what roles their verified token grants, and whether the object came from
+ * a real Firebase Auth callback or from the localStorage cache.
+ *
+ * That distinction is not academic. `isFromCache` and `isVerifiedAuth` are what
+ * authRoles.js checks before honouring any privileged role — a cached session
+ * can never claim admin — so a component that treats the two shapes as
+ * interchangeable is one that has lost track of whether its user is verified.
+ *
+ * Optional profile-ish fields are declared because pages legitimately probe for
+ * them: a page may be handed either shape, and the payload Login dispatches
+ * carries a name and a photo alongside the session fields.
+ */
+export interface AuthSessionUser {
+  uid: string;
+  email?: string;
+  displayName?: string;
+  photoURL?: string;
+
+  /** Roles derived from verified ID token claims — never from the profile document. */
+  roles?: string[];
+  activeRole?: string;
+  isSuperAdmin?: boolean;
+  isMerchantVerified?: boolean;
+  isMerchantRegistered?: boolean;
+
+  /** 🔒 False on anything restored from localStorage. Privileged roles require true. */
+  isVerifiedAuth?: boolean;
+  isTokenVerified?: boolean;
+  isFromCache?: boolean;
+
+  storeId?: string;
+  school?: string;
+  accountId?: string;
+
+  /** Verified ID token custom claims, when the session carries them. */
+  tokenClaims?: Record<string, unknown>;
+
+  // Carried through from the profile document by the sign-in path.
+  id?: string;
+  name?: string;
+  fullName?: string;
+  phone?: string;
+  phoneNumber?: string;
+  photo?: string;
+  provider?: string;
+  isGoogleUser?: boolean;
+  lastLoginAt?: string;
+  role?: string;
+}
+
 export interface CustomerProfile {
   id: string;
+  /**
+   * The Firebase Auth uid.
+   *
+   * A customer profile document lives at `users/{uid}`, so `id` and `uid` are
+   * the same value — but pages that may be handed either this or an
+   * AuthSessionUser read `user?.uid || user?.id`, and declaring it here lets
+   * that read type-check instead of forcing a cast.
+   */
+  uid?: string;
   name: string;
   phone?: string;
   phoneNumber?: string;

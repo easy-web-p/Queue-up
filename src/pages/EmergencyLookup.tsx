@@ -35,7 +35,7 @@ export default function EmergencyLookup() {
         setNotFound(true);
       }
       setIsLoadingOrders(false);
-    } catch (err: any) {
+    } catch (err) {
       console.error('[EmergencyLookup] Error:', err);
       setNotFound(true);
     } finally {
