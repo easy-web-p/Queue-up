@@ -708,6 +708,57 @@ await runTest('🚨 A chat with no storeId admits no merchant at all', async () 
   await assertSucceeds(getDoc(doc(asStudent, 'chats', ORPHAN)));
 });
 
+console.log('\n💰 Wallet top-up requests (a claim, not a credit)');
+
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  await setDoc(doc(ctx.firestore(), 'wallet_topup_requests', 'topup_1'), {
+    id: 'topup_1',
+    studentId: STUDENT,
+    amountSatang: 50000,
+    status: 'PENDING',
+    requestedBy: GUARDIAN,
+  });
+});
+
+await runTest('🚨 A guardian cannot confirm their own top-up request', async () => {
+  // The hole this whole mechanism closes: nothing captures a payment, so a
+  // guardian who could flip their own request to CONFIRMED would be minting
+  // balance that buys real food.
+  await assertFails(
+    updateDoc(doc(asGuardian, 'wallet_topup_requests', 'topup_1'), { status: 'CONFIRMED' })
+  );
+});
+
+await runTest('🚨 Nobody can create a top-up request client-side', async () => {
+  await assertFails(
+    setDoc(doc(asGuardian, 'wallet_topup_requests', 'forged'), {
+      studentId: STUDENT,
+      amountSatang: 2000000,
+      status: 'CONFIRMED',
+      requestedBy: GUARDIAN,
+    })
+  );
+  await assertFails(
+    setDoc(doc(asStudent, 'wallet_topup_requests', 'forged2'), {
+      studentId: STUDENT,
+      amountSatang: 2000000,
+      status: 'CONFIRMED',
+    })
+  );
+});
+
+await runTest('A guardian can see the status of the request they made', async () => {
+  await assertSucceeds(getDoc(doc(asGuardian, 'wallet_topup_requests', 'topup_1')));
+});
+
+await runTest('🚨 A stranger cannot read someone else top-up request', async () => {
+  await assertFails(getDoc(doc(asStranger, 'wallet_topup_requests', 'topup_1')));
+});
+
+await runTest('Staff can read a pending request in order to confirm it', async () => {
+  await assertSucceeds(getDoc(doc(asTeacher, 'wallet_topup_requests', 'topup_1')));
+});
+
 console.log('\n🎟️  Coupon redemptions (the record behind "once per account")');
 
 await runTest('🚨 A user cannot reset their own redemption count', async () => {

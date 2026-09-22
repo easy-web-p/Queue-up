@@ -1600,6 +1600,45 @@ export const topupCampusWallet = onCall(
 
     const walletRef = db.collection("wallets").doc(studentId);
 
+    // ------------------------------------------------------------------
+    // A guardian may request a top-up; only staff may grant one.
+    // ------------------------------------------------------------------
+    // There is no payment gateway behind this call — it writes a number into
+    // balanceSatang and nothing collects the money. allowSelf:false kept the
+    // student out, but a verified guardian could credit their own child up to
+    // ฿20,000 per call for free, and that balance buys real food from stalls
+    // that accrue real earnings. The school would be settling with vendors
+    // against money it never received.
+    //
+    // Staff top-ups still credit immediately: staff are the ones physically
+    // handed the cash or shown the transfer slip, so their call *is* the
+    // capture. A guardian's call now creates a request that a member of staff
+    // confirms once the money has actually arrived, through
+    // reviewWalletTopupRequest below.
+    if (actorRole === "GUARDIAN") {
+      const requestRef = db.collection("wallet_topup_requests").doc();
+      await requestRef.set({
+        id: requestRef.id,
+        studentId,
+        amountSatang: amt,
+        status: "PENDING",
+        requestedBy: request.auth.uid,
+        requestedByName: request.auth.token?.name || request.auth.token?.email || "ผู้ปกครอง",
+        paymentMethod: paymentMethod || "PROMPTPAY",
+        note: typeof note === "string" ? note.slice(0, 500) : "",
+        createdAt: FieldValue.serverTimestamp(),
+      });
+
+      return {
+        success: true,
+        pending: true,
+        requestId: requestRef.id,
+        studentId,
+        requestedSatang: amt,
+        message: `บันทึกคำขอเติมเงิน ฿${amt / 100} เรียบร้อย กรุณาชำระเงินที่ห้องธุรการ เจ้าหน้าที่จะยืนยันและเติมเงินเข้ากระเป๋าให้หลังได้รับเงินแล้วครับ`,
+      };
+    }
+
     return await db.runTransaction(async (tx) => {
       const walletSnap = await tx.get(walletRef);
       let currentBal = 0;
@@ -1642,10 +1681,143 @@ export const topupCampusWallet = onCall(
 
       return {
         success: true,
+        pending: false,
         studentId,
         addedSatang: amt,
         newBalanceSatang: newBal,
         newBalanceBaht: newBal / 100,
+      };
+    });
+  }
+);
+
+/**
+ * 💰 Confirm or reject a guardian's top-up request (Staff / Admin only)
+ *
+ * The moment the money is actually recognised. A guardian's request is a claim
+ * that they intend to pay; this is a member of staff saying the payment
+ * arrived. Crediting on the claim alone let a guardian mint balance that buys
+ * real food from stalls the school then has to settle with.
+ *
+ * The status check and the credit happen in one transaction, so confirming the
+ * same request twice credits once — a double-click, a retry after a timeout, or
+ * two members of staff working the same queue cannot double the balance.
+ */
+export const reviewWalletTopupRequest = onCall(
+  { region: "asia-southeast1", cors: true },
+  async (request) => {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "กรุณาเข้าสู่ระบบก่อนตรวจสอบคำขอเติมเงิน");
+    }
+
+    // Deliberately staff-only, not "staff or the guardian who asked": a guardian
+    // approving their own request would restore exactly the hole this closes.
+    if (!(await isStaffOrAdmin(db, request.auth))) {
+      throw new HttpsError(
+        "permission-denied",
+        "TOPUP_REVIEW_FORBIDDEN: เฉพาะเจ้าหน้าที่หรือผู้ดูแลระบบเท่านั้นที่ยืนยันการเติมเงินได้"
+      );
+    }
+
+    const { requestId, decision, note } = request.data || {};
+    if (!requestId || typeof requestId !== "string") {
+      throw new HttpsError("invalid-argument", "กรุณาระบุ requestId");
+    }
+    if (!["CONFIRMED", "REJECTED"].includes(decision)) {
+      throw new HttpsError("invalid-argument", "กรุณาระบุ decision ('CONFIRMED' หรือ 'REJECTED')");
+    }
+
+    const requestRef = db.collection("wallet_topup_requests").doc(requestId);
+
+    return await db.runTransaction(async (tx) => {
+      const reqSnap = await tx.get(requestRef);
+      if (!reqSnap.exists) {
+        throw new HttpsError("not-found", "ไม่พบคำขอเติมเงินนี้ในระบบ");
+      }
+
+      const topup = reqSnap.data();
+      if (topup.status !== "PENDING") {
+        throw new HttpsError(
+          "failed-precondition",
+          `TOPUP_ALREADY_REVIEWED: คำขอนี้ถูกตรวจสอบไปแล้ว (สถานะปัจจุบัน: ${topup.status})`
+        );
+      }
+
+      const amt = Number(topup.amountSatang) || 0;
+      if (!Number.isInteger(amt) || amt <= 0 || amt > MAX_TOPUP_SATANG) {
+        throw new HttpsError("failed-precondition", "TOPUP_AMOUNT_INVALID: จำนวนเงินในคำขอไม่ถูกต้อง");
+      }
+
+      const walletRef = db.collection("wallets").doc(topup.studentId);
+      // Read before any write, and only where the balance is about to change.
+      const walletSnap = decision === "CONFIRMED" ? await tx.get(walletRef) : null;
+
+      const reviewerUid = request.auth.uid;
+      const reviewerName = request.auth.token?.name || request.auth.token?.email || "เจ้าหน้าที่";
+
+      tx.update(requestRef, {
+        status: decision,
+        reviewedBy: reviewerUid,
+        reviewedByName: reviewerName,
+        reviewedAt: FieldValue.serverTimestamp(),
+        reviewNote: typeof note === "string" ? note.slice(0, 500) : "",
+      });
+
+      let newBal = null;
+      if (decision === "CONFIRMED") {
+        const currentBal = walletSnap.exists ? Number(walletSnap.data().balanceSatang) || 0 : 0;
+        newBal = currentBal + amt;
+
+        tx.set(
+          walletRef,
+          {
+            studentId: topup.studentId,
+            balanceSatang: newBal,
+            ...resolveMissingLimitDefaults(walletSnap.exists ? walletSnap.data() : null),
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+
+        const txRef = db.collection("wallet_transactions").doc();
+        tx.set(txRef, {
+          id: txRef.id,
+          walletId: topup.studentId,
+          studentId: topup.studentId,
+          amountSatang: amt,
+          type: "TOPUP",
+          actorUid: reviewerUid,
+          actorRole: "STAFF",
+          requestedBy: topup.requestedBy || null,
+          topupRequestId: requestId,
+          paymentMethod: topup.paymentMethod || "PROMPTPAY",
+          note: topup.note || "เติมเงินเข้ากระเป๋านักเรียน (ยืนยันโดยเจ้าหน้าที่)",
+          timestamp: FieldValue.serverTimestamp(),
+        });
+      }
+
+      const auditRef = db.collection("audit_logs").doc();
+      tx.set(auditRef, {
+        id: auditRef.id,
+        action: `WALLET_TOPUP_${decision}`,
+        actorUid: reviewerUid,
+        actorName: reviewerName,
+        targetStudentId: topup.studentId,
+        topupRequestId: requestId,
+        amountSatang: amt,
+        timestamp: FieldValue.serverTimestamp(),
+      });
+
+      return {
+        success: true,
+        requestId,
+        status: decision,
+        studentId: topup.studentId,
+        newBalanceSatang: newBal,
+        message:
+          decision === "CONFIRMED"
+            ? `ยืนยันการเติมเงิน ฿${amt / 100} เข้ากระเป๋าเรียบร้อย`
+            : "ปฏิเสธคำขอเติมเงินเรียบร้อย",
       };
     });
   }

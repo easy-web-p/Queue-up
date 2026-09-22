@@ -461,6 +461,27 @@ service cloud.firestore {
     // ==========================================
     // 15. STUDENT WALLETS (Cloud Functions Backend-Only Write)
     // ==========================================
+    // ==========================================
+    // WALLET TOP-UP REQUESTS (Guardian Asks, Staff Grants)
+    // ==========================================
+    match /wallet_topup_requests/{requestId} {
+      // 🔒 A top-up request is a claim that someone intends to pay. Nothing
+      // behind topupCampusWallet captures a payment, so crediting on the claim
+      // alone let a guardian mint balance that buys real food. The request is
+      // written by the backend and confirmed by staff, who are the ones actually
+      // handed the money.
+      //
+      // Write is closed completely: a client that could create a CONFIRMED row,
+      // or flip its own PENDING one, would be right back to self-service credit.
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        isStaffSupervisor() ||
+        resource.data.requestedBy == request.auth.uid ||
+        resource.data.studentId == request.auth.uid
+      );
+      allow write: if false;
+    }
+
     match /wallets/{studentId} {
       allow read: if isAuthenticated() && (
         isOwner(studentId) ||

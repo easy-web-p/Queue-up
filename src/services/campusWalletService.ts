@@ -98,18 +98,44 @@ export async function fetchWalletTransactions(
   }
 }
 
+export interface TopupResult {
+  success: boolean;
+  /**
+   * True when the call recorded a REQUEST rather than crediting the wallet.
+   *
+   * A guardian's top-up is a request: nothing behind this call captures a
+   * payment, so crediting on the guardian's word alone would let them mint
+   * balance that buys real food from stalls the school then settles with.
+   * Staff — who are handed the cash — confirm it afterwards, and only then does
+   * the balance move. Staff's own top-ups credit immediately and return false.
+   *
+   * A caller that ignores this flag will tell a guardian their money arrived
+   * when it has not.
+   */
+  pending?: boolean;
+  requestId?: string;
+  studentId: string;
+  requestedSatang?: number;
+  addedSatang?: number;
+  newBalanceSatang?: number;
+  newBalanceBaht?: number;
+  message?: string;
+}
+
 /**
- * Top up student wallet balance via Cloud Function
+ * Top up a student wallet, or request one.
+ *
+ * See TopupResult.pending — the outcome depends on who is calling.
  */
 export async function topupCampusWallet(
   studentId: string,
   amountSatang: number,
   note?: string,
   paymentMethod = 'PROMPTPAY'
-): Promise<{ success: boolean; newBalanceSatang: number; newBalanceBaht: number }> {
+): Promise<TopupResult> {
   const callable = httpsCallable<
     { studentId: string; amountSatang: number; note?: string; paymentMethod?: string },
-    { success: boolean; newBalanceSatang: number; newBalanceBaht: number }
+    TopupResult
   >(functions, 'topupCampusWallet');
 
   const res = await callable({
@@ -119,6 +145,20 @@ export async function topupCampusWallet(
     paymentMethod,
   });
 
+  return res.data;
+}
+
+/** Staff confirming that a guardian's payment actually arrived. */
+export async function reviewWalletTopupRequest(
+  requestId: string,
+  decision: 'CONFIRMED' | 'REJECTED',
+  note?: string
+): Promise<{ success: boolean; requestId: string; status: string; message: string }> {
+  const callable = httpsCallable<
+    { requestId: string; decision: string; note?: string },
+    { success: boolean; requestId: string; status: string; message: string }
+  >(functions, 'reviewWalletTopupRequest');
+  const res = await callable({ requestId, decision, note });
   return res.data;
 }
 

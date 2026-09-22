@@ -207,8 +207,25 @@ export default function GuardianDashboard() {
     if (!selectedChild || topupAmountBaht <= 0) return;
     setIsTopupProcessing(true);
     try {
-      await topupCampusWallet(selectedChild.studentId, Math.round(topupAmountBaht * 100));
+      const result = await topupCampusWallet(
+        selectedChild.studentId,
+        Math.round(topupAmountBaht * 100)
+      );
       setIsTopupOpen(false);
+
+      // A guardian's top-up records a request; the balance does not move until
+      // staff confirm the money arrived. Reporting it as a completed top-up
+      // would have the parent believe their child can spend it now.
+      if (result.pending) {
+        toast.warning(
+          result.message ||
+            `บันทึกคำขอเติมเงิน ฿${topupAmountBaht} แล้ว กรุณาชำระเงินที่ห้องธุรการ ยอดเงินจะเข้ากระเป๋าหลังเจ้าหน้าที่ยืนยัน`,
+          { duration: 12000 }
+        );
+      } else {
+        toast.success(result.message || `เติมเงิน ฿${topupAmountBaht} เรียบร้อยแล้ว`);
+      }
+
       const w = await fetchStudentWallet(selectedChild.studentId);
       setWallet(w);
       const txs = await fetchWalletTransactions(selectedChild.studentId);
