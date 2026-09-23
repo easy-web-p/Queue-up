@@ -740,6 +740,19 @@ function UserProfile() {
               </span>
             </div>
 
+            {/* The student's own wallet. Every campus-wallet order debits it,
+                and before this there was nowhere at all to look at it. */}
+            <div
+              className="shopee-sidebar-nav-item cursor-pointer"
+              onClick={() => navigate("/wallet")}
+            >
+              <div className="shopee-sidebar-nav-left">
+                <i className="bi bi-wallet2 text-success shopee-sidebar-nav-icon" />
+                <span>กระเป๋าเงินนักเรียนของฉัน</span>
+              </div>
+              <i className="bi bi-chevron-right small text-secondary ms-auto" />
+            </div>
+
             <div
               className="shopee-sidebar-nav-item cursor-pointer"
               onClick={() => navigate("/guardian")}

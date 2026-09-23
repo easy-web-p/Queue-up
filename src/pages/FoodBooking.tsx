@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectCartItems, clearCart } from '../store/cartSlice';
 import { calculateCartItemUnitPrice } from '../store/cartPricing.js';
@@ -19,6 +19,14 @@ import {
   type OfferedCoupon,
 } from '../services/couponService';
 import { getEffectiveRoles } from '../utils/authRoles.js';
+import { fetchStudentWallet } from '../services/campusWalletService';
+import {
+  bangkokDateKey,
+  describeBlocker,
+  formatBaht,
+  walletSpendView,
+  type WalletSpendView,
+} from '../services/walletView';
 import { errorMessage } from '../utils/errorMessage';
 import type { RootState } from '../store/store';
 
@@ -90,6 +98,10 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
     : (currentUser?.phone || currentUser?.phoneNumber || '');
 
   const [paymentMode, setPaymentMode] = useState<'DIRECT_ZERO_PAYMENT' | 'CAMPUS_WALLET'>('DIRECT_ZERO_PAYMENT');
+  // What the campus wallet can actually cover, so the student learns it here
+  // rather than by having the order refused. `null` until it is known — the
+  // wallet is never assumed empty, and never assumed sufficient.
+  const [walletView, setWalletView] = useState<WalletSpendView | null>(null);
   const [customInstructions, setCustomInstructions] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
@@ -211,6 +223,27 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
     setCouponInput('');
     setCouponError(null);
   };
+
+  // Load the wallet once, for the student who would be paying. Failing to read
+  // it leaves `walletView` null, and the card below then says nothing rather
+  // than claiming a balance it does not know.
+  const walletOwnerUid = currentUser?.id || currentUser?.uid;
+  useEffect(() => {
+    if (!walletOwnerUid) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const w = await fetchStudentWallet(walletOwnerUid);
+        if (!cancelled) setWalletView(w ? walletSpendView(w, bangkokDateKey()) : null);
+      } catch (err) {
+        console.warn('[FoodBooking] Could not read the campus wallet:', err);
+        if (!cancelled) setWalletView(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [walletOwnerUid]);
 
   const calculateFinalTotal = () => {
     const gross = calculateTotal();
@@ -733,8 +766,37 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
                     <span className="text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 rounded-full">Digital Wallet</span>
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-[#9CA3AF] mb-0">ตัดยอดอัตโนมัติ พร้อมตรวจเช็ควงเงินและหมวดหมู่ที่ผู้ปกครองอนุญาต</p>
+                  {/* The figure that decides whether this order goes through.
+                      Hidden until it is known: an unread wallet must not read
+                      as ฿0.00, which would send a student away with money in
+                      the account. */}
+                  {walletView && (
+                    <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 mt-2 mb-0 font-['JetBrains_Mono']">
+                      ใช้ได้ตอนนี้ {formatBaht(walletView.spendableSatang)}
+                    </p>
+                  )}
                 </button>
               </div>
+
+              {/* Say it before the order is refused, not after. The server
+                  checks the same three numbers inside the transaction. */}
+              {paymentMode === 'CAMPUS_WALLET' && walletView && (
+                <div
+                  className={`mt-3 rounded-2xl px-4 py-3 border text-[11px] font-semibold ${
+                    walletView.blocker || Math.round(calculateFinalTotal() * 100) > walletView.spendableSatang
+                      ? 'bg-rose-50 dark:bg-rose-950/25 border-rose-200 dark:border-rose-900/50 text-rose-800 dark:text-rose-200'
+                      : 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/40 text-emerald-800 dark:text-emerald-200'
+                  }`}
+                >
+                  {describeBlocker(walletView.blocker) ||
+                    (Math.round(calculateFinalTotal() * 100) > walletView.spendableSatang
+                      ? `ยอดที่ต้องชำระ ${formatBaht(Math.round(calculateFinalTotal() * 100))} เกินกว่าที่ใช้ได้ตอนนี้ (${formatBaht(walletView.spendableSatang)}) — เลือก Zero-Payment หรือให้ผู้ปกครองเติมเงินก่อน`
+                      : `ยอดที่ต้องชำระ ${formatBaht(Math.round(calculateFinalTotal() * 100))} · หลังสั่งจะเหลือใช้ได้อีก ${formatBaht(walletView.spendableSatang - Math.round(calculateFinalTotal() * 100))}`)}
+                  <Link to="/wallet" className="underline ms-1 font-bold">
+                    ดูกระเป๋าเงินของฉัน
+                  </Link>
+                </div>
+              )}
             </div>
 
             {/* Customer Phone for Queue Alert */}

@@ -200,6 +200,36 @@ export async function fetchMyTopupRequests(
 }
 
 /**
+ * Top-up requests awaiting staff confirmation, for the student the money is for.
+ *
+ * `fetchMyTopupRequests` filters on `requestedBy`, which is the guardian who
+ * asked — a student would see nothing through it, and a pending request is
+ * precisely what explains why their balance has not moved yet. The rules allow
+ * a student to read a request whose `studentId` is their own uid.
+ */
+export async function fetchTopupRequestsForStudent(
+  studentId: string,
+  max = 10
+): Promise<WalletTopupRequest[]> {
+  try {
+    const snap = await getDocs(
+      query(
+        collection(db, 'wallet_topup_requests'),
+        where('studentId', '==', studentId),
+        orderBy('createdAt', 'desc'),
+        limit(max)
+      )
+    );
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as WalletTopupRequest);
+  } catch (err) {
+    // An unbuilt composite index or a tightened rule must not blank the whole
+    // wallet page; the balance and the ledger are the point.
+    console.error('[fetchTopupRequestsForStudent] Error:', err);
+    return [];
+  }
+}
+
+/**
  * Update spending limits & restricted categories
  */
 export async function updateCampusWalletLimits(

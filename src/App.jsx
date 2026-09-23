@@ -34,6 +34,7 @@ const VendorApprovalPanel = lazy(() => import("./pages/VendorApprovalPanel.tsx")
 const GuardianDashboard = lazy(() => import("./pages/GuardianDashboard.tsx"));
 const GuardianLinkApproval = lazy(() => import("./pages/GuardianLinkApproval.tsx"));
 const WalletTopupApproval = lazy(() => import("./pages/WalletTopupApproval.tsx"));
+const StudentWallet = lazy(() => import("./pages/StudentWallet.tsx"));
 const SpendingLimitSetting = lazy(() => import("./pages/SpendingLimitSetting.tsx"));
 const AllergyAlertSetting = lazy(() => import("./pages/AllergyAlertSetting.tsx"));
 const ChildOrderHistory = lazy(() => import("./pages/ChildOrderHistory.tsx"));
@@ -90,6 +91,12 @@ function App() {
             <Route path="/user/account/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
             <Route path="/user/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
+
+            {/* The student's own wallet. A parent could always see this money
+                from the guardian dashboard; the student whose wallet it is
+                could not see it anywhere. */}
+            <Route path="/wallet" element={<ProtectedRoute><StudentWallet /></ProtectedRoute>} />
+            <Route path="/user/wallet" element={<ProtectedRoute><StudentWallet /></ProtectedRoute>} />
 
             {/* Search & Product Routes */}
             <Route path="/search" element={<ProtectedRoute><SearchResults /></ProtectedRoute>} />
