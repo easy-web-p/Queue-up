@@ -35,6 +35,8 @@ export interface CouponDocument {
   startsOn?: string;
   expiresOn?: string;
   active?: boolean;
+  /** Set on a loyalty reward: only this uid may use the code. */
+  ownerUid?: string;
 }
 
 export interface CouponContext {
@@ -44,6 +46,8 @@ export interface CouponContext {
   timesUsedByUser: number;
   userRoles: string[];
   storeId: string;
+  /** The caller, checked against a coupon's ownerUid. */
+  userId?: string;
 }
 
 export type CouponVerdict =

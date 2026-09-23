@@ -104,6 +104,10 @@ export async function previewCoupon(
     timesUsedByUser,
     userRoles: input.userRoles,
     storeId: input.storeId,
+    // The preview has to refuse someone else's loyalty coupon for the same
+    // reason the server does — otherwise the checkout screen shows a discount
+    // the order transaction will then take away.
+    userId: input.userId,
   });
 
   // Narrowed with `in` rather than `!verdict.ok`: this project compiles with
@@ -150,7 +154,12 @@ export interface OfferedCoupon {
  */
 export async function fetchOfferedCoupons(): Promise<OfferedCoupon[]> {
   const { hhmm } = bangkokNow();
-  const snap = await getDocs(query(collection(db, 'coupons'), where('active', '==', true)));
+  // `isPublic` rather than just `active`: a redeemed loyalty reward is an active
+  // coupon too, and without this every customer's personal code would be listed
+  // as a chip for everyone else to tap.
+  const snap = await getDocs(
+    query(collection(db, 'coupons'), where('active', '==', true), where('isPublic', '==', true))
+  );
   return snap.docs.map((d) => {
     const data = d.data();
     const win = data.dailyWindow;

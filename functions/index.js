@@ -32,6 +32,13 @@ import {
 } from "./orderRequest.js";
 import { checkProductAvailability, priceOrder } from "./orderPricing.js";
 import {
+  LOYALTY_REWARDS,
+  computeBalance,
+  checkRedeemable,
+  buildRewardCouponCode,
+  buildRewardCoupon,
+} from "./loyaltyRules.js";
+import {
   OPEN_ORDER_STATUSES,
   DELETION_PLAN,
   checkDeletable,
@@ -557,6 +564,9 @@ export const createOrderAuthoritative = onCall(
                   : 0,
               userRoles: resolveOrderUserRoles(request.auth),
               storeId,
+              // A loyalty coupon names its owner. Without this the code on one
+              // student's screen would price an order for anyone who read it.
+              userId: effectiveUserId,
             }
           );
 
@@ -1273,12 +1283,20 @@ export const seedBuiltinCoupons = onCall(
     const batch = db.batch();
     const installed = [];
     const skipped = [];
+    const backfilled = [];
 
     for (const coupon of BUILTIN_COUPONS) {
       const ref = db.collection("coupons").doc(coupon.id);
       const existing = await ref.get();
       if (existing.exists) {
-        // Already there, possibly retuned by an administrator. Leave it alone.
+        // Already there, possibly retuned by an administrator. Leave the tuning
+        // alone — but backfill isPublic if it predates that field, because the
+        // security rule now reads it: a coupon without it is invisible to every
+        // customer and its code stops working.
+        if (existing.data().isPublic !== true) {
+          batch.update(ref, { isPublic: true });
+          backfilled.push(coupon.id);
+        }
         skipped.push(coupon.id);
         continue;
       }
@@ -1291,15 +1309,36 @@ export const seedBuiltinCoupons = onCall(
       installed.push(coupon.id);
     }
 
-    if (installed.length > 0) await batch.commit();
+    // Any coupon an administrator created before isPublic existed is invisible
+    // to customers under the current rule. One call from the console fixes the
+    // lot, which is better than a code that silently stops working.
+    const legacy = await db.collection("coupons").get();
+    for (const d of legacy.docs) {
+      const data = d.data();
+      if (data.isPublic === true || data.ownerUid) continue;
+      if (backfilled.includes(d.id) || installed.includes(d.id)) continue;
+      batch.update(d.ref, { isPublic: true });
+      backfilled.push(d.id);
+    }
+
+    if (installed.length > 0 || backfilled.length > 0) await batch.commit();
 
     return {
       success: true,
       installed,
       skipped,
-      message: installed.length
-        ? `ติดตั้งคูปองเริ่มต้น ${installed.length} รายการ: ${installed.join(", ")}`
-        : "คูปองเริ่มต้นทั้งหมดมีอยู่ในระบบแล้ว",
+      backfilled,
+      message:
+        [
+          installed.length
+            ? `ติดตั้งคูปองเริ่มต้น ${installed.length} รายการ: ${installed.join(", ")}`
+            : "คูปองเริ่มต้นทั้งหมดมีอยู่ในระบบแล้ว",
+          backfilled.length
+            ? `และเปิดให้ลูกค้าเห็นคูปองเดิมอีก ${backfilled.length} รายการ`
+            : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
     };
   }
 );
@@ -2054,6 +2093,132 @@ export const updateCampusWalletLimits = onCall(
       success: true,
       studentId,
       message: "อัปเดตการตั้งค่าและวงเงินการใช้งานเรียบร้อยแล้ว",
+    };
+  }
+);
+
+/**
+ * 🏆 Points balance and redemption
+ *
+ * Half of this was already honest: `createOrderAuthoritative` writes
+ * `pointsEarned` onto every order from the amount actually charged. The other
+ * half was not. UserProfile opened with `useState(1250)` — 1,250 points every
+ * account had never earned, shown beside a membership tier computed from them —
+ * and redeeming subtracted from that React state, promised "นำคูปองไปใช้ที่หน้าร้านได้ทันที",
+ * and created nothing. The points came back on reload.
+ *
+ * The balance is earned minus redeemed, both read from documents the browser
+ * cannot write. A redemption records itself and issues a real coupon in ONE
+ * transaction: separately, a crash between them either takes the points and
+ * gives nothing, or gives a reward that cost nothing and can be taken again.
+ *
+ * The issued coupon carries `ownerUid`, so the code on one student's screen
+ * does not price an order for whoever reads it over their shoulder.
+ */
+export const getLoyaltyBalance = onCall(
+  { region: "asia-southeast1", cors: true },
+  async (request) => {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "กรุณาเข้าสู่ระบบก่อนดูแต้มสะสม");
+    }
+    const uid = request.auth.uid;
+
+    const [ordersSnap, redemptionsSnap] = await Promise.all([
+      db.collection("orders").where("userId", "==", uid).where("status", "==", "COMPLETED").get(),
+      db.collection("loyalty_redemptions").where("userId", "==", uid).get(),
+    ]);
+
+    const totals = computeBalance(
+      ordersSnap.docs.map((d) => d.data()),
+      redemptionsSnap.docs.map((d) => d.data())
+    );
+
+    return {
+      ...totals,
+      rewards: LOYALTY_REWARDS.map((r) => ({
+        id: r.id,
+        title: r.title,
+        description: r.description,
+        pointsCost: r.pointsCost,
+        affordable: totals.balance >= r.pointsCost,
+      })),
+      // Every coupon this account has been issued and not yet spent, so the
+      // screen can show what was actually bought rather than a promise of it.
+      issued: (
+        await db
+          .collection("coupons")
+          .where("ownerUid", "==", uid)
+          .where("active", "==", true)
+          .get()
+      ).docs.map((d) => ({
+        code: d.id,
+        title: d.data().title || d.id,
+        description: d.data().description || "",
+      })),
+    };
+  }
+);
+
+export const redeemLoyaltyReward = onCall(
+  { region: "asia-southeast1", cors: true },
+  async (request) => {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "กรุณาเข้าสู่ระบบก่อนแลกของรางวัล");
+    }
+    const uid = request.auth.uid;
+    const { rewardId } = request.data || {};
+
+    // Read the balance OUTSIDE the transaction: it is an aggregate over two
+    // whole collections, which a transaction cannot hold a consistent read of
+    // anyway. What the transaction guarantees is the thing that matters — that
+    // the redemption row and the coupon are written together, or neither is.
+    const [ordersSnap, redemptionsSnap] = await Promise.all([
+      db.collection("orders").where("userId", "==", uid).where("status", "==", "COMPLETED").get(),
+      db.collection("loyalty_redemptions").where("userId", "==", uid).get(),
+    ]);
+    const totals = computeBalance(
+      ordersSnap.docs.map((d) => d.data()),
+      redemptionsSnap.docs.map((d) => d.data())
+    );
+
+    const check = checkRedeemable(rewardId, totals.balance);
+    throwIfRefused(check);
+    const reward = check.reward;
+
+    const redemptionRef = db.collection("loyalty_redemptions").doc();
+    const code = buildRewardCouponCode(reward.id, redemptionRef.id);
+    const couponRef = db.collection("coupons").doc(code);
+
+    await db.runTransaction(async (tx) => {
+      // A code collision would otherwise overwrite someone's unspent reward.
+      const existing = await tx.get(couponRef);
+      if (existing.exists) {
+        throw new HttpsError("aborted", "รหัสคูปองซ้ำ กรุณาลองใหม่อีกครั้ง");
+      }
+
+      tx.set(redemptionRef, {
+        id: redemptionRef.id,
+        userId: uid,
+        rewardId: reward.id,
+        rewardTitle: reward.title,
+        pointsCost: reward.pointsCost,
+        couponCode: code,
+        redeemedAt: FieldValue.serverTimestamp(),
+      });
+
+      tx.set(couponRef, {
+        ...buildRewardCoupon(reward, code, uid),
+        createdAt: FieldValue.serverTimestamp(),
+      });
+    });
+
+    return {
+      success: true,
+      rewardId: reward.id,
+      couponCode: code,
+      pointsSpent: reward.pointsCost,
+      balance: totals.balance - reward.pointsCost,
+      message: `แลก "${reward.title}" สำเร็จ — ใช้โค้ด ${code} ตอนสั่งอาหารได้เลย`,
     };
   }
 );

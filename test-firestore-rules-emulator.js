@@ -14,6 +14,7 @@
  */
 
 import fs from 'node:fs';
+import { readFileSync } from 'node:fs';
 import process from 'node:process';
 import { buildSeedProducts } from './src/lib/seedCatalog.js';
 import {
@@ -818,7 +819,88 @@ await runTest('A user can read their own redemption record', async () => {
   await assertSucceeds(getDoc(doc(asStudent, 'coupon_redemptions', `${STUDENT}_WELCOME50`)));
 });
 
-await runTest('🚨 A coupon cannot be created or retuned from a browser', async () => {
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  await setDoc(doc(ctx.firestore(), 'coupons', 'PUBLIC50'), {
+    title: 'ส่วนลด 50', type: 'FIXED', amountSatang: 5000, active: true, isPublic: true,
+  });
+  await setDoc(doc(ctx.firestore(), 'coupons', 'LP-DISCOUNT5-AAA'), {
+    title: 'ส่วนลด 5', type: 'FIXED', amountSatang: 500, active: true, ownerUid: STUDENT,
+  });
+  await setDoc(doc(ctx.firestore(), 'loyalty_redemptions', 'redeem_1'), {
+    id: 'redeem_1', userId: STUDENT, rewardId: 'DISCOUNT_5', pointsCost: 50,
+  });
+});
+
+await runTest('A public coupon is readable by any signed-in customer', async () => {
+  await assertSucceeds(getDoc(doc(asStudent, 'coupons', 'PUBLIC50')));
+  await assertSucceeds(getDoc(doc(asStranger, 'coupons', 'PUBLIC50')));
+});
+
+await runTest('🚨 A loyalty coupon is not readable by anyone but its owner', async () => {
+  // The code on one student's screen would otherwise be one query away for
+  // everyone else. evaluateCoupon refuses to price it for them either way, but
+  // a code nobody else can read is the better fence.
+  await assertSucceeds(getDoc(doc(asStudent, 'coupons', 'LP-DISCOUNT5-AAA')));
+  await assertFails(getDoc(doc(asStranger, 'coupons', 'LP-DISCOUNT5-AAA')));
+});
+
+await runTest('🚨 The offered-coupons query returns only public ones', async () => {
+  // What FoodBooking actually runs. It has to succeed for everyone, which it
+  // can only do while every document it matches is one the rule allows.
+  await assertSucceeds(
+    getDocs(
+      query(
+        collection(asStranger, 'coupons'),
+        where('active', '==', true),
+        where('isPublic', '==', true)
+      )
+    )
+  );
+});
+
+await runTest('🚨 A customer cannot list every coupon, personal ones included', async () => {
+  // The reason the rule tests `isPublic == true` rather than "has no ownerUid".
+  // Both `!('ownerUid' in resource.data)` and `resource.data.get('ownerUid','') == ''`
+  // pass a `get` on someone else's coupon and then fail OPEN on a list — the
+  // escape clause evaluates true for every document, and this query returns
+  // every customer's personal code. This test is the only thing that tells the
+  // two spellings apart.
+  await assertFails(getDocs(query(collection(asStranger, 'coupons'))));
+});
+
+await runTest('🚨 A coupon predating isPublic is not silently unusable', async () => {
+  // The flip side of the rule above: a coupon with neither field is readable by
+  // nobody, so its code stops working with no error anyone would connect to it.
+  // seedBuiltinCoupons backfills them, which is why the console's one button
+  // remains the fix.
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'coupons', 'LEGACY10'), {
+      title: 'ส่วนลดเก่า', type: 'FIXED', amountSatang: 1000, active: true,
+    });
+  });
+  await assertFails(getDoc(doc(asStudent, 'coupons', 'LEGACY10')));
+
+  const seeder = readFileSync(new URL('./functions/index.js', import.meta.url), 'utf8');
+  const at = seeder.indexOf('export const seedBuiltinCoupons');
+  const body = seeder.slice(at, seeder.indexOf('\nexport const', at + 10));
+  if (!/isPublic: true/.test(body)) throw new Error('the seeder does not backfill isPublic');
+});
+
+await runTest('🚨 A student cannot delete their own loyalty redemption', async () => {
+  // The balance is earned minus redeemed. Deleting the row gives the points
+  // back and the same reward can be taken forever.
+  await assertFails(deleteDoc(doc(asStudent, 'loyalty_redemptions', 'redeem_1')));
+  await assertFails(
+    setDoc(doc(asStudent, 'loyalty_redemptions', 'forged'), { userId: STUDENT, pointsCost: 0 })
+  );
+});
+
+await runTest('A student can read their own redemptions, and nobody else can', async () => {
+  await assertSucceeds(getDoc(doc(asStudent, 'loyalty_redemptions', 'redeem_1')));
+  await assertFails(getDoc(doc(asStranger, 'loyalty_redemptions', 'redeem_1')));
+});
+
+runTest('🚨 A coupon cannot be created or retuned from a browser', async () => {
   // Coupons are money. Admin-only write, per the rules.
   await assertFails(
     setDoc(doc(asStudent, 'coupons', 'FREEFOOD'), { type: 'FIXED', amountSatang: 999999, active: true })

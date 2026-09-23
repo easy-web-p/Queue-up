@@ -1,12 +1,27 @@
 import { useEffect } from 'react';
-import { Award, Gift, X } from 'lucide-react';
+import { Award, Gift, Ticket, X } from 'lucide-react';
 
+/**
+ * The points drawer.
+ *
+ * Every number here comes from `getLoyaltyBalance`, which reads the caller's
+ * COMPLETED orders and their redemption rows — documents no browser can write.
+ * The balance this used to show was `useState(1250)` in the parent, and
+ * redeeming subtracted from it and produced nothing.
+ *
+ * `issued` is the point of the whole screen: a reward is a coupon code, so the
+ * drawer shows the codes already bought rather than telling someone to take a
+ * promise to the counter.
+ */
 export const ClientLoyaltyDrawer = ({
   isOpen,
   onClose,
   profile = {},
   rewards = [],
+  issued = [],
   onRedeemReward,
+  isLoading = false,
+  redeemingId = null,
 }) => {
   // 🔒 Close on Escape key
   useEffect(() => {
@@ -79,9 +94,47 @@ export const ClientLoyaltyDrawer = ({
             <span>คูปองส่วนลดและของรางวัล</span>
           </h6>
 
+          {isLoading && (
+            <p className="text-xs text-slate-400 dark:text-slate-500 animate-pulse mb-0">
+              กำลังโหลดแต้มสะสม…
+            </p>
+          )}
+
+          {/* What the points already bought. A code, not a promise. */}
+          {issued.length > 0 && (
+            <div className="space-y-2">
+              <h6 className="font-['Kanit'] font-bold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                <Ticket className="w-4 h-4 text-emerald-500" />
+                <span>คูปองของคุณ (ใช้ได้เลย)</span>
+              </h6>
+              {issued.map((c) => (
+                <div
+                  key={c.code}
+                  className="p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-2xl border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-between gap-3"
+                >
+                  <div className="min-w-0">
+                    <p className="font-['Kanit'] font-bold text-sm text-emerald-900 dark:text-emerald-200 mb-0 truncate">
+                      {c.title}
+                    </p>
+                    <p className="text-[11px] text-emerald-700 dark:text-emerald-400 mb-0 truncate">
+                      {c.description}
+                    </p>
+                  </div>
+                  <code className="shrink-0 px-2 py-1 bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-700 rounded-lg text-[11px] font-bold text-emerald-800 dark:text-emerald-300">
+                    {c.code}
+                  </code>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="space-y-3">
             {rewards.map((reward) => {
-              const canRedeem = (profile.points || 0) >= reward.pointsRequired;
+              // The server decides affordability, so the button's state and the
+              // call's outcome cannot disagree.
+              const canRedeem = reward.affordable ?? (profile.points || 0) >= reward.pointsCost;
+              const cost = reward.pointsCost ?? reward.pointsRequired;
+              const busy = redeemingId === reward.id;
               const rewardTitle = reward.title || reward.name || 'ของรางวัลพิเศษ';
               return (
                 <div
@@ -96,13 +149,13 @@ export const ClientLoyaltyDrawer = ({
                       {reward.description}
                     </p>
                     <span className="inline-block mt-2 px-2.5 py-0.5 bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200/70 dark:border-amber-800/60 rounded-full text-[11px] font-bold">
-                      ใช้ {reward.pointsRequired} แต้ม
+                      ใช้ {cost} แต้ม
                     </span>
                   </div>
 
                   <button
                     type="button"
-                    disabled={!canRedeem}
+                    disabled={!canRedeem || busy}
                     onClick={() => onRedeemReward(reward)}
                     className={`px-3.5 py-2 rounded-xl text-xs font-['Kanit'] font-bold transition-all shrink-0 cursor-pointer ${
                       canRedeem
@@ -110,7 +163,7 @@ export const ClientLoyaltyDrawer = ({
                         : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700 cursor-not-allowed opacity-70'
                     }`}
                   >
-                    {canRedeem ? 'แลกรางวัล' : 'แต้มไม่พอ'}
+                    {busy ? 'กำลังแลก…' : canRedeem ? 'แลกรางวัล' : 'แต้มไม่พอ'}
                   </button>
                 </div>
               );

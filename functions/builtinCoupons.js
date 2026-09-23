@@ -31,6 +31,8 @@ export const BUILTIN_COUPONS = Object.freeze([
     // The whole point of a welcome offer, and the one rule it did not enforce.
     maxPerUser: 1,
     active: true,
+    // Offered to everyone; a loyalty reward carries ownerUid instead.
+    isPublic: true,
   },
   {
     id: "HAPPY15",
@@ -42,6 +44,8 @@ export const BUILTIN_COUPONS = Object.freeze([
     minSpendSatang: 5000,
     dailyWindow: { start: "14:00", end: "17:00" },
     active: true,
+    // Offered to everyone; a loyalty reward carries ownerUid instead.
+    isPublic: true,
   },
   {
     id: "STUDENT10",
@@ -54,6 +58,8 @@ export const BUILTIN_COUPONS = Object.freeze([
     // Named for students, so it is for students.
     audienceRoles: ["student", "student_vendor", "customer"],
     active: true,
+    // Offered to everyone; a loyalty reward carries ownerUid instead.
+    isPublic: true,
   },
 ]);
 

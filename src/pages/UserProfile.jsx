@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { setUser, clearUser } from "../store/authSlice.js";
@@ -19,6 +19,7 @@ import {
   accountUsesPassword,
 } from "../services/accountService";
 import { errorMessage } from "../utils/errorMessage";
+import { fetchLoyaltyBalance, redeemLoyaltyReward } from "../services/loyaltyService";
 import "./UserProfile.css";
 import "./UserPurchase.css";
 
@@ -67,33 +68,73 @@ function UserProfile() {
   const [orders, setOrders] = useState([]);
   const [isLoyaltyOpen, setIsLoyaltyOpen] = useState(false);
 
-  // 🏆 Loyalty & Membership Tier System (Bronze, Silver, Gold, Platinum)
-  const [userPoints, setUserPoints] = useState(1250);
+  // 🏆 Loyalty points, from the server.
+  //
+  // This was `useState(1250)` — 1,250 points every account opened with and had
+  // never earned, displayed beside a membership tier computed from them. The
+  // balance is earned (from COMPLETED orders, whose pointsEarned the order
+  // transaction writes) minus redeemed, both from documents no browser can
+  // write.
+  const [loyalty, setLoyalty] = useState(null);
+  const [isLoyaltyLoading, setIsLoyaltyLoading] = useState(false);
+  const [redeemingRewardId, setRedeemingRewardId] = useState(null);
 
-  // Points and tier are derived from this user's own completed orders, combined with user points
-  const loyaltyProfile = useMemo(() => {
-    const completed = orders.filter((o) => o.status === "COMPLETED");
-    const pointsFromOrders = completed.reduce((sum, o) => sum + (Number(o.pointsEarned) || 0), 0);
-    const points = pointsFromOrders > 0 ? pointsFromOrders : userPoints;
-    return { points, ordersCount: completed.length };
-  }, [orders, userPoints]);
+  const userPoints = loyalty?.balance ?? 0;
 
-  const LOYALTY_REWARDS = [
-    { id: "r50", title: "ส่วนลด 5 บาท", name: "ส่วนลด 5 บาท", description: "ใช้ได้กับทุกเมนูในโรงอาหาร", pointsRequired: 50 },
-    { id: "r120", title: "ส่วนลด 15 บาท", name: "ส่วนลด 15 บาท", description: "ใช้ได้กับออเดอร์ตั้งแต่ 50 บาทขึ้นไป", pointsRequired: 120 },
-    { id: "r300", title: "เครื่องดื่มฟรี 1 แก้ว", name: "เครื่องดื่มฟรี 1 แก้ว", description: "แลกรับที่เคาน์เตอร์ร้านที่ร่วมรายการ", pointsRequired: 300 },
-  ];
+  const loyaltyProfile = useMemo(
+    () => ({
+      points: userPoints,
+      ordersCount: orders.filter((o) => o.status === "COMPLETED").length,
+    }),
+    [userPoints, orders]
+  );
 
-  const handleRedeemReward = (reward) => {
-    const cost = Number(reward.pointsRequired) || 0;
-    if (userPoints < cost) {
-      toast.error(`แต้มสะสมไม่เพียงพอ (ต้องการ ${cost} แต้ม)`);
-      return;
+  const refreshLoyalty = useCallback(async () => {
+    if (!user?.uid) return;
+    setIsLoyaltyLoading(true);
+    try {
+      setLoyalty(await fetchLoyaltyBalance());
+    } catch (err) {
+      // Zero rather than an invented number. A balance the screen made up is
+      // how this got here in the first place.
+      console.warn("[UserProfile] could not load loyalty balance:", err);
+      setLoyalty(null);
+    } finally {
+      setIsLoyaltyLoading(false);
     }
-    setUserPoints((prev) => Math.max(0, prev - cost));
-    toast.success(
-      `แลกสิทธิ์ "${reward.title || reward.name}" สำเร็จ! สามารถนำคูปองไปใช้ที่หน้าร้านได้ทันที`
-    );
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    let cancelled = false;
+    async function loadLoyalty() {
+      try {
+        const data = await fetchLoyaltyBalance();
+        if (!cancelled) setLoyalty(data);
+      } catch (err) {
+        console.warn("[UserProfile] could not load loyalty balance:", err);
+      }
+    }
+    loadLoyalty();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid]);
+
+  const handleRedeemReward = async (reward) => {
+    setRedeemingRewardId(reward.id);
+    try {
+      // The server checks the balance and writes the redemption and the coupon
+      // in one transaction. What was here subtracted from React state and told
+      // the student to take a coupon to the counter that was never created.
+      const result = await redeemLoyaltyReward(reward.id);
+      await refreshLoyalty();
+      toast.success(result.message, { duration: 15000 });
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setRedeemingRewardId(null);
+    }
   };
   const [orderStatusTab, setOrderStatusTab] = useState("ALL");
   const [orderSearchQuery, setOrderSearchQuery] = useState("");
@@ -541,7 +582,10 @@ function UserProfile() {
         isOpen={isLoyaltyOpen}
         onClose={() => setIsLoyaltyOpen(false)}
         profile={loyaltyProfile}
-        rewards={LOYALTY_REWARDS}
+        rewards={loyalty?.rewards || []}
+        issued={loyalty?.issued || []}
+        isLoading={isLoyaltyLoading}
+        redeemingId={redeemingRewardId}
         onRedeemReward={handleRedeemReward}
       />
 

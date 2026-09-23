@@ -41,6 +41,7 @@ export const COUPON_REFUSAL = Object.freeze({
   ALREADY_USED: "ALREADY_USED",
   AUDIENCE_MISMATCH: "AUDIENCE_MISMATCH",
   STORE_MISMATCH: "STORE_MISMATCH",
+  NOT_YOUR_COUPON: "NOT_YOUR_COUPON",
 });
 
 /** Normalises whatever the user typed into the id a coupon document uses. */
@@ -100,6 +101,7 @@ export function evaluateCoupon(coupon, context) {
     timesUsedByUser = 0,
     userRoles = [],
     storeId = "",
+    userId = "",
   } = context || {};
 
   if (!coupon || typeof coupon !== "object") {
@@ -136,6 +138,17 @@ export function evaluateCoupon(coupon, context) {
         detail: { audienceRoles: coupon.audienceRoles },
       };
     }
+  }
+
+  // --- Whose it is ----------------------------------------------------------
+  // A loyalty reward is issued to one person. Without this, the code printed on
+  // their screen works for anyone who reads it over their shoulder — and the
+  // points that bought it were somebody else's.
+  //
+  // Only enforced when the coupon states an owner, so every ordinary coupon is
+  // unaffected.
+  if (typeof coupon.ownerUid === "string" && coupon.ownerUid && coupon.ownerUid !== userId) {
+    return { ok: false, reason: COUPON_REFUSAL.NOT_YOUR_COUPON };
   }
 
   // --- Which store ----------------------------------------------------------
@@ -203,6 +216,8 @@ export function describeCouponRefusal(reason, detail = {}) {
       return detail.maxPerUser === 1
         ? "โค้ดนี้ใช้ได้เพียงครั้งเดียวต่อหนึ่งบัญชี และคุณใช้ไปแล้ว"
         : `โค้ดนี้ใช้ได้สูงสุด ${detail.maxPerUser} ครั้งต่อบัญชี และคุณใช้ครบแล้ว`;
+    case COUPON_REFUSAL.NOT_YOUR_COUPON:
+      return "โค้ดนี้เป็นของผู้ใช้รายอื่น ไม่สามารถใช้กับบัญชีนี้ได้";
     case COUPON_REFUSAL.AUDIENCE_MISMATCH:
       return "บัญชีของคุณไม่อยู่ในกลุ่มที่ใช้โค้ดนี้ได้";
     case COUPON_REFUSAL.STORE_MISMATCH:

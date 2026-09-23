@@ -368,7 +368,31 @@ service cloud.firestore {
     // 9. COUPONS & PROMOTIONS (Admin Write, Authenticated Read)
     // ==========================================
     match /coupons/{couponId} {
-      allow read: if isAuthenticated();
+      // 🔒 A loyalty reward is issued to one person and carries `ownerUid`.
+      // Left world-readable, the code on one student's screen is one query away
+      // for everyone else — and while `evaluateCoupon` refuses to price it for
+      // anyone but its owner, a code nobody else can read is the better fence.
+      //
+      // Public coupons carry no ownerUid, so the offered-coupons query
+      // (`where isPublic == true`) returns only documents this allows.
+      // Written as a POSITIVE test on isPublic, deliberately.
+      //
+      // `!('ownerUid' in resource.data)` and `resource.data.get('ownerUid','') == ''`
+      // both look equivalent and both fail open on a LIST: the escape clause
+      // evaluates true for every document, so an unfiltered query over this
+      // collection returns everyone's personal codes. Verified against the
+      // emulator, and the test below is what keeps it verified.
+      //
+      // A public coupon carries `isPublic: true` (seedBuiltinCoupons and the
+      // admin console both set it, and the seeder backfills older rows). A
+      // loyalty reward carries `ownerUid` instead, so it is readable only by
+      // the person whose points bought it.
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.get('isPublic', false) == true ||
+        resource.data.get('ownerUid', '') == request.auth.uid
+      );
+      // Written by an admin, or by redeemLoyaltyReward through the Admin SDK.
       allow create, update, delete: if isAdmin();
     }
 
@@ -378,6 +402,19 @@ service cloud.firestore {
     // is the exact hole this collection was added to close (the previous
     // mechanism was a localStorage flag). Readable by the owner so the app can
     // show which offers they have already used.
+    // 🔒 Loyalty redemptions: the record that makes a points balance mean
+    // something. The balance is earned (from COMPLETED orders) minus redeemed
+    // (from here), so a client able to delete a row here would get its points
+    // back and could redeem the same reward forever. Readable by the owner so
+    // the profile can show what they have already exchanged.
+    match /loyalty_redemptions/{redemptionId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.userId == request.auth.uid
+      );
+      allow write: if false;
+    }
+
     match /coupon_redemptions/{redemptionId} {
       allow read: if isAuthenticated() && (
         isAdmin() ||

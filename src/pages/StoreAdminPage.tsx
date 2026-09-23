@@ -73,6 +73,10 @@ interface AdminCoupon {
   maxPerUser?: number;
   active: boolean;
   builtin?: boolean;
+  /** Offered to every customer as a chip. A loyalty reward is not. */
+  isPublic?: boolean;
+  /** Set on a loyalty reward: only this uid may use the code. */
+  ownerUid?: string;
 }
 
 /** A row in audit_logs — written only by Cloud Functions, read here for display. */
@@ -466,6 +470,9 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
       amountSatang: Math.round(Number(newCouponDiscount) * 100),
       minSpendSatang: Math.round(Number(newCouponMinSpend) * 100),
       active: true,
+      // Offered to every customer as a chip. A loyalty reward is issued to one
+      // person and carries ownerUid instead, so it never appears here.
+      isPublic: true,
     };
     try {
       await setDoc(doc(db, "coupons", code), newCoupon, { merge: true });
