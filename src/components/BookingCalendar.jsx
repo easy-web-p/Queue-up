@@ -1,88 +1,78 @@
 import { useState } from "react";
 import "./BookingCalendar.css";
 
-const MOCK_USER_BOOKINGS = [
-  {
-    id: "BK-8091",
-    shopName: "ร้านป้าแดง ตามสั่ง & ไก่ทอด",
-    canteenName: "โรงอาหารกลาง อาคาร 2",
-    date: "2026-08-17",
-    timeSlot: "11:45 - 12:00 น.",
-    items: [
-      { name: "ข้าวไก่แซ่บกรอบพิเศษ", qty: 1, price: 55 },
-      { name: "ชาไทยเย็นหวานน้อย", qty: 1, price: 30 },
-    ],
-    totalPrice: 85,
-    status: "READY", // PENDING, COOKING, READY, COMPLETED
-    queueNo: "A042",
-  },
-  {
-    id: "BK-8095",
-    shopName: "ร้านก๋วยเตี๋ยวเรือเสือร้องไห้",
-    canteenName: "โรงอาหารกลาง อาคาร 2",
-    date: "2026-08-17",
-    timeSlot: "12:15 - 12:30 น.",
-    items: [{ name: "ก๋วยเตี๋ยวเรือเนื้อหมกเส้นเล็ก", qty: 1, price: 60 }],
-    totalPrice: 60,
-    status: "COOKING",
-    queueNo: "B018",
-  },
-  {
-    id: "BK-8102",
-    shopName: "ร้านสเต็กพี่ตั้ม School Food",
-    canteenName: "โรงอาหารคณะวิศวกรรมศาสตร์",
-    date: "2026-08-18",
-    timeSlot: "12:00 - 12:15 น.",
-    items: [{ name: "สเต็กไก่พริกไทยดำ + เฟรนช์ฟรายส์", qty: 1, price: 79 }],
-    totalPrice: 79,
-    status: "PENDING",
-    queueNo: "S009",
-  },
-];
-
-export default function BookingCalendar({ viewMode = "user", storeId = "", orders = [] }) {
+export default function BookingCalendar({
+  viewMode = "user",
+  storeId = "",
+  orders = [],
+  maxOrdersPerSlot = 20,
+}) {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [activeTab, setActiveTab] = useState(viewMode);
 
-  // Compute dynamic capacity slots based on storeId and real orders
+  /**
+   * The bookable pickup times, and how full each one is.
+   *
+   * This used to list eight fifteen-minute ranges — "11:45 - 12:00 น." — and
+   * count orders whose `o.time` or `o.timeSlot` equalled one. An order has
+   * neither field; it has `pickupTime`, and it holds "11:45", not a range. So
+   * every slot counted zero and every slot read "low", on every day, including
+   * a lunch hour that was actually full. A merchant planning staff saw an empty
+   * canteen at peak.
+   *
+   * The times below are the ones a customer can actually pick, from
+   * ProductDetail's BASE_TIME_SLOTS.
+   */
   const getCapacitySlots = () => {
-    const timeSlots = [
-      "11:00 - 11:15 น.",
-      "11:15 - 11:30 น.",
-      "11:30 - 11:45 น.",
-      "11:45 - 12:00 น.",
-      "12:00 - 12:15 น.",
-      "12:15 - 12:30 น.",
-      "12:30 - 12:45 น.",
-      "12:45 - 13:00 น.",
-    ];
+    const timeSlots = ["11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30"];
 
-    const relevantOrders = storeId
-      ? orders.filter((o) => !o.storeId || o.storeId === storeId)
-      : orders;
+    const relevantOrders = orders.filter((o) => {
+      if (storeId && o.storeId && o.storeId !== storeId) return false;
+      // Only the day being looked at. Without this every order ever placed
+      // counted towards today's lunch rush.
+      if (o.pickupDate && o.pickupDate !== selectedDate) return false;
+      const status = String(o.status || "").toUpperCase();
+      return status !== "CANCELLED";
+    });
 
-    // For specific store (new store or real orders), count orders per time slot
     return timeSlots.map((slot) => {
-      const count = relevantOrders.filter((o) => o.time === slot || o.timeSlot === slot).length;
-      const capacity = 20;
+      const count = relevantOrders.filter((o) => o.pickupTime === slot).length;
+      const capacity = Number(maxOrdersPerSlot) || 20;
       let status = "low";
       if (count >= capacity) status = "full";
-      else if (count >= 15) status = "high";
-      else if (count >= 8) status = "medium";
+      else if (count >= capacity * 0.75) status = "high";
+      else if (count >= capacity * 0.4) status = "medium";
 
-      return {
-        time: slot,
-        count,
-        capacity,
-        status,
-      };
+      return { time: slot, count, capacity, status };
     });
   };
 
+  /**
+   * This person's own bookings for the selected day.
+   *
+   * Three invented ones used to sit here — BK-8091 at ร้านป้าแดง on 2026-08-17 —
+   * filtered by date, so the list was empty on every day but one and wrong on
+   * that one.
+   */
+  const bookingsForDay = orders
+    .filter((o) => {
+      if (o.pickupDate && o.pickupDate !== selectedDate) return false;
+      return String(o.status || "").toUpperCase() !== "CANCELLED";
+    })
+    .sort((a, b) => String(a.pickupTime || "").localeCompare(String(b.pickupTime || "")));
+
   const hourlyPrepData = getCapacitySlots();
 
+  /**
+   * An order's status as a badge.
+   *
+   * The cases were READY, COOKING and PENDING, matched against the mock
+   * bookings' own vocabulary. A real order is PENDING, CONFIRMED, PREPARING,
+   * READY, COMPLETED or CANCELLED — so PREPARING fell through to "เสร็จสิ้น",
+   * telling a merchant an order was finished while it was still on the stove.
+   */
   const getStatusBadge = (status) => {
-    switch (status) {
+    switch (String(status || "").toUpperCase()) {
       case "READY":
         return (
           <span className="booking-status-badge status-ready inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
@@ -90,6 +80,7 @@ export default function BookingCalendar({ viewMode = "user", storeId = "", order
             พร้อมรับตามนัด
           </span>
         );
+      case "PREPARING":
       case "COOKING":
         return (
           <span className="booking-status-badge status-cooking inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-orange-100 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300 border border-orange-300 dark:border-orange-800">
@@ -98,10 +89,18 @@ export default function BookingCalendar({ viewMode = "user", storeId = "", order
           </span>
         );
       case "PENDING":
+      case "CONFIRMED":
         return (
           <span className="booking-status-badge status-pending inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
             <i className="bi bi-clock-history" />
             รับออเดอร์แล้ว (รอนัดหมาย)
+          </span>
+        );
+      case "CANCELLED":
+        return (
+          <span className="booking-status-badge status-cancelled inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300 border border-red-300 dark:border-red-800">
+            <i className="bi bi-x-circle" />
+            ยกเลิกแล้ว
           </span>
         );
       default:
@@ -185,18 +184,18 @@ export default function BookingCalendar({ viewMode = "user", storeId = "", order
       {/* Content based on Active Tab */}
       {activeTab === "user" ? (
         <div className="booking-cards-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {MOCK_USER_BOOKINGS.filter((b) => b.date === selectedDate).map((booking) => (
-            <div key={booking.id} className="booking-card bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
+          {bookingsForDay.map((booking) => (
+            <div key={booking.id || booking.orderId} className="booking-card bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
               <div className="booking-card-head flex items-start justify-between gap-2 pb-3 border-b border-slate-200/80 dark:border-slate-700/80">
                 <div>
-                  <span className="booking-id inline-block text-[11px] font-bold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 px-2 py-0.5 rounded-md mb-1">เลขคิว {booking.queueNo}</span>
+                  <span className="booking-id inline-block text-[11px] font-bold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 px-2 py-0.5 rounded-md mb-1">เลขคิว {booking.queueNumber || "—"}</span>
                   <div className="booking-shop-name font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
                     <i className="bi bi-shop text-orange-500" />
-                    {booking.shopName}
+                    {booking.storeName || booking.storeId || "ร้านค้า"}
                   </div>
                   <div className="booking-canteen-location text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
                     <i className="bi bi-geo-alt" />
-                    {booking.canteenName}
+                    {booking.pickupDate || selectedDate}
                   </div>
                 </div>
                 {getStatusBadge(booking.status)}
@@ -205,21 +204,34 @@ export default function BookingCalendar({ viewMode = "user", storeId = "", order
               <div className="booking-card-body py-3 space-y-2">
                 <div className="booking-time-highlight flex items-center gap-2 p-2 bg-amber-50 dark:bg-amber-950/40 rounded-xl text-amber-800 dark:text-amber-300 text-xs border border-amber-200/60 dark:border-amber-900/40">
                   <i className="bi bi-clock-fill text-amber-500" />
-                  <span>เวลานัดรับอาหาร: <strong>{booking.timeSlot}</strong></span>
+                  <span>เวลานัดรับอาหาร: <strong>{booking.pickupTime || "—"}</strong></span>
                 </div>
 
                 <div className="booking-items-list space-y-1">
-                  {booking.items.map((item, idx) => (
+                  {/* Stored items carry `name` and `quantity`; a line from the
+                      cart carries `menuItem.name`. Both shapes reach this list. */}
+                  {(booking.items || []).map((item, idx) => (
                     <div key={idx} className="booking-item-row flex justify-between text-xs text-slate-600 dark:text-slate-300">
-                      <span>{item.name} x{item.qty}</span>
-                      <strong className="text-slate-900 dark:text-white">฿{item.price * item.qty}</strong>
+                      <span>
+                        {item.name || item.menuItem?.name || "รายการอาหาร"} x
+                        {item.quantity ?? item.qty ?? 1}
+                      </span>
+                      <strong className="text-slate-900 dark:text-white">
+                        ฿{(
+                          (Number(item.lineTotalSatang) ||
+                            Number(item.unitPriceSatang) * (item.quantity ?? 1) ||
+                            0) / 100
+                        ).toFixed(2)}
+                      </strong>
                     </div>
                   ))}
                 </div>
               </div>
 
               <div className="booking-card-foot flex items-center justify-between pt-3 border-t border-slate-200/80 dark:border-slate-700/80 mt-auto">
-                <span className="text-xs text-slate-500 dark:text-slate-400">ราคารวมทั้งสิ้น: <strong className="text-orange-600 dark:text-orange-400 text-base font-black">฿{booking.totalPrice}</strong></span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">ราคารวมทั้งสิ้น: <strong className="text-orange-600 dark:text-orange-400 text-base font-black">
+                  ฿{((Number(booking.finalAmountSatang) || Number(booking.totalAmountSatang) || 0) / 100).toFixed(2)}
+                </strong></span>
                 <button className="booking-action-btn px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-xs border-0">
                   <i className="bi bi-qr-code-scan" />
                   แสดงสลิปการจอง
@@ -228,7 +240,7 @@ export default function BookingCalendar({ viewMode = "user", storeId = "", order
             </div>
           ))}
 
-          {MOCK_USER_BOOKINGS.filter((b) => b.date === selectedDate).length === 0 && (
+          {bookingsForDay.length === 0 && (
             <div className="booking-empty-state col-span-full py-12 text-center text-slate-400 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
               <i className="bi bi-calendar-x text-4xl text-slate-300 dark:text-slate-600 mb-2 block" />
               <h6 className="font-bold text-slate-700 dark:text-slate-300 text-sm">ยังไม่มีตารางสั่งจองอาหารในวันที่เลือก</h6>

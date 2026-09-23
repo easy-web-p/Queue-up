@@ -11,8 +11,6 @@ import FoodCard from "../components/FoodCard.jsx";
 import ShopeeSearchBar from "../components/ShopeeSearchBar.jsx";
 import ChatModal from "../components/ChatModal.jsx";
 import Footer from "../components/Footer.jsx";
-import DailyMenuBoard from "../components/DailyMenuBoard.jsx";
-import ShopReelsFeed from "../components/ShopReelsFeed.jsx";
 import { usePreferences } from "../context/PreferencesContext.jsx";
 import { FoodGridSkeleton, EmptyState, ErrorState } from "../components/LoadingStates.jsx";
 import { Utensils } from "lucide-react";
@@ -51,7 +49,7 @@ function Home() {
 
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
-  const [, setShops] = useState([]);
+  const [shops, setShops] = useState([]);
   // Starts empty and loading rather than pre-filled with INITIAL_PRODUCTS. The
   // hardcoded catalogue used to be the initial state AND the fetch's fallback, so a
   // student saw a full menu of dishes that were not in the database — tappable,
@@ -137,16 +135,11 @@ function Home() {
             : "กระเป๋าคูปองส่วนลดสมาชิกใหม่ และระบบติดตามรายจ่ายโภชนาการสำหรับผู้ปกครอง!",
         targetPath: "/user/account/profile?tab=coupons",
       },
-      {
-        id: "shop-pa-daeng",
-        type: "store",
-        badge: language === "en" ? "STORE UPDATE" : "อัปเดตจากร้านค้าที่ติดตาม",
-        title:
-          language === "en"
-            ? "[Pa Daeng Canteen] Order ahead now & claim free 50 CRM bonus points!"
-            : "[ร้านป้าแดง ตามสั่ง] เปิดให้สั่งอาหารล่วงหน้ารับแต้มสะสม CRM ฟรีได้ทันที!",
-        targetPath: "/product/m1",
-      }
+      // A banner advertising "[ร้านป้าแดง ตามสั่ง] … รับแต้มสะสม CRM ฟรี" and
+      // linking to /product/m1 used to sit here. The shop does not exist, the
+      // bonus does not exist, and m1 was the mock catalogue's id — that link now
+      // correctly lands on "ไม่พบเมนูนี้ในระบบ", which is the whole problem with
+      // advertising something nobody can buy.
     );
 
     return list;
@@ -230,6 +223,14 @@ function Home() {
 
     loadMenu();
   }, [loadMenu]);
+
+  /**
+   * Shops currently taking orders.
+   *
+   * `isOpen !== false` rather than `isOpen === true`: a shop document written
+   * before the field existed is open, which is what it was.
+   */
+  const openShops = shops.filter((s2) => s2 && s2.isOpen !== false).slice(0, 6);
 
   const toggleFavorite = (itemId) => {
     setFavorites((prev) =>
@@ -772,67 +773,52 @@ function Home() {
           <div className="queue-ai-header-row">
             <div>
               <div className="queue-ai-tag">
-                <i className="bi bi-stars text-warning me-1" /> ระบบวิเคราะห์ความอร่อยใกล้คุณ (AI QueueUp Smart Search)
+                <i className="bi bi-shop text-warning me-1" /> ร้านค้าในโรงอาหาร
               </div>
-              <h2 className="queue-ai-title">
-                แนะนำร้านอร่อยที่สุด จากพิกัดที่ใกล้คุณที่สุด
-              </h2>
-            </div>
-            <div className="queue-ai-location">
-              <i className="bi bi-geo-alt-fill text-danger me-1" /> ตำแหน่งของคุณ: อาคารเรียน 2 (โรงอาหารกลาง)
+              <h2 className="queue-ai-title">ร้านที่เปิดให้สั่งอยู่ตอนนี้</h2>
             </div>
           </div>
 
+          {/* Three shops were ranked here — ร้านป้าแดง "อร่อยอันดับ 1 ใกล้คุณ"
+              4.9/5 serving in 8 minutes, ร้านก๋วยเตี๋ยวเรือเสือร้องไห้ "เสิร์ฟไว
+              อันดับ 1", ร้านสเต็กพี่ตั้ม "ยอดนิยมสูงสุด" — beside a line reading
+              "ตำแหน่งของคุณ: อาคารเรียน 2". None of the shops exist, nothing
+              measures a serve time, no rating was ever collected and the app
+              knows nobody's location. These are the real ones, showing what a
+              shop document actually holds. */}
           <div className="queue-ai-cards-grid">
-            <div
-              className="queue-ai-shop-card"
-              onClick={() => navigate("/search?keyword=ป้าแดง")}
-            >
-              <span className="queue-ai-badge-rank">
-                <i className="bi bi-trophy-fill text-warning me-1" /> อร่อยอันดับ 1 ใกล้คุณ
-              </span>
-              <div className="queue-ai-shop-name">ร้านป้าแดง ตามสั่ง & ไก่ทอด</div>
-              <div className="queue-ai-shop-meta">
-                <span><i className="bi bi-star-fill text-warning me-1" /> 4.9 / 5</span>
-                <span>• เสิร์ฟไวเฉลี่ย 8 นาที</span>
+            {openShops.length === 0 && (
+              <div className="text-muted small">ยังไม่มีร้านค้าที่เปิดรับออเดอร์ในขณะนี้</div>
+            )}
+            {openShops.map((shop) => (
+              <div
+                key={shop.id}
+                className="queue-ai-shop-card"
+                onClick={() => navigate(`/search?keyword=${encodeURIComponent(shop.storeName || shop.name || shop.id)}`)}
+              >
+                <span className="queue-ai-badge-rank bg-emerald-600">
+                  <i className="bi bi-door-open-fill text-warning me-1" /> เปิดรับออเดอร์
+                </span>
+                <div className="queue-ai-shop-name">{shop.storeName || shop.name || shop.id}</div>
+                <div className="queue-ai-shop-meta">
+                  <span>
+                    <i className="bi bi-geo-alt-fill text-danger me-1" />
+                    {shop.canteenLocation || shop.location || "ไม่ระบุตำแหน่ง"}
+                  </span>
+                  {shop.storeHours && <span>• {shop.storeHours}</span>}
+                </div>
               </div>
-            </div>
-
-            <div
-              className="queue-ai-shop-card"
-              onClick={() => navigate("/search?keyword=ก๋วยเตี๋ยว")}
-            >
-              <span className="queue-ai-badge-rank bg-emerald-600">
-                <i className="bi bi-lightning-fill text-warning me-1" /> เสิร์ฟไวอันดับ 1
-              </span>
-              <div className="queue-ai-shop-name">ร้านก๋วยเตี๋ยวเรือเสือร้องไห้</div>
-              <div className="queue-ai-shop-meta">
-                <span><i className="bi bi-star-fill text-warning me-1" /> 4.8 / 5</span>
-                <span>• เสิร์ฟไวเฉลี่ย 4 นาที</span>
-              </div>
-            </div>
-
-            <div
-              className="queue-ai-shop-card"
-              onClick={() => navigate("/search?keyword=สเต็ก")}
-            >
-              <span className="queue-ai-badge-rank bg-purple-600">
-                <i className="bi bi-award-fill text-warning me-1" /> ยอดนิยมสูงสุด
-              </span>
-              <div className="queue-ai-shop-name">ร้านสเต็กพี่ตั้ม School Food</div>
-              <div className="queue-ai-shop-meta">
-                <span><i className="bi bi-star-fill text-warning me-1" /> 4.9 / 5</span>
-                <span>• คิวรอน้อยกว่า 12 นาที</span>
-              </div>
-            </div>
+            ))}
           </div>
         </section>
 
-        {/* 7.1 Daily Menu Board — per-shop announcements for today */}
-        <DailyMenuBoard />
-
-        {/* 7.2 Shop Reels — short menu videos from shops and student vendors */}
-        <ShopReelsFeed />
+        {/* Two sections stood here and both were fiction.
+            DailyMenuBoard listed "ประกาศประจำวัน" from ร้านป้าแดง, ร้านก๋วยเตี๋ยว
+            เรือเสือร้องไห้ and ร้านสเต็กพี่ตั้ม — shops that do not exist — over a
+            Mon–Fri grid of specials nothing schedules. ShopReelsFeed showed
+            cooking videos with like counts, linking to a productId that resolves
+            to nothing; there is no video upload and no storage for one.
+            What is on today is the real catalogue, in the section below. */}
 
         {/* 8. Food Catalog Grid with Interactive Filters & Sorting */}
         <section className="bg-white p-4 rounded-4 shadow-sm border mb-4">

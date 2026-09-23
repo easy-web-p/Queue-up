@@ -3,7 +3,16 @@ import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { switchRole, clearUser } from "../store/authSlice.js";
 import { db, doc, getDoc, setDoc } from "../firebase/config.js";
-import { collection, query, where, onSnapshot, updateDoc, serverTimestamp } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  updateDoc,
+  getDocs,
+  deleteDoc,
+  serverTimestamp,
+} from "firebase/firestore";
 import { MerchantKDS } from "../components/MerchantKDS.tsx";
 import ChatModal from "../components/ChatModal.jsx";
 import BookingCalendar from "../components/BookingCalendar.jsx";
@@ -143,6 +152,7 @@ function MerchantDashboard() {
     };
   }, [currentStoreId]);
 
+  const [maxOrdersPerSlot, setMaxOrdersPerSlot] = useState(20);
   const [storeName, setStoreName] = useState(initialStore.name);
   const [storePhone, setStorePhone] = useState(initialStore.phone);
   const [canteenLocation, setCanteenLocation] = useState(initialStore.location);
@@ -152,11 +162,41 @@ function MerchantDashboard() {
   const [privateAccountNo, setPrivateAccountNo] = useState("");
   const [privateAccountOwner, setPrivateAccountOwner] = useState("");
 
-  const [staffList, setStaffList] = useState([
-    { uid: "STF01", name: "นางสาวมยุรี ใจดี", role: "พนักงานรับออเดอร์/แคชเชียร์", phone: "082-111-2233" },
-    { uid: "STF02", name: "นายประสิทธิ์ ขยันทำงาน", role: "พ่อครัว/ผู้ช่วยเตรียมอาหาร", phone: "083-444-5566" },
-  ]);
+  /**
+   * The people who can work this stall, from shops/{storeId}/staff.
+   *
+   * This was two invented colleagues — นางสาวมยุรี ใจดี and นายประสิทธิ์
+   * ขยันทำงาน, with phone numbers — shown to every merchant as their own staff,
+   * and add and remove both only touched React state. A merchant revoked
+   * someone's access, watched the row disappear, and reloaded to find them back.
+   *
+   * Same collection the admin console reads and writes, so the two agree.
+   */
+  const [staffList, setStaffList] = useState([]);
+  const [staffStatus, setStaffStatus] = useState('loading');
+
+  useEffect(() => {
+    if (!currentStoreId) return undefined;
+    let cancelled = false;
+    async function loadStaff() {
+      try {
+        const snap = await getDocs(collection(db, 'shops', currentStoreId, 'staff'));
+        if (cancelled) return;
+        setStaffList(snap.docs.map((d) => ({ ...d.data(), id: d.id })));
+        setStaffStatus('ready');
+      } catch (err) {
+        console.error('[MerchantDashboard] could not load staff:', err);
+        if (!cancelled) setStaffStatus('error');
+      }
+    }
+    loadStaff();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentStoreId]);
+
   const [newStaffName, setNewStaffName] = useState("");
+  const [newStaffPhone, setNewStaffPhone] = useState("");
   const [newStaffRole, setNewStaffRole] = useState("พนักงานรับออเดอร์/แคชเชียร์");
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
 
@@ -265,6 +305,9 @@ function MerchantDashboard() {
           if (sData.phone) setStorePhone(sData.phone);
           if (sData.canteenLocation) setCanteenLocation(sData.canteenLocation);
           if (sData.storeHours) setStoreHours(sData.storeHours);
+          // The booking calendar's "full" threshold. Read rather than assumed,
+          // so a stall that takes 40 orders a slot is not painted red at 20.
+          if (Number(sData.maxOrdersPerSlot) > 0) setMaxOrdersPerSlot(Number(sData.maxOrdersPerSlot));
         }
       });
     }
@@ -567,20 +610,57 @@ function MerchantDashboard() {
     }
   };
 
-  const handleAddStaff = (e) => {
+  const handleAddStaff = async (e) => {
     e.preventDefault();
     if (!newStaffName.trim()) return;
+    if (!currentStoreId) {
+      toast.error("ไม่พบรหัสร้านค้า — ยังเพิ่มพนักงานไม่ได้");
+      return;
+    }
 
+    // Firestore's own id. `STF0${staffList.length + 1}` repeats the moment
+    // anyone is removed, and a merge write on a repeated id overwrites one
+    // person's access record with another's.
+    const ref = doc(collection(db, "shops", currentStoreId, "staff"));
     const newStaff = {
-      uid: `STF0${staffList.length + 1}`,
-      name: newStaffName,
+      id: ref.id,
+      name: newStaffName.trim(),
       role: newStaffRole,
-      phone: "089-XXX-XXXX",
+      phone: newStaffPhone.trim() || "",
+      status: "Active",
     };
 
-    setStaffList([...staffList, newStaff]);
-    setNewStaffName("");
-    setIsAddStaffOpen(false);
+    try {
+      await setDoc(ref, newStaff, { merge: true });
+      setStaffList((prev) => [...prev, newStaff]);
+      setNewStaffName("");
+      setNewStaffPhone("");
+      setIsAddStaffOpen(false);
+      toast.success(`เพิ่มพนักงาน ${newStaff.name} เรียบร้อยแล้ว`);
+    } catch (err) {
+      console.error("[MerchantDashboard] add staff failed:", err);
+      toast.error(`เพิ่มพนักงานไม่สำเร็จ: ${errorMessage(err)}`);
+    }
+  };
+
+  const handleRemoveStaff = async (member) => {
+    if (!currentStoreId) return;
+    const ok = await toast.confirm({
+      title: `ลบสิทธิ์ของ ${member.name}`,
+      message: "พนักงานคนนี้จะไม่สามารถเข้าถึงระบบหลังร้านได้อีก",
+      confirmLabel: "ลบสิทธิ์",
+      tone: "error",
+    });
+    if (!ok) return;
+
+    try {
+      await deleteDoc(doc(db, "shops", currentStoreId, "staff", member.id));
+      setStaffList((prev) => prev.filter((s2) => s2.id !== member.id));
+      toast.success(`ลบสิทธิ์ของ ${member.name} เรียบร้อยแล้ว`);
+    } catch (err) {
+      console.error("[MerchantDashboard] remove staff failed:", err);
+      toast.error(`ลบสิทธิ์ไม่สำเร็จ: ${errorMessage(err)}`);
+    }
   };
 
   const handleSwitchToStudentView = () => {
@@ -766,7 +846,12 @@ function MerchantDashboard() {
         {/* TAB 2: BOOKING & PREP PLANNER */}
         {activeTab === "planner" && (
           <div className="merchant-panel-box">
-            <BookingCalendar viewMode="merchant" storeId={currentStoreId} orders={merchantOrders} />
+            <BookingCalendar
+              viewMode="merchant"
+              storeId={currentStoreId}
+              orders={merchantOrders}
+              maxOrdersPerSlot={maxOrdersPerSlot}
+            />
           </div>
         )}
 
@@ -994,7 +1079,18 @@ function MerchantDashboard() {
                       <option value="ผู้ดูแลระบบร้านค้าประจำสาขา">ผู้ดูแลระบบร้านค้าประจำสาขา</option>
                     </select>
                   </div>
-                  <div className="col-md-2">
+                  <div className="col-md-8">
+                    {/* The phone number used to be hardcoded as "089-XXX-XXXX"
+                        on every staff record. Asked for, or left empty. */}
+                    <input
+                      type="tel"
+                      className="form-control"
+                      placeholder="เบอร์โทรศัพท์ (ไม่บังคับ)"
+                      value={newStaffPhone}
+                      onChange={(e) => setNewStaffPhone(e.target.value)}
+                    />
+                  </div>
+                  <div className="col-md-4">
                     <button type="submit" className="btn btn-success w-100 font-weight-bold">
                       เพิ่มสิทธิ์
                     </button>
@@ -1015,9 +1111,30 @@ function MerchantDashboard() {
                   </tr>
                 </thead>
                 <tbody>
+                  {/* Loading, empty and failed told apart. With two invented
+                      colleagues always present, none of these states existed. */}
+                  {staffStatus === "loading" && (
+                    <tr>
+                      <td colSpan={5} className="text-muted small py-3">กำลังโหลดรายชื่อพนักงาน…</td>
+                    </tr>
+                  )}
+                  {staffStatus === "error" && (
+                    <tr>
+                      <td colSpan={5} className="text-danger small py-3">
+                        โหลดรายชื่อพนักงานไม่สำเร็จ — รายชื่อด้านล่างอาจไม่ครบถ้วน
+                      </td>
+                    </tr>
+                  )}
+                  {staffStatus === "ready" && staffList.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="text-muted small py-3">
+                        ยังไม่มีพนักงานในร้านนี้ กดปุ่มด้านบนเพื่อเพิ่ม
+                      </td>
+                    </tr>
+                  )}
                   {staffList.map((stf) => (
-                    <tr key={stf.uid}>
-                      <td className="fw-bold">{stf.uid}</td>
+                    <tr key={stf.id}>
+                      <td className="fw-bold">{stf.id}</td>
                       <td>{stf.name}</td>
                       <td>
                         <span className="badge bg-primary-subtle text-primary border border-primary-subtle">
@@ -1028,7 +1145,7 @@ function MerchantDashboard() {
                       <td>
                         <button
                           className="btn btn-sm btn-outline-danger"
-                          onClick={() => setStaffList(staffList.filter((s) => s.uid !== stf.uid))}
+                          onClick={() => void handleRemoveStaff(stf)}
                         >
                           ลบสิทธิ์
                         </button>

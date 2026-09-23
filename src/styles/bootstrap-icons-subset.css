@@ -7,7 +7,7 @@
  * Generator:  node .vr/enumerate-icons.mjs && node .vr/subset-icons.mjs
  * Verified:   npm run test:icons
  *
- * 193 of 2,078 icons — the ones this project actually renders.
+ * 194 of 2,078 icons — the ones this project actually renders.
  *
  * The full package ships a 134 KB woff2, a 180 KB woff fallback and a 79 KB
  * stylesheet declaring every glyph. The fallback is dropped: it exists for
@@ -110,6 +110,7 @@
 .bi-database-fill-gear::before { content: "\f8b9"; }
 .bi-diagram-3-fill::before { content: "\f2ed"; }
 .bi-door-open::before { content: "\f308"; }
+.bi-door-open-fill::before { content: "\f307"; }
 .bi-droplet::before { content: "\f30d"; }
 .bi-droplet-half::before { content: "\f30c"; }
 .bi-egg::before { content: "\f313"; }
