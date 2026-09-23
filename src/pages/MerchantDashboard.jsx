@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { switchRole, clearUser } from "../store/authSlice.js";
 import { db, doc, getDoc, setDoc } from "../firebase/config.js";
 import { collection, query, where, onSnapshot, updateDoc, serverTimestamp } from "firebase/firestore";
-import { SHARED_PRODUCTS } from "../data/mockProducts.js";
 import { MerchantKDS } from "../components/MerchantKDS.tsx";
 import ChatModal from "../components/ChatModal.jsx";
 import BookingCalendar from "../components/BookingCalendar.jsx";
@@ -16,6 +15,9 @@ import {
   fetchStoreModifierGroups,
   createStoreModifierGroup,
   toggleStoreModifierOptionStock,
+  fetchStoreProducts,
+  createStoreProduct,
+  updateStoreProduct,
 } from "../services/catalogService";
 import {
   generateAIMarketingRecommendations,
@@ -27,6 +29,7 @@ import { getSecurityHealthReport } from "../services/aiSecurityShield.js";
 import { recordAuditLog } from "../services/storeIsolationEngine.js";
 import Footer from "../components/Footer.jsx";
 import { useToast } from "../components/ToastProvider.jsx";
+import { errorMessage } from "../utils/errorMessage";
 import "./MerchantDashboard.css";
 
 function MerchantDashboard() {
@@ -95,23 +98,50 @@ function MerchantDashboard() {
   const [merchantOrders, setMerchantOrders] = useState([]);
   const [modifierGroups, setModifierGroups] = useState([]);
 
-  const [menuItems, setMenuItems] = useState(() => {
-    if (initialStore.storeId) {
-      const savedMenu = localStorage.getItem(`queueup_merchant_menu_${initialStore.storeId}`);
-      if (savedMenu) {
-        try {
-          return JSON.parse(savedMenu);
-        } catch {
-          // ignore
-        }
-      }
-      return SHARED_PRODUCTS.filter((p) => p.storeId === initialStore.storeId).map((p) => ({
-        ...p,
-        isAvailable: true,
-      }));
+  // The menu, from the products collection.
+  //
+  // It was seeded from localStorage or, failing that, from SHARED_PRODUCTS —
+  // so a merchant managed a menu of dishes they do not sell, and every edit
+  // below only called setMenuItems. Marking something out of stock changed the
+  // screen and nothing else; students kept ordering it. A price edit never
+  // reached a single customer.
+  const [menuItems, setMenuItems] = useState([]);
+  const [menuStatus, setMenuStatus] = useState('loading');
+
+  const loadMenu = useCallback(async () => {
+    if (!currentStoreId) {
+      setMenuStatus('ready');
+      return;
     }
-    return [];
-  });
+    try {
+      setMenuItems(await fetchStoreProducts(db, currentStoreId));
+      setMenuStatus('ready');
+    } catch (err) {
+      console.error('[MerchantDashboard] could not load the menu:', err);
+      setMenuStatus('error');
+    }
+  }, [currentStoreId]);
+
+  useEffect(() => {
+    if (!currentStoreId) return undefined;
+    let cancelled = false;
+    async function load() {
+      try {
+        const rows = await fetchStoreProducts(db, currentStoreId);
+        if (!cancelled) {
+          setMenuItems(rows);
+          setMenuStatus('ready');
+        }
+      } catch (err) {
+        console.error('[MerchantDashboard] could not load the menu:', err);
+        if (!cancelled) setMenuStatus('error');
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentStoreId]);
 
   const [storeName, setStoreName] = useState(initialStore.name);
   const [storePhone, setStorePhone] = useState(initialStore.phone);
@@ -318,40 +348,68 @@ function MerchantDashboard() {
     }
   };
 
-  const handleToggleProductStatus = (productId) => {
-    setMenuItems((prev) =>
-      prev.map((p) => (p.id === productId ? { ...p, isAvailable: !p.isAvailable } : p))
-    );
+  /**
+   * Every menu edit, through the catalogue service.
+   *
+   * These each called `setMenuItems` and stopped. The row on screen changed and
+   * Firestore did not, so a dish marked out of stock stayed on sale, a price
+   * change never reached a customer, and a declared allergen never reached the
+   * allergen guard — the one that exists to stop a child being served something
+   * they react to.
+   *
+   * The local state is updated after the write succeeds, not before: a failure
+   * must leave the screen showing what the database actually holds.
+   */
+  const applyMenuEdit = async (productId, updates, optimistic) => {
+    const target = menuItems.find((p) => p.id === productId);
+    if (!target) return;
+    try {
+      await updateStoreProduct(db, target.storeId || currentStoreId, productId, updates);
+      setMenuItems((prev) => prev.map((p) => (p.id === productId ? { ...p, ...optimistic } : p)));
+    } catch (err) {
+      console.error('[MerchantDashboard] menu update failed:', err);
+      toast.error(`บันทึกการแก้ไขเมนูไม่สำเร็จ: ${errorMessage(err)}`);
+      await loadMenu();
+    }
   };
 
-  // Menu edits stay on the same local + localStorage state the menu tab has always
-  // used; MerchantMenuManager replaces a read-only grid whose "add item" button only
-  // raised an alert, so create/price/stock actually work now.
+  const handleToggleProductStatus = (productId) => {
+    const target = menuItems.find((p) => p.id === productId);
+    if (!target) return;
+    const next = !target.isAvailable;
+    void applyMenuEdit(productId, { isAvailable: next }, { isAvailable: next });
+  };
+
   const handleUpdateStock = (productId, newStock) => {
-    setMenuItems((prev) =>
-      prev.map((p) => (p.id === productId ? { ...p, stock: Math.max(0, Number(newStock) || 0) } : p))
-    );
+    const stock = Math.max(0, Number(newStock) || 0);
+    void applyMenuEdit(productId, { stock }, { stock });
   };
 
   const handleUpdatePrice = (productId, newPrice) => {
     const price = Number(newPrice);
     if (!Number.isFinite(price) || price <= 0) return;
-    setMenuItems((prev) =>
-      prev.map((p) => (p.id === productId ? { ...p, price, priceSatang: Math.round(price * 100) } : p))
-    );
+    // updateStoreProduct derives priceSatang from this one number, so the two
+    // money fields cannot drift apart.
+    void applyMenuEdit(productId, { price }, { price, priceSatang: Math.round(price * 100) });
   };
 
   const handleUpdateAllergens = (productId, allergenIds) => {
-    setMenuItems((prev) =>
-      prev.map((p) => (p.id === productId ? { ...p, allergens: allergenIds } : p))
-    );
+    void applyMenuEdit(productId, { allergens: allergenIds }, { allergens: allergenIds });
   };
 
-  const handleAddNewItem = (item) => {
-    setMenuItems((prev) => [
-      ...prev,
-      { ...item, id: `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, storeId: currentStoreId },
-    ]);
+  const handleAddNewItem = async (item) => {
+    if (!currentStoreId) {
+      toast.error('ไม่พบรหัสร้านค้า — ยังเพิ่มเมนูไม่ได้');
+      return;
+    }
+    try {
+      const created = await createStoreProduct(db, currentStoreId, item);
+      setMenuItems((prev) => [...prev, created]);
+      toast.success(`เพิ่มเมนู ${created.name} เรียบร้อยแล้ว`);
+    } catch (err) {
+      console.error('[MerchantDashboard] add item failed:', err);
+      toast.error(`เพิ่มเมนูไม่สำเร็จ: ${errorMessage(err)}`);
+    }
   };
 
   // Repeat customers, aggregated from this store's own orders. Derived rather than
@@ -715,6 +773,24 @@ function MerchantDashboard() {
         {/* TAB 3: MENU MANAGEMENT */}
         {activeTab === "menu" && (
           <div className="merchant-panel-box">
+            {/* Loading and failed are not the same as an empty menu. A merchant
+                seeing no dishes needs to know whether the read failed, which the
+                mock seed made impossible — there was always something there. */}
+            {menuStatus === "loading" && (
+              <p className="text-muted small mb-3" role="status">
+                กำลังโหลดเมนูของร้าน…
+              </p>
+            )}
+            {menuStatus === "error" && (
+              <div className="alert alert-danger d-flex justify-content-between align-items-center" role="alert">
+                <span className="small mb-0">
+                  โหลดเมนูของร้านไม่สำเร็จ — การแก้ไขในหน้านี้จะยังไม่ถูกบันทึก
+                </span>
+                <button type="button" className="btn btn-sm btn-danger" onClick={() => void loadMenu()}>
+                  ลองใหม่
+                </button>
+              </div>
+            )}
             <MerchantMenuManager
               storeId={currentStoreId}
               menuItems={menuItems}

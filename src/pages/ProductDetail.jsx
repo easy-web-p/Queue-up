@@ -8,14 +8,19 @@ import { collection, addDoc, query, where, getDocs, serverTimestamp } from "fire
 import ShopeeSearchBar from "../components/ShopeeSearchBar.jsx";
 import ChatModal from "../components/ChatModal.jsx";
 import Footer from "../components/Footer.jsx";
-import { PRODUCTS_BY_ID, SHARED_PRODUCTS, SHARED_SHOPS } from "../data/mockProducts.js";
 import {
+  fetchProductsFromFirestore,
   fetchProductByIdFromFirestore,
   fetchStoreByIdFromFirestore,
   checkUserFavoriteInFirestore,
   toggleUserFavoriteInFirestore,
   fetchLiveSlotCapacities,
 } from "../lib/firebase.js";
+import { EmptyState, ErrorState } from "../components/LoadingStates.jsx";
+import {
+  averageRating as computeAverageRating,
+  ratingDistribution,
+} from "../services/reviewStats";
 import { useToast } from "../components/ToastProvider.jsx";
 import "./ProductDetail.css";
 
@@ -330,49 +335,20 @@ function getCategoryModifiers(category, productTitle = "") {
 
 // ⭐ CUSTOMER REVIEWS MOCK DATA
 
-function resolveProductByParam(rawParam) {
-  if (!rawParam) return PRODUCTS_BY_ID.m1;
-
-  const decoded = decodeURIComponent(rawParam).trim();
-
-  // 1. Direct match by ID (e.g. m1, m2)
-  if (PRODUCTS_BY_ID[decoded]) return PRODUCTS_BY_ID[decoded];
-  if (PRODUCTS_BY_ID[rawParam]) return PRODUCTS_BY_ID[rawParam];
-
-  // 2. Match by exact product name or title or encoded name
-  const foundByName = SHARED_PRODUCTS.find((p) => {
-    if (!p) return false;
-    const pName = (p.name || "").trim();
-    const pTitle = (p.title || "").trim();
-    return (
-      pName === decoded ||
-      pTitle === decoded ||
-      encodeURIComponent(pName) === rawParam ||
-      encodeURIComponent(pTitle) === rawParam ||
-      pName.includes(decoded) ||
-      decoded.includes(pName)
-    );
-  });
-
-  return foundByName || PRODUCTS_BY_ID.m1;
-}
-
-function resolveStoreByStoreId(storeId) {
-  if (!storeId) return SHARED_SHOPS[0];
-  const found = SHARED_SHOPS.find((s) => s.id === storeId);
-  return (
-    found || {
-      id: storeId,
-      name: "ร้านป้าแดง ตามสั่ง & ไก่ทอด",
-      location: "โรงอาหาร 2 (โรงอาหารกลาง 1) ชั้น 1 • ช่อง 04",
-      hours: "07:00 - 14:30 น.",
-      rating: 4.8,
-      reviewsCount: 1840,
-      isOpen: true,
-      status: "open",
-    }
-  );
-}
+/**
+ * There is no fallback catalogue here any more.
+ *
+ * `resolveProductByParam` used to return `PRODUCTS_BY_ID.m1` for any id
+ * Firestore did not have — so a link to a dish that had been deleted, or a
+ * mistyped id, or a permissions failure, all opened a real-looking page for
+ * "ชุดไก่บักเก็ตซอสเกาหลี" at ฿69, rating 4.9, and let you order it. Its
+ * companion `resolveStoreByStoreId` invented "ร้านป้าแดง ตามสั่ง & ไก่ทอด" with
+ * 1,840 reviews and a Bangkok street address.
+ *
+ * The same mistake the menu list made once: a missing thing looked exactly like
+ * a present one. Loading, missing and failed are three different outcomes, and
+ * the page now shows three different things.
+ */
 
 function ProductDetail() {
   const toast = useToast();
@@ -384,13 +360,15 @@ function ProductDetail() {
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
 
-  const initialProduct = resolveProductByParam(id);
-  const [product, setProduct] = useState(initialProduct);
+  // No initial product. It used to open on a dish from the mock catalogue while
+  // the real read was in flight, so the page flashed the wrong food — and stayed
+  // on it whenever the read found nothing.
+  const [product, setProduct] = useState(null);
+  const [store, setStore] = useState(null);
+  /** 'loading' | 'ready' | 'notfound' | 'error' — three outcomes, not one. */
+  const [loadState, setLoadState] = useState('loading');
 
-  const initialStore = resolveStoreByStoreId(initialProduct.storeId);
-  const [store, setStore] = useState(initialStore);
-
-  const [selectedImg, setSelectedImg] = useState(initialProduct.mainImg || initialProduct.image);
+  const [selectedImg, setSelectedImg] = useState(null);
   const [quantity, setQuantity] = useState(1);
   
   // 📅 Calendar Date Selection State
@@ -399,9 +377,6 @@ function ProductDetail() {
   const [timeSlots, setTimeSlots] = useState(BASE_TIME_SLOTS);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState(BASE_TIME_SLOTS[1]);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
-
-  // 🗺️ Canteen Walking Guide Modal State
-  const [isMapModalOpen, setIsMapModalOpen] = useState(false);
 
   // 💬 Chat & Favorite States
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -546,30 +521,43 @@ function ProductDetail() {
 
   const matchedAllergens = allergenResult.matchedAllergenNames;
 
-  // Load Product & Store from Firestore database service layer
+  // Load the product and its store. Firestore is the only source.
   useEffect(() => {
     let isMounted = true;
     async function loadProductAndStoreData() {
-      const decoded = decodeURIComponent(id || "").trim();
-      let docData = await fetchProductByIdFromFirestore(id);
-      if (!docData && decoded !== id) {
-        docData = await fetchProductByIdFromFirestore(decoded);
-      }
+      try {
+        const decoded = decodeURIComponent(id || "").trim();
+        let docData = await fetchProductByIdFromFirestore(id);
+        if (!docData && decoded !== id) {
+          docData = await fetchProductByIdFromFirestore(decoded);
+        }
+        if (!isMounted) return;
 
-      if (isMounted) {
-        const resolvedProd = docData || resolveProductByParam(id);
-        setProduct(resolvedProd);
-        setSelectedImg(resolvedProd.mainImg || resolvedProd.image);
+        if (!docData) {
+          // Missing is missing. Showing another dish here is how someone orders
+          // food they never chose.
+          setLoadState('notfound');
+          return;
+        }
 
-        // Load Store Data from Database / Service Layer
-        const storeData = await fetchStoreByIdFromFirestore(resolvedProd.storeId);
-        setStore(storeData || resolveStoreByStoreId(resolvedProd.storeId));
+        setProduct(docData);
+        setSelectedImg(docData.mainImg || docData.image || null);
+        setLoadState('ready');
 
-        // Check Favorite Status if user logged in
-        if (user && user.uid && resolvedProd.id) {
-          const favStatus = await checkUserFavoriteInFirestore(user.uid, resolvedProd.id);
+        const storeData = await fetchStoreByIdFromFirestore(docData.storeId);
+        if (!isMounted) return;
+        // No invented shop. Without a store document the page shows the id it
+        // has rather than a name, a rating and 1,840 reviews nobody wrote.
+        setStore(storeData || { id: docData.storeId });
+
+        if (user && user.uid && docData.id) {
+          const favStatus = await checkUserFavoriteInFirestore(user.uid, docData.id);
           if (isMounted) setIsFavorite(favStatus);
         }
+      } catch (err) {
+        console.error("[ProductDetail] could not load the product:", err);
+        // A failed read is not an empty canteen and not a missing dish.
+        if (isMounted) setLoadState('error');
       }
     }
     loadProductAndStoreData();
@@ -651,14 +639,37 @@ function ProductDetail() {
   const unitPrice = basePrice + dynamicModifiersPrice;
   const totalCalculatedPrice = unitPrice * quantity;
 
-  // 15. Store Menu Recommendations
-  const recommendedProducts = useMemo(() => {
-    const storeId = product?.storeId || store?.id || store?.storeId;
-    if (!storeId) return [];
-    return SHARED_PRODUCTS.filter(
-      (p) => p.storeId === storeId && p.id !== product.id
-    ).slice(0, 4);
-  }, [product, store]);
+  // 15. Other dishes from this store — the store's real ones.
+  //
+  // These came from SHARED_PRODUCTS, so the "เมนูอื่นจากร้านนี้" strip
+  // recommended dishes the stall does not sell, each linking to another page
+  // that would itself fall back to the mock catalogue.
+  const [storeMenu, setStoreMenu] = useState([]);
+
+  useEffect(() => {
+    const storeId = product?.storeId;
+    if (!storeId) return undefined;
+    let cancelled = false;
+    async function loadStoreMenu() {
+      try {
+        const all = await fetchProductsFromFirestore();
+        if (cancelled) return;
+        setStoreMenu(all.filter((p) => p.storeId === storeId && p.id !== product.id).slice(0, 4));
+      } catch (err) {
+        console.warn("[ProductDetail] could not load the store menu:", err);
+      }
+    }
+    loadStoreMenu();
+    return () => {
+      cancelled = true;
+    };
+  }, [product?.storeId, product?.id]);
+
+  const recommendedProducts = storeMenu;
+
+  /** The average of the ratings actually left, and how they are distributed. */
+  const averageRating = useMemo(() => computeAverageRating(reviews), [reviews]);
+  const ratingCounts = useMemo(() => ratingDistribution(reviews), [reviews]);
 
   // 11. Profile Completeness Check
   const checkProfileCompleteness = async () => {
@@ -910,6 +921,54 @@ function ProductDetail() {
     store?.status === "closed" ||
     product?.availability === false;
 
+  // Loading, missing and failed, told apart.
+  //
+  // All three used to render the same full product page — for a dish out of the
+  // mock catalogue — so a deleted item, a mistyped link and a permissions error
+  // were each indistinguishable from a real menu item you could add to a cart.
+  if (loadState !== 'ready' || !product) {
+    return (
+      <div className="queue-pd-container">
+        <ShopeeSearchBar />
+        <div className="queue-pd-wrapper">
+          <div className="py-5">
+            {loadState === 'loading' && (
+              <div className="text-center py-5" role="status">
+                <div className="spinner-border text-danger mb-3" aria-hidden="true" />
+                <p className="text-muted mb-0">กำลังโหลดข้อมูลเมนู…</p>
+              </div>
+            )}
+
+            {loadState === 'notfound' && (
+              <EmptyState
+                icon={<i className="bi bi-search fs-1" aria-hidden="true" />}
+                title="ไม่พบเมนูนี้ในระบบ"
+                message="เมนูนี้อาจถูกร้านค้านำออกไปแล้ว หรือลิงก์ที่ใช้ไม่ถูกต้อง"
+                action={
+                  <button
+                    type="button"
+                    className="btn btn-danger rounded-pill fw-bold px-4"
+                    onClick={() => navigate("/search?keyword=ทั้งหมด")}
+                  >
+                    ดูเมนูทั้งหมดในโรงอาหาร
+                  </button>
+                }
+              />
+            )}
+
+            {loadState === 'error' && (
+              <ErrorState
+                message="ไม่สามารถโหลดข้อมูลเมนูได้ กรุณาตรวจสอบการเชื่อมต่อแล้วลองใหม่อีกครั้ง"
+                onRetry={() => window.location.reload()}
+              />
+            )}
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
   return (
     <div className="queue-pd-container queue-pd-has-order-bar">
       <ShopeeSearchBar />
@@ -925,7 +984,7 @@ function ProductDetail() {
             โรงอาหารกลาง (โรงอาหาร 2)
           </span>
           <span className="text-muted">/</span>
-          <span className="text-muted">{store.name || product.shopName}</span>
+          <span className="text-muted">{store?.name || product.shopName || store?.id || "ร้านค้า"}</span>
           <span className="text-muted">/</span>
           <span className="fw-bold text-dark">{product.name}</span>
         </div>
@@ -1009,7 +1068,7 @@ function ProductDetail() {
             <div className="queue-pd-shop-banner-box">
               <img loading="lazy" decoding="async"
                 src={product.shopBanner || store.banner}
-                alt={store.name || product.shopName}
+                alt={store?.name || product.shopName || store?.id || "ร้านค้า"}
                 className="queue-pd-shop-banner-img"
                 onError={(e) => {
                   e.currentTarget.onerror = null;
@@ -1045,14 +1104,21 @@ function ProductDetail() {
             {/* Store Meta */}
             <div className="d-flex justify-content-between align-items-center">
               <div>
-                <h1 className="queue-pd-shop-title mb-0">{store.name || product.shopName}</h1>
+                <h1 className="queue-pd-shop-title mb-0">{store?.name || product.shopName || store?.id || "ร้านค้า"}</h1>
                 <div className="queue-pd-shop-hours small text-muted">
-                  <i className="bi bi-clock me-1 text-primary" /> เวลาทำการ: {store.hours || "07:00 - 14:30 น."}
+                  <i className="bi bi-clock me-1 text-primary" /> เวลาทำการ: {store?.hours || "ไม่ระบุ"}
                 </div>
               </div>
               <div className="queue-pd-shop-rating">
-                <i className="bi bi-star-fill text-warning me-1" /> {store.rating || 4.8}
-                <span className="text-muted small fw-normal ms-1">({store.reviewsCount || "1.8k"})</span>
+                {/* Was `store.rating || 4.8` and `|| "1.8k"` — a shop with no
+                    ratings showed 4.8 stars from 1,800 reviews that did not exist. */}
+                <i className="bi bi-star-fill text-warning me-1" />{" "}
+                {Number.isFinite(Number(store?.rating)) && Number(store?.rating) > 0
+                  ? Number(store.rating).toFixed(1)
+                  : "ยังไม่มีคะแนน"}
+                {Number(store?.reviewsCount) > 0 && (
+                  <span className="text-muted small fw-normal ms-1">({store.reviewsCount})</span>
+                )}
               </div>
             </div>
 
@@ -1361,100 +1427,41 @@ function ProductDetail() {
           </div>
         </div>
 
-        {/* 3. 🗺️ SECTION: CANTEEN INDOOR MAP & WAYFINDING */}
+        {/* 3. 📍 SECTION: WHERE TO COLLECT
+            A simulated floor plan stood here: four invented stalls with
+            "ล็อค 04: ป้าแดง" always the destination whichever shop you were
+            looking at, a 40-second walking time, a column C3 with a green
+            QueueUp sign, a "QueueUp Locker" that does not exist, and a bowl
+            return point ten paces away. Every product page showed the same map.
+            A store has one piece of location data — the text its owner typed —
+            so that is what this shows. */}
         <section className="queue-pd-canteen-map-section mt-4">
           <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
             <div>
               <h2 className="fs-5 fw-bold text-dark d-flex align-items-center gap-2 mb-1">
-                <i className="bi bi-geo-alt-fill text-primary" /> แผนที่เดินทางไปร้าน &amp; ผังจุดรับอาหาร
+                <i className="bi bi-geo-alt-fill text-primary" /> จุดรับอาหาร
               </h2>
               <p className="text-muted small mb-0">
-                โรงอาหาร 2 (โรงอาหารกลาง 1) ชั้น 1 • ช่องจำหน่าย 04 ใกล้ประตูทางเข้าทิศเหนือ
+                {store?.location || store?.building || "ร้านค้ายังไม่ได้ระบุตำแหน่งจุดรับอาหาร"}
               </p>
             </div>
-            <button
-              type="button"
-              className="btn btn-outline-primary btn-sm rounded-pill fw-bold"
-              onClick={() => setIsMapModalOpen(true)}
-            >
-              <i className="bi bi-compass me-1" /> เปิดแผนที่นำทาง (Walking Guide)
-            </button>
           </div>
 
-          <div className="row g-3 items-center">
-            {/* Left: Interactive Simulated Canteen Blueprint Floor Plan */}
-            <div className="col-12 col-lg-8">
-              <div className="queue-pd-blueprint-card">
-                <div className="queue-pd-blueprint-header">
-                  <span><i className="bi bi-door-open text-primary me-1" /> ทางเข้าทิศเหนือ (North Gate)</span>
-                  <span className="badge bg-secondary-subtle text-secondary">โรงอาหาร 2 ชั้น 1 (Zone A)</span>
-                  <span><i className="bi bi-layers me-1" /> บันไดขึ้นชั้น 2</span>
-                </div>
-
-                {/* Stalls Grid */}
-                <div className="queue-pd-stalls-grid">
-                  <div className="queue-pd-stall-box">
-                    <span className="stall-num">ล็อค 01</span>
-                    <span className="stall-name">ข้าวมันไก่</span>
-                  </div>
-                  <div className="queue-pd-stall-box">
-                    <span className="stall-num">ล็อค 02</span>
-                    <span className="stall-name">ข้าวแกงใต้</span>
-                  </div>
-                  <div className="queue-pd-stall-box">
-                    <span className="stall-num">ล็อค 03</span>
-                    <span className="stall-name">เครื่องดื่ม/ผลไม้</span>
-                  </div>
-                  <div className="queue-pd-stall-box target">
-                    <span className="target-badge">ปลายทาง</span>
-                    <i className="bi bi-shop fs-4 text-warning" />
-                    <span className="stall-name fw-bold">ล็อค 04: ป้าแดง</span>
-                  </div>
-                </div>
-
-                {/* Walking Path */}
-                <div className="queue-pd-walking-path">
-                  <div className="d-flex align-items-center gap-2">
-                    <div className="queue-pd-pin-icon">
-                      <i className="bi bi-person-walking" />
-                    </div>
-                    <div>
-                      <div className="fw-bold small text-dark">จุดเริ่มต้น: ทางเข้าลานกิจกรรมหน้าโรงอาหาร</div>
-                      <div className="text-muted text-xs">เดินตรงผ่านเสา C3 เข้ามาประมาณ 25 เมตร • ร้านอยู่ทางขวามือ</div>
-                    </div>
-                  </div>
-                  <span className="badge bg-success-subtle text-success fw-bold">เดิน 40 วินาที</span>
+          <div className="queue-pd-landmarks-box">
+            <div className="queue-pd-landmark-item">
+              <i className="bi bi-shop text-danger fs-5" />
+              <div>
+                <div className="fw-bold small">{store?.name || product.shopName || "ร้านค้า"}</div>
+                <div className="text-muted text-xs">
+                  {store?.location || "สอบถามตำแหน่งร้านได้ที่เคาน์เตอร์โรงอาหาร"}
                 </div>
               </div>
             </div>
-
-            {/* Right: Landmarks & Spotting Helpers */}
-            <div className="col-12 col-lg-4">
-              <div className="queue-pd-landmarks-box">
-                <div className="fw-bold text-dark small mb-2">
-                  <i className="bi bi-flag-fill text-primary me-1" /> จุดสังเกตสำคัญในบริเวณร้าน
-                </div>
-                <div className="queue-pd-landmark-item">
-                  <i className="bi bi-geo-fill text-danger fs-5" />
-                  <div>
-                    <div className="fw-bold small">เสาอาคาร C3 (ป้ายไฟเขียว QueueUp)</div>
-                    <div className="text-muted text-xs">ตรงข้ามตู้กดน้ำดื่มสะอาด และจุดเติมเงินบัตรโรงอาหาร</div>
-                  </div>
-                </div>
-                <div className="queue-pd-landmark-item">
-                  <i className="bi bi-box-seam-fill text-primary fs-5" />
-                  <div>
-                    <div className="fw-bold small">ตู้สแกนรับคิวด่วน (QueueUp Locker)</div>
-                    <div className="text-muted text-xs">หยิบกล่องออเดอร์พร้อมทานได้ทันที ไม่ต้องเบียดคิวหน้าร้าน</div>
-                  </div>
-                </div>
-                <div className="queue-pd-landmark-item">
-                  <i className="bi bi-arrow-return-left text-success fs-5" />
-                  <div>
-                    <div className="fw-bold small">ใกล้จุดส่งคืนภาชนะ Zone A</div>
-                    <div className="text-muted text-xs">ทานเสร็จสามารถเดินนำชามไปคืนได้สะดวก ห่างเพียง 10 ก้าว</div>
-                  </div>
-                </div>
+            <div className="queue-pd-landmark-item">
+              <i className="bi bi-clock text-primary fs-5" />
+              <div>
+                <div className="fw-bold small">เวลาทำการ</div>
+                <div className="text-muted text-xs">{store?.hours || "ไม่ระบุ"}</div>
               </div>
             </div>
           </div>
@@ -1474,7 +1481,13 @@ function ProductDetail() {
               <h2 className="fs-5 fw-bold text-dark d-flex align-items-center gap-2 mb-1">
                 <i className="bi bi-chat-square-quote-fill text-warning" /> รีวิวและคะแนนความพึงพอใจ
               </h2>
-              <p className="text-muted small mb-0">จากนักศึกษาและบุคลากรกว่า 1,840 ออเดอร์จริง</p>
+              {/* "กว่า 1,840 ออเดอร์จริง" came from the invented shop's
+                  reviewsCount. This counts the reviews actually loaded. */}
+              <p className="text-muted small mb-0">
+                {reviews.length > 0
+                  ? `จากรีวิวจริง ${reviews.length} รายการ`
+                  : "ยังไม่มีรีวิวสำหรับเมนูนี้"}
+              </p>
             </div>
             <button
               type="button"
@@ -1491,73 +1504,63 @@ function ProductDetail() {
             </button>
           </div>
 
-          {/* Rating Breakdown Bars */}
-          <div className="queue-pd-rating-analytics-card">
-            <div className="row g-3 align-items-center">
-              <div className="col-12 col-md-4 text-center border-end-md">
-                <div className="display-4 fw-black text-danger mb-0">4.8</div>
-                <div className="text-warning mb-1">
-                  <i className="bi bi-star-fill me-1" />
-                  <i className="bi bi-star-fill me-1" />
-                  <i className="bi bi-star-fill me-1" />
-                  <i className="bi bi-star-fill me-1" />
-                  <i className="bi bi-star-half" />
+          {/* Rating summary, computed from the reviews actually loaded.
+              This card used to read 4.8 with a 98% recommend badge and four
+              sub-scores — รสชาติ 4.9, ความสะอาด 4.9, ความรวดเร็ว 4.7,
+              ความคุ้มค่า 4.8 — all hardcoded, on every dish, including one with
+              no reviews at all. A review document carries a single `rating`, so
+              a single average is all there is to show. */}
+          {reviews.length > 0 && (
+            <div className="queue-pd-rating-analytics-card">
+              <div className="row g-3 align-items-center">
+                <div className="col-12 col-md-4 text-center border-end-md">
+                  <div className="display-4 fw-black text-danger mb-0">
+                    {averageRating.toFixed(1)}
+                  </div>
+                  <div className="text-warning mb-1" aria-hidden="true">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <i
+                        key={star}
+                        className={`me-1 bi ${
+                          averageRating >= star
+                            ? "bi-star-fill"
+                            : averageRating >= star - 0.5
+                              ? "bi-star-half"
+                              : "bi-star"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <div className="small text-muted">
+                    คะแนนเฉลี่ย {averageRating.toFixed(1)} จากเต็ม 5.0 ดาว ({reviews.length} รีวิว)
+                  </div>
                 </div>
-                <div className="small text-muted">คะแนนรวม 4.8 จากเต็ม 5.0 ดาว</div>
-                <div className="badge bg-success-subtle text-success mt-1">98% ของผู้ทานแนะนำร้านนี้</div>
-              </div>
 
-              <div className="col-12 col-md-8">
-                <div className="d-flex flex-column gap-2">
-                  <div className="d-flex align-items-center gap-2 small">
-                    <span className="w-[90px]">รสชาติอาหาร</span>
-                    <div className="progress flex-grow-1 h-2">
-                      <div className="progress-bar bg-danger w-[98%]" />
-                    </div>
-                    <span className="fw-bold">4.9</span>
-                  </div>
-                  <div className="d-flex align-items-center gap-2 small">
-                    <span className="w-[90px]">ความสะอาด</span>
-                    <div className="progress flex-grow-1 h-2">
-                      <div className="progress-bar bg-success w-[98%]" />
-                    </div>
-                    <span className="fw-bold">4.9</span>
-                  </div>
-                  <div className="d-flex align-items-center gap-2 small">
-                    <span className="w-[90px]">ความรวดเร็ว</span>
-                    <div className="progress flex-grow-1 h-2">
-                      <div className="progress-bar bg-primary w-[94%]" />
-                    </div>
-                    <span className="fw-bold">4.7</span>
-                  </div>
-                  <div className="d-flex align-items-center gap-2 small">
-                    <span className="w-[90px]">ความคุ้มค่า</span>
-                    <div className="progress flex-grow-1 h-2">
-                      <div className="progress-bar bg-warning w-[96%]" />
-                    </div>
-                    <span className="fw-bold">4.8</span>
+                <div className="col-12 col-md-8">
+                  <div className="d-flex flex-column gap-2">
+                    {[5, 4, 3, 2, 1].map((star) => {
+                      const count = ratingCounts[star] || 0;
+                      const pct = reviews.length > 0 ? Math.round((count / reviews.length) * 100) : 0;
+                      return (
+                        <div key={star} className="d-flex align-items-center gap-2 small">
+                          <span className="w-[90px]">{star} ดาว</span>
+                          <div className="progress flex-grow-1 h-2">
+                            <div className="progress-bar bg-danger" style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="fw-bold">{count}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Quick Highlight Filter Chips */}
-          <div className="d-flex align-items-center flex-wrap gap-2 my-3">
-            <span className="text-muted small fw-bold">ประเด็นที่พูดถึงบ่อย:</span>
-            <span className="badge bg-light text-dark border p-2 cursor-pointer">
-              <i className="bi bi-hand-thumbs-up text-primary me-1" /> น้ำซุปเข้มข้นสะใจ (512)
-            </span>
-            <span className="badge bg-light text-dark border p-2 cursor-pointer">
-              <i className="bi bi-hand-thumbs-up text-primary me-1" /> กากหมูกรอบใหม่ไม่อมน้ำมัน (384)
-            </span>
-            <span className="badge bg-light text-dark border p-2 cursor-pointer">
-              <i className="bi bi-hand-thumbs-up text-primary me-1" /> ได้คิวไว ไม่ต้องรอนาน (295)
-            </span>
-            <span className="badge bg-light text-dark border p-2 cursor-pointer">
-              <i className="bi bi-hand-thumbs-up text-primary me-1" /> ปริมาณคุ้มราคา 30 บ. (260)
-            </span>
-          </div>
+          {/* Four "ประเด็นที่พูดถึงบ่อย" chips stood here — น้ำซุปเข้มข้นสะใจ (512),
+              กากหมูกรอบใหม่ไม่อมน้ำมัน (384) and two more — with counts, on every
+              dish in the canteen. Nothing tags or counts review topics, so there
+              was nothing behind any of the numbers. */}
 
           {/* Diner Reviews List */}
           {reviewsLoaded && reviews.length === 0 && (
@@ -1611,10 +1614,10 @@ function ProductDetail() {
           <section className="mt-4 pt-3 border-top">
             <div className="d-flex justify-content-between align-items-center mb-3">
               <h2 className="fs-5 fw-bold text-dark mb-0 d-flex align-items-center gap-2">
-                <i className="bi bi-shop text-primary" /> เมนูอื่นจากร้านนี้ ({store.name || product.shopName})
+                <i className="bi bi-shop text-primary" /> เมนูอื่นจากร้านนี้ ({store?.name || product.shopName || store?.id || "ร้านค้า"})
               </h2>
               <span className="text-primary small fw-bold cursor-pointer" onClick={() => navigate("/search?keyword=ทั้งหมด")}>
-                ดูเมนูทั้งหมด ({store.name}) <i className="bi bi-arrow-right" />
+                ดูเมนูทั้งหมด ({store?.name || "ร้านนี้"}) <i className="bi bi-arrow-right" />
               </span>
             </div>
 
@@ -1793,56 +1796,6 @@ function ProductDetail() {
 
 
       {/* 8. WALKING GUIDE MAP MODAL */}
-      {isMapModalOpen && (
-        <div
-          className="modal fade show d-block bg-slate-900/75 backdrop-blur-sm z-[100000]"
-          tabIndex="-1"
-        >
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content rounded-4 border-0 shadow-lg p-2">
-              <div className="modal-header border-0 pb-0">
-                <h5 className="modal-title fw-bold text-dark">
-                  <i className="bi bi-compass text-primary me-1.5" /> แผนที่นำทางไปยัง {store.name}
-                </h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setIsMapModalOpen(false)}
-                />
-              </div>
-              <div className="modal-body py-3">
-                <div className="p-3 bg-light rounded-3 border mb-3">
-                  <div className="fw-bold text-primary small mb-1">📍 ตำแหน่งที่ตั้ง:</div>
-                  <div className="small text-dark">{store.location || "โรงอาหาร 2 (โรงอาหารกลาง 1) ชั้น 1 • ช่อง 04"}</div>
-                </div>
-                <div className="d-flex flex-column gap-2 small">
-                  <div className="d-flex gap-2">
-                    <span className="badge bg-primary rounded-circle w-[22px] h-[22px] d-flex align-items-center justify-content-center">1</span>
-                    <span>เข้าประตูโรงอาหารทิศเหนือ (ลานกิจกรรม)</span>
-                  </div>
-                  <div className="d-flex gap-2">
-                    <span className="badge bg-primary rounded-circle w-[22px] h-[22px] d-flex align-items-center justify-content-center">2</span>
-                    <span>เดินตรงผ่านเสา C3 และจุดเติมเงินบัตร</span>
-                  </div>
-                  <div className="d-flex gap-2">
-                    <span className="badge bg-primary rounded-circle w-[22px] h-[22px] d-flex align-items-center justify-content-center">3</span>
-                    <span>ร้านป้าแดง (ล็อค 04) อยู่ทางขวามือ ติดกับตู้ QueueUp Locker</span>
-                  </div>
-                </div>
-              </div>
-              <div className="modal-footer border-0 pt-0">
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm px-4 rounded-pill fw-bold"
-                  onClick={() => setIsMapModalOpen(false)}
-                >
-                  เข้าใจแล้ว
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 8.1 ✍️ WRITE REVIEW MODAL */}
       {isReviewModalOpen && (
