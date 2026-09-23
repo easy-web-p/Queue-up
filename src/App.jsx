@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import PageRouteLoader, { PageRouteLoaderView } from "./components/PageRouteLoader.jsx";
 import CookieConsentBanner from "./components/CookieConsentBanner.jsx";
 import CookieSessionTracker from "./components/CookieSessionTracker.jsx";
+import RouteAnnouncer from "./components/RouteAnnouncer.jsx";
 
 import NotFound from "./pages/NotFound.jsx"; // eager: ProtectedRoute imports it synchronously
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
@@ -52,6 +53,10 @@ function App() {
               until focused. */}
           <a href="#main-content" className="skip-to-content">ข้ามไปยังเนื้อหาหลัก</a>
           {/* Global Page Route Transition Loading Animation Overlay */}
+          {/* Says out loud that the page changed, retitles the tab and moves
+              focus into the new content. A single-page app does none of the
+              three on its own. */}
+          <RouteAnnouncer />
           <PageRouteLoader />
           {/* Global Cookie Session Tracker on Every Page */}
           <CookieSessionTracker />
@@ -68,10 +73,14 @@ function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/landing" element={<LandingPage />} />
             <Route path="/queueup" element={<Queueup />} />
+            {/* /about and /contact are aliases of the landing page, which is
+                genuinely what they ask for: it explains the project and it
+                carries the pilot-request form. /team and /pricing used to be
+                aliases too, and there is no team page and no pricing page —
+                the URL promised something the app does not have, and answering
+                it with an unrelated screen is a worse answer than 404. */}
             <Route path="/about" element={<LandingPage />} />
             <Route path="/contact" element={<LandingPage />} />
-            <Route path="/team" element={<LandingPage />} />
-            <Route path="/pricing" element={<LandingPage />} />
 
             {/* Standalone Legal & PDPA Policy Routes */}
             <Route path="/pdpa" element={<PdpaPolicy />} />
