@@ -67,15 +67,27 @@ function generateUpcomingCalendarDays() {
 }
 
 // ⏰ TIME SLOTS DATA FOR CALENDAR SELECTION
+/**
+ * The pickup slots. Real — their capacity is read live from the store — but
+ * they carry no discount, and never did.
+ *
+ * Each of these used to have one: -50% before noon, -20% at 12:30, -10% after.
+ * The page computed a discounted price from it, showed a struck-through
+ * `basePrice + 40` beside it and a "-50% QueueUp Early Bird" badge above it.
+ * Nothing applied any of it: orderPricing.js prices from the product's
+ * priceSatang with no reference to the pickup time, and createCurrentCartItem
+ * correctly put the FULL price in the cart. A student saw ฿27, tapped add, and
+ * found ฿55 in their basket.
+ */
 const BASE_TIME_SLOTS = [
-  { time: "11:00", discount: "-50%", status: "AVAILABLE" },
-  { time: "11:30", discount: "-50%", status: "AVAILABLE" },
-  { time: "12:00", discount: "-50%", status: "AVAILABLE" },
-  { time: "12:30", discount: "-20%", status: "AVAILABLE" },
-  { time: "13:00", discount: "-10%", status: "AVAILABLE" },
-  { time: "13:30", discount: "-10%", status: "AVAILABLE" },
-  { time: "14:00", discount: "-10%", status: "AVAILABLE" },
-  { time: "14:30", discount: "-10%", status: "AVAILABLE" },
+  { time: "11:00", status: "AVAILABLE" },
+  { time: "11:30", status: "AVAILABLE" },
+  { time: "12:00", status: "AVAILABLE" },
+  { time: "12:30", status: "AVAILABLE" },
+  { time: "13:00", status: "AVAILABLE" },
+  { time: "13:30", status: "AVAILABLE" },
+  { time: "14:00", status: "AVAILABLE" },
+  { time: "14:30", status: "AVAILABLE" },
 ];
 
 // 🍜 CATEGORY-AWARE DYNAMIC MODIFIER CONFIGURATIONS (Zero fake bypass defaults for required groups)
@@ -315,44 +327,6 @@ function getCategoryModifiers(category, productTitle = "") {
 
 
 // 🎬 VIDEO REELS MOCK DATA
-const VIDEO_REVIEWS = [
-  {
-    id: "v1",
-    author: "@FoodieCampus",
-    title: "ชิมน้ำตกเข้มข้นป้าแดง กระดูกหมูตุ๋นเปื่อยละลายในปาก!",
-    views: "48.2k",
-    duration: "0:45",
-    tags: "#ก๋วยเตี๋ยวเรือหมูน้ำตก #โรงอาหาร2",
-    thumbnail: "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=500&auto=format&fit=crop&q=80",
-  },
-  {
-    id: "v2",
-    author: "@เด็กหอพาชิม",
-    title: "ASMR กากหมูเจียวสดใหม่ กรอบสนั่น ชามละ 30 บาทคุ้มเว่อร์",
-    views: "32.5k",
-    duration: "0:38",
-    tags: "#กากหมูเจียว #อร่อยบอกต่อ",
-    thumbnail: "https://images.unsplash.com/photo-1555126634-323283e090fa?w=500&auto=format&fit=crop&q=80",
-  },
-  {
-    id: "v3",
-    author: "@KinRaiDeeTU",
-    title: "วิธีกดจองคิว QueueUp ไม่ต้องต่อแถวพักเที่ยง ได้กินตรงเวลาเป๊ะ!",
-    views: "29.1k",
-    duration: "0:52",
-    tags: "#QueueUpLife #กินไรดี",
-    thumbnail: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80",
-  },
-  {
-    id: "v4",
-    author: "@AuntyDaengFan",
-    title: "บุกหลังครัวป้าแดง ชมหม้อน้ำซุปสมุนไพรเคี่ยว 4 ชั่วโมงของจริง",
-    views: "19.8k",
-    duration: "1:12",
-    tags: "#สูตรลับป้าแดง #ก๋วยเตี๋ยวเรือ",
-    thumbnail: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=500&auto=format&fit=crop&q=80",
-  },
-];
 
 // ⭐ CUSTOMER REVIEWS MOCK DATA
 
@@ -428,9 +402,6 @@ function ProductDetail() {
 
   // 🗺️ Canteen Walking Guide Modal State
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
-
-  // 🎬 Video Player Modal State
-  const [activeVideo, setActiveVideo] = useState(null);
 
   // 💬 Chat & Favorite States
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -674,10 +645,11 @@ function ProductDetail() {
     return extra;
   }, [activeModifierGroups, selectedModifiersMap]);
 
-  const discountPercent = parseInt((selectedTimeSlot?.discount || "0").replace("-", "").replace("%", "")) / 100;
   const basePrice = Number(product?.price) || 30;
-  const discountedUnitPrice = Math.max(0, Math.round((basePrice + dynamicModifiersPrice) * (1 - discountPercent)));
-  const totalCalculatedPrice = discountedUnitPrice * quantity;
+  // What the cart will hold and the server will charge. There is no time-slot
+  // discount to apply, so there is none subtracted here.
+  const unitPrice = basePrice + dynamicModifiersPrice;
+  const totalCalculatedPrice = unitPrice * quantity;
 
   // 15. Store Menu Recommendations
   const recommendedProducts = useMemo(() => {
@@ -1014,10 +986,15 @@ function ProductDetail() {
                   <i className="bi bi-info-circle-fill me-1 text-primary" />
                   เงื่อนไขการสั่งจองและรับส่วนลด
                 </h3>
-                <span className="queue-pd-discount-badge-pink">-50% QueueUp Early Bird</span>
               </div>
               <p className="queue-pd-recommend-desc">
-                ส่วนลดพิเศษระบบ QueueUp Food CRM สั่งจองคิวล่วงหน้ารับแต้มสะสมฟรี 2 เท่า และสามารถระบุสล็อตเวลารับอาหารที่สะดวก โดยระบบจะแจ้งเตือนเมื่อเตาเริ่มปรุงเสร็จ
+                {/* "-50% QueueUp Early Bird" and "รับแต้มสะสมฟรี 2 เท่า" were both
+                    here, and neither existed: no discount is applied by pickup
+                    time, and points are a flat 1 per ฿10 spent — the order
+                    transaction writes pointsEarned itself. */}
+                จองคิวล่วงหน้าเพื่อเลือกช่วงเวลารับอาหารที่สะดวก
+                ระบบจะแจ้งเตือนเมื่ออาหารพร้อมรับ และทุกการสั่งซื้อที่สำเร็จจะได้รับแต้มสะสม
+                ฿10 ต่อ 1 แต้ม สำหรับแลกคูปองส่วนลด
               </p>
               <div className="queue-pd-terms-footer">
                 <span><i className="bi bi-shield-check text-success me-1" /> ไม่ต้องตัดบัตรเครดิต</span>
@@ -1086,8 +1063,10 @@ function ProductDetail() {
                 <h2 className="fs-5 fw-bold text-dark mb-0">{product.name}</h2>
               </div>
               <div className="text-end">
-                <div className="text-muted small text-decoration-line-through">฿{basePrice + 40}</div>
-                <div className="text-danger fw-black fs-4">฿{discountedUnitPrice}</div>
+                {/* A struck-through `basePrice + 40` used to sit here — ฿40 added
+                    to the real price purely so the number below looked like a
+                    saving. There is no previous price to compare against. */}
+                <div className="text-danger fw-black fs-4">฿{unitPrice}</div>
               </div>
             </div>
 
@@ -1298,7 +1277,6 @@ function ProductDetail() {
                         onClick={() => setSelectedTimeSlot(slot)}
                       >
                         <span className="fw-bold">{slot.time}</span>
-                        <span className="small text-danger fw-bold">{slot.discount}</span>
                         <span className="queue-pd-slot-cap">
                           {slot.status === "FULL" ? "เต็ม" : (slot.remaining !== undefined && slot.remaining !== null ? `ว่าง ${slot.remaining}` : "เปิดจอง")}
                         </span>
@@ -1321,7 +1299,7 @@ function ProductDetail() {
             <div className="queue-pd-booking-footer queue-pd-footer-inline">
               <div>
                 <div className="queue-pd-booking-summary-text">
-                  {quantity} ชาม · {selectedDay.fullDateStr}, {selectedTimeSlot.time} น. ({selectedTimeSlot.discount})
+                  {quantity} ชาม · {selectedDay.fullDateStr}, {selectedTimeSlot.time} น.
                 </div>
                 <div className="fw-bold fs-5" style={{ color: "var(--qu-accent)" }}>
                   ยอดรวม: ฿{totalCalculatedPrice.toFixed(2)}
@@ -1482,50 +1460,12 @@ function ProductDetail() {
           </div>
         </section>
 
-        {/* 4. 🎬 SECTION: FOOD VIBE & VIDEO REVIEWS (SHORTS/REELS STYLE) */}
-        <section className="queue-pd-video-section mt-4">
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <div>
-              <h2 className="fs-5 fw-bold text-dark d-flex align-items-center gap-2 mb-1">
-                <i className="bi bi-camera-reels-fill text-danger" /> วิดีโอรีวิวความอร่อย (Food Vibe &amp; Video Reviews)
-              </h2>
-              <p className="text-muted small mb-0">ชมความเข้มข้นของน้ำตกและเสียงกรุบกรอบของกากหมูเจียวสด</p>
-            </div>
-            <span className="badge bg-danger-subtle text-danger fw-bold d-none d-sm-inline-block">
-              <i className="bi bi-fire me-1" /> ไวรัลสัปดาห์นี้
-            </span>
-          </div>
-
-          <div className="row g-3">
-            {VIDEO_REVIEWS.map((vid) => (
-              <div key={vid.id} className="col-6 col-md-3">
-                <div
-                  className="queue-pd-video-card"
-                  onClick={() => setActiveVideo(vid)}
-                >
-                  <img loading="lazy" decoding="async" src={vid.thumbnail} alt={vid.title} className="queue-pd-video-thumb" />
-                  <div className="queue-pd-video-overlay" />
-                  <div className="queue-pd-video-top">
-                    <span className="badge bg-dark bg-opacity-75 text-white">
-                      <i className="bi bi-play-fill" /> {vid.duration}
-                    </span>
-                    <span className="badge bg-dark bg-opacity-75 text-white">
-                      <i className="bi bi-eye" /> {vid.views}
-                    </span>
-                  </div>
-                  <div className="queue-pd-video-play-btn">
-                    <i className="bi bi-play-fill fs-3" />
-                  </div>
-                  <div className="queue-pd-video-bottom">
-                    <div className="queue-pd-video-author">{vid.author}</div>
-                    <div className="queue-pd-video-title">{vid.title}</div>
-                    <div className="queue-pd-video-tags">{vid.tags}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+        {/* The "วิดีโอรีวิวความอร่อย" section stood here: four influencer
+            reviews — @FoodieCampus, @เด็กหอพาชิม — with view counts, durations
+            and hashtags, all written into this file. There is no video upload,
+            no storage for one and no reviewer; tapping a card opened a modal
+            showing the same still image with a play button that played nothing.
+            Real reviews are below, from the reviews collection. */}
 
         {/* 5. ⭐ SECTION: RATINGS & REVIEWS ANALYTICS */}
         <section className="queue-pd-reviews-section mt-4">
@@ -1996,44 +1936,6 @@ function ProductDetail() {
         </div>
       )}
 
-      {/* 9. VIDEO MODAL PLAYER */}
-      {activeVideo && (
-        <div
-          className="modal fade show d-block bg-slate-950/85 backdrop-blur-md z-[100002]"
-          tabIndex="-1"
-        >
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content rounded-4 border-0 shadow-lg p-0 overflow-hidden bg-dark text-white">
-              <div className="position-relative h-[360px]">
-                <img loading="lazy" decoding="async"
-                  src={activeVideo.thumbnail}
-                  alt={activeVideo.title}
-                  className="w-100 h-100 object-fit-cover opacity-75"
-                />
-                <div className="position-absolute top-0 end-0 p-3">
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-dark rounded-circle"
-                    onClick={() => setActiveVideo(null)}
-                  >
-                    <i className="bi bi-x-lg" />
-                  </button>
-                </div>
-                <div className="position-absolute top-50 start-50 translate-middle">
-                  <div className="btn btn-light btn-lg rounded-circle shadow-lg p-3">
-                    <i className="bi bi-play-fill fs-2 text-danger" />
-                  </div>
-                </div>
-                <div className="position-absolute bottom-0 start-0 end-0 p-3 bg-gradient-to-t from-black/85 to-transparent">
-                  <div className="fw-bold small text-warning">{activeVideo.author}</div>
-                  <div className="fw-bold">{activeVideo.title}</div>
-                  <div className="text-xs text-slate-300">{activeVideo.tags}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 10. CHAT MODAL */}
       <button
