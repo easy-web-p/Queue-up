@@ -39,7 +39,15 @@ import {
 let passed = 0;
 let failed = 0;
 
+// Every runTest must be awaited. One was not, and its body ran after
+// testEnv.cleanup() and after the summary had already printed — so the
+// assertion executed against a torn-down environment, its result was never
+// counted, and a failure could not affect the exit code. The counter below is
+// what notices if that happens again.
+let started = 0;
+
 async function runTest(name, fn) {
+  started++;
   try {
     await fn();
     passed++;
@@ -911,7 +919,7 @@ await runTest('A student can read their own redemptions, and nobody else can', a
   await assertFails(getDoc(doc(asStranger, 'loyalty_redemptions', 'redeem_1')));
 });
 
-runTest('🚨 A coupon cannot be created or retuned from a browser', async () => {
+await runTest('🚨 A coupon cannot be created or retuned from a browser', async () => {
   // Coupons are money. Admin-only write, per the rules.
   await assertFails(
     setDoc(doc(asStudent, 'coupons', 'FREEFOOD'), { type: 'FIXED', amountSatang: 999999, active: true })
@@ -938,5 +946,16 @@ await testEnv.cleanup();
 console.log(`\n${'='.repeat(60)}`);
 console.log(`RESULT: ${passed} passed, ${failed} failed`);
 console.log('='.repeat(60));
+
+// A test that was started but never finished is one whose runTest call was not
+// awaited: it runs after this line, against an environment already cleaned up,
+// and its verdict reaches nobody.
+if (started !== passed + failed) {
+  console.log(
+    `\n🚨 ${started - passed - failed} test(s) did not complete before the summary — ` +
+      'a runTest call is missing its await.'
+  );
+  process.exit(1);
+}
 
 if (failed > 0) process.exit(1);
