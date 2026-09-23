@@ -1012,7 +1012,7 @@ function MerchantDashboard() {
                   <h5 className="fw-bold mb-3">ข้อมูลร้านค้าที่แสดงสาธารณะ</h5>
                   <div className="mb-3">
                     <label className="form-label font-weight-bold">ชื่อร้านค้า:</label>
-                    <input
+                    <input autoComplete="organization" aria-label="ชื่อร้านค้า"
                       type="text"
                       className="form-control"
                       value={storeName}
@@ -1021,7 +1021,7 @@ function MerchantDashboard() {
                   </div>
                   <div className="mb-3">
                     <label className="form-label font-weight-bold">พิกัดโรงอาหาร:</label>
-                    <input
+                    <input aria-label="พิกัดโรงอาหาร"
                       type="text"
                       className="form-control"
                       value={canteenLocation}
@@ -1030,7 +1030,7 @@ function MerchantDashboard() {
                   </div>
                   <div className="mb-3">
                     <label className="form-label font-weight-bold">เบอร์โทรศัพท์ร้านค้า:</label>
-                    <input
+                    <input aria-label="เบอร์โทรศัพท์ร้านค้า"
                       type="text"
                       className="form-control"
                       value={storePhone}
@@ -1039,7 +1039,7 @@ function MerchantDashboard() {
                   </div>
                   <div className="mb-3">
                     <label className="form-label font-weight-bold">เวลาทำการ:</label>
-                    <input
+                    <input aria-label="เวลาทำการ"
                       type="text"
                       className="form-control"
                       value={storeHours}
@@ -1053,7 +1053,7 @@ function MerchantDashboard() {
                   </h6>
                   <div className="mb-3">
                     <label className="form-label font-weight-bold">ชื่อธนาคาร / บริการ:</label>
-                    <input
+                    <input aria-label="ชื่อธนาคาร / บริการ"
                       type="text"
                       className="form-control"
                       value={privateBankName}
@@ -1063,7 +1063,7 @@ function MerchantDashboard() {
                   </div>
                   <div className="mb-3">
                     <label className="form-label font-weight-bold">เลขที่บัญชี / หมายเลขพร้อมเพย์:</label>
-                    <input
+                    <input aria-label="เลขที่บัญชี / หมายเลขพร้อมเพย์"
                       type="text"
                       className="form-control"
                       value={privateAccountNo}
@@ -1073,7 +1073,7 @@ function MerchantDashboard() {
                   </div>
                   <div className="mb-3">
                     <label className="form-label font-weight-bold">ชื่อเจ้าของบัญชี:</label>
-                    <input
+                    <input autoComplete="name" aria-label="ชื่อเจ้าของบัญชี"
                       type="text"
                       className="form-control"
                       value={privateAccountOwner}
@@ -1148,7 +1148,7 @@ function MerchantDashboard() {
                 <h6 className="fw-bold mb-3">เพิ่มข้อมูลพนักงานใหม่</h6>
                 <div className="row g-3">
                   <div className="col-md-5">
-                    <input
+                    <input autoComplete="off" aria-label="ชื่อ"
                       type="text"
                       className="form-control"
                       placeholder="ชื่อ-นามสกุล พนักงาน"
@@ -1158,7 +1158,7 @@ function MerchantDashboard() {
                     />
                   </div>
                   <div className="col-md-5">
-                    <select
+                    <select aria-label="บทบาทของพนักงาน"
                       className="form-select"
                       value={newStaffRole}
                       onChange={(e) => setNewStaffRole(e.target.value)}
@@ -1171,7 +1171,7 @@ function MerchantDashboard() {
                   <div className="col-md-8">
                     {/* The phone number used to be hardcoded as "089-XXX-XXXX"
                         on every staff record. Asked for, or left empty. */}
-                    <input
+                    <input autoComplete="off" aria-label="เบอร์โทรศัพท์ (ไม่บังคับ)"
                       type="tel"
                       className="form-control"
                       placeholder="เบอร์โทรศัพท์ (ไม่บังคับ)"

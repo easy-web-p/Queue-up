@@ -1002,7 +1002,7 @@ export default function Queueup() {
                     <div className="row g-3 mb-3">
                       <div className="col-md-6">
                         <label className="text-slate-300 small fw-bold mb-1">ชื่อผู้ติดต่อ *</label>
-                        <input
+                        <input autoComplete="name" aria-label="ชื่อผู้ติดต่อ"
                           type="text"
                           className="form-control qup-input"
                           placeholder="เช่น อาจารย์สมชาย / ป้าแดง"
@@ -1013,7 +1013,7 @@ export default function Queueup() {
                       </div>
                       <div className="col-md-6">
                         <label className="text-slate-300 small fw-bold mb-1">ชื่อโรงเรียน / สถานศึกษา / ร้านค้า</label>
-                        <input
+                        <input autoComplete="organization" aria-label="ชื่อโรงเรียน / สถานศึกษา / ร้านค้า"
                           type="text"
                           className="form-control qup-input"
                           placeholder="เช่น โรงเรียนหล่มสักวิทยาคม / ร้านข้าวมันไก่"
@@ -1026,7 +1026,7 @@ export default function Queueup() {
                     <div className="row g-3 mb-3">
                       <div className="col-md-6">
                         <label className="text-slate-300 small fw-bold mb-1">เบอร์โทรศัพท์ติดต่อกลับ *</label>
-                        <input
+                        <input autoComplete="tel" aria-label="เบอร์โทรศัพท์ติดต่อกลับ"
                           type="tel"
                           className="form-control qup-input"
                           placeholder="081-234-5678"
@@ -1037,7 +1037,7 @@ export default function Queueup() {
                       </div>
                       <div className="col-md-6">
                         <label className="text-slate-300 small fw-bold mb-1">อีเมลติดต่อ *</label>
-                        <input
+                        <input autoComplete="email" aria-label="อีเมลติดต่อ"
                           type="email"
                           className="form-control qup-input"
                           placeholder="your-email@school.ac.th"
@@ -1050,7 +1050,7 @@ export default function Queueup() {
 
                     <div className="mb-3">
                       <label className="text-slate-300 small fw-bold mb-1">ประเภทความสนใจ</label>
-                      <select
+                      <select aria-label="ประเภทความสนใจ"
                         className="form-select qup-input"
                         value={contactPackage}
                         onChange={(e) => setContactPackage(e.target.value)}
@@ -1064,7 +1064,7 @@ export default function Queueup() {
 
                     <div className="mb-4">
                       <label className="text-slate-300 small fw-bold mb-1">ข้อความหรือรายละเอียดเพิ่มเติม</label>
-                      <textarea
+                      <textarea aria-label="ข้อความหรือรายละเอียดเพิ่มเติม"
                         className="form-control qup-input"
                         rows="3"
                         placeholder="ระบุจำนวนร้านค้าโดยประมาณ หรือช่วงเวลาที่สะดวกให้ติดต่อกลับ..."
@@ -1175,7 +1175,7 @@ export default function Queueup() {
 
                   <div className="mb-3">
                     <label className="form-label font-weight-bold">ชื่อผู้ประเมิน / บทบาท:</label>
-                    <input
+                    <input aria-label="ชื่อผู้ประเมิน / บทบาท"
                       type="text"
                       className="form-control bg-dark text-white border-secondary"
                       placeholder="เช่น อาจารย์ประจำวิชา / ร้านค้า / นักเรียน ม.1/6"
@@ -1188,7 +1188,7 @@ export default function Queueup() {
                   <div className="row g-3 mb-3">
                     <div className="col-md-6">
                       <label className="form-label small">🎨 UX/UI Design ({evalUx} / 10):</label>
-                      <input
+                      <input aria-label="🎨 UX/UI Design"
                         type="range"
                         className="form-range"
                         min="1"
@@ -1201,7 +1201,7 @@ export default function Queueup() {
 
                     <div className="col-md-6">
                       <label className="form-label small">👤 "บัญชีเดียว ขยายได้" ({evalAccount} / 10):</label>
-                      <input
+                      <input aria-label="👤 ”บัญชีเดียว ขยายได้”"
                         type="range"
                         className="form-range"
                         min="1"
@@ -1214,7 +1214,7 @@ export default function Queueup() {
 
                     <div className="col-md-6">
                       <label className="form-label small">📋 Order & Live Queue Flow ({evalQueue} / 10):</label>
-                      <input
+                      <input aria-label="📋 Order & Live Queue Flow"
                         type="range"
                         className="form-range"
                         min="1"
@@ -1227,7 +1227,7 @@ export default function Queueup() {
 
                     <div className="col-md-6">
                       <label className="form-label small">🏪 Merchant Seller Centre ({evalMerchant} / 10):</label>
-                      <input
+                      <input aria-label="🏪 Merchant Seller Centre"
                         type="range"
                         className="form-range"
                         min="1"
@@ -1240,7 +1240,7 @@ export default function Queueup() {
 
                     <div className="col-md-12">
                       <label className="form-label small">🛡️ Security & Private Finance ({evalSecurity} / 10):</label>
-                      <input
+                      <input aria-label="🛡️ Security & Private Finance"
                         type="range"
                         className="form-range"
                         min="1"
@@ -1254,7 +1254,7 @@ export default function Queueup() {
 
                   <div className="mb-3">
                     <label className="form-label font-weight-bold">ข้อเสนอแนะเพิ่มเติม:</label>
-                    <textarea
+                    <textarea aria-label="ข้อเสนอแนะเพิ่มเติม"
                       className="form-control bg-dark text-white border-secondary"
                       rows="3"
                       placeholder="เขียนข้อเสนอแนะเกี่ยวกับสถาปัตยกรรมระบบหรือฟีเจอร์..."

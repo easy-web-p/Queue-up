@@ -174,7 +174,7 @@ export default function SpendingLimitSetting() {
                 </label>
                 <div className="relative">
                   <span className="absolute left-4 top-3 text-lg font-bold text-[#FF7A1A]">฿</span>
-                  <input
+                  <input aria-label="วงเงินใช้จ่ายรายวัน (Daily Limit)"
                     type="number"
                     min="0"
                     step="10"
@@ -203,7 +203,7 @@ export default function SpendingLimitSetting() {
                 </label>
                 <div className="relative">
                   <span className="absolute left-4 top-3 text-lg font-bold text-amber-500">฿</span>
-                  <input
+                  <input aria-label="วงเงินใช้จ่ายรายสัปดาห์ (Weekly Limit)"
                     type="number"
                     min="0"
                     step="50"

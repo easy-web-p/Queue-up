@@ -924,7 +924,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                     <span className="font-bold text-xs text-slate-800">ระยะเวลาประกอบอาหารมาตรฐาน</span>
                     <span className="text-xs font-extrabold text-[#FF7A1A]">{prepTimeDefault} นาที</span>
                   </div>
-                  <input
+                  <input aria-label="เวลาเตรียมอาหารมาตรฐาน (นาที)"
                     type="range"
                     min="3"
                     max="30"
@@ -1051,7 +1051,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-                <input
+                <input autoComplete="off" aria-label="ค้นหาชื่ออาหาร หรือ รหัสเมนู..."
                   type="text"
                   placeholder="ค้นหาชื่ออาหาร หรือ รหัสเมนู..."
                   value={searchQuery}
@@ -1060,7 +1060,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                 />
               </div>
 
-              <select
+              <select aria-label="กรองตามหมวดหมู่อาหาร"
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
                 className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700"
@@ -1109,7 +1109,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                       <td className="p-3 font-extrabold text-slate-900">
                         <div className="flex items-center gap-1">
                           <span className="text-slate-400 text-xs font-bold">฿</span>
-                          <input
+                          <input aria-label={`ราคาของ ${item.name}`}
                             type="number"
                             value={item.price}
                             onChange={(e) => handleUpdatePrice(item.id, Number(e.target.value))}
@@ -1272,7 +1272,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
               <div className="space-y-4 border-r border-slate-200 pr-0 md:pr-6">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700">ขีดจำกัดออเดอร์ต่อสล็อตเวลา (Max Orders Per Slot)</label>
-                  <input
+                  <input aria-label="ขีดจำกัดออเดอร์ต่อสล็อตเวลา (Max Orders Per Slot)"
                     type="number"
                     min="1"
                     max="100"
@@ -1293,7 +1293,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700">ชื่อผู้ดูแลร้านค้า</label>
-                  <input
+                  <input aria-label="ชื่อผู้ดูแลร้านค้า"
                     type="text"
                     value={shopInfo?.ownerName || 'เจ้าของร้าน'}
                     onChange={(e) => setShopInfo((prev) => prev ? { ...prev, ownerName: e.target.value } : null)}
@@ -1676,7 +1676,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
             <form onSubmit={handleAddStaffSubmit} className="space-y-3">
               <div>
                 <label className="text-xs font-bold text-slate-700">ชื่อ-นามสกุลพนักงาน *</label>
-                <input
+                <input autoComplete="off" aria-label="ชื่อ-นามสกุลพนักงาน"
                   type="text"
                   required
                   placeholder="เช่น นายเอกชัย รักบริการ"
@@ -1688,7 +1688,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
 
               <div>
                 <label className="text-xs font-bold text-slate-700">บทบาทหน้าที่ *</label>
-                <select
+                <select aria-label="บทบาทหน้าที่"
                   value={newStaffRole}
                   onChange={(e) => setNewStaffRole(e.target.value)}
                   className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold"
@@ -1702,7 +1702,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
 
               <div>
                 <label className="text-xs font-bold text-slate-700">เบอร์โทรศัพท์ติดต่อ</label>
-                <input
+                <input autoComplete="off" aria-label="เบอร์โทรศัพท์ติดต่อ"
                   type="tel"
                   placeholder="081-000-0000"
                   value={newStaffPhone}
@@ -1750,7 +1750,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
             <form onSubmit={handleAddCouponSubmit} className="space-y-3">
               <div>
                 <label className="text-xs font-bold text-slate-700">รหัสโค้ดคูปอง (ตัวพิมพ์ใหญ่) *</label>
-                <input
+                <input aria-label="รหัสโค้ดคูปอง (ตัวพิมพ์ใหญ่)"
                   type="text"
                   required
                   placeholder="เช่น PROMO50, LUNCH10"
@@ -1763,7 +1763,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-xs font-bold text-slate-700">มูลค่าส่วนลด (บาท) *</label>
-                  <input
+                  <input aria-label="มูลค่าส่วนลด (บาท)"
                     type="number"
                     required
                     min={1}
@@ -1774,7 +1774,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-700">ยอดสั่งซื้อขั้นต่ำ (บาท) *</label>
-                  <input
+                  <input aria-label="ยอดสั่งซื้อขั้นต่ำ (บาท)"
                     type="number"
                     required
                     min={0}
@@ -1824,7 +1824,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
             <form onSubmit={handleAddNewItemSubmit} className="space-y-3">
               <div>
                 <label className="text-xs font-bold text-slate-700">ชื่อเมนูอาหาร *</label>
-                <input
+                <input aria-label="ชื่อเมนูอาหาร"
                   type="text"
                   required
                   placeholder="เช่น ข้าวหมูกรอบราดซอส"
@@ -1837,7 +1837,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-xs font-bold text-slate-700">ราคา (บาท) *</label>
-                  <input
+                  <input aria-label="ราคา (บาท)"
                     type="number"
                     required
                     value={newItemPrice}
@@ -1847,7 +1847,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-700">หมวดหมู่ *</label>
-                  <select
+                  <select aria-label="หมวดหมู่"
                     value={newItemCategory}
                     onChange={(e) => setNewItemCategory(e.target.value)}
                     className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold"
@@ -1862,7 +1862,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
 
               <div>
                 <label className="text-xs font-bold text-slate-700">รายละเอียดเมนู</label>
-                <textarea
+                <textarea aria-label="รายละเอียดเมนู"
                   rows={2}
                   placeholder="คำอธิบายเพิ่มเติม เช่น ระดับความเผ็ด"
                   value={newItemDesc}

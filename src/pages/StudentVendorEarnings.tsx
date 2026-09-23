@@ -217,14 +217,14 @@ export default function StudentVendorEarnings() {
 
             {/* Add Team Member */}
             <form onSubmit={handleAddTeamMember} className="pt-2 border-t border-slate-100 dark:border-white/10 flex flex-col sm:flex-row gap-2">
-              <input
+              <input autoComplete="off" aria-label="ชื่อเพื่อนร่วมทีม"
                 type="text"
                 placeholder="ชื่อเพื่อนร่วมทีม"
                 value={newMemberName}
                 onChange={(e) => setNewMemberName(e.target.value)}
                 className="flex-1 px-3 py-2 bg-slate-50 dark:bg-[#16100C] border border-slate-300 dark:border-[#FF7A1A]/20 rounded-xl text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#FF7A1A]"
               />
-              <input
+              <input aria-label="บทบาทหน้าที่"
                 type="text"
                 placeholder="บทบาทหน้าที่"
                 value={newMemberRole}
@@ -232,7 +232,7 @@ export default function StudentVendorEarnings() {
                 className="w-32 px-3 py-2 bg-slate-50 dark:bg-[#16100C] border border-slate-300 dark:border-[#FF7A1A]/20 rounded-xl text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#FF7A1A]"
               />
               <div className="flex items-center gap-1">
-                <input
+                <input aria-label="สัดส่วนแบ่งรายได้ (%)"
                   type="number"
                   min="1"
                   max="100"
@@ -264,7 +264,7 @@ export default function StudentVendorEarnings() {
               <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">
                 สัดส่วนต้นทุนวัตถุดิบต่อยอดขาย ({costRatioPercent}%)
               </label>
-              <input
+              <input aria-label="สัดส่วนต้นทุนวัตถุดิบต่อยอดขาย (%)"
                 type="range"
                 min="10"
                 max="80"

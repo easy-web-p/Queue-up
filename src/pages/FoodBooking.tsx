@@ -611,7 +611,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
                     <div className="flex gap-2">
                       <div className="relative flex-1">
                         <Tag className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                        <input
+                        <input aria-label="กรอกโค้ดส่วนลด (เช่น WELCOME50)"
                           type="text"
                           value={couponInput}
                           onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
@@ -696,6 +696,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
                 </div>
                 <input
                   type="date"
+                  aria-label="วันที่นัดรับอาหาร"
                   value={pickupDate}
                   onChange={(e) => setPickupDate(e.target.value)}
                   className="text-xs font-bold bg-white dark:bg-[#241C16] border border-slate-300 dark:border-[#FF7A1A]/30 rounded-xl px-2.5 py-1.5 text-slate-700 dark:text-white focus:outline-none focus:border-[#8B0000] dark:focus:border-[#FF7A1A]"
@@ -805,7 +806,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
                 <Phone className="w-4 h-4 text-[#8B0000] dark:text-[#FF7A1A]" />
                 เบอร์โทรศัพท์สำหรับรับการแจ้งเตือนคิว *
               </label>
-              <input
+              <input autoComplete="tel" aria-label="เบอร์โทรศัพท์สำหรับรับการแจ้งเตือนคิว"
                 type="tel"
                 value={effectivePhone}
                 onChange={(e) => setCustomPhone(e.target.value)}
@@ -820,7 +821,7 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
               <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-200 uppercase tracking-wider mb-2">
                 คำสั่งพิเศษถึงร้านค้า (ถ้ามี)
               </label>
-              <input
+              <input aria-label="คำสั่งพิเศษถึงร้านค้า (ถ้ามี)"
                 type="text"
                 value={customInstructions}
                 onChange={(e) => setCustomInstructions(e.target.value)}

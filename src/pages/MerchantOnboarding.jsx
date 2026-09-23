@@ -248,7 +248,7 @@ function MerchantOnboarding() {
             <form onSubmit={(e) => { e.preventDefault(); setStep(2); }}>
               <div className="mb-3">
                 <label className="form-label fw-bold small text-dark">ชื่อร้านค้า (Store Name) *</label>
-                <input
+                <input autoComplete="organization" aria-label="ชื่อร้านค้า (Store Name)"
                   type="text"
                   className="form-control"
                   value={storeName}
@@ -260,7 +260,7 @@ function MerchantOnboarding() {
 
               <div className="mb-3">
                 <label className="form-label fw-bold small text-dark">ตำแหน่งโรงอาหาร (Canteen Location) *</label>
-                <select
+                <select aria-label="ตำแหน่งโรงอาหาร (Canteen Location)"
                   className="form-select"
                   value={canteenLocation}
                   onChange={(e) => setCanteenLocation(e.target.value)}
@@ -275,7 +275,7 @@ function MerchantOnboarding() {
               <div className="row g-3 mb-4">
                 <div className="col-md-6">
                   <label className="form-label fw-bold small text-dark">เลขเคาน์เตอร์ / ล็อคร้านค้า *</label>
-                  <input
+                  <input aria-label="เลขเคาน์เตอร์ / ล็อคร้านค้า"
                     type="text"
                     className="form-control"
                     value={counterNo}
@@ -286,7 +286,7 @@ function MerchantOnboarding() {
                 </div>
                 <div className="col-md-6">
                   <label className="form-label fw-bold small text-dark">เบอร์โทรศัพท์ติดต่อร้านค้า *</label>
-                  <input
+                  <input aria-label="เบอร์โทรศัพท์ติดต่อร้านค้า"
                     type="text"
                     className="form-control"
                     value={phone}
@@ -325,7 +325,7 @@ function MerchantOnboarding() {
             <form onSubmit={handleCompleteRegistration}>
               <div className="mb-3">
                 <label className="form-label fw-bold small text-dark">ชื่อบัญชีรับเงิน (PromptPay Name) *</label>
-                <input
+                <input autoComplete="name" aria-label="ชื่อบัญชีรับเงิน (PromptPay Name)"
                   type="text"
                   className="form-control"
                   value={promptpayName}
@@ -337,7 +337,7 @@ function MerchantOnboarding() {
 
               <div className="mb-4">
                 <label className="form-label fw-bold small text-dark">หมายเลข PromptPay / เบอร์โทรศัพท์รับเงิน *</label>
-                <input
+                <input aria-label="หมายเลข PromptPay / เบอร์โทรศัพท์รับเงิน"
                   type="text"
                   className="form-control"
                   value={promptpayNo}

@@ -548,7 +548,7 @@ function Login() {
                 <div className="yeti-form-group">
                   <label className="yeti-label">Display Name / Nickname *</label>
                   <div className="yeti-input-wrapper">
-                    <input
+                    <input autoComplete="nickname" aria-label="Display Name / Nickname"
                       type="text"
                       className="yeti-input"
                       placeholder="เช่น ชื่อเล่น หรือชื่อแสดงผลในระบบ"
@@ -562,7 +562,7 @@ function Login() {
                 <div className="yeti-form-group">
                   <label className="yeti-label">Phone Number (เบอร์โทรศัพท์ - ไม่บังคับ)</label>
                   <div className="yeti-input-wrapper">
-                    <input
+                    <input autoComplete="tel" aria-label="Phone Number (เบอร์โทรศัพท์ - ไม่บังคับ)"
                       type="tel"
                       className="yeti-input"
                       placeholder="08X-XXX-XXXX"
@@ -598,7 +598,7 @@ function Login() {
                   <div className="yeti-form-group">
                     <label className="yeti-label">ชื่อ-นามสกุล *</label>
                     <div className="yeti-input-wrapper">
-                      <input
+                      <input autoComplete="name" aria-label="ชื่อ-นามสกุล"
                         type="text"
                         className="yeti-input"
                         placeholder="เช่น นายสมชาย ใจดี"
@@ -613,7 +613,7 @@ function Login() {
                 <div className="yeti-form-group">
                   <label className="yeti-label">Email *</label>
                   <div className="yeti-input-wrapper">
-                    <input
+                    <input autoComplete="email" aria-label="Email"
                       type="email"
                       className={`yeti-input ${emailError ? "border-danger" : ""}`}
                       placeholder="Enter your email"
@@ -630,7 +630,7 @@ function Login() {
                 <div className="yeti-form-group">
                   <label className="yeti-label">Password *</label>
                   <div className="yeti-input-wrapper">
-                    <input
+                    <input aria-label="Password"
                       type={showPassword ? "text" : "password"}
                       className="yeti-input"
                       placeholder="Enter your password"
@@ -675,7 +675,7 @@ function Login() {
                   <div className="yeti-form-group">
                     <label className="yeti-label">Confirm Password *</label>
                     <div className="yeti-input-wrapper">
-                      <input
+                      <input aria-label="Confirm Password"
                         type={showPassword ? "text" : "password"}
                         className="yeti-input"
                         placeholder="Confirm your password"
@@ -730,7 +730,7 @@ function Login() {
                 {!isSignUp && (
                   <div className="yeti-options-row">
                     <label className="yeti-checkbox-label">
-                      <input
+                      <input aria-label="จดจำการเข้าสู่ระบบบนอุปกรณ์นี้"
                         type="checkbox"
                         className="yeti-checkbox"
                         checked={rememberMe}

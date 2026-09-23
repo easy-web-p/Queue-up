@@ -816,7 +816,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
         <div className="shopee-search-area">
           <form className="shopee-search-box" onSubmit={handleSearchSubmit}>
             {/* Input Field */}
-            <input
+            <input aria-label={language === "en" ? "Search foods and shops" : "ค้นหาร้านค้าและอาหาร"}
               type="text"
               className="shopee-search-input"
               placeholder={language === "en" ? "Search foods, shops, or ask QueueUp AI..." : "ค้นหาร้าน อาหาร หรือถาม QueueUp AI..."}

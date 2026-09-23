@@ -177,7 +177,7 @@ export default function SellerAssistantModal({ isOpen, onClose, userName = "ผ�
         <div className="seller-assistant-footer p-3 bg-slate-50 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800">
           <form onSubmit={handleSendMsg} className="seller-chat-form mb-2">
             <div className="seller-input-wrapper flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-full px-3 py-1.5 shadow-sm focus-within:border-[#FF7A1A]">
-              <input
+              <input aria-label="พิมพ์เพื่อคุยกับ Shogi เช่น ตามของ~"
                 type="text"
                 className="seller-chat-input flex-1 bg-transparent border-0 text-xs text-slate-900 dark:text-white focus:outline-none"
                 placeholder="พิมพ์เพื่อคุยกับ Shogi เช่น ตามของ~"

@@ -236,7 +236,7 @@ export default function VendorApprovalPanel() {
               <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">
                 ร้านค้า: <strong className="text-slate-900 dark:text-white">{selectedRequest.shopName}</strong> ({selectedRequest.studentName})
               </p>
-              <textarea
+              <textarea aria-label="เช่น สินค้าประเภทเครื่องดื่มชูกำลังไม่อนุญาตในโรงเรียน หรือเ"
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
                 placeholder="เช่น สินค้าประเภทเครื่องดื่มชูกำลังไม่อนุญาตในโรงเรียน หรือเมนูมีความเสี่ยงต่ออาการแพ้สูง..."

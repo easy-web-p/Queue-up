@@ -904,7 +904,7 @@ function UserProfile() {
                 </div>
                 {editingField === "name" ? (
                   <div className="shopee-inline-edit-input">
-                    <input
+                    <input autoComplete="given-name" aria-label="กรอกชื่อ"
                       type="text"
                       className="shopee-inline-input"
                       value={fullName}
@@ -939,7 +939,7 @@ function UserProfile() {
                 </div>
                 {editingField === "lastname" ? (
                   <div className="shopee-inline-edit-input">
-                    <input
+                    <input autoComplete="family-name" aria-label="กรอกนามสกุล"
                       type="text"
                       className="shopee-inline-input"
                       placeholder="กรอกนามสกุล"
@@ -981,7 +981,7 @@ function UserProfile() {
                 </div>
                 {editingField === "gender" ? (
                   <div className="shopee-inline-edit-input">
-                    <select
+                    <select aria-label="เพศ"
                       className="shopee-inline-input"
                       value={gender}
                       onChange={(e) => {
@@ -1026,7 +1026,7 @@ function UserProfile() {
                 </div>
                 {editingField === "birthdate" ? (
                   <div className="shopee-inline-edit-input">
-                    <input
+                    <input aria-label="วันเกิด"
                       type="date"
                       className="shopee-inline-input"
                       value={birthDate}
@@ -1065,7 +1065,7 @@ function UserProfile() {
                 </div>
                 {editingField === "email" ? (
                   <div className="shopee-inline-edit-input">
-                    <input
+                    <input autoComplete="email" aria-label="อีเมล"
                       type="email"
                       className="shopee-inline-input"
                       value={email}
@@ -1102,7 +1102,7 @@ function UserProfile() {
                 </div>
                 {editingField === "phone" ? (
                   <div className="shopee-inline-edit-input">
-                    <input
+                    <input autoComplete="tel" aria-label="08X"
                       type="tel"
                       className="shopee-inline-input"
                       placeholder="08X-XXX-XXXX"
@@ -1211,7 +1211,7 @@ function UserProfile() {
                 <div className="shopee-coupon-input-wrapper">
                   <div className="shopee-coupon-input-box">
                     <i className="bi bi-tag shopee-coupon-input-icon" />
-                    <input
+                    <input aria-label="ใส่รหัสส่วนลด"
                       type="text"
                       className="shopee-coupon-input"
                       placeholder="ใส่รหัสส่วนลด"
@@ -1432,7 +1432,7 @@ function UserProfile() {
               {/* Order Search Box */}
               <div className="shopee-order-search-box mb-3">
                 <i className="bi bi-search shopee-order-search-icon" />
-                <input
+                <input aria-label="ค้นหาคำสั่งซื้อ" autoComplete="off"
                   type="text"
                   className="shopee-order-search-input"
                   placeholder="คุณสามารถค้นหาด้วยชื่อผู้ขาย รหัสคำสั่งซื้อ หรือชื่อสินค้า"
@@ -1708,7 +1708,7 @@ function UserProfile() {
               {accountUsesPassword() ? (
                 <div>
                   <label className="security-modal-label">รหัสผ่าน (Password) *</label>
-                  <input
+                  <input aria-label="รหัสผ่าน (Password)"
                     type="password"
                     className="security-modal-input"
                     placeholder="กรอกรหัสผ่านของคุณ"

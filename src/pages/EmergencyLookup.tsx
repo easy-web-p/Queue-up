@@ -79,7 +79,7 @@ export default function EmergencyLookup() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">รหัสประจำตัวนักเรียน (Student Code) *</label>
-              <input
+              <input aria-label="รหัสประจำตัวนักเรียน (Student Code)"
                 type="text"
                 required
                 value={studentCodeInput}
@@ -90,7 +90,7 @@ export default function EmergencyLookup() {
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">เหตุผลการเข้าถึงข้อมูล *</label>
-              <input
+              <input aria-label="เหตุผลการเข้าถึงข้อมูล"
                 type="text"
                 required
                 value={lookupReason}

@@ -249,7 +249,7 @@ export const MerchantModifierManager: React.FC<Props> = ({
             <form onSubmit={handleCreateGroup} className="space-y-4 text-xs">
               <div>
                 <label className="block font-bold text-slate-700 mb-1">ชื่อกลุ่มตัวเลือก</label>
-                <input
+                <input aria-label="ชื่อกลุ่มตัวเลือก"
                   type="text"
                   required
                   value={groupName}
@@ -262,7 +262,7 @@ export const MerchantModifierManager: React.FC<Props> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">รูปแบบการเลือก</label>
-                  <select
+                  <select aria-label="รูปแบบการเลือก"
                     value={selectionType}
                     onChange={(e) => setSelectionType(e.target.value as 'single' | 'multiple')}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-medium"
@@ -307,13 +307,14 @@ export const MerchantModifierManager: React.FC<Props> = ({
                       <input
                         type="text"
                         required
+                        aria-label={`ชื่อตัวเลือกที่ ${idx + 1}`}
                         value={opt.name}
                         onChange={(e) => handleOptionChange(idx, 'name', e.target.value)}
                         placeholder={`ชื่อตัวเลือก เช่น ${idx === 0 ? 'หวาน 50%' : 'ไข่ดาวกรอบ'}`}
                         className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-2 font-medium"
                       />
                       <div className="w-28 relative">
-                        <input
+                        <input aria-label="0.00"
                           type="number"
                           min="0"
                           step="0.5"

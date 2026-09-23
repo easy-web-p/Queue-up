@@ -232,7 +232,7 @@ export const MerchantMenuManager: React.FC<Props> = ({
                   {/* Price */}
                   <td className="p-4">
                     {editingItemId === item.id ? (
-                      <input
+                      <input aria-label="ราคาใหม่ (บาท)"
                         type="number"
                         min="1"
                         value={tempPrice}
@@ -247,7 +247,7 @@ export const MerchantMenuManager: React.FC<Props> = ({
                   {/* Stock */}
                   <td className="p-4">
                     {editingItemId === item.id ? (
-                      <input
+                      <input aria-label="จำนวนคงเหลือ"
                         type="number"
                         min="0"
                         value={tempStock}
@@ -339,7 +339,7 @@ export const MerchantMenuManager: React.FC<Props> = ({
             <form onSubmit={handleCreateItem} className="space-y-3 text-xs">
               <div>
                 <label className="block font-bold text-slate-700 mb-1">ชื่อเมนูอาหาร</label>
-                <input
+                <input aria-label="ชื่อเมนูอาหาร"
                   type="text"
                   required
                   value={newName}
@@ -352,7 +352,7 @@ export const MerchantMenuManager: React.FC<Props> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">หมวดหมู่</label>
-                  <select
+                  <select aria-label="หมวดหมู่"
                     value={newCategory}
                     onChange={(e) => setNewCategory(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-medium"
@@ -367,7 +367,7 @@ export const MerchantMenuManager: React.FC<Props> = ({
 
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">ราคา (บาท)</label>
-                  <input
+                  <input aria-label="ราคา (บาท)"
                     type="number"
                     required
                     min="1"
@@ -382,7 +382,7 @@ export const MerchantMenuManager: React.FC<Props> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">สต็อกประจำวัน</label>
-                  <input
+                  <input aria-label="สต็อกประจำวัน"
                     type="number"
                     required
                     min="0"
@@ -394,7 +394,7 @@ export const MerchantMenuManager: React.FC<Props> = ({
 
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">เวลาปรุง (นาที)</label>
-                  <input
+                  <input aria-label="เวลาปรุง (นาที)"
                     type="number"
                     required
                     min="1"
@@ -434,7 +434,7 @@ export const MerchantMenuManager: React.FC<Props> = ({
 
               <div>
                 <label className="block font-bold text-slate-700 mb-1">คำอธิบายเมนู</label>
-                <textarea
+                <textarea aria-label="คำอธิบายเมนู"
                   rows={2}
                   value={newDescription}
                   onChange={(e) => setNewDescription(e.target.value)}

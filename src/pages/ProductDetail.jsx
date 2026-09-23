@@ -1225,7 +1225,7 @@ function ProductDetail() {
                               className={`queue-pd-option-chip justify-content-between ${isChecked ? "active" : ""}`}
                             >
                               <div className="d-flex align-items-center gap-1.5">
-                                <input
+                                <input aria-label={opt.name || "ตัวเลือกเพิ่มเติม"}
                                   type="checkbox"
                                   checked={isChecked}
                                   onChange={(e) => {
@@ -1255,7 +1255,7 @@ function ProductDetail() {
               {/* Note & Quantity Stepper */}
               <div className="row g-2 align-items-center">
                 <div className="col-12 col-sm-7">
-                  <input
+                  <input aria-label="หมายเหตุ: เช่น แยกพริก"
                     type="text"
                     className="form-control form-control-sm text-xs"
                     placeholder="หมายเหตุ: เช่น แยกพริก, ไม่ใส่ผักบุ้ง"
@@ -1847,7 +1847,7 @@ function ProductDetail() {
                   {/* Menu details */}
                   <div className="mb-3">
                     <label className="form-label small fw-bold text-dark">เมนูหรือท็อปปิ้งที่สั่ง:</label>
-                    <input
+                    <input aria-label="เมนูหรือท็อปปิ้งที่สั่ง"
                       type="text"
                       className="form-control form-control-sm rounded-3"
                       placeholder={`เช่น สั่ง: ${product?.name || "เมนูนี้"} + ไข่ดาว`}
@@ -1859,7 +1859,7 @@ function ProductDetail() {
                   {/* Comment */}
                   <div className="mb-2">
                     <label className="form-label small fw-bold text-dark">ข้อความรีวิวประสบการณ์ของคุณ *:</label>
-                    <textarea
+                    <textarea aria-label="ข้อความรีวิวประสบการณ์ของคุณ *"
                       rows={3}
                       required
                       className="form-control form-control-sm rounded-3"

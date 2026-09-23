@@ -70,7 +70,7 @@ export const MerchantCRMAnalytics: React.FC<Props> = ({ customers, onSendBroadca
         </p>
 
         <form onSubmit={handleBroadcast} className="flex gap-2">
-          <input
+          <input aria-label="พิมพ์ข้อความข่าวสาร เช่น 'พิเศษวันนี้! สั่งผัดไทยกุ้งสดรับฟร"
             type="text"
             value={broadcastText}
             onChange={(e) => setBroadcastText(e.target.value)}

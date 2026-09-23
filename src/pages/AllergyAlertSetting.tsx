@@ -222,7 +222,7 @@ export default function AllergyAlertSetting() {
                 พิมพ์เพิ่มสารก่อภูมิแพ้อื่นๆ:
               </label>
               <form onSubmit={handleAddCustomAllergy} className="flex gap-2">
-                <input
+                <input aria-label="พิมพ์เพิ่มสารก่อภูมิแพ้อื่นๆ"
                   type="text"
                   value={newAllergyInput}
                   onChange={(e) => setNewAllergyInput(e.target.value)}
@@ -273,7 +273,7 @@ export default function AllergyAlertSetting() {
               <label className="block text-sm font-bold text-slate-700 dark:text-[#E5E7EB]">
                 ข้อควรระวังพิเศษ & โรคประจำตัว (สำหรับคุณครูหรือห้องพยาบาล):
               </label>
-              <textarea
+              <textarea aria-label="ข้อควรระวังพิเศษ & โรคประจำตัว (สำหรับคุณครูหรือห้องพยาบาล)"
                 rows={4}
                 value={healthNotes}
                 onChange={(e) => setHealthNotes(e.target.value)}

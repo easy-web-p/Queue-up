@@ -186,7 +186,7 @@ export default function GuardianLinkApproval() {
           <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">
             บันทึกการตรวจสอบ (แนบไปกับผลการตัดสินและ Audit Log)
           </label>
-          <input
+          <input aria-label="บันทึกการตรวจสอบ (แนบไปกับผลการตัดสินและ Audit Log)"
             type="text"
             value={note}
             onChange={(e) => setNote(e.target.value)}

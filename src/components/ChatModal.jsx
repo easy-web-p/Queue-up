@@ -419,7 +419,7 @@ function ChatModal({ isOpen, onClose, storeId, storeName, initialStoreName, init
                   void handleSendMessage();
                 }}
               >
-                <input
+                <input aria-label="พิมพ์ข้อความตอบกลับร้านค้า..."
                   type="text"
                   className="queueup-chat-input-box flex-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#FF7A1A]"
                   placeholder="พิมพ์ข้อความตอบกลับร้านค้า..."

@@ -765,7 +765,7 @@ export default function GuardianDashboard() {
                     <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">
                       วงเงินการใช้จ่ายรายวัน (บาท/วัน)
                     </label>
-                    <input
+                    <input aria-label="วงเงินการใช้จ่ายรายวัน (บาท/วัน)"
                       type="number"
                       min="0"
                       value={dailyLimitBaht}
@@ -777,7 +777,7 @@ export default function GuardianDashboard() {
                     <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">
                       วงเงินการใช้จ่ายรายสัปดาห์ (บาท/สัปดาห์)
                     </label>
-                    <input
+                    <input aria-label="วงเงินการใช้จ่ายรายสัปดาห์ (บาท/สัปดาห์)"
                       type="number"
                       min="0"
                       value={weeklyLimitBaht}
@@ -864,7 +864,7 @@ export default function GuardianDashboard() {
                   </div>
 
                   <form onSubmit={handleAddCustomAllergy} className="flex gap-2">
-                    <input
+                    <input aria-label="เพิ่มสารก่อภูมิแพ้อื่นๆ (เช่น ผงชูรส"
                       type="text"
                       value={newAllergyInput}
                       onChange={(e) => setNewAllergyInput(e.target.value)}
@@ -884,7 +884,7 @@ export default function GuardianDashboard() {
                   <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">
                     ข้อควรระวังสุขภาพ / โรคประจำตัว
                   </label>
-                  <textarea
+                  <textarea aria-label="ข้อควรระวังสุขภาพ / โรคประจำตัว"
                     rows={3}
                     value={healthNotes}
                     onChange={(e) => setHealthNotes(e.target.value)}
@@ -1062,7 +1062,7 @@ export default function GuardianDashboard() {
                     </button>
                   ))}
                 </div>
-                <input
+                <input aria-label="จำนวนเงินที่ต้องการเติม (บาท)"
                   type="number"
                   min="1"
                   value={topupAmountBaht}
@@ -1098,6 +1098,7 @@ export default function GuardianDashboard() {
                   <input
                     type="radio"
                     name="topup-method"
+                    aria-label="ชำระด้วยเงินสดที่โรงเรียน"
                     className="mt-1 accent-[#FF7A1A]"
                     checked={topupMethod === 'CASH'}
                     onChange={() => setTopupMethod('CASH')}
@@ -1152,7 +1153,7 @@ export default function GuardianDashboard() {
               </h3>
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-1">รหัสประจำตัวนักเรียน (Student Code / ID) *</label>
-                <input
+                <input aria-label="รหัสประจำตัวนักเรียน (Student Code / ID)"
                   type="text"
                   required
                   value={newStudentId}
@@ -1163,7 +1164,7 @@ export default function GuardianDashboard() {
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-1">ชื่อ - นามสกุล นักเรียน *</label>
-                <input
+                <input autoComplete="off" aria-label="ชื่อ - นามสกุล นักเรียน"
                   type="text"
                   required
                   value={newStudentName}
@@ -1174,7 +1175,7 @@ export default function GuardianDashboard() {
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-1">ความสัมพันธ์</label>
-                <select
+                <select aria-label="ความสัมพันธ์"
                   value={relationship}
                   onChange={(e) => setRelationship(e.target.value as 'FATHER' | 'MOTHER' | 'GUARDIAN')}
                   className="w-full px-4 py-3 bg-slate-50 dark:bg-[#16100C] border border-slate-300 dark:border-[#FF7A1A]/30 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none focus:border-[#FF7A1A]"

@@ -218,7 +218,7 @@ function SearchResults() {
                 { key: "โรงอาหาร 2", label: "โรงอาหาร 2 (อาคารกิจกรรม)" },
               ].map((loc) => (
                 <label key={loc.key} className="shopee-filter-item flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 mb-2 cursor-pointer hover:text-[#FF7A1A] select-none">
-                  <input
+                  <input aria-label={`กรองเฉพาะ ${loc.label}`}
                     type="checkbox"
                     className="rounded border-slate-300 text-[#FF7A1A] focus:ring-[#FF7A1A]"
                     checked={selectedLocations.includes(loc.key)}
@@ -234,7 +234,7 @@ function SearchResults() {
               <div className="shopee-filter-title text-xs font-bold text-slate-700 dark:text-slate-300 mb-2.5">ช่วงราคา (บาท)</div>
               <form onSubmit={handleApplyPrice}>
                 <div className="shopee-price-range-inputs flex items-center gap-2 mb-2.5">
-                  <input
+                  <input aria-label="ขั้นต่ำ ฿"
                     type="number"
                     className="shopee-price-input w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#FF7A1A]"
                     placeholder="ขั้นต่ำ ฿"
@@ -242,7 +242,7 @@ function SearchResults() {
                     onChange={(e) => setInputMinPrice(e.target.value)}
                   />
                   <span className="text-slate-400">-</span>
-                  <input
+                  <input aria-label="สูงสุด ฿"
                     type="number"
                     className="shopee-price-input w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#FF7A1A]"
                     placeholder="สูงสุด ฿"
@@ -306,7 +306,7 @@ function SearchResults() {
                 >
                   ขายดี
                 </button>
-                <select
+                <select aria-label="เรียงลำดับผลการค้นหา"
                   className="shopee-sort-select bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs font-bold cursor-pointer focus:outline-none focus:border-[#FF7A1A]"
                   value={
                     sortBy.startsWith("price") ? sortBy : "price_default"

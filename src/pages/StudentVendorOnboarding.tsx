@@ -221,7 +221,7 @@ export default function StudentVendorOnboarding() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">ชื่อ - นามสกุล นักเรียน *</label>
-              <input
+              <input aria-label="ชื่อ - นามสกุล นักเรียน"
                 type="text"
                 value={studentName}
                 onChange={(e) => setStudentName(e.target.value)}
@@ -232,7 +232,7 @@ export default function StudentVendorOnboarding() {
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">รหัสประจำตัวนักเรียน *</label>
-              <input
+              <input aria-label="รหัสประจำตัวนักเรียน"
                 type="text"
                 value={studentCode}
                 onChange={(e) => setStudentCode(e.target.value)}
@@ -243,7 +243,7 @@ export default function StudentVendorOnboarding() {
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">ระดับชั้น (Class / Grade)</label>
-              <input
+              <input aria-label="ระดับชั้น (Class / Grade)"
                 type="text"
                 value={className}
                 onChange={(e) => setClassName(e.target.value)}
@@ -253,7 +253,7 @@ export default function StudentVendorOnboarding() {
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">ห้องเรียน / อาคารประจำ</label>
-              <input
+              <input aria-label="ห้องเรียน / อาคารประจำ"
                 type="text"
                 value={room}
                 onChange={(e) => setRoom(e.target.value)}
@@ -271,7 +271,7 @@ export default function StudentVendorOnboarding() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">ชื่อร้านค้า (Shop Name) *</label>
-              <input
+              <input aria-label="ชื่อร้านค้า (Shop Name)"
                 type="text"
                 value={shopName}
                 onChange={(e) => setShopName(e.target.value)}
@@ -282,7 +282,7 @@ export default function StudentVendorOnboarding() {
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-[#E5E7EB] mb-2">โซนโรงอาหารที่ต้องการ *</label>
-              <select
+              <select aria-label="โซนโรงอาหารที่ต้องการ"
                 value={requestedZone}
                 onChange={(e) => setRequestedZone(e.target.value)}
                 className="w-full px-4 py-3 bg-slate-50 dark:bg-[#16100C] border border-slate-300 dark:border-[#FF7A1A]/30 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-[#FF7A1A] transition-colors"
@@ -325,7 +325,7 @@ export default function StudentVendorOnboarding() {
           <div className="space-y-3">
             {menuItems.map((item, idx) => (
               <div key={idx} className="p-4 bg-slate-50 dark:bg-[#16100C] border border-slate-200 dark:border-white/10 rounded-2xl flex flex-col md:flex-row gap-3 items-start md:items-center">
-                <input
+                <input aria-label="ชื่อเมนู (เช่น ขนมปังปิ้งเนยนม)"
                   type="text"
                   placeholder="ชื่อเมนู (เช่น ขนมปังปิ้งเนยนม)"
                   value={item.name}
@@ -334,7 +334,7 @@ export default function StudentVendorOnboarding() {
                 />
                 <div className="flex items-center gap-2 w-full md:w-auto">
                   <span className="text-xs font-bold text-slate-600 dark:text-[#9CA3AF]">ราคา (บาท):</span>
-                  <input
+                  <input aria-label={`ราคาของเมนูที่ ${idx + 1} (บาท)`}
                     type="number"
                     min="1"
                     value={item.price}
