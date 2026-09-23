@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useToast } from "./ToastProvider.jsx";
+import { useDialog } from "../hooks/useDialog.js";
 import "./SellerAssistantModal.css";
 
 export default function SellerAssistantModal({ isOpen, onClose, userName = "ผู้ขาย" }) {
@@ -7,6 +8,11 @@ export default function SellerAssistantModal({ isOpen, onClose, userName = "ผ�
   const [activeTab, setActiveTab] = useState("recommended");
   const [inputMsg, setInputMsg] = useState("");
   const [chatLogs, setChatLogs] = useState([]);
+  const { dialogRef, dialogProps, backdropProps } = useDialog({
+    isOpen,
+    onClose,
+    labelledBy: "seller-assistant-title",
+  });
 
   if (!isOpen) return null;
 
@@ -38,12 +44,16 @@ export default function SellerAssistantModal({ isOpen, onClose, userName = "ผ�
   };
 
   return (
-    <div className="seller-assistant-backdrop fixed inset-0 z-[99999] bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-end sm:p-6 transition-all" onClick={onClose}>
-      <div className="seller-assistant-card w-full sm:w-[420px] max-h-[90vh] sm:h-[640px] bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden transition-all font-sans" onClick={(e) => e.stopPropagation()}>
+    <div className="seller-assistant-backdrop fixed inset-0 z-[99999] bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-end sm:p-6 transition-all" {...backdropProps}>
+      <div
+        ref={dialogRef}
+        {...dialogProps}
+        className="seller-assistant-card w-full sm:w-[420px] max-h-[90vh] sm:h-[640px] bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden transition-all font-sans"
+      >
         {/* Header */}
         <div className="seller-assistant-header bg-gradient-to-r from-[#FF7A1A] to-[#FF7A1A] text-white p-4 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-2">
-            <span className="seller-assistant-title font-bold text-base flex items-center gap-2">
+            <span id="seller-assistant-title" className="seller-assistant-title font-bold text-base flex items-center gap-2">
               <i className="bi bi-robot text-lg" />
               Seller Assistant (Shogi AI)
             </span>

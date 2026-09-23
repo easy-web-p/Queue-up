@@ -230,9 +230,17 @@ runTest('Every control in the cart has an accessible name', () => {
 });
 
 runTest('The cart dialog is announced as a dialog', () => {
-  assert(cartModal.includes('role="dialog"'), 'a modal must say so');
-  assert(cartModal.includes('aria-modal="true"'), 'and trap the reader inside it');
-  assert(cartModal.includes('aria-labelledby'), 'and be named');
+  // The three attributes used to be written out here by hand, on the backdrop
+  // rather than on the panel, and with no Escape or focus trap behind them.
+  // They come from useDialog now, which also supplies the rest; what this
+  // still has to hold is that the cart is one of the dialogs that uses it and
+  // that it is named. The hook's own behaviour is pinned in test-dialog-a11y.js.
+  assert(cartModal.includes('useDialog({'), 'the cart modal no longer behaves as a dialog');
+  const call = cartModal.slice(cartModal.indexOf('useDialog({'), cartModal.indexOf('});', cartModal.indexOf('useDialog({')));
+  assert(/labelledBy:\s*['"]([^'"]+)['"]/.test(call), 'the cart dialog is not named');
+  const id = call.match(/labelledBy:\s*['"]([^'"]+)['"]/)[1];
+  assert(cartModal.includes(`id="${id}"`), `the cart dialog is named after a missing id "${id}"`);
+  assert(cartModal.includes('{...dialogProps}'), 'the dialog role never reaches the panel');
 });
 
 runTest('The cart badge counts pieces, not lines', () => {

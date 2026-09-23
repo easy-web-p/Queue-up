@@ -20,6 +20,7 @@
 
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, AlertTriangle, AlertCircle, Info, X } from 'lucide-react';
+import { useDialog } from '../hooks/useDialog.js';
 
 const ToastContext = createContext(null);
 
@@ -96,6 +97,20 @@ export function ToastProvider({ children }) {
     if (resolve) resolve(result);
   }, []);
 
+  // Escape answers the confirmation the same way the cancel button does:
+  // "no". A dialog that asks a yes/no question and cannot be dismissed by
+  // Escape leaves a keyboard user with no way to decline.
+  const {
+    dialogRef: confirmDialogRef,
+    dialogProps: confirmDialogProps,
+    backdropProps: confirmBackdropProps,
+  } = useDialog({
+    isOpen: dialog !== null,
+    onClose: () => closeDialog(false),
+    labelledBy: 'toast-dialog-title',
+    role: 'alertdialog',
+  });
+
   const api = useMemo(
     () => ({
       success: (m, o) => push('success', m, o),
@@ -147,16 +162,17 @@ export function ToastProvider({ children }) {
       </div>
 
       {dialog && (
+        // The role and the label were on the dimmed layer rather than on the
+        // panel, so what a reader was told was the dialog was the whole
+        // screen, the page underneath included.
         <div
           className="fixed inset-0 z-[99999995] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-          role="alertdialog"
-          aria-modal="true"
-          aria-labelledby="toast-dialog-title"
-          onClick={() => closeDialog(false)}
+          {...confirmBackdropProps}
         >
           <div
+            ref={confirmDialogRef}
+            {...confirmDialogProps}
             className="bg-white dark:bg-[#241C16] border-2 border-slate-200 dark:border-white/10 rounded-3xl shadow-2xl max-w-md w-full max-h-[90dvh] overflow-y-auto overscroll-contain p-6 space-y-4 font-['IBM_Plex_Sans_Thai']"
-            onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start gap-3">
               {DialogIcon && (

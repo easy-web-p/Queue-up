@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useDialog } from '../hooks/useDialog.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
   fetchParentChildLinks,
@@ -106,6 +107,32 @@ export default function GuardianDashboard() {
   const [newStudentId, setNewStudentId] = useState('');
   const [newStudentName, setNewStudentName] = useState('');
   const [relationship, setRelationship] = useState<'FATHER' | 'MOTHER' | 'GUARDIAN'>('GUARDIAN');
+
+  // Escape, a focus trap, a name and a scroll lock: this modal had none
+  // of the four. No backdrop close either — it never had one, and adding
+  // it to a form would throw away what someone had typed.
+  const {
+    dialogRef: topupDialogRef,
+    dialogProps: topupDialogProps,
+  } = useDialog({
+    isOpen: isTopupOpen,
+    onClose: () => setIsTopupOpen(false),
+    labelledBy: "guardian-topup-title",
+    closeOnBackdrop: false,
+  });
+
+  // Escape, a focus trap, a name and a scroll lock: this modal had none
+  // of the four. No backdrop close either — it never had one, and adding
+  // it to a form would throw away what someone had typed.
+  const {
+    dialogRef: linkDialogRef,
+    dialogProps: linkDialogProps,
+  } = useDialog({
+    isOpen: isLinkModalOpen,
+    onClose: () => setIsLinkModalOpen(false),
+    labelledBy: "guardian-link-title",
+    closeOnBackdrop: false,
+  });
 
   const categoryOptions = [
     'Sugary Drinks', 'Fast Food', 'Snacks', 'Spicy Food', 'Dessert & Bakery', 'Energy Drinks'
@@ -984,8 +1011,10 @@ export default function GuardianDashboard() {
         {/* Top-up Modal */}
         {isTopupOpen && (
           <div className="fixed inset-0 z-50 bg-slate-900/70 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-[#241C16] border border-slate-200 dark:border-[#FF7A1A]/30 rounded-3xl p-6 max-w-md w-full max-h-[90dvh] overflow-y-auto overscroll-contain shadow-2xl space-y-4">
-              <h3 className="text-lg font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
+            <div
+            ref={topupDialogRef}
+            {...topupDialogProps} className="bg-white dark:bg-[#241C16] border border-slate-200 dark:border-[#FF7A1A]/30 rounded-3xl p-6 max-w-md w-full max-h-[90dvh] overflow-y-auto overscroll-contain shadow-2xl space-y-4">
+              <h3 id="guardian-topup-title" className="text-lg font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
                 <CreditCard className="w-5 h-5 text-[#FF7A1A]" />
                 เติมเงินเข้ากระเป๋าบุตรหลาน
               </h3>
@@ -1114,8 +1143,10 @@ export default function GuardianDashboard() {
         {/* Link Child Modal */}
         {isLinkModalOpen && (
           <div className="fixed inset-0 z-50 bg-slate-900/70 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-            <form onSubmit={handleLinkChild} className="bg-white dark:bg-[#241C16] border border-slate-200 dark:border-[#FF7A1A]/30 rounded-3xl p-6 max-w-md w-full max-h-[90dvh] overflow-y-auto overscroll-contain shadow-2xl space-y-4">
-              <h3 className="text-lg font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
+            <form
+            ref={linkDialogRef}
+            {...linkDialogProps} onSubmit={handleLinkChild} className="bg-white dark:bg-[#241C16] border border-slate-200 dark:border-[#FF7A1A]/30 rounded-3xl p-6 max-w-md w-full max-h-[90dvh] overflow-y-auto overscroll-contain shadow-2xl space-y-4">
+              <h3 id="guardian-link-title" className="text-lg font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
                 <Plus className="w-5 h-5 text-[#FF7A1A]" />
                 ผูกบัญชีนักเรียนในความดูแล
               </h3>

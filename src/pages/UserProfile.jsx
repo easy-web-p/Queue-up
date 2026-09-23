@@ -23,6 +23,7 @@ import { cancelOrderWithRefund } from "../services/orderCancelService";
 import { CUSTOMER_CANCELLABLE_STATUSES as CUSTOMER_CANCELLABLE } from "../../functions/refundRules.js";
 import { fetchLoyaltyBalance, redeemLoyaltyReward } from "../services/loyaltyService";
 import { deriveAccountCode } from "../utils/accountCode.ts";
+import { useDialog } from "../hooks/useDialog.js";
 import "./UserProfile.css";
 import "./UserPurchase.css";
 
@@ -201,6 +202,37 @@ function UserProfile() {
   // Delete Account Modal State
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isFinalConfirmModalOpen, setIsFinalConfirmModalOpen] = useState(false);
+
+  // The two deletion dialogs. Neither had a role, a label, Escape, or a focus
+  // trap — so Tab walked straight out of the back of the dialog and into the
+  // profile page behind it, which is the very account being deleted, still
+  // focusable and now invisible under a dim layer.
+  //
+  // Neither closes on a backdrop click: a stray tap beside a confirmation is
+  // not an answer to it, in either direction.
+  const {
+    dialogRef: deleteDialogRef,
+    dialogProps: deleteDialogProps,
+    backdropProps: deleteBackdropProps,
+  } = useDialog({
+    isOpen: isDeleteModalOpen,
+    onClose: () => setIsDeleteModalOpen(false),
+    labelledBy: "delete-account-title",
+    closeOnBackdrop: false,
+  });
+  const {
+    dialogRef: finalConfirmDialogRef,
+    dialogProps: finalConfirmDialogProps,
+    backdropProps: finalConfirmBackdropProps,
+  } = useDialog({
+    isOpen: isFinalConfirmModalOpen,
+    onClose: () => setIsFinalConfirmModalOpen(false),
+    labelledBy: "delete-confirm-title",
+    closeOnBackdrop: false,
+    // The last step before the account goes. An alertdialog is announced with
+    // more insistence than a dialog, which is the right amount here.
+    role: "alertdialog",
+  });
   const [deletePassword, setDeletePassword] = useState("");
   const [isReauthenticating, setIsReauthenticating] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -1643,10 +1675,14 @@ function UserProfile() {
       {/* 🔒 Password Security Verification Modal for Account ID Edit */}
       {/* 🗑️ Step 1: Delete Account Form Modal */}
       {isDeleteModalOpen && (
-        <div className="security-modal-overlay">
-          <div className="security-modal-card">
+        <div className="security-modal-overlay" {...deleteBackdropProps}>
+          <div
+            ref={deleteDialogRef}
+            {...deleteDialogProps}
+            className="security-modal-card"
+          >
             <div className="security-modal-header">
-              <h3 className="security-modal-title text-danger">
+              <h3 id="delete-account-title" className="security-modal-title text-danger">
                 <i className="bi bi-trash3-fill me-2" />
                 ขอยกเลิกและลบข้อมูลบัญชีออกจากระบบ
               </h3>
@@ -1713,12 +1749,16 @@ function UserProfile() {
 
       {/* ⚠️ Step 2: Final Warning Confirmation Modal */}
       {isFinalConfirmModalOpen && (
-        <div className="security-modal-overlay">
-          <div className="security-modal-card text-center py-4">
+        <div className="security-modal-overlay" {...finalConfirmBackdropProps}>
+          <div
+            ref={finalConfirmDialogRef}
+            {...finalConfirmDialogProps}
+            className="security-modal-card text-center py-4"
+          >
             <div className="mb-3">
               <i className="bi bi-exclamation-triangle-fill text-danger text-5xl" />
             </div>
-            <h4 className="fw-bold text-dark mb-2">ยืนยันการลบข้อมูลบัญชีถาวร</h4>
+            <h4 id="delete-confirm-title" className="fw-bold text-dark mb-2">ยืนยันการลบข้อมูลบัญชีถาวร</h4>
             {/* Spelled out rather than "ลบทุกอย่างถาวร". Some of this is kept,
                 and a promise of total erasure that the system does not keep is
                 worse than a shorter one it does. */}

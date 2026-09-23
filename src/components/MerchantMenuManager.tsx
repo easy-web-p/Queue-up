@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { useDialog } from '../hooks/useDialog.js';
 import type { MenuItem, ModifierGroup } from '../types';
 import { ToggleLeft, ToggleRight, Plus, Utensils, Edit2, Check, Layers, AlertTriangle } from 'lucide-react';
 import { ALLERGEN_PRESET_DICTIONARY } from '../utils/allergenMatcher';
@@ -48,6 +49,19 @@ export const MerchantMenuManager: React.FC<Props> = ({
   const [newPrepTime, setNewPrepTime] = useState<number>(5);
   const [newDescription, setNewDescription] = useState('');
   const [selectedModifierIds, setSelectedModifierIds] = useState<string[]>([]);
+
+  // Escape, a focus trap, a name and a scroll lock: this modal had none
+  // of the four. No backdrop close either — it never had one, and adding
+  // it to a form would throw away what someone had typed.
+  const {
+    dialogRef: addItemDialogRef,
+    dialogProps: addItemDialogProps,
+  } = useDialog({
+    isOpen: showAddModal,
+    onClose: () => setShowAddModal(false),
+    labelledBy: "menu-add-item-title",
+    closeOnBackdrop: false,
+  });
 
   const handleToggleModifierSelection = (modId: string) => {
     setSelectedModifierIds((prev) =>
@@ -309,9 +323,11 @@ export const MerchantMenuManager: React.FC<Props> = ({
       {/* Add New Item Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+          <div
+            ref={addItemDialogRef}
+            {...addItemDialogProps} className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="font-bold text-slate-900 text-base">เพิ่มรายการอาหารใหม่</h3>
+              <h3 id="menu-add-item-title" className="font-bold text-slate-900 text-base">เพิ่มรายการอาหารใหม่</h3>
               <button
                 onClick={() => setShowAddModal(false)}
                 className="text-slate-400 hover:text-slate-600 font-bold"

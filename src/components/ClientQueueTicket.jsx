@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useDialog } from '../hooks/useDialog.js';
 import { useNavigate, Link } from 'react-router-dom';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config.js';
@@ -40,6 +41,19 @@ export const ClientQueueTicket = ({
   const [showQrModal, setShowQrModal] = useState(false);
   const [showItemsDetail, setShowItemsDetail] = useState(false);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
+
+  // Escape, a focus trap, a name and a scroll lock: this modal had none
+  // of the four. No backdrop close either — it never had one, and adding
+  // it to a form would throw away what someone had typed.
+  const {
+    dialogRef: qrDialogRef,
+    dialogProps: qrDialogProps,
+  } = useDialog({
+    isOpen: showQrModal,
+    onClose: () => setShowQrModal(false),
+    labelledBy: "queue-qr-title",
+    closeOnBackdrop: false,
+  });
 
   const prevPhaseIndexRef = useRef(1);
   const resolvedOrderId = initialOrderId || initialOrder?.id || initialOrder?.orderId;
@@ -359,9 +373,11 @@ export const ClientQueueTicket = ({
       {/* Digital Pickup Code & QR Modal */}
       {showQrModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white text-stone-900 rounded-3xl p-6 max-w-sm w-full max-h-[90dvh] overflow-y-auto overscroll-contain shadow-2xl border border-stone-200 text-center space-y-4 animate-scale-in">
+          <div
+            ref={qrDialogRef}
+            {...qrDialogProps} className="bg-white text-stone-900 rounded-3xl p-6 max-w-sm w-full max-h-[90dvh] overflow-y-auto overscroll-contain shadow-2xl border border-stone-200 text-center space-y-4 animate-scale-in">
             <div className="flex justify-between items-center pb-2 border-b border-stone-200">
-              <span className="text-xs font-black uppercase text-amber-700">Digital Pickup Token</span>
+              <span id="queue-qr-title" className="text-xs font-black uppercase text-amber-700">Digital Pickup Token</span>
               <button
                 onClick={() => setShowQrModal(false)}
                 className="p-1 rounded-full hover:bg-stone-100 text-stone-500 cursor-pointer"

@@ -3,6 +3,7 @@ import { pressableProps } from "../utils/pressable.js";
 import { getChatGPTResponse } from "../services/aiChatService.js";
 import { analyzeAndShieldInput, checkRateLimit } from "../services/aiSecurityShield.js";
 import { useToast } from "./ToastProvider.jsx";
+import { useDialog } from "../hooks/useDialog.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import {
   SENDER,
@@ -38,6 +39,14 @@ const QUICK_SUGGESTIONS = [
 const STORE_AVATAR = "/logo.png";
 
 function ChatModal({ isOpen, onClose, storeId, storeName, initialStoreName, initialOrderContext }) {
+  // No role, no label and no Escape before this: the chat opened and a screen
+  // reader was told nothing, and the only way out was to find the ✕.
+  const { dialogRef, dialogProps, backdropProps } = useDialog({
+    isOpen,
+    onClose,
+    label: "แชทติดต่อร้านค้า",
+  });
+
   const toast = useToast();
   const { user } = useAuth();
   const customerUid = user?.uid || null;
@@ -217,8 +226,12 @@ function ChatModal({ isOpen, onClose, storeId, storeName, initialStoreName, init
   const handleSelectChat = (chatId) => setActiveChatId(chatId);
 
   return (
-    <div className="queueup-chat-overlay fixed inset-0 z-[100000] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
-      <div className="queueup-chat-card w-full max-w-4xl h-[620px] max-h-[90vh] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 flex overflow-hidden font-sans" onClick={(e) => e.stopPropagation()}>
+    <div className="queueup-chat-overlay fixed inset-0 z-[100000] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in" {...backdropProps}>
+      <div
+        ref={dialogRef}
+        {...dialogProps}
+        className="queueup-chat-card w-full max-w-4xl h-[620px] max-h-[90vh] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 flex overflow-hidden font-sans"
+      >
         {/* ---------------- 1. LEFT SIDEBAR (STORE CHAT LIST) ---------------- */}
         <aside className="queueup-chat-sidebar w-72 shrink-0 border-r border-slate-200 dark:border-slate-800 flex flex-col bg-slate-50 dark:bg-slate-900/60">
           <div className="queueup-chat-sidebar-header p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">

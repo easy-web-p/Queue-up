@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { useDialog } from '../hooks/useDialog.js';
 import type { ModifierGroup, ModifierOption } from '../types';
 import { Plus, Trash2, Layers, AlertCircle, ToggleLeft, ToggleRight } from 'lucide-react';
 import { errorMessage } from '../utils/errorMessage';
@@ -31,6 +32,19 @@ export const MerchantModifierManager: React.FC<Props> = ({
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Escape, a focus trap, a name and a scroll lock: this modal had none
+  // of the four. No backdrop close either — it never had one, and adding
+  // it to a form would throw away what someone had typed.
+  const {
+    dialogRef: addGroupDialogRef,
+    dialogProps: addGroupDialogProps,
+  } = useDialog({
+    isOpen: showAddModal,
+    onClose: () => setShowAddModal(false),
+    labelledBy: "modifier-add-group-title",
+    closeOnBackdrop: false,
+  });
 
   const handleAddOptionField = () => {
     setOptions([...options, { name: '', price: 0 }]);
@@ -212,9 +226,11 @@ export const MerchantModifierManager: React.FC<Props> = ({
       {/* Modal Add Group */}
       {showAddModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+          <div
+            ref={addGroupDialogRef}
+            {...addGroupDialogProps} className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="font-bold text-slate-900 text-base">สร้างกลุ่มตัวเลือกเพิ่มเติมใหม่</h3>
+              <h3 id="modifier-add-group-title" className="font-bold text-slate-900 text-base">สร้างกลุ่มตัวเลือกเพิ่มเติมใหม่</h3>
               <button
                 onClick={() => setShowAddModal(false)}
                 className="text-slate-400 hover:text-slate-600 font-bold"

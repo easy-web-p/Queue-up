@@ -1,5 +1,6 @@
 import { ShoppingBag, Trash2, Plus, Minus, ArrowRight, Utensils, Store } from 'lucide-react';
 import { calculateCartItemUnitPrice } from '../store/cartPricing.js';
+import { useDialog } from '../hooks/useDialog.js';
 
 /**
  * 🛒 The cart.
@@ -18,6 +19,13 @@ export const ClientCartModal = ({
   onCheckout,
   onBrowseMenu,
 }) => {
+  // Before the early return: a hook cannot sit behind a conditional.
+  const { dialogRef, dialogProps, backdropProps } = useDialog({
+    isOpen,
+    onClose,
+    labelledBy: 'cart-modal-title',
+  });
+
   if (!isOpen) return null;
 
   const totalAmount = cartItems.reduce(
@@ -40,16 +48,17 @@ export const ClientCartModal = ({
   };
 
   return (
+    // The dialog is the panel, not the dimmed layer: `role="dialog"` sat on
+    // the backdrop, which is the whole screen, so what the reader was told was
+    // a dialog contained the page as well.
     <div
       className="fixed inset-0 z-[10005] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="cart-modal-title"
-      onClick={onClose}
+      {...backdropProps}
     >
       <div
+        ref={dialogRef}
+        {...dialogProps}
         className="bg-white dark:bg-[#241C16] rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[90vh] border border-slate-200 dark:border-white/10 font-['IBM_Plex_Sans_Thai']"
-        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="bg-gradient-to-r from-[#241C16] via-[#1D140F] to-[#16100C] text-white px-5 sm:px-6 py-4 flex items-center justify-between border-b border-white/10">

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useDialog } from "../hooks/useDialog.js";
 import { Link } from "react-router-dom";
 import { setCookie, getCookie } from "../utils/cookieManager.js";
 import "./CookieConsentBanner.css";
@@ -14,6 +15,19 @@ export default function CookieConsentBanner() {
   // Preference switches
   const [analyticsConsent, setAnalyticsConsent] = useState(true);
   const [marketingConsent, setMarketingConsent] = useState(true);
+
+  // Escape, a focus trap, a name and a scroll lock: this modal had none
+  // of the four. No backdrop close either — it never had one, and adding
+  // it to a form would throw away what someone had typed.
+  const {
+    dialogRef: cookieSettingsDialogRef,
+    dialogProps: cookieSettingsDialogProps,
+  } = useDialog({
+    isOpen: isSettingsOpen,
+    onClose: () => setIsSettingsOpen(false),
+    labelledBy: "cookie-settings-title",
+    closeOnBackdrop: false,
+  });
 
   // Accept All Cookies
   const handleAcceptAll = () => {
@@ -86,7 +100,9 @@ export default function CookieConsentBanner() {
       {/* Cookie Custom Settings Modal */}
       {isSettingsOpen && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in font-['IBM_Plex_Sans_Thai']">
-          <div className="bg-gradient-to-br from-slate-900 via-stone-900 to-slate-950 border border-orange-500/40 rounded-3xl shadow-2xl max-w-lg w-full max-h-[90dvh] text-white overflow-hidden flex flex-col">
+          <div
+            ref={cookieSettingsDialogRef}
+            {...cookieSettingsDialogProps} className="bg-gradient-to-br from-slate-900 via-stone-900 to-slate-950 border border-orange-500/40 rounded-3xl shadow-2xl max-w-lg w-full max-h-[90dvh] text-white overflow-hidden flex flex-col">
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -94,7 +110,7 @@ export default function CookieConsentBanner() {
                   <i className="bi bi-gear-fill" />
                 </div>
                 <div>
-                  <h5 className="font-['Kanit'] font-bold text-base mb-0 text-white">
+                  <h5 id="cookie-settings-title" className="font-['Kanit'] font-bold text-base mb-0 text-white">
                     ตั้งค่าความยินยอมการใช้คุกกี้
                   </h5>
                   <span className="text-[11px] text-slate-400">PDPA Cookie Preferences</span>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useDialog } from '../hooks/useDialog.js';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
@@ -228,6 +229,45 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [logStatus, setLogStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [logError, setLogError] = useState('');
+
+  // Escape, a focus trap, a name and a scroll lock: this modal had none
+  // of the four. No backdrop close either — it never had one, and adding
+  // it to a form would throw away what someone had typed.
+  const {
+    dialogRef: addStaffDialogRef,
+    dialogProps: addStaffDialogProps,
+  } = useDialog({
+    isOpen: showAddStaffModal,
+    onClose: () => setShowAddStaffModal(false),
+    labelledBy: "admin-add-staff-title",
+    closeOnBackdrop: false,
+  });
+
+  // Escape, a focus trap, a name and a scroll lock: this modal had none
+  // of the four. No backdrop close either — it never had one, and adding
+  // it to a form would throw away what someone had typed.
+  const {
+    dialogRef: addCouponDialogRef,
+    dialogProps: addCouponDialogProps,
+  } = useDialog({
+    isOpen: showAddCouponModal,
+    onClose: () => setShowAddCouponModal(false),
+    labelledBy: "admin-add-coupon-title",
+    closeOnBackdrop: false,
+  });
+
+  // Escape, a focus trap, a name and a scroll lock: this modal had none
+  // of the four. No backdrop close either — it never had one, and adding
+  // it to a form would throw away what someone had typed.
+  const {
+    dialogRef: addAdminItemDialogRef,
+    dialogProps: addAdminItemDialogProps,
+  } = useDialog({
+    isOpen: showAddItemModal,
+    onClose: () => setShowAddItemModal(false),
+    labelledBy: "admin-add-item-title",
+    closeOnBackdrop: false,
+  });
 
   /**
    * Writes the sample dishes into this store's menu as real, orderable products.
@@ -1620,9 +1660,11 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
       {/* Add Staff Modal Overlay */}
       {showAddStaffModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[90dvh] overflow-y-auto overscroll-contain space-y-4 border border-slate-200 shadow-2xl">
+          <div
+            ref={addStaffDialogRef}
+            {...addStaffDialogProps} className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[90dvh] overflow-y-auto overscroll-contain space-y-4 border border-slate-200 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="font-extrabold text-slate-900 text-base">เพิ่มพนักงานใหม่</h3>
+              <h3 id="admin-add-staff-title" className="font-extrabold text-slate-900 text-base">เพิ่มพนักงานใหม่</h3>
               <button
                 onClick={() => setShowAddStaffModal(false)}
                 className="text-slate-400 hover:text-slate-600 text-sm font-bold"
@@ -1692,9 +1734,11 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
       {/* Add Coupon Modal Overlay */}
       {showAddCouponModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[90dvh] overflow-y-auto overscroll-contain space-y-4 border border-slate-200 shadow-2xl">
+          <div
+            ref={addCouponDialogRef}
+            {...addCouponDialogProps} className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[90dvh] overflow-y-auto overscroll-contain space-y-4 border border-slate-200 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="font-extrabold text-slate-900 text-base">สร้างโค้ดคูปองส่วนลดใหม่</h3>
+              <h3 id="admin-add-coupon-title" className="font-extrabold text-slate-900 text-base">สร้างโค้ดคูปองส่วนลดใหม่</h3>
               <button
                 onClick={() => setShowAddCouponModal(false)}
                 className="text-slate-400 hover:text-slate-600 text-sm font-bold"
@@ -1764,9 +1808,11 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
       {/* Add New Item Modal Overlay */}
       {showAddItemModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[90dvh] overflow-y-auto overscroll-contain space-y-4 border border-slate-200 shadow-2xl">
+          <div
+            ref={addAdminItemDialogRef}
+            {...addAdminItemDialogProps} className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[90dvh] overflow-y-auto overscroll-contain space-y-4 border border-slate-200 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="font-extrabold text-slate-900 text-base">เพิ่มรายการอาหารใหม่</h3>
+              <h3 id="admin-add-item-title" className="font-extrabold text-slate-900 text-base">เพิ่มรายการอาหารใหม่</h3>
               <button
                 onClick={() => setShowAddItemModal(false)}
                 className="text-slate-400 hover:text-slate-600 text-sm font-bold"

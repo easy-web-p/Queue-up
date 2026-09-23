@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useDialog } from '../hooks/useDialog.js';
 import { reviewVendorApproval } from '../services/campusWalletService';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config.js';
@@ -14,6 +15,20 @@ export default function VendorApprovalPanel() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Escape, a focus trap, a name and a scroll lock: this modal had none
+  // of the four. No backdrop close either — it never had one, and adding
+  // it to a form would throw away what someone had typed.
+  const {
+    dialogRef: rejectDialogRef,
+    dialogProps: rejectDialogProps,
+  } = useDialog({
+    isOpen: selectedRequest !== null,
+    onClose: () => setSelectedRequest(null),
+    labelledBy: "vendor-reject-title",
+    closeOnBackdrop: false,
+    role: "alertdialog",
+  });
 
   useEffect(() => {
     const q = query(
@@ -211,8 +226,10 @@ export default function VendorApprovalPanel() {
         {/* Rejection Modal */}
         {selectedRequest && (
           <div className="fixed inset-0 z-50 bg-slate-900/70 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-[#241C16] border border-slate-200 dark:border-[#FF7A1A]/30 rounded-3xl p-6 max-w-md w-full max-h-[90dvh] overflow-y-auto overscroll-contain shadow-2xl space-y-4">
-              <h3 className="text-lg font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
+            <div
+            ref={rejectDialogRef}
+            {...rejectDialogProps} className="bg-white dark:bg-[#241C16] border border-slate-200 dark:border-[#FF7A1A]/30 rounded-3xl p-6 max-w-md w-full max-h-[90dvh] overflow-y-auto overscroll-contain shadow-2xl space-y-4">
+              <h3 id="vendor-reject-title" className="text-lg font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
                 <AlertCircle className="w-5 h-5 text-red-500" />
                 ระบุเหตุผลในการปฏิเสธคำขอ
               </h3>

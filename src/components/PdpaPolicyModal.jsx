@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useDialog } from "../hooks/useDialog.js";
 import "./PdpaPolicyModal.css";
 
 /**
@@ -7,18 +8,31 @@ import "./PdpaPolicyModal.css";
  */
 export default function PdpaPolicyModal({ isOpen, onClose, initialTab = "privacy" }) {
   const [activeTab, setActiveTab] = useState(initialTab); // 'privacy' | 'terms' | 'merchant' | 'parent' | 'refund'
+  // A legal notice with no way out but the ✕, and nothing telling a reader it
+  // had opened. `tabIndex="-1"` on the backdrop was the only nod to any of it.
+  const { dialogRef, dialogProps, backdropProps } = useDialog({
+    isOpen,
+    onClose,
+    labelledBy: "pdpa-modal-title",
+    // Dismissing a policy by clicking beside it is too easy to do by accident.
+    closeOnBackdrop: false,
+  });
 
   if (!isOpen) return null;
 
   return (
-    <div className="pdpa-modal-overlay fixed inset-0 z-[100002] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 transition-all" tabIndex="-1">
-      <div className="pdpa-modal-card w-full max-w-4xl max-h-[90vh] bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 text-white rounded-3xl border border-slate-700/80 shadow-2xl flex flex-col overflow-hidden font-sans">
+    <div className="pdpa-modal-overlay fixed inset-0 z-[100002] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 transition-all" {...backdropProps}>
+      <div
+        ref={dialogRef}
+        {...dialogProps}
+        className="pdpa-modal-card w-full max-w-4xl max-h-[90vh] bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 text-white rounded-3xl border border-slate-700/80 shadow-2xl flex flex-col overflow-hidden font-sans"
+      >
         {/* Header */}
         <div className="pdpa-modal-header p-5 sm:p-6 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
           <div className="flex items-center gap-3">
             <i className="bi bi-shield-check text-amber-400 text-3xl" />
             <div>
-              <h4 className="font-bold mb-0 text-white text-base sm:text-lg">
+              <h4 id="pdpa-modal-title" className="font-bold mb-0 text-white text-base sm:text-lg">
                 ข้อตกลงและนโยบายความเป็นส่วนตัว (PDPA Policy & Terms)
               </h4>
               <span className="text-slate-400 text-xs">
@@ -26,7 +40,7 @@ export default function PdpaPolicyModal({ isOpen, onClose, initialTab = "privacy
               </span>
             </div>
           </div>
-          <button type="button" className="btn-close btn-close-white cursor-pointer" onClick={onClose} />
+          <button type="button" aria-label="ปิดหน้าต่างนโยบาย" className="btn-close btn-close-white cursor-pointer" onClick={onClose} />
         </div>
 
         {/* Tab Navigation */}

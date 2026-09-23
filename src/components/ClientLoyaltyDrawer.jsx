@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
 import { Award, Gift, Ticket, X } from 'lucide-react';
+import { useDialog } from '../hooks/useDialog.js';
 
 /**
  * The points drawer.
@@ -23,29 +23,25 @@ export const ClientLoyaltyDrawer = ({
   isLoading = false,
   redeemingId = null,
 }) => {
-  // 🔒 Close on Escape key
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') onClose?.();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  // Escape was already handled here; the trap, the focus restore and the
+  // scroll lock were not, and they are the same three everywhere.
+  const { dialogRef, dialogProps, backdropProps } = useDialog({
+    isOpen,
+    onClose,
+    labelledBy: 'loyalty-drawer-title',
+  });
 
   if (!isOpen) return null;
 
   return (
     <div
       className="fixed inset-0 z-[10005] bg-black/60 backdrop-blur-sm flex justify-end animate-fade-in"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="loyalty-drawer-title"
-      onClick={onClose}
+      {...backdropProps}
     >
       <div
+        ref={dialogRef}
+        {...dialogProps}
         className="bg-white dark:bg-slate-900 w-full max-w-md h-full shadow-2xl flex flex-col font-['IBM_Plex_Sans_Thai'] border-l border-slate-200 dark:border-slate-800 relative z-10"
-        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="bg-gradient-to-br from-red-600 via-orange-600 to-amber-500 text-white p-6 shadow-md pt-7">
