@@ -36,6 +36,7 @@ import {
   checkCancellable,
   computeRefund,
   refundTargetStudentId,
+  reverseSpendCounters,
 } from "./refundRules.js";
 import {
   validateStoreCoupon,
@@ -723,6 +724,12 @@ export const createOrderAuthoritative = onCall(
           paymentMode: isCampusWallet ? "CAMPUS_WALLET" : "DIRECT_ZERO_PAYMENT",
           paymentStatus: isCampusWallet ? "PAID" : "NOT_APPLICABLE",
           studentId: effectiveStudentId,
+          // The spending-counter periods this order was charged against.
+          // A refund reverses a counter only while its period is still the
+          // current one; without these, cancelling yesterday's order today
+          // would hand back today's allowance, which was never spent on it.
+          spendDateKey: isCampusWallet && walletCounters ? walletCounters.todayYmd : null,
+          spendWeekKey: isCampusWallet && walletCounters ? walletCounters.weekKey : null,
           totalAmountSatang: calculatedTotalSatang,
           totalAmount: calculatedTotalSatang / 100,
           finalAmountSatang: finalAmountSatang,
@@ -2208,26 +2215,20 @@ export const cancelOrderWithRefund = onCall(
 
       // The spend counters move back too. Without this a cancelled order still
       // counts against the child's daily limit — they are told they have spent
-      // money that was returned to them.
-      const spentToday = Math.max(
-        0,
-        (Number(walletSnap.exists ? walletSnap.data().spentTodaySatang : 0) || 0) - refundSatang
-      );
-      const spentWeek = Math.max(
-        0,
-        (Number(walletSnap.exists ? walletSnap.data().spentThisWeekSatang : 0) || 0) - refundSatang
-      );
+      // money that was returned to them. Only the periods this order was
+      // actually charged against move; see reverseSpendCounters.
+      const walletData = walletSnap.exists ? walletSnap.data() : null;
+      const counterPatch = reverseSpendCounters(order, walletData, refundSatang);
 
       tx.set(
         walletRef,
         {
           studentId,
           balanceSatang: newBal,
-          spentTodaySatang: spentToday,
-          spentThisWeekSatang: spentWeek,
+          ...counterPatch,
           // A merge write can bring a wallet into existence. One created
           // without limits is unspendable, so every such path seeds them.
-          ...resolveMissingLimitDefaults(walletSnap.exists ? walletSnap.data() : null),
+          ...resolveMissingLimitDefaults(walletData),
           updatedAt: FieldValue.serverTimestamp(),
         },
         { merge: true }

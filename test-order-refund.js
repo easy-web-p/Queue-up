@@ -31,6 +31,7 @@ import {
   checkCancellable,
   computeRefund,
   refundTargetStudentId,
+  reverseSpendCounters,
 } from './functions/refundRules.js';
 
 let passed = 0;
@@ -214,22 +215,85 @@ runTest('🚨 A REFUND ledger row is written with the money', () => {
 runTest('🚨 The spend counters move back too', () => {
   // Without this a cancelled order still counts against the child's daily
   // limit: they are told they have spent money that was returned.
-  //
-  // Read the wallet write itself, not the whole function: `spentTodaySatang`
-  // appears in the *read* of the current counter too, so a `fn.includes` here
-  // passes with the write deleted.
+  const wallet = {
+    lastSpentDate: '2026-09-23',
+    lastSpentWeek: '2026-W39',
+    spentTodaySatang: 8000,
+    spentThisWeekSatang: 30000,
+  };
+  const charged = { spendDateKey: '2026-09-23', spendWeekKey: '2026-W39' };
+  assertEqual(
+    JSON.stringify(reverseSpendCounters(charged, wallet, 5000)),
+    JSON.stringify({ spentTodaySatang: 3000, spentThisWeekSatang: 25000 }),
+    'the refund did not come off both counters'
+  );
+});
+
+runTest('🚨 A counter cannot be driven below zero', () => {
+  const wallet = { lastSpentDate: 'D', lastSpentWeek: 'W', spentTodaySatang: 100, spentThisWeekSatang: 100 };
+  const patch = reverseSpendCounters({ spendDateKey: 'D', spendWeekKey: 'W' }, wallet, 90000);
+  assertEqual(patch.spentTodaySatang, 0, "today's counter went negative");
+  assertEqual(patch.spentThisWeekSatang, 0, "the week's counter went negative");
+});
+
+runTest("🚨 Yesterday's order does not hand back today's allowance", () => {
+  // The wallet keeps one running total per period. Subtracting an order
+  // charged yesterday from today's total loosens the limit a parent set.
+  const wallet = {
+    lastSpentDate: '2026-09-23',
+    lastSpentWeek: '2026-W39',
+    spentTodaySatang: 8000,
+    spentThisWeekSatang: 30000,
+  };
+  const yesterday = { spendDateKey: '2026-09-22', spendWeekKey: '2026-W39' };
+  const patch = reverseSpendCounters(yesterday, wallet, 5000);
+  assert(!('spentTodaySatang' in patch), "today's allowance was credited for yesterday's order");
+  assertEqual(patch.spentThisWeekSatang, 25000, 'the week is still the same, so it must reverse');
+
+  const lastWeek = { spendDateKey: '2026-09-16', spendWeekKey: '2026-W38' };
+  assertEqual(
+    JSON.stringify(reverseSpendCounters(lastWeek, wallet, 5000)),
+    '{}',
+    "a refund from a closed period moved this period's counters"
+  );
+});
+
+runTest('An order predating the period stamp leaves the counters alone', () => {
+  // Nothing on it says which period was charged, and guessing wrong means
+  // overspending a limit a parent set. The money still comes back.
+  const wallet = { lastSpentDate: 'D', lastSpentWeek: 'W', spentTodaySatang: 8000 };
+  assertEqual(JSON.stringify(reverseSpendCounters({}, wallet, 5000)), '{}', 'a period was guessed');
+  assertEqual(JSON.stringify(reverseSpendCounters(null, wallet, 5000)), '{}', 'a missing order');
+  assertEqual(JSON.stringify(reverseSpendCounters({ spendDateKey: 'D' }, wallet, 0)), '{}', 'no refund, no move');
+});
+
+runTest('🚨 The order records the periods it was charged against', () => {
+  // reverseSpendCounters can only be right if the debit stamps them.
+  const create = live.slice(
+    live.indexOf('export const createOrderAuthoritative'),
+    live.indexOf('\nexport const', live.indexOf('export const createOrderAuthoritative') + 10)
+  );
+  const payloadAt = create.indexOf('const orderPayload = {');
+  assert(payloadAt > 0, 'the order payload is gone');
+  const payload = create.slice(payloadAt, create.indexOf('\n        };', payloadAt));
+  assert(/spendDateKey:\s*\S/.test(payload), 'the order does not record its daily counter period');
+  assert(/spendWeekKey:\s*\S/.test(payload), 'the order does not record its weekly counter period');
+  assert(payload.includes('walletCounters.todayYmd'), 'the stamp is not the key the debit used');
+  assert(payload.includes('walletCounters.weekKey'), 'the stamp is not the key the debit used');
+});
+
+runTest('🚨 The refund reverses the counters through that rule, and credits the balance', () => {
   const at = fn.indexOf('tx.set(');
   assert(at > 0, 'the wallet is never written');
   const walletWrite = fn.slice(at, fn.indexOf('{ merge: true }', at));
 
-  for (const counter of ['spentTodaySatang', 'spentThisWeekSatang']) {
-    const written = walletWrite.match(new RegExp(`${counter}:\\s*(\\w+)`));
-    assert(written, `${counter} is not written back to the wallet`);
-    const decl = fn.match(new RegExp(`const\\s+${written[1]}\\s*=([\\s\\S]*?);\\n`));
-    assert(decl, `${counter} is written from ${written[1]}, which is never computed`);
-    assert(decl[1].includes('- refundSatang'), `${counter} is not reduced by the refund`);
-    assert(/Math\.max\(\s*0,/.test(decl[1]), `${counter} could be driven negative`);
-  }
+  const spread = walletWrite.match(/\.\.\.(\w+),/g) || [];
+  const counters = spread.map((m) => m.slice(3, -1)).filter((n) => n !== 'resolveMissingLimitDefaults');
+  assert(counters.length > 0, 'nothing spreads a counter patch into the wallet write');
+  const decl = fn.match(new RegExp(`const\\s+${counters[0]}\\s*=([^;]*);`));
+  assert(decl, `${counters[0]} is spread in but never computed`);
+  assert(decl[1].includes('reverseSpendCounters('), 'the counters are reversed some other way');
+  assert(decl[1].includes('refundSatang'), 'the reversal is not of the refunded amount');
 
   const balance = walletWrite.match(/balanceSatang:\s*(\w+)/);
   assert(balance, 'the balance is never credited');

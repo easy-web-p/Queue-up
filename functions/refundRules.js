@@ -174,3 +174,46 @@ export function describeRefundRefusal(code) {
       return "ยกเลิกคำสั่งซื้อไม่สำเร็จ";
   }
 }
+
+/**
+ * How the guardian's spending counters move when a refund is paid.
+ *
+ * A counter is only reversed while the period it was charged against is still
+ * the current one. The wallet keeps one running total per period and stamps it
+ * with the period key (`lastSpentDate`, `lastSpentWeek`); a stored total whose
+ * key has rolled over reads as zero, so it no longer contains this order's
+ * spend at all. Subtracting from today's total an order that was charged
+ * yesterday would hand the student allowance they never spent today — which is
+ * a guardian's spending control quietly loosening itself overnight.
+ *
+ * `spendDateKey` / `spendWeekKey` are stamped on the order at the moment of the
+ * debit. An order placed before those fields existed carries neither, and
+ * nothing else on it says which period was charged: `createdAt` is the request
+ * time, not necessarily the counter key, and guessing wrong here means
+ * overspending a limit a parent set. So a legacy order refunds the money and
+ * leaves the counters alone — the conservative direction.
+ *
+ * @param {object} order   the order being cancelled
+ * @param {object|null} wallet  the wallet document as read in the transaction
+ * @param {number} refundSatang the amount being returned
+ * @returns {{spentTodaySatang?: number, spentThisWeekSatang?: number}} a patch,
+ *          possibly empty
+ */
+export function reverseSpendCounters(order, wallet, refundSatang) {
+  const o = order || {};
+  const w = wallet || {};
+  const amount = Number(refundSatang);
+  if (!Number.isInteger(amount) || amount <= 0) return {};
+
+  const patch = {};
+  const back = (stored) => Math.max(0, (Number(stored) || 0) - amount);
+
+  if (typeof o.spendDateKey === "string" && o.spendDateKey && o.spendDateKey === w.lastSpentDate) {
+    patch.spentTodaySatang = back(w.spentTodaySatang);
+  }
+  if (typeof o.spendWeekKey === "string" && o.spendWeekKey && o.spendWeekKey === w.lastSpentWeek) {
+    patch.spentThisWeekSatang = back(w.spentThisWeekSatang);
+  }
+
+  return patch;
+}
