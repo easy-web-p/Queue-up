@@ -1,4 +1,6 @@
-import 'bootstrap-icons/font/bootstrap-icons.css';
+// Bootstrap Icons, subset to the 193 glyphs this project renders.
+// Generated and verified: npm run test:icons
+import './styles/bootstrap-icons-subset.css';
 import './index.css';
 // Loaded AFTER index.css on purpose, because that is where Bootstrap was.
 //

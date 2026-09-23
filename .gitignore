@@ -32,3 +32,6 @@ dist-ssr
 .vr/pages-*.json
 .vr/last-diff.json
 .vr/gallery.html
+.vr/.icons.html
+.vr/.d.html
+.vr/icons-used.json
