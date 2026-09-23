@@ -126,6 +126,17 @@ body.dark-mode .shopee-header-container {
   overflow-y: auto;
 }
 
+/* Shown when this person has no orders in flight. The dropdown used to be
+   incapable of being empty — four notifications were written into the JSX — so
+   there was never a state to style. */
+.shopee-notif-empty {
+  padding: 28px 16px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--qu-text-muted, #6b7280);
+  background: var(--qu-surface);
+}
+
 .shopee-notif-item {
   display: flex;
   gap: 12px;

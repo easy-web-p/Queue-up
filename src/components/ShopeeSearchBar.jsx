@@ -1,5 +1,7 @@
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase/config.js";
+import { fetchProductsFromFirestore } from "../lib/firebase.js";
+import { subscribeToMyNotifications } from "../services/notificationService";
 import { useState, useEffect, useMemo } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -11,19 +13,6 @@ import { selectCartTotalCount, selectCartItems, updateQuantity, removeItem } fro
 import ClientCartModal from "./ClientCartModal.jsx";
 import { useToast } from "./ToastProvider.jsx";
 import "./ShopeeSearchBar.css";
-
-const MOCK_PRODUCTS = [
-  "ไก่ทอดซอสเกาหลี",
-  "เบอร์เกอร์ไก่กรอบชีสทะลัก",
-  "ข้าวผัดกุ้งกะทะร้อน",
-  "ชานมไข่มุกบราวน์ชูการ์",
-  "ก๋วยเตี๋ยวเรือหมูน้ำตก",
-  "ต้มยำกุ้งแม่น้ำน้ำข้น",
-  "ชุดชาบูหมูสไลด์ซุปดำ",
-  "ข้าวหน้าแซลมอนย่างเทริยากิ",
-  "สเต็กหมูพริกไทยดำ",
-  "บิงซูสตรอว์เบอร์รีนมสด",
-];
 
 function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) {
   const toast = useToast();
@@ -45,6 +34,19 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
   const [isThemeOpen, setIsThemeOpen] = useState(false);
   const [isCampusOpen, setIsCampusOpen] = useState(false);
   const [, setIsNotificationOpen] = useState(false);
+  const [liveNotifications, setLiveNotifications] = useState([]);
+  // Signed out, there is nothing of this person's to show — derived rather than
+  // cleared, so a stale list cannot outlive the session that fetched it.
+  const notifications = user?.uid ? liveNotifications : [];
+  /** Only READY orders. The badge reads 0 when there is nothing to collect. */
+  const actionableCount = notifications.filter((n) => n.actionable).length;
+
+  useEffect(() => {
+    // The subscription is the external system; signing out simply unsubscribes
+    // and the list is derived as empty below rather than cleared in here.
+    if (!user?.uid) return undefined;
+    return subscribeToMyNotifications(user.uid, setLiveNotifications);
+  }, [user?.uid]);
 
   useEffect(() => {
     const handleOutsideClick = () => {
@@ -100,15 +102,44 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
+  /**
+   * Dish names for the suggestion list, from the products collection.
+   *
+   * This was a ten-item MOCK_PRODUCTS array. Typing "ก๋วยเตี๋ยว" suggested
+   * "ก๋วยเตี๋ยวเรือหมูน้ำตก" whether or not any stall sold it, and choosing it
+   * searched for a dish that was not there.
+   */
+  const [catalogueNames, setCatalogueNames] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadCatalogue() {
+      try {
+        const products = await fetchProductsFromFirestore();
+        if (cancelled) return;
+        setCatalogueNames(
+          [...new Set(products.map((p) => p?.name).filter((n) => typeof n === "string" && n))]
+        );
+      } catch (err) {
+        // No suggestions rather than invented ones. The search box still works.
+        console.warn("[ShopeeSearchBar] could not load the catalogue:", err);
+      }
+    }
+    loadCatalogue();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // 2. Filter Logic (ค้นหาคีย์เวิร์ดด้วย useMemo เพื่อหลีกเลี่ยงการ setState ใน useEffect)
   const suggestions = useMemo(() => {
     if (debouncedQuery.trim().length > 0) {
-      return MOCK_PRODUCTS.filter((item) =>
-        item.toLowerCase().includes(debouncedQuery.toLowerCase())
-      );
+      return catalogueNames
+        .filter((item) => item.toLowerCase().includes(debouncedQuery.toLowerCase()))
+        .slice(0, 8);
     }
     return [];
-  }, [debouncedQuery]);
+  }, [debouncedQuery, catalogueNames]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -318,136 +349,85 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
 
         <div className="shopee-nav-right">
           {/* Notifications Dropdown Popover */}
+          {/* Notifications, from this person's own orders.
+              Four were written into this file: invented shops, invented dishes,
+              a queue number A05, a pickup at 12:15 at counter 1, and a badge
+              that always read 4. Every visitor saw the same four on every page,
+              and tapping one opened a bookings tab showing something else. */}
           <div className="shopee-notification-dropdown-container">
-            <span
-              className="shopee-nav-item cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate("/user/account/profile?tab=bookings");
-              }}
-              title="คลิกเพื่อไปหน้าการจอง / เลื่อนเมาส์ผ่านเพื่อดูป๊อบอัพการแจ้งเตือน"
-            >
+            <span className="shopee-nav-item cursor-pointer">
               <i className="bi bi-bell" /> {language === "en" ? "Notifications" : "การแจ้งเตือน"}
-              <span className="shopee-badge-icon">4</span>
+              {actionableCount > 0 && (
+                <span className="shopee-badge-icon">{actionableCount}</span>
+              )}
             </span>
 
             <div className="shopee-notification-popover">
                 <div className="shopee-notif-header">
-                  <span>รายการแจ้งเตือนคำสั่งซื้อ & โปรโมชั่นร้านที่ติดตาม</span>
+                  <span>สถานะคำสั่งซื้อของคุณ</span>
                 </div>
 
                 <div className="shopee-notif-body">
-                  {/* Notif 1: Active Booking Ready */}
-                  <div
-                    className="shopee-notif-item unread"
-                    onClick={() => {
-                      setIsNotificationOpen(false);
-                      navigate("/user/account/profile?tab=bookings");
-                    }}
-                  >
-                    <div className="shopee-notif-icon-box bg-success-subtle text-success">
-                      <i className="bi bi-bell-fill" />
+                  {!user?.uid && (
+                    <div className="shopee-notif-empty">
+                      เข้าสู่ระบบเพื่อดูสถานะคำสั่งซื้อของคุณ
                     </div>
-                    <div className="shopee-notif-content">
-                      <div className="d-flex align-items-center justify-content-between">
-                        <span className="shopee-notif-store">ร้านครัวโรงเรียน QueueUp Canteen</span>
-                        <span className="badge bg-success small">คิวพร้อมรับ A05</span>
-                      </div>
-                      <div className="shopee-notif-food">
-                        <i className="bi bi-egg-fried me-1 text-danger" /> เมนู: ชุดข้าวผัดกุ้งกะทะร้อน + ไข่ดาวสด (1 ชุด)
-                      </div>
-                      <div className="shopee-notif-details">
-                        <span><i className="bi bi-clock me-1 text-primary" /> เวลาที่รับ: 12:15 น. (วันนี้)</span>
-                        <span className="ms-2"><i className="bi bi-geo-alt-fill me-1 text-danger" /> จุดรับ: เคาน์เตอร์ 1 อาคารโรงอาหาร 1</span>
-                      </div>
-                      <div className="d-flex align-items-center justify-content-between mt-1">
-                        <span className="shopee-notif-time">5 นาทีที่แล้ว</span>
-                        <span className="text-danger fw-bold text-xs">คลิกดูรายละเอียดการจอง <i className="bi bi-arrow-right-short" /></span>
-                      </div>
-                    </div>
-                  </div>
+                  )}
 
-                  {/* Notif 2: Cooking Queue */}
-                  <div
-                    className="shopee-notif-item"
-                    onClick={() => {
-                      setIsNotificationOpen(false);
-                      navigate("/user/account/profile?tab=bookings");
-                    }}
-                  >
-                    <div className="shopee-notif-icon-box bg-warning-subtle text-warning">
-                      <i className="bi bi-fire" />
+                  {user?.uid && notifications.length === 0 && (
+                    <div className="shopee-notif-empty">
+                      ยังไม่มีคำสั่งซื้อที่กำลังดำเนินการ
                     </div>
-                    <div className="shopee-notif-content">
-                      <div className="d-flex align-items-center justify-content-between">
-                        <span className="shopee-notif-store">ร้านสเต็กพี่ตั้ม School Food</span>
-                        <span className="badge bg-primary small">กำลังปรุงคิวอาหาร</span>
-                      </div>
-                      <div className="shopee-notif-food">
-                        <i className="bi bi-egg-fried me-1 text-danger" /> เมนู: สเต็กหมูพริกไทยดำ + เฟรนช์ฟรายส์กรอบ (1 ชุด)
-                      </div>
-                      <div className="shopee-notif-details">
-                        <span><i className="bi bi-clock me-1 text-primary" /> เวลาที่รับ: 12:30 น. (วันนี้)</span>
-                        <span className="ms-2"><i className="bi bi-geo-alt-fill me-1 text-danger" /> จุดรับ: เคาน์เตอร์ 3 อาคารโรงอาหาร 1</span>
-                      </div>
-                      <div className="d-flex align-items-center justify-content-between mt-1">
-                        <span className="shopee-notif-time">12 นาทีที่แล้ว</span>
-                        <span className="text-primary fw-bold text-xs">คลิกดูรายละเอียดการจอง <i className="bi bi-arrow-right-short" /></span>
-                      </div>
-                    </div>
-                  </div>
+                  )}
 
-                  {/* Notif 3: Followed Store Promo 1 */}
-                  <div
-                    className="shopee-notif-item"
-                    onClick={() => {
-                      setIsNotificationOpen(false);
-                      navigate("/search?keyword=ป้าแดง");
-                    }}
-                  >
-                    <div className="shopee-notif-icon-box bg-danger-subtle text-danger">
-                      <i className="bi bi-ticket-perforated-fill" />
-                    </div>
-                    <div className="shopee-notif-content">
-                      <div className="d-flex align-items-center justify-content-between">
-                        <span className="shopee-notif-store">ร้านป้าแดง ตามสั่ง (ร้านที่ติดตาม)</span>
-                        <span className="badge bg-danger small">โปรโมชั่น CRM</span>
+                  {notifications.map((n) => (
+                    <div
+                      key={n.id}
+                      className={`shopee-notif-item${n.actionable ? " unread" : ""}`}
+                      onClick={() => {
+                        setIsNotificationOpen(false);
+                        navigate("/user/account/profile?tab=bookings");
+                      }}
+                    >
+                      <div
+                        className={`shopee-notif-icon-box ${
+                          n.tone === "READY"
+                            ? "bg-success-subtle text-success"
+                            : n.tone === "COOKING"
+                              ? "bg-warning-subtle text-warning"
+                              : "bg-primary-subtle text-primary"
+                        }`}
+                      >
+                        <i className={`bi ${n.tone === "READY" ? "bi-bell-fill" : n.tone === "COOKING" ? "bi-fire" : "bi-hourglass-split"}`} />
                       </div>
-                      <div className="shopee-notif-promo">
-                        <i className="bi bi-gift-fill me-1 text-danger" /> แจกโค้ดส่วนลด 15% สิทธิพิเศษสมาชิก QueueUp CRM รับแต้มสะสมฟรี 50 คะแนน!
-                      </div>
-                      <div className="d-flex align-items-center justify-content-between mt-1">
-                        <span className="shopee-notif-time">30 นาทีที่แล้ว</span>
-                        <span className="text-danger fw-bold text-xs">คลิกดูโปรโมชั่นร้าน <i className="bi bi-arrow-right-short" /></span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Notif 4: Followed Store Promo 2 */}
-                  <div
-                    className="shopee-notif-item"
-                    onClick={() => {
-                      setIsNotificationOpen(false);
-                      navigate("/search?keyword=ชาไข่มุก");
-                    }}
-                  >
-                    <div className="shopee-notif-icon-box text-purple-600 bg-purple-100">
-                      <i className="bi bi-award-fill" />
-                    </div>
-                    <div className="shopee-notif-content">
-                      <div className="d-flex align-items-center justify-content-between">
-                        <span className="shopee-notif-store">ร้านชาไข่มุก บราวน์ชูการ์ Express (ร้านที่ติดตาม)</span>
-                        <span className="badge bg-warning text-dark small">โปร 1 แถม 1</span>
-                      </div>
-                      <div className="shopee-notif-promo">
-                        <i className="bi bi-cup-straw me-1 text-primary" /> ซื้อชานมไข่มุกขนาดใหญ่ 1 แก้ว แถมฟรี ชาไทยนมสด 1 แก้ว (ช่วงเวลา 13:00 - 14:00 น.)
-                      </div>
-                      <div className="d-flex align-items-center justify-content-between mt-1">
-                        <span className="shopee-notif-time">1 ชั่วโมงที่แล้ว</span>
-                        <span className="text-purple-600 font-bold text-xs">คลิกดูโปรโมชั่นร้าน <i className="bi bi-arrow-right-short" /></span>
+                      <div className="shopee-notif-content">
+                        <div className="d-flex align-items-center justify-content-between">
+                          <span className="shopee-notif-store">{n.storeName}</span>
+                          <span
+                            className={`badge small ${
+                              n.tone === "READY" ? "bg-success" : n.tone === "COOKING" ? "bg-primary" : "bg-secondary"
+                            }`}
+                          >
+                            {n.statusLabel} {n.queueNumber}
+                          </span>
+                        </div>
+                        <div className="shopee-notif-food">
+                          <i className="bi bi-egg-fried me-1 text-danger" /> {n.itemsLabel}
+                        </div>
+                        <div className="shopee-notif-details">
+                          <span>
+                            <i className="bi bi-clock me-1 text-primary" /> เวลาที่รับ: {n.pickupTime}
+                          </span>
+                        </div>
+                        <div className="d-flex align-items-center justify-content-between mt-1">
+                          <span className="shopee-notif-time">คิว {n.queueNumber}</span>
+                          <span className="text-danger fw-bold text-xs">
+                            คลิกดูรายละเอียดการจอง <i className="bi bi-arrow-right-short" />
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
 
                 <div className="shopee-notif-footer">

@@ -472,19 +472,6 @@
   box-shadow: 0 12px 28px rgba(255, 122, 26, 0.4);
 }
 
-.queue-chat-badge {
-  background: var(--qu-accent);
-  color: #ffffff;
-  font-size: 10px;
-  font-weight: 800;
-  border-radius: 50%;
-  width: 18px;
-  height: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 /* Responsive Media Queries */
 @media (max-width: 768px) {
   .queue-home-wrapper {

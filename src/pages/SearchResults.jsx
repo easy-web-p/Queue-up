@@ -425,7 +425,9 @@ function SearchResults() {
       >
         <i className="bi bi-chat-dots-fill text-sm" />
         <span>Chat</span>
-        <span className="queue-chat-badge bg-white text-orange-600 text-[10px] font-black px-1.5 py-0.5 rounded-full">3</span>
+        {/* No badge. This read "3" on every page for every visitor;
+            nothing in the chat records what has been read, so there is no
+            number to show. The button opens a chat — that is all it does. */}
       </button>
 
       {/* Real-Time Chat Modal Component */}
