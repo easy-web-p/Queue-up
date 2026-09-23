@@ -51,14 +51,23 @@ The system operates under a 6-agent cooperative governance model:
 - **Spending Freeze (`0 THB`)**: Setting a limit of `0` satang is treated as a deliberate, valid freeze rather than unset. Any order attempt with limit 0 immediately triggers `DAILY_LIMIT_EXCEEDED` or `WEEKLY_LIMIT_EXCEEDED`.
 - **Lazy Counter Rollovers**: Spending counters reset lazily on server Bangkok calendar date and ISO week (`YYYY-Www`) boundaries without reliance on external cron schedulers.
 
-## 4. Payment Top-Up Architecture & Institutional Blocker
-- **Payment Gateway Blocker (PromptPay / Opn vs. Cash Counter)**:
-  - Online payment gateways (PromptPay Dynamic QR via Opn or bank APIs) require institutional KYC, payment aggregator licensing, and bank fee reconciliation agreements.
-  - In production campus canteen deployments, automated external payment gateway top-up remains blocked pending school financial board approval and merchant account clearance.
-- **Primary Operational Top-Up Flow (School Cashier Counter)**:
-  - Student or parent presents cash at the school financial counter.
-  - An authorized school cashier / staff supervisor (verified server-side via `request.auth.token.role === 'staff_supervisor' | 'admin'` or verified document in `/staff_supervisors`) executes `topupCampusWallet`.
-  - Immutable credit record is written to `/wallet_transactions` with `type: 'TOPUP'` and cashier `actorUid`.
+## 4. Payment Top-Up Architecture
+Money enters the system in one place — a wallet top-up — by one of two paths.
+Both write a `PENDING` row to `/wallet_topup_requests` and credit only when
+something **outside the browser** confirms the money exists. Neither path lets
+a client move a balance.
+
+- **Stripe (card / PromptPay)** — `createTopupPaymentIntent` → Payment Element → `stripeTopupWebhook`:
+  - The callable creates the request row first, then a PaymentIntent in satang (Stripe's minor unit for THB, so no conversion), carrying `queueup_*` metadata that names the student and the request.
+  - `stripeTopupWebhook` verifies the signature over `req.rawBody`, credits `amount_received` rather than the requested `amount`, and records `idempotency_keys/stripe_<event.id>` in the same transaction as the credit, so a redelivered event credits nothing.
+  - `canConfirmManually` refuses to let staff hand-confirm a Stripe request: that would credit a wallet for a payment that may have failed.
+  - Unconfigured (`VITE_STRIPE_PUBLISHABLE_KEY` unset) the app hides this option rather than failing at the till.
+- **Cash at the school counter** — `topupCampusWallet` → `reviewWalletTopupRequest`:
+  - A guardian records a request; nothing is credited by it. A student or parent then presents cash at the financial counter.
+  - An authorized cashier / staff supervisor (verified server-side via `request.auth.token.role === 'staff_supervisor' | 'admin'` or a verified document in `/staff_supervisors`) confirms it — that confirmation IS the capture, because they are the ones handed the notes.
+  - Staff topping up directly credit immediately; `assertWalletAuthority(allowSelf: false)` keeps a student off both paths for their own wallet, since the wallet carries spending controls a guardian set.
+- Either way an immutable credit lands in `/wallet_transactions` with `type: 'TOPUP'` and the confirming `actorUid` (`stripe_webhook` for the Stripe path).
+- **Institutional note**: a *gateway of the school's own* (aggregator licensing, bank fee reconciliation, institutional KYC) remains a separate question from this integration, which settles to a Stripe account the school already holds.
 
 ## 5. Security & Server-Authoritative Audit Logs
 - **Backend-Only Immutability**:
@@ -73,4 +82,6 @@ The system operates under a 6-agent cooperative governance model:
 - `/parent_child_links/{linkId}`: Verified guardian-student relationship mappings.
 - `/vendor_approvals/{approvalId}`: Student entrepreneur applications reviewed by school staff.
 - `/staff_supervisors/{staffId}`: Teacher & canteen administrator permissions directory.
+- `/wallet_topup_requests/{requestId}`: A claim that money is coming, `PENDING` until Stripe's webhook or a staff confirmation settles it. `allow write: if false;` — a client that could create a `CONFIRMED` row would be back to self-service credit.
+- `/idempotency_keys/{keyId}`: Records that an event has already been processed. Stripe rows are prefixed `stripe_` and written in the same transaction as the credit, so a redelivered webhook cannot double it.
 - `/audit_logs/{auditId}`: Immutable security and emergency medical lookup log.

@@ -4,6 +4,7 @@ import { getAuth } from "firebase-admin/auth";
 import { onRequest, onCall, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
+import Stripe from "stripe";
 import { resolveWalletAuthority, isStaffOrAdmin, MAX_TOPUP_SATANG } from "./walletAuthority.js";
 import { resolveSpendingCounters, resolveMissingLimitDefaults } from "./walletLimits.js";
 import { isBootstrapSuperAdmin } from "./superAdmins.js";
@@ -13,6 +14,16 @@ import {
   describeCouponRefusal,
 } from "./couponRules.js";
 import { BUILTIN_COUPONS } from "./builtinCoupons.js";
+import {
+  TOPUP_SOURCE,
+  TOPUP_STATUS,
+  STRIPE_CURRENCY,
+  validateTopupAmount,
+  interpretStripeEvent,
+  buildTopupMetadata,
+  resolveTopupTarget,
+  canConfirmManually,
+} from "./stripeTopup.js";
 import {
   validateOrderRequest,
   checkStoreAvailability,
@@ -49,6 +60,14 @@ import { validateEvaluation } from "./systemEvaluation.js";
 // 🔒 Server-only credential. Never expose this through a VITE_* variable: Vite inlines
 // those into the client bundle. Set with: firebase functions:secrets:set OPENAI_API_KEY
 const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
+
+// Server-only, for the same reason OPENAI_API_KEY is: Vite inlines every VITE_*
+// variable into the client bundle. The publishable key (pk_…) is designed to be
+// public and lives in .env as VITE_STRIPE_PUBLISHABLE_KEY; these two never can.
+//   firebase functions:secrets:set STRIPE_SECRET_KEY
+//   firebase functions:secrets:set STRIPE_WEBHOOK_SECRET
+const STRIPE_SECRET_KEY = defineSecret("STRIPE_SECRET_KEY");
+const STRIPE_WEBHOOK_SECRET = defineSecret("STRIPE_WEBHOOK_SECRET");
 
 const ASSISTANT_MAX_MESSAGE_CHARS = 500;
 // Server-side quota for the OpenAI proxy. The client-side limiter in
@@ -1468,6 +1487,10 @@ export const topupCampusWallet = onCall(
         studentId,
         amountSatang: amt,
         status: "PENDING",
+        // Explicit, because canConfirmManually distinguishes on it. A request
+        // with no source is treated as MANUAL for the rows written before this
+        // field existed.
+        source: TOPUP_SOURCE.MANUAL,
         requestedBy: request.auth.uid,
         requestedByName: request.auth.token?.name || request.auth.token?.email || "ผู้ปกครอง",
         paymentMethod: paymentMethod || "PROMPTPAY",
@@ -1538,6 +1561,303 @@ export const topupCampusWallet = onCall(
 );
 
 /**
+ * 💳 Start a Stripe-paid wallet top-up
+ *
+ * The missing half of this system. topupCampusWallet writes a number into
+ * balanceSatang and nothing captures a payment, which is why a guardian's
+ * top-up currently records a request that staff confirm after cash arrives at
+ * the office. This is the same flow with Stripe doing the capturing.
+ *
+ * Returns a client secret. The browser confirms the payment with the
+ * publishable key; the balance does not move here and must not — a client that
+ * could report its own success would be back to crediting itself. The wallet is
+ * credited by stripeTopupWebhook below, on Stripe's word.
+ *
+ * PromptPay is listed first because it is how most people in Thailand pay.
+ */
+export const createTopupPaymentIntent = onCall(
+  { region: "asia-southeast1", cors: true, secrets: [STRIPE_SECRET_KEY] },
+  async (request) => {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "กรุณาเข้าสู่ระบบก่อนเติมเงิน");
+    }
+
+    const { studentId, amountSatang } = request.data || {};
+    if (!studentId || typeof studentId !== "string") {
+      throw new HttpsError("invalid-argument", "กรุณาระบุ studentId");
+    }
+
+    // Same authority as the manual path: a student may not top up their own
+    // wallet even when they are the one paying, because the wallet carries
+    // spending controls a guardian set and self-service would route around the
+    // person who set them.
+    const actorRole = await assertWalletAuthority(request.auth, studentId, {
+      allowSelf: false,
+      action: "เติมเงิน",
+    });
+
+    const check = validateTopupAmount(amountSatang, MAX_TOPUP_SATANG);
+    if (!check.ok) {
+      throw new HttpsError("invalid-argument", `${check.code}: ${check.message}`);
+    }
+
+    // The request row exists before the PaymentIntent, so the webhook always
+    // has something to complete. Created PENDING and only a verified webhook
+    // moves it — see canConfirmManually.
+    const requestRef = db.collection("wallet_topup_requests").doc();
+    await requestRef.set({
+      id: requestRef.id,
+      studentId,
+      amountSatang: check.amountSatang,
+      status: TOPUP_STATUS.PENDING,
+      source: TOPUP_SOURCE.STRIPE,
+      requestedBy: request.auth.uid,
+      requestedByName: request.auth.token?.name || request.auth.token?.email || "ผู้ปกครอง",
+      requestedByRole: actorRole,
+      paymentMethod: "STRIPE",
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+    const stripe = new Stripe(STRIPE_SECRET_KEY.value());
+
+    let intent;
+    try {
+      intent = await stripe.paymentIntents.create(
+        {
+          // Satang IS Stripe's minor unit for THB, so the stored amount goes
+          // across unchanged. No ×100 anywhere in this file, by design.
+          amount: check.amountSatang,
+          currency: STRIPE_CURRENCY,
+          payment_method_types: ["promptpay", "card"],
+          // Everything the webhook needs to know whose wallet this is. It
+          // arrives with no memory of this call, and reads Stripe's copy of
+          // the metadata, which the browser cannot alter afterwards.
+          metadata: buildTopupMetadata({
+            studentId,
+            requestId: requestRef.id,
+            requestedBy: request.auth.uid,
+          }),
+          description: `QueueUp wallet top-up · student ${studentId}`,
+        },
+        // Stripe's own idempotency: a retried call returns the same
+        // PaymentIntent rather than creating a second one to pay.
+        { idempotencyKey: `topup_${requestRef.id}` }
+      );
+    } catch (err) {
+      await requestRef.update({
+        status: TOPUP_STATUS.FAILED,
+        failureReason: String(err?.message || err).slice(0, 500),
+        failedAt: FieldValue.serverTimestamp(),
+      });
+      throw new HttpsError(
+        "internal",
+        `STRIPE_INTENT_FAILED: เริ่มรายการชำระเงินไม่สำเร็จ: ${err?.message || err}`
+      );
+    }
+
+    await requestRef.update({ paymentIntentId: intent.id });
+
+    return {
+      success: true,
+      requestId: requestRef.id,
+      paymentIntentId: intent.id,
+      clientSecret: intent.client_secret,
+      amountSatang: check.amountSatang,
+      currency: STRIPE_CURRENCY,
+      // Nothing has been credited. Saying so is the difference between a parent
+      // who waits for confirmation and one who tells their child to go and buy
+      // lunch with money that has not arrived.
+      pending: true,
+      message: `เริ่มรายการเติมเงิน ฿${check.amountSatang / 100} — ยอดเงินจะเข้ากระเป๋าหลังชำระเงินสำเร็จ`,
+    };
+  }
+);
+
+/**
+ * 💳 Stripe webhook — the only thing that credits a Stripe-paid top-up
+ *
+ * Three properties this endpoint has to hold, each of them a way to lose money:
+ *
+ *  1. **Verify the signature.** An unverified endpoint is a URL that credits
+ *     wallets to anyone who can guess it. The raw body is required for this —
+ *     see rawBody below.
+ *
+ *  2. **Survive redelivery.** Stripe retries on any non-2xx and can deliver the
+ *     same event twice unprompted. The event id is recorded in the same
+ *     transaction that moves the balance, so the second delivery finds it
+ *     already there and credits nothing. This is what idempotency_keys was
+ *     always for; it had a security rule and no writer until now.
+ *
+ *  3. **Credit what arrived, not what was asked for.** amount_received is
+ *     Stripe's number. The request's own amountSatang is the client's, and
+ *     trusting it would let a caller ask to pay ฿20 and be credited ฿20,000.
+ *
+ * Always answers 200 once the signature verifies, even for events it ignores.
+ * A non-2xx makes Stripe retry, and retrying an event nobody handles eventually
+ * gets the endpoint disabled — taking the ones that matter down with it.
+ */
+export const stripeTopupWebhook = onRequest(
+  { region: "asia-southeast1", secrets: [STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET] },
+  async (req, res) => {
+    const signature = req.headers["stripe-signature"];
+    if (!signature) {
+      res.status(400).send("Missing stripe-signature header");
+      return;
+    }
+
+    const stripe = new Stripe(STRIPE_SECRET_KEY.value());
+
+    let event;
+    try {
+      // req.rawBody, not req.body. Express has already parsed and re-serialised
+      // the JSON by this point, and re-serialising changes bytes — key order,
+      // whitespace — so the signature over the original bytes no longer
+      // matches. Firebase preserves the raw buffer for exactly this.
+      event = stripe.webhooks.constructEvent(
+        req.rawBody,
+        signature,
+        STRIPE_WEBHOOK_SECRET.value()
+      );
+    } catch (err) {
+      // Refused, not logged-and-accepted: a body whose signature does not
+      // verify did not come from Stripe.
+      console.error("[stripeTopupWebhook] signature verification failed:", err?.message);
+      res.status(400).send(`Webhook signature verification failed`);
+      return;
+    }
+
+    const verdict = interpretStripeEvent(event);
+    if (verdict.action === "IGNORE") {
+      res.status(200).json({ received: true, ignored: verdict.reason });
+      return;
+    }
+
+    const target = resolveTopupTarget(verdict.metadata);
+    if (!target.ok) {
+      // An event from some other integration on the same Stripe account. Not an
+      // error, and certainly not something to credit a wallet for.
+      res.status(200).json({ received: true, ignored: target.reason });
+      return;
+    }
+
+    const eventRef = db.collection("idempotency_keys").doc(`stripe_${event.id}`);
+    const requestRef = db.collection("wallet_topup_requests").doc(target.requestId);
+    const walletRef = db.collection("wallets").doc(target.studentId);
+
+    try {
+      const outcome = await db.runTransaction(async (tx) => {
+        // Reads first, all of them, before any write.
+        const eventSnap = await tx.get(eventRef);
+        if (eventSnap.exists) {
+          return { status: "duplicate", eventId: event.id };
+        }
+
+        const reqSnap = await tx.get(requestRef);
+        if (!reqSnap.exists) {
+          return { status: "unknown_request", requestId: target.requestId };
+        }
+        const topup = reqSnap.data();
+
+        if (topup.status !== TOPUP_STATUS.PENDING) {
+          // Already settled — by an earlier delivery of a different event for
+          // the same intent, most likely.
+          return { status: "already_settled", current: topup.status };
+        }
+
+        const walletSnap =
+          verdict.action === "CREDIT" ? await tx.get(walletRef) : null;
+
+        // ---- writes ----
+        tx.set(eventRef, {
+          id: `stripe_${event.id}`,
+          source: "stripe",
+          eventId: event.id,
+          eventType: event.type,
+          requestId: target.requestId,
+          studentId: target.studentId,
+          processedAt: FieldValue.serverTimestamp(),
+        });
+
+        if (verdict.action === "FAIL") {
+          tx.update(requestRef, {
+            status: TOPUP_STATUS.FAILED,
+            failureReason: String(verdict.reason).slice(0, 500),
+            failedAt: FieldValue.serverTimestamp(),
+          });
+          return { status: "failed", requestId: target.requestId };
+        }
+
+        const currentBal = walletSnap.exists
+          ? Number(walletSnap.data().balanceSatang) || 0
+          : 0;
+        const newBal = currentBal + verdict.creditSatang;
+
+        tx.set(
+          walletRef,
+          {
+            studentId: target.studentId,
+            balanceSatang: newBal,
+            // A wallet first created by a top-up would otherwise be credited
+            // and then refuse every order — spending is fail-closed on limits.
+            ...resolveMissingLimitDefaults(walletSnap.exists ? walletSnap.data() : null),
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+
+        tx.update(requestRef, {
+          status: TOPUP_STATUS.CONFIRMED,
+          creditedSatang: verdict.creditSatang,
+          paymentIntentId: verdict.paymentIntentId,
+          confirmedBy: "stripe_webhook",
+          confirmedAt: FieldValue.serverTimestamp(),
+        });
+
+        const txRef = db.collection("wallet_transactions").doc();
+        tx.set(txRef, {
+          id: txRef.id,
+          walletId: target.studentId,
+          studentId: target.studentId,
+          amountSatang: verdict.creditSatang,
+          type: "TOPUP",
+          actorUid: topup.requestedBy || null,
+          actorRole: "STRIPE",
+          topupRequestId: target.requestId,
+          paymentIntentId: verdict.paymentIntentId,
+          stripeEventId: event.id,
+          paymentMethod: "STRIPE",
+          note: "เติมเงินผ่าน Stripe",
+          timestamp: FieldValue.serverTimestamp(),
+        });
+
+        const auditRef = db.collection("audit_logs").doc();
+        tx.set(auditRef, {
+          id: auditRef.id,
+          action: "WALLET_TOPUP_CONFIRMED",
+          actorUid: "stripe_webhook",
+          actorName: "Stripe",
+          targetStudentId: target.studentId,
+          topupRequestId: target.requestId,
+          amountSatang: verdict.creditSatang,
+          stripeEventId: event.id,
+          timestamp: FieldValue.serverTimestamp(),
+        });
+
+        return { status: "credited", creditedSatang: verdict.creditSatang, newBalanceSatang: newBal };
+      });
+
+      res.status(200).json({ received: true, ...outcome });
+    } catch (err) {
+      // A 500 here is correct: the transaction did not commit, so Stripe should
+      // retry. The idempotency record commits with the credit or not at all, so
+      // a retry cannot double it.
+      console.error("[stripeTopupWebhook] processing failed:", err);
+      res.status(500).json({ received: false, error: "processing_failed" });
+    }
+  }
+);
+
+/**
  * 💰 Confirm or reject a guardian's top-up request (Staff / Admin only)
  *
  * The moment the money is actually recognised. A guardian's request is a claim
@@ -1587,6 +1907,18 @@ export const reviewWalletTopupRequest = onCall(
           "failed-precondition",
           `TOPUP_ALREADY_REVIEWED: คำขอนี้ถูกตรวจสอบไปแล้ว (สถานะปัจจุบัน: ${topup.status})`
         );
+      }
+
+      // Only a cash request can be completed by hand.
+      //
+      // Staff confirming a MANUAL request IS the capture — they are the ones
+      // handed the money. A STRIPE request has Stripe doing the capturing, and
+      // letting staff confirm it would credit a wallet for a payment that may
+      // have failed or never been attempted. That is the hole the manual flow
+      // was built to close, reopened from the other side.
+      const manual = canConfirmManually(topup);
+      if (!manual.ok) {
+        throw new HttpsError("failed-precondition", `${manual.code}: ${manual.message}`);
       }
 
       const amt = Number(topup.amountSatang) || 0;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
   fetchParentChildLinks,
@@ -29,6 +29,15 @@ import { Link } from 'react-router-dom';
 import type { ParentChildLink, StudentWallet, WalletTransaction, StudentProfile } from '../types/campus';
 import { useToast } from '../components/ToastProvider.jsx';
 import { errorMessage } from '../utils/errorMessage';
+import StripePaymentForm from '../components/StripePaymentForm';
+import {
+  createTopupPaymentIntent,
+  isStripeConfigured,
+  readRedirectOutcome,
+  readTopupRequestStatus,
+  type ConfirmOutcome,
+  type TopupIntent,
+} from '../services/stripeTopupService';
 
 export default function GuardianDashboard() {
   const toast = useToast();
@@ -58,6 +67,21 @@ export default function GuardianDashboard() {
   const [isTopupOpen, setIsTopupOpen] = useState(false);
   const [topupAmountBaht, setTopupAmountBaht] = useState(100);
   const [isTopupProcessing, setIsTopupProcessing] = useState(false);
+  /**
+   * How the money is actually going to arrive.
+   *
+   * STRIPE captures it now; CASH records a request that a member of staff
+   * confirms once the notes are on the desk. They are genuinely different
+   * promises to a parent, so the choice is explicit rather than a default
+   * hidden behind one button.
+   */
+  const [topupMethod, setTopupMethod] = useState<'STRIPE' | 'CASH'>(
+    isStripeConfigured() ? 'STRIPE' : 'CASH'
+  );
+  /** Set once the server has a PaymentIntent; the modal then shows Stripe's form. */
+  const [stripeIntent, setStripeIntent] = useState<TopupIntent | null>(null);
+  /** Shown after a payment: what Stripe said, never what the wallet holds. */
+  const [payNotice, setPayNotice] = useState<string | null>(null);
 
   // Link Child Modal State
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
@@ -210,7 +234,131 @@ export default function GuardianDashboard() {
     setNewAllergyInput('');
   };
 
-  const handleTopup = async () => {
+  /**
+   * Who is on screen right now, readable from a callback that has been waiting.
+   *
+   * A poll started before a redirect closes over the child selected at the time;
+   * by the time it resolves the parent may be looking at their other child.
+   */
+  const selectedChildRef = useRef<ParentChildLink | null>(null);
+  useEffect(() => {
+    selectedChildRef.current = selectedChild;
+  }, [selectedChild]);
+
+  /**
+   * Re-read a wallet, and paint it only if it is the one being shown.
+   *
+   * On the redirect path the payment may have been for the parent's other
+   * child — the dashboard reopens on whichever child sorts first. Painting
+   * unconditionally would put one child's balance under the other's name.
+   */
+  const refreshWallet = async (studentId: string) => {
+    const w = await fetchStudentWallet(studentId);
+    if (selectedChildRef.current?.studentId !== studentId) return w;
+    setWallet(w);
+    const txs = await fetchWalletTransactions(studentId);
+    setTransactions(txs);
+    return w;
+  };
+
+  /**
+   * Watch for the webhook's credit to land, for a few seconds.
+   *
+   * Stripe answers the browser and calls the webhook independently, so the
+   * credit arrives shortly AFTER the payment succeeds — usually within a second,
+   * occasionally not. The request row is what gets polled rather than the
+   * balance: a balance can move for a second top-up, a refund, or the child
+   * buying lunch, and any of those would be mistaken for this payment. The row
+   * is written by the transaction that moves the money, so CONFIRMED means this
+   * payment landed and nothing else does.
+   *
+   * Not finding it is not a failure — Stripe may simply be slow — and the
+   * wording the parent sees says exactly that.
+   */
+  const waitForCredit = async (requestId: string, studentId: string) => {
+    for (let attempt = 0; attempt < 6; attempt++) {
+      await new Promise((r) => setTimeout(r, attempt === 0 ? 1200 : 2000));
+      const status = await readTopupRequestStatus(requestId);
+      if (status === 'CONFIRMED') {
+        await refreshWallet(studentId);
+        return true;
+      }
+      if (status === 'FAILED' || status === 'REJECTED') return false;
+    }
+    return false;
+  };
+
+  /**
+   * What to tell the parent once Stripe has spoken.
+   *
+   * PAID means Stripe captured the money, not that the wallet holds it — the
+   * webhook credits it, in its own transaction. Saying "เติมเงินสำเร็จ" before
+   * the balance actually moves is how a child ends up at the counter with money
+   * that has not arrived, so the wording waits for the balance too.
+   */
+  const handleStripeOutcome = async (
+    requestId: string,
+    studentId: string,
+    outcome: ConfirmOutcome,
+    amountSatang: number | null
+  ) => {
+    if (outcome.status === 'FAILED') {
+      toast.error(outcome.message);
+      return;
+    }
+    if (outcome.status === 'PROCESSING') {
+      toast.warning(
+        'รอการยืนยันการชำระเงิน — ยอดเงินจะเข้ากระเป๋าโดยอัตโนมัติเมื่อชำระเงินสำเร็จ',
+        { duration: 12000 }
+      );
+      return;
+    }
+
+    setPayNotice('ชำระเงินสำเร็จ — กำลังรอระบบเติมเงินเข้ากระเป๋า…');
+    // finally, because a dropped connection mid-poll must not leave the parent
+    // on "กำลังรอ…" with nothing else ever happening.
+    let credited: boolean;
+    try {
+      credited = await waitForCredit(requestId, studentId);
+    } finally {
+      setPayNotice(null);
+    }
+    if (credited) {
+      // No amount when the parent came back from a redirect: this component was
+      // remounted and never saw what they chose. Inventing it from the modal's
+      // default would put a number in front of them that is not their payment.
+      toast.success(
+        amountSatang
+          ? `เติมเงิน ฿${amountSatang / 100} เข้ากระเป๋าเรียบร้อยแล้ว`
+          : 'เติมเงินเข้ากระเป๋าเรียบร้อยแล้ว'
+      );
+    } else {
+      toast.warning(
+        'ชำระเงินสำเร็จแล้ว ยอดเงินจะเข้ากระเป๋าภายในไม่กี่นาที หากยังไม่เข้า กรุณาติดต่อห้องธุรการ',
+        { duration: 15000 }
+      );
+    }
+  };
+
+  /** Start a Stripe payment: the server creates the intent, the form confirms it. */
+  const handleStartStripeTopup = async () => {
+    if (!selectedChild || topupAmountBaht <= 0) return;
+    setIsTopupProcessing(true);
+    try {
+      const intent = await createTopupPaymentIntent(
+        selectedChild.studentId,
+        Math.round(topupAmountBaht * 100)
+      );
+      setStripeIntent(intent);
+    } catch (err) {
+      toast.error('เริ่มรายการชำระเงินไม่สำเร็จ: ' + errorMessage(err));
+    } finally {
+      setIsTopupProcessing(false);
+    }
+  };
+
+  /** The cash path: a request staff confirm once the money is handed over. */
+  const handleCashTopupRequest = async () => {
     if (!selectedChild || topupAmountBaht <= 0) return;
     setIsTopupProcessing(true);
     try {
@@ -233,16 +381,57 @@ export default function GuardianDashboard() {
         toast.success(result.message || `เติมเงิน ฿${topupAmountBaht} เรียบร้อยแล้ว`);
       }
 
-      const w = await fetchStudentWallet(selectedChild.studentId);
-      setWallet(w);
-      const txs = await fetchWalletTransactions(selectedChild.studentId);
-      setTransactions(txs);
+      await refreshWallet(selectedChild.studentId);
     } catch (err) {
       toast.error('เติมเงินไม่สำเร็จ: ' + errorMessage(err));
     } finally {
       setIsTopupProcessing(false);
     }
   };
+
+  const handleTopup = () =>
+    topupMethod === 'STRIPE' ? handleStartStripeTopup() : handleCashTopupRequest();
+
+  const closeTopupModal = () => {
+    setIsTopupOpen(false);
+    setStripeIntent(null);
+  };
+
+  /**
+   * Pick a payment back up after Stripe sent the parent away.
+   *
+   * PromptPay opens a banking app and 3-D Secure opens the bank's page, so the
+   * payment finishes on a page this component never saw. Stripe returns them
+   * with `payment_intent_client_secret` in the URL; without this they land on a
+   * dashboard that has forgotten the payment it started and shows the old
+   * balance with no explanation.
+   */
+  const redirectHandled = useRef(false);
+  useEffect(() => {
+    if (redirectHandled.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const clientSecret = params.get('payment_intent_client_secret');
+    const studentId = params.get('topup_student');
+    const requestId = params.get('topup_request');
+    if (!clientSecret || !studentId || !requestId) return;
+    redirectHandled.current = true;
+
+    // Cleared from the address bar first: a refresh would otherwise re-run this,
+    // and the URL carries a payment identifier that does not belong in history.
+    window.history.replaceState({}, '', window.location.pathname);
+
+    (async () => {
+      try {
+        const outcome = await readRedirectOutcome(clientSecret);
+        await handleStripeOutcome(requestId, studentId, outcome, null);
+      } catch (err) {
+        toast.error('อ่านสถานะการชำระเงินไม่สำเร็จ: ' + errorMessage(err));
+      }
+    })();
+    // Runs once, for the URL this page was opened with. handleStripeOutcome is
+    // re-created every render and listing it would re-run the read on each one.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleLinkChild = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -367,6 +556,19 @@ export default function GuardianDashboard() {
                     {isLocked ? 'กระเป๋าเงินถูกล็อค' : 'กระเป๋าเงินพร้อมใช้งาน'}
                   </button>
                 </div>
+
+                {/* The gap between Stripe taking the money and the webhook
+                    crediting the wallet, said out loud. Without it the balance
+                    below simply fails to change for a few seconds. */}
+                {payNotice && (
+                  <div
+                    role="status"
+                    className="mt-6 flex items-center gap-2 px-4 py-3 rounded-2xl border border-[#FF7A1A]/40 bg-[#FF7A1A]/10 text-xs font-semibold text-[#B45309] dark:text-[#FFB86B]"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-[#FF7A1A] animate-pulse" aria-hidden="true" />
+                    {payNotice}
+                  </div>
+                )}
 
                 <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="bg-white/90 dark:bg-[#16100C]/70 backdrop-blur p-4 rounded-2xl border border-slate-200 dark:border-white/10 shadow-xs">
@@ -686,6 +888,29 @@ export default function GuardianDashboard() {
               <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">
                 เติมเงินให้: <strong className="text-slate-900 dark:text-white">{selectedChild?.studentName}</strong>
               </p>
+
+              {stripeIntent ? (
+                <StripePaymentForm
+                  clientSecret={stripeIntent.clientSecret}
+                  amountSatang={stripeIntent.amountSatang}
+                  /* Stripe returns the parent here; the student id rides along
+                     because a remounted page has no memory of which child this
+                     payment was for. */
+                  returnUrl={`${window.location.origin}${window.location.pathname}?topup_student=${encodeURIComponent(
+                    selectedChild?.studentId || ''
+                  )}&topup_request=${encodeURIComponent(stripeIntent.requestId)}`}
+                  onCancel={closeTopupModal}
+                  onOutcome={async (outcome) => {
+                    const studentId = selectedChild?.studentId;
+                    const { requestId, amountSatang } = stripeIntent;
+                    closeTopupModal();
+                    if (studentId) {
+                      await handleStripeOutcome(requestId, studentId, outcome, amountSatang);
+                    }
+                  }}
+                />
+              ) : (
+              <>
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-700 dark:text-[#E5E7EB]">จำนวนเงิน (บาท)</label>
                 <div className="grid grid-cols-4 gap-2 mb-2">
@@ -713,10 +938,52 @@ export default function GuardianDashboard() {
                 />
               </div>
 
+              <div className="space-y-2">
+                <span className="text-xs font-bold text-slate-700 dark:text-[#E5E7EB]">ช่องทางชำระเงิน</span>
+                {/* Two genuinely different promises, so the parent picks one
+                    rather than discovering which they got. */}
+                {isStripeConfigured() && (
+                  <label className="flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors border-slate-200 dark:border-white/10 has-checked:border-[#FF7A1A] has-checked:bg-[#FF7A1A]/5">
+                    <input
+                      type="radio"
+                      name="topup-method"
+                      className="mt-1 accent-[#FF7A1A]"
+                      checked={topupMethod === 'STRIPE'}
+                      onChange={() => setTopupMethod('STRIPE')}
+                    />
+                    <span>
+                      <span className="block text-xs font-bold text-slate-900 dark:text-white">
+                        พร้อมเพย์ / บัตรเครดิต-เดบิต
+                      </span>
+                      <span className="block text-[11px] text-slate-500 dark:text-[#9CA3AF]">
+                        ชำระออนไลน์ทันที ยอดเงินเข้ากระเป๋าอัตโนมัติหลังชำระเงินสำเร็จ
+                      </span>
+                    </span>
+                  </label>
+                )}
+                <label className="flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors border-slate-200 dark:border-white/10 has-checked:border-[#FF7A1A] has-checked:bg-[#FF7A1A]/5">
+                  <input
+                    type="radio"
+                    name="topup-method"
+                    className="mt-1 accent-[#FF7A1A]"
+                    checked={topupMethod === 'CASH'}
+                    onChange={() => setTopupMethod('CASH')}
+                  />
+                  <span>
+                    <span className="block text-xs font-bold text-slate-900 dark:text-white">
+                      เงินสดที่ห้องธุรการ
+                    </span>
+                    <span className="block text-[11px] text-slate-500 dark:text-[#9CA3AF]">
+                      บันทึกคำขอไว้ก่อน ยอดเงินเข้ากระเป๋าเมื่อเจ้าหน้าที่ยืนยันว่าได้รับเงินแล้ว
+                    </span>
+                  </span>
+                </label>
+              </div>
+
               <div className="flex gap-2 justify-end pt-2">
                 <button
                   type="button"
-                  onClick={() => setIsTopupOpen(false)}
+                  onClick={closeTopupModal}
                   className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/20 text-slate-700 dark:text-white text-xs font-semibold rounded-xl cursor-pointer"
                 >
                   ยกเลิก
@@ -725,11 +992,17 @@ export default function GuardianDashboard() {
                   type="button"
                   disabled={isTopupProcessing}
                   onClick={handleTopup}
-                  className="px-4 py-2 bg-[#FF7A1A] hover:bg-[#E6680D] text-white text-xs font-semibold rounded-xl cursor-pointer"
+                  className="px-4 py-2 bg-[#FF7A1A] hover:bg-[#E6680D] text-white text-xs font-semibold rounded-xl cursor-pointer disabled:opacity-50"
                 >
-                  {isTopupProcessing ? 'กำลังประมวลผล...' : 'ยืนยันการเติมเงิน'}
+                  {isTopupProcessing
+                    ? 'กำลังประมวลผล...'
+                    : topupMethod === 'STRIPE'
+                      ? 'ไปหน้าชำระเงิน'
+                      : 'บันทึกคำขอเติมเงิน'}
                 </button>
               </div>
+              </>
+              )}
             </div>
           </div>
         )}

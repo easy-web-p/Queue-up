@@ -390,7 +390,19 @@ service cloud.firestore {
     // 10. IDEMPOTENCY KEYS (Internal & Owner Read)
     // ==========================================
     match /idempotency_keys/{keyId} {
-      allow read: if isAuthenticated() && (keyId.matches('^' + request.auth.uid + '_.*') || isAdmin());
+      // 🔒 The record that stops a replayed Stripe webhook crediting a wallet
+      // twice. Stripe retries on any non-2xx and can redeliver an event
+      // unprompted; stripeTopupWebhook writes the event id here in the same
+      // transaction that moves the balance, so the second delivery finds it
+      // and credits nothing.
+      //
+      // A client able to delete a row here could replay a real payment for as
+      // many credits as it liked, so writes stay closed to everything but the
+      // Admin SDK. Stripe rows are prefixed `stripe_` and are nobody's to read.
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        (keyId.matches('^' + request.auth.uid + '_.*') && !keyId.matches('^stripe_.*'))
+      );
       allow write: if false; // Only manageable by Cloud Functions / Admin SDK
     }
 
