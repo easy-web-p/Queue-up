@@ -1,7 +1,12 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
-import { fetchEvaluationsFromFirestore, submitEvaluationToFirestore } from "../lib/firebase.js";
+import {
+  fetchEvaluationsFromFirestore,
+  submitEvaluationToFirestore,
+  fetchShopsFromFirestore,
+  fetchProductsFromFirestore,
+} from "../lib/firebase.js";
 import { submitPilotLead } from "../services/pilotLeadService.js";
 import PdpaPolicyModal from "../components/PdpaPolicyModal.jsx";
 import Footer from "../components/Footer.jsx";
@@ -17,6 +22,17 @@ export default function Queueup() {
   const navigate = useNavigate();
   const { user } = useSelector((state) => state.auth);
   const [isScrolled, setIsScrolled] = useState(false);
+
+  /**
+   * What the canteen actually holds, for the stats bar.
+   *
+   * That bar read "50,000+ คิวที่ให้บริการสำเร็จ", "500+ ร้านค้าพันธมิตรไว้วางใจ",
+   * "99.9% Uptime" and "< 2 นาที เวลาการรอคิวเฉลี่ย". Nothing has served fifty
+   * thousand queues, no five hundred shops signed up, nothing measures uptime
+   * and nothing measures a wait. `shops` and `products` are publicly readable,
+   * so these two numbers are the ones a visitor can check for themselves.
+   */
+  const [catalogueStats, setCatalogueStats] = useState(null);
 
   // Dynamic Real User Evaluations State
   const [evaluations, setEvaluations] = useState([]);
@@ -103,6 +119,31 @@ export default function Queueup() {
         console.warn("Could not load system evaluations:", err);
         if (!cancelled) setEvalLoadFailed(true);
       });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadCatalogueStats() {
+      try {
+        const [shops, products] = await Promise.all([
+          fetchShopsFromFirestore(),
+          fetchProductsFromFirestore(),
+        ]);
+        if (cancelled) return;
+        setCatalogueStats({
+          shops: shops.length,
+          openShops: shops.filter((sh) => sh && sh.isOpen !== false).length,
+          dishes: products.filter((pr) => pr && pr.isAvailable !== false).length,
+        });
+      } catch (err) {
+        // No numbers rather than invented ones. The bar hides itself.
+        console.warn("Could not load catalogue stats:", err);
+      }
+    }
+    loadCatalogueStats();
     return () => {
       cancelled = true;
     };
@@ -321,20 +362,26 @@ export default function Queueup() {
       <section id="stats" className="qup-stats-bar">
         <div className="qup-stats-grid">
           <div className="qup-stat-item">
-            <div className="qup-stat-number">50,000+</div>
-            <div className="qup-stat-label">คิวที่ให้บริการสำเร็จ</div>
+            <div className="qup-stat-number">
+              {catalogueStats ? catalogueStats.shops.toLocaleString() : "—"}
+            </div>
+            <div className="qup-stat-label">ร้านค้าในระบบ</div>
           </div>
           <div className="qup-stat-item">
-            <div className="qup-stat-number">500+</div>
-            <div className="qup-stat-label">ร้านค้าพันธมิตรไว้วางใจ</div>
+            <div className="qup-stat-number">
+              {catalogueStats ? catalogueStats.openShops.toLocaleString() : "—"}
+            </div>
+            <div className="qup-stat-label">ร้านที่เปิดรับออเดอร์ตอนนี้</div>
           </div>
           <div className="qup-stat-item">
-            <div className="qup-stat-number">99.9%</div>
-            <div className="qup-stat-label">Uptime ความเสถียรของระบบ</div>
+            <div className="qup-stat-number">
+              {catalogueStats ? catalogueStats.dishes.toLocaleString() : "—"}
+            </div>
+            <div className="qup-stat-label">เมนูที่สั่งได้</div>
           </div>
           <div className="qup-stat-item">
-            <div className="qup-stat-number">&lt; 2 นาที</div>
-            <div className="qup-stat-label">เวลาการรอคิวเฉลี่ย</div>
+            <div className="qup-stat-number">{scores.count.toLocaleString()}</div>
+            <div className="qup-stat-label">ผลประเมินจากผู้ใช้จริง</div>
           </div>
         </div>
       </section>

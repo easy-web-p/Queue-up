@@ -318,6 +318,48 @@ runTest('What the security section claims instead is checkable', () => {
   assert(landing.includes('Cloud Functions'), 'the real money boundary is not stated');
 });
 
+console.log('\n📣 Two screens do not contradict each other');
+
+runTest('🚨 The broadcast box does not claim to have broadcast', () => {
+  // The CRM tab showed "กระจายข้อความไปยังหน้าเว็บฝั่งลูกค้าเรียบร้อยแล้ว!" directly
+  // beside its host's honest "(ยังไม่ได้เชื่อมระบบส่งข้อความจริง)". There is no
+  // broadcast transport; of the two contradictory notices the green one was the
+  // false one.
+  const crm = stripComments(read('src/components/MerchantCRMAnalytics.tsx'));
+  assert(
+    !crm.includes('กระจายข้อความไปยังหน้าเว็บฝั่งลูกค้าเรียบร้อยแล้ว'),
+    'the component claims a broadcast that never happens'
+  );
+  const host = stripComments(read('src/pages/MerchantDashboard.jsx'));
+  assert(
+    host.includes('ยังไม่ได้เชื่อมระบบส่งข้อความจริง'),
+    'the honest message about there being no transport is gone too'
+  );
+});
+
+console.log('\n📊 The landing page counts what it can count');
+
+runTest('🚨 The invented business metrics are gone', () => {
+  // "50,000+ คิวที่ให้บริการสำเร็จ", "500+ ร้านค้าพันธมิตรไว้วางใจ", "99.9% Uptime"
+  // and "< 2 นาที เวลาการรอคิวเฉลี่ย". Nothing served fifty thousand queues, no
+  // five hundred shops signed up, and nothing measures uptime or a wait.
+  const landing = stripComments(read('src/pages/Queueup.jsx'));
+  for (const ghost of ['50,000+', '500+', '99.9%', '< 2 นาที']) {
+    assert(!landing.includes(ghost), `the stats bar still claims "${ghost}"`);
+  }
+  assert(landing.includes('catalogueStats'), 'the bar is not derived from real data');
+  assert(
+    landing.includes('fetchShopsFromFirestore') && landing.includes('fetchProductsFromFirestore'),
+    'the counts are not read from the collections'
+  );
+});
+
+runTest('A failed read shows no number rather than a plausible one', () => {
+  const landing = read('src/pages/Queueup.jsx');
+  assert(/catalogueStats \? catalogueStats\.shops/.test(landing), 'the shop count has no empty state');
+  assert(landing.includes('"—"'), 'an unknown count renders as something other than unknown');
+});
+
 console.log(`\n${'='.repeat(60)}`);
 console.log(`RESULT: ${passed} passed, ${failed} failed`);
 console.log('='.repeat(60));

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { CustomerProfile } from '../types';
-import { Users, Send, TrendingUp, Award, Phone, CheckCircle2 } from 'lucide-react';
+import { Users, Send, TrendingUp, Award, Phone } from 'lucide-react';
 
 interface Props {
   customers: CustomerProfile[];
@@ -9,7 +9,6 @@ interface Props {
 
 export const MerchantCRMAnalytics: React.FC<Props> = ({ customers, onSendBroadcast }) => {
   const [broadcastText, setBroadcastText] = useState('');
-  const [sentNotice, setSentNotice] = useState(false);
 
   const handleBroadcast = (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,8 +16,6 @@ export const MerchantCRMAnalytics: React.FC<Props> = ({ customers, onSendBroadca
 
     onSendBroadcast(broadcastText);
     setBroadcastText('');
-    setSentNotice(true);
-    setTimeout(() => setSentNotice(false), 3000);
   };
 
   return (
@@ -89,12 +86,11 @@ export const MerchantCRMAnalytics: React.FC<Props> = ({ customers, onSendBroadca
           </button>
         </form>
 
-        {sentNotice && (
-          <div className="p-3 bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold rounded-xl flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            <span>กระจายข้อความไปยังหน้าเว็บฝั่งลูกค้าเรียบร้อยแล้ว!</span>
-          </div>
-        )}
+        {/* This said "กระจายข้อความไปยังหน้าเว็บฝั่งลูกค้าเรียบร้อยแล้ว!" — broadcast
+            to the customer site, done — directly beside the host's own message
+            saying the opposite: "(ยังไม่ได้เชื่อมระบบส่งข้อความจริง)". There is no
+            broadcast transport. Two contradictory notices, and the green one was
+            the false one, so the host's honest message is now the only one. */}
       </div>
 
       {/* Customer Database List */}
