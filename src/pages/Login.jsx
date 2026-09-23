@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { pressableProps } from "../utils/pressable.js";
 import { deriveAccountCode } from "../utils/accountCode.ts";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
@@ -520,7 +521,7 @@ function Login() {
                       className={`avatar-option ${
                         selectedAvatar === item.src ? "selected" : ""
                       }`}
-                      onClick={() => setSelectedAvatar(item.src)}
+                      {...pressableProps(() => setSelectedAvatar(item.src), { pressed: selectedAvatar === item.src })}
                     >
                       <img loading="lazy" decoding="async" src={item.src} alt={item.label} />
                       {selectedAvatar === item.src && (

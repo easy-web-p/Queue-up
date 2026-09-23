@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { pressableProps } from "../utils/pressable.js";
 import { getChatGPTResponse } from "../services/aiChatService.js";
 import { analyzeAndShieldInput, checkRateLimit } from "../services/aiSecurityShield.js";
 import { useToast } from "./ToastProvider.jsx";
@@ -258,7 +259,7 @@ function ChatModal({ isOpen, onClose, storeId, storeName, initialStoreName, init
                       ? "active bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-900/40"
                       : "hover:bg-slate-100 dark:hover:bg-slate-800/60"
                   }`}
-                  onClick={() => handleSelectChat(chat.id)}
+                  {...pressableProps(() => handleSelectChat(chat.id), { pressed: activeChatId === chat.id })}
                 >
                   <div className="queueup-chat-item-avatar-wrapper relative w-10 h-10 shrink-0">
                     {/* Presence used to be a hardcoded `online: true` with

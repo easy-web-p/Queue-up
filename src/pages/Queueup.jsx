@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { pressableProps } from "../utils/pressable.js";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import {
@@ -276,7 +277,7 @@ export default function Queueup() {
       {/* ==================== 1. STICKY NAVBAR ==================== */}
       <header className={`qup-navbar ${isScrolled ? "scrolled" : ""}`}>
         <div className="qup-nav-content">
-          <div className="qup-logo-group" onClick={() => navigate("/about")}>
+          <div className="qup-logo-group" {...pressableProps(() => navigate("/about"))}>
             <img decoding="async" src="/logo.png" alt="QueueUp Logo" className="qup-logo-img" />
             <span className="qup-logo-text">QueueUp</span>
           </div>
@@ -1095,7 +1096,7 @@ export default function Queueup() {
       <footer className="qup-footer">
         <div className="qup-footer-grid">
           <div>
-            <div className="qup-logo-group mb-3" onClick={() => navigate("/")}>
+            <div className="qup-logo-group mb-3" {...pressableProps(() => navigate("/"))}>
               <img decoding="async" src="/logo.png" alt="QueueUp Logo" className="qup-logo-img" />
               <span className="qup-logo-text">QueueUp</span>
             </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { pressableProps } from "../utils/pressable.js";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { setUser, clearUser } from "../store/authSlice.js";
@@ -615,7 +616,7 @@ function UserProfile() {
                 color: membershipInfo.color,
                 border: `1px solid ${membershipInfo.color}50`,
               }}
-              onClick={() => handleTabChange("membership")}
+              {...pressableProps(() => handleTabChange("membership"))}
               title="คลิกเพื่อดูสิทธิพิเศษประจำระดับสมาชิก"
             >
               <i className={`bi ${membershipInfo.icon}`} />
@@ -637,7 +638,7 @@ function UserProfile() {
           <nav className="shopee-sidebar-nav-list">
             <div
               className={`shopee-sidebar-nav-item ${activeTab === "bookings" ? "active" : ""}`}
-              onClick={() => handleTabChange("bookings")}
+              {...pressableProps(() => handleTabChange("bookings"), { pressed: activeTab === "bookings" })}
             >
               <div className="shopee-sidebar-nav-left">
                 <i className="bi bi-list-task shopee-sidebar-nav-icon" />
@@ -647,7 +648,7 @@ function UserProfile() {
 
             <div
               className={`shopee-sidebar-nav-item ${activeTab === "coupons" ? "active" : ""}`}
-              onClick={() => handleTabChange("coupons")}
+              {...pressableProps(() => handleTabChange("coupons"), { pressed: activeTab === "coupons" })}
             >
               <div className="shopee-sidebar-nav-left">
                 <i className="bi bi-tag shopee-sidebar-nav-icon" />
@@ -657,7 +658,7 @@ function UserProfile() {
 
             <div
               className={`shopee-sidebar-nav-item ${activeTab === "membership" ? "active" : ""}`}
-              onClick={() => handleTabChange("membership")}
+              {...pressableProps(() => handleTabChange("membership"), { pressed: activeTab === "membership" })}
             >
               <div className="shopee-sidebar-nav-left">
                 <i className="bi bi-trophy shopee-sidebar-nav-icon" />
@@ -667,7 +668,7 @@ function UserProfile() {
 
             <div
               className={`shopee-sidebar-nav-item ${activeTab === "info" ? "active" : ""}`}
-              onClick={() => handleTabChange("info")}
+              {...pressableProps(() => handleTabChange("info"), { pressed: activeTab === "info" })}
             >
               <div className="shopee-sidebar-nav-left">
                 <i className="bi bi-person shopee-sidebar-nav-icon" />
@@ -680,7 +681,7 @@ function UserProfile() {
 
             <div
               className={`shopee-sidebar-nav-item ${activeTab === "settings" ? "active" : ""}`}
-              onClick={() => handleTabChange("settings")}
+              {...pressableProps(() => handleTabChange("settings"), { pressed: activeTab === "settings" })}
             >
               <div className="shopee-sidebar-nav-left">
                 <i className="bi bi-gear shopee-sidebar-nav-icon" />
@@ -698,7 +699,7 @@ function UserProfile() {
                 and before this there was nowhere at all to look at it. */}
             <div
               className="shopee-sidebar-nav-item cursor-pointer"
-              onClick={() => navigate("/wallet")}
+              {...pressableProps(() => navigate("/wallet"))}
             >
               <div className="shopee-sidebar-nav-left">
                 <i className="bi bi-wallet2 text-success shopee-sidebar-nav-icon" />
@@ -709,7 +710,7 @@ function UserProfile() {
 
             <div
               className="shopee-sidebar-nav-item cursor-pointer"
-              onClick={() => navigate("/guardian")}
+              {...pressableProps(() => navigate("/guardian"))}
             >
               <div className="shopee-sidebar-nav-left">
                 <i className="bi bi-shield-heart text-danger shopee-sidebar-nav-icon" />
@@ -720,7 +721,7 @@ function UserProfile() {
 
             <div
               className="shopee-sidebar-nav-item cursor-pointer"
-              onClick={() => navigate("/student-vendor/apply")}
+              {...pressableProps(() => navigate("/student-vendor/apply"))}
             >
               <div className="shopee-sidebar-nav-left">
                 <i className="bi bi-mortarboard text-warning shopee-sidebar-nav-icon" />
@@ -732,7 +733,7 @@ function UserProfile() {
             {(user?.role === "student_vendor" || user?.role === "merchant" || user?.role === "admin") && (
               <div
                 className="shopee-sidebar-nav-item cursor-pointer"
-                onClick={() => navigate("/student-vendor/earnings")}
+                {...pressableProps(() => navigate("/student-vendor/earnings"))}
               >
                 <div className="shopee-sidebar-nav-left">
                   <i className="bi bi-wallet2 text-success shopee-sidebar-nav-icon" />
@@ -746,7 +747,7 @@ function UserProfile() {
               <>
                 <div
                   className="shopee-sidebar-nav-item cursor-pointer"
-                  onClick={() => navigate("/admin/vendor-approvals")}
+                  {...pressableProps(() => navigate("/admin/vendor-approvals"))}
                 >
                   <div className="shopee-sidebar-nav-left">
                     <i className="bi bi-person-check text-info shopee-sidebar-nav-icon" />
@@ -757,7 +758,7 @@ function UserProfile() {
 
                 <div
                   className="shopee-sidebar-nav-item cursor-pointer"
-                  onClick={() => navigate("/emergency")}
+                  {...pressableProps(() => navigate("/emergency"))}
                 >
                   <div className="shopee-sidebar-nav-left">
                     <i className="bi bi-heart-pulse text-danger shopee-sidebar-nav-icon" />
@@ -770,7 +771,7 @@ function UserProfile() {
 
             <div
               className="shopee-sidebar-nav-item cursor-pointer"
-              onClick={() => navigate("/campus/monitor")}
+              {...pressableProps(() => navigate("/campus/monitor"))}
             >
               <div className="shopee-sidebar-nav-left">
                 <i className="bi bi-tv text-primary shopee-sidebar-nav-icon" />
@@ -1122,7 +1123,7 @@ function UserProfile() {
                     คุณลบบัญชีและข้อมูลส่วนบุคคลได้เองที่ปุ่มด้านล่าง —{" "}
                     <span
                       className="text-primary text-decoration-underline cursor-pointer"
-                      onClick={() => navigate("/pdpa")}
+                      {...pressableProps(() => navigate("/pdpa"))}
                     >
                       อ่านรายละเอียดในนโยบาย PDPA
                     </span>
@@ -1204,13 +1205,13 @@ function UserProfile() {
               <div className="shopee-coupon-sub-tabs">
                 <div
                   className={`shopee-coupon-tab-item ${couponTab === "usable" ? "active" : ""}`}
-                  onClick={() => setCouponTab("usable")}
+                  {...pressableProps(() => setCouponTab("usable"), { pressed: couponTab === "usable" })}
                 >
                   ใช้ได้
                 </div>
                 <div
                   className={`shopee-coupon-tab-item ${couponTab === "expired" ? "active" : ""}`}
-                  onClick={() => setCouponTab("expired")}
+                  {...pressableProps(() => setCouponTab("expired"), { pressed: couponTab === "expired" })}
                 >
                   หมดอายุแล้ว
                 </div>
@@ -1389,7 +1390,7 @@ function UserProfile() {
                   <div
                     key={tab.id}
                     className={`shopee-tab-item ${orderStatusTab === tab.id ? "active" : ""}`}
-                    onClick={() => setOrderStatusTab(tab.id)}
+                    {...pressableProps(() => setOrderStatusTab(tab.id), { pressed: orderStatusTab === tab.id })}
                   >
                     {tab.label}
                   </div>

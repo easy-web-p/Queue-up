@@ -1,4 +1,5 @@
 import { doc, getDoc } from "firebase/firestore";
+import { pressableProps } from "../utils/pressable.js";
 import { db } from "../firebase/config.js";
 import { fetchProductsFromFirestore } from "../lib/firebase.js";
 import { subscribeToMyNotifications } from "../services/notificationService";
@@ -214,14 +215,14 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
         <div className="shopee-nav-left">
           <span
             className="shopee-nav-item cursor-pointer"
-            onClick={handleMerchantLinkClick}
+            {...pressableProps(handleMerchantLinkClick)}
           >
             <i className="bi bi-shop me-1" /> {language === "en" ? "Seller Centre" : "ศูนย์ผู้ขาย"} {user && user.activeRole === "merchant" ? "(Merchant)" : ""}
           </span>
           <span className="shopee-nav-divider" />
           <span
             className="shopee-nav-item cursor-pointer"
-            onClick={handleMerchantLinkClick}
+            {...pressableProps(handleMerchantLinkClick)}
           >
             <i className="bi bi-rocket-takeoff me-1" /> สมัครเป็นผู้ขาย / เปิดร้านค้า
           </span>
@@ -230,10 +231,10 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
           <div className={`shopee-campus-dropdown-container ${isCampusOpen ? "open" : ""}`}>
             <span
               className="shopee-nav-item text-warning fw-bold cursor-pointer"
-              onClick={(e) => {
+              {...pressableProps((e) => {
                 e.stopPropagation();
                 setIsCampusOpen((prev) => !prev);
-              }}
+              })}
               title="บริการแคมปัสและโรงอาหาร (จอคิว, ผู้ปกครอง, ร้านค้านักเรียน)"
             >
               <i className="bi bi-mortarboard-fill me-1" />
@@ -334,7 +335,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
               <span className="shopee-nav-divider" />
               <span
                 className="shopee-nav-item fw-bold text-warning cursor-pointer"
-                onClick={() => navigate("/admin")}
+                {...pressableProps(() => navigate("/admin"))}
               >
                 <i className="bi bi-shield-lock-fill me-1" /> {language === "en" ? "Admin Portal" : "ระบบหลังบ้าน"}
               </span>
@@ -384,10 +385,10 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
                     <div
                       key={n.id}
                       className={`shopee-notif-item${n.actionable ? " unread" : ""}`}
-                      onClick={() => {
+                      {...pressableProps(() => {
                         setIsNotificationOpen(false);
                         navigate("/user/account/profile?tab=bookings");
-                      }}
+                      })}
                     >
                       <div
                         className={`shopee-notif-icon-box ${
@@ -445,7 +446,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
           </div>
           <span
             className="shopee-nav-item cursor-pointer"
-            onClick={() => toast.info("ศูนย์ช่วยเหลือ QueueUp CRM พร้อมให้บริการตลอด 24 ชั่วโมง")}
+            {...pressableProps(() => toast.info("ศูนย์ช่วยเหลือ QueueUp CRM พร้อมให้บริการตลอด 24 ชั่วโมง"))}
           >
             <i className="bi bi-question-circle" /> {language === "en" ? "Help" : "ช่วยเหลือ"}
           </span>
@@ -470,7 +471,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
           {/* Official Bootstrap 5 Theme Dropdown Menu */}
           <div
             className="shopee-theme-bs5-dropdown-container me-2"
-            onClick={(e) => e.stopPropagation()}
+            {...pressableProps((e) => e.stopPropagation())}
           >
             <button
               id="bd-theme"
@@ -577,7 +578,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
           <div className="shopee-user-dropdown-container">
             <div
               className="shopee-user-trigger"
-              onClick={() => navigate("/user/account/profile")}
+              {...pressableProps(() => navigate("/user/account/profile"))}
               title={user ? user.name || user.email : "โปรไฟล์ของฉัน"}
             >
               <img loading="lazy" decoding="async"
@@ -829,7 +830,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
             {/* Scope Selection Dropdown ("ในร้านนี้ ▾") */}
             <div
               className="shopee-search-scope-select"
-              onClick={() => setIsScopeOpen(!isScopeOpen)}
+              {...pressableProps(() => setIsScopeOpen(!isScopeOpen))}
             >
               <span>{scope === "shop" ? "ในร้านนี้" : "ทั้งหมด"}</span>
               <i className="bi bi-chevron-down" />
@@ -838,19 +839,19 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
                 <div className="shopee-scope-dropdown-menu">
                   <div
                     className="shopee-scope-option"
-                    onClick={() => {
+                    {...pressableProps(() => {
                       setScope("shop");
                       setIsScopeOpen(false);
-                    }}
+                    }, { pressed: scope === "shop" })}
                   >
                     ในร้านนี้
                   </div>
                   <div
                     className="shopee-scope-option"
-                    onClick={() => {
+                    {...pressableProps(() => {
                       setScope("all");
                       setIsScopeOpen(false);
-                    }}
+                    }, { pressed: scope === "all" })}
                   >
                     ทั้งหมด
                   </div>
@@ -938,7 +939,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
                   <span
                     key={idx}
                     className={`shopee-trending-link item-priority-${idx}`}
-                    onClick={() => handleSelectKeyword(kw)}
+                    {...pressableProps(() => handleSelectKeyword(kw))}
                   >
                     {kw}
                   </span>
@@ -951,7 +952,7 @@ function ShopeeSearchBar({ disableHistory = false, hideTrendingLinks = false }) 
         {/* Shopping Cart Icon */}
         <div
           className="shopee-cart-container"
-          onClick={() => setIsCartOpen(true)}
+          {...pressableProps(() => setIsCartOpen(true))}
           title="ดูตะกร้าอาหารของคุณ"
           role="button"
           tabIndex={0}

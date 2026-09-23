@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { pressableProps } from "../utils/pressable.js";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { addItem } from "../store/cartSlice";
@@ -976,11 +977,11 @@ function ProductDetail() {
       <div className="queue-pd-wrapper">
         {/* 1. BREADCRUMB NAVIGATION */}
         <div className="queue-pd-breadcrumb">
-          <span className="text-muted cursor-pointer" onClick={() => navigate("/home")}>
+          <span className="text-muted cursor-pointer" {...pressableProps(() => navigate("/home"))}>
             <i className="bi bi-house-door-fill me-1 text-primary" /> หน้าหลัก
           </span>
           <span className="text-muted">/</span>
-          <span className="text-muted cursor-pointer" onClick={() => navigate("/search?keyword=ทั้งหมด")}>
+          <span className="text-muted cursor-pointer" {...pressableProps(() => navigate("/search?keyword=ทั้งหมด"))}>
             โรงอาหารกลาง (โรงอาหาร 2)
           </span>
           <span className="text-muted">/</span>
@@ -1023,7 +1024,7 @@ function ProductDetail() {
                 <div
                   key={idx}
                   className={`queue-pd-thumb-box ${selectedImg === img ? "active" : ""}`}
-                  onClick={() => setSelectedImg(img)}
+                  {...pressableProps(() => setSelectedImg(img))}
                 >
                   <img loading="lazy" decoding="async"
                     src={img}
@@ -1616,7 +1617,7 @@ function ProductDetail() {
               <h2 className="fs-5 fw-bold text-dark mb-0 d-flex align-items-center gap-2">
                 <i className="bi bi-shop text-primary" /> เมนูอื่นจากร้านนี้ ({store?.name || product.shopName || store?.id || "ร้านค้า"})
               </h2>
-              <span className="text-primary small fw-bold cursor-pointer" onClick={() => navigate("/search?keyword=ทั้งหมด")}>
+              <span className="text-primary small fw-bold cursor-pointer" {...pressableProps(() => navigate("/search?keyword=ทั้งหมด"))}>
                 ดูเมนูทั้งหมด ({store?.name || "ร้านนี้"}) <i className="bi bi-arrow-right" />
               </span>
             </div>
@@ -1626,10 +1627,10 @@ function ProductDetail() {
                 <div key={rec.id} className="col-6 col-md-3">
                   <div
                     className="queue-pd-rec-menu-card"
-                    onClick={() => {
+                    {...pressableProps(() => {
                       navigate(`/product/${rec.id}`);
                       window.scrollTo({ top: 0, behavior: "smooth" });
-                    }}
+                    })}
                   >
                     <div className="queue-pd-rec-img-box">
                       <img loading="lazy" decoding="async"
@@ -1646,13 +1647,15 @@ function ProductDetail() {
                       </div>
                       <div className="d-flex justify-content-between align-items-center pt-2">
                         <span className="text-danger fw-bold">฿{rec.price}</span>
-                        <button
-                          type="button"
-                          aria-label={`ดูเมนู ${rec.name}`}
+                        {/* The card is the control. This was a real button
+                            with no handler on it: Tab stopped here, a reader
+                            called it a button, and pressing it did nothing. */}
+                        <span
+                          aria-hidden="true"
                           className="btn btn-sm btn-primary rounded-circle d-flex align-items-center justify-content-center w-7 h-7 min-w-[44px] min-h-[44px]"
                         >
                           <i className="bi bi-plus" />
-                        </button>
+                        </span>
                       </div>
                     </div>
                   </div>

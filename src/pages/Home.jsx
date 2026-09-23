@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { pressableProps } from "../utils/pressable.js";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import {
@@ -314,13 +315,13 @@ function Home() {
             </span>
             <span
               className="queue-flash-content cursor-pointer"
-              onClick={() => {
+              {...pressableProps(() => {
                 if (currentUpdate.actionType === "claim_coupon") {
                   handleClaimWelcomeCoupon();
                 } else if (currentUpdate.targetPath) {
                   navigate(currentUpdate.targetPath);
                 }
-              }}
+              })}
               title="คลิกดูรายละเอียดอัปเดตนี้"
             >
               {currentUpdate.title}
@@ -481,7 +482,8 @@ function Home() {
             {/* 1. Student Vendor */}
             <div
               className="p-5 rounded-2xl bg-white dark:bg-[#16100C] border border-orange-200/80 dark:border-[#FF7A1A]/25 hover:border-[#FF7A1A] hover:shadow-lg hover:shadow-orange-500/10 transition-all duration-300 flex flex-col justify-between cursor-pointer group hover:-translate-y-1 shadow-xs"
-              onClick={() => navigate("/student-vendor/apply")}
+              aria-label="ร้านค้านักเรียน"
+              {...pressableProps(() => navigate("/student-vendor/apply"))}
             >
               <div>
                 <div className="text-3xl mb-3 group-hover:scale-110 transition-transform inline-block">🧑‍🎓</div>
@@ -490,18 +492,19 @@ function Home() {
                   ยื่นขอเปิดร้านค้าในโรงอาหาร บ่มเพาะทักษะธุรกิจ
                 </p>
               </div>
-              <button
-                type="button"
-                className="w-full py-2.5 rounded-xl border border-[#FF7A1A] text-[#FF7A1A] group-hover:bg-[#FF7A1A] group-hover:text-white font-['Kanit'] font-bold text-xs transition-all mt-4 text-center cursor-pointer"
+              <span
+                className="block w-full py-2.5 rounded-xl border border-[#FF7A1A] text-[#FF7A1A] group-hover:bg-[#FF7A1A] group-hover:text-white font-['Kanit'] font-bold text-xs transition-all mt-4 text-center cursor-pointer"
+                aria-hidden="true"
               >
                 ยื่นขอเปิดร้าน ›
-              </button>
+              </span>
             </div>
 
             {/* 2. Guardian Portal */}
             <div
               className="p-5 rounded-2xl bg-white dark:bg-[#16100C] border border-orange-200/80 dark:border-[#FF7A1A]/25 hover:border-[#FF7A1A] hover:shadow-lg hover:shadow-orange-500/10 transition-all duration-300 flex flex-col justify-between cursor-pointer group hover:-translate-y-1 shadow-xs"
-              onClick={() => navigate("/guardian")}
+              aria-label="ผู้ปกครอง (Guardian)"
+              {...pressableProps(() => navigate("/guardian"))}
             >
               <div>
                 <div className="text-3xl mb-3 group-hover:scale-110 transition-transform inline-block">🛡️</div>
@@ -510,18 +513,19 @@ function Home() {
                   เติมเงิน กำหนดวงเงินรายวัน และบล็อกหมวดอาหาร
                 </p>
               </div>
-              <button
-                type="button"
-                className="w-full py-2.5 rounded-xl border border-[#FF7A1A] text-[#FF7A1A] group-hover:bg-[#FF7A1A] group-hover:text-white font-['Kanit'] font-bold text-xs transition-all mt-4 text-center cursor-pointer"
+              <span
+                className="block w-full py-2.5 rounded-xl border border-[#FF7A1A] text-[#FF7A1A] group-hover:bg-[#FF7A1A] group-hover:text-white font-['Kanit'] font-bold text-xs transition-all mt-4 text-center cursor-pointer"
+                aria-hidden="true"
               >
                 จัดการกระเป๋าเงิน ›
-              </button>
+              </span>
             </div>
 
             {/* 3. Teacher/Supervisor Approvals */}
             <div
               className="p-5 rounded-2xl bg-white dark:bg-[#16100C] border border-orange-200/80 dark:border-[#FF7A1A]/25 hover:border-[#FF7A1A] hover:shadow-lg hover:shadow-orange-500/10 transition-all duration-300 flex flex-col justify-between cursor-pointer group hover:-translate-y-1 shadow-xs"
-              onClick={() => navigate("/admin/vendor-approvals")}
+              aria-label="อาจารย์ / ฝ่ายปกครอง"
+              {...pressableProps(() => navigate("/admin/vendor-approvals"))}
             >
               <div>
                 <div className="text-3xl mb-3 group-hover:scale-110 transition-transform inline-block">👨‍🏫</div>
@@ -530,18 +534,19 @@ function Home() {
                   อนุมัติร้านค้านักเรียน และตรวจสอบสุขอนามัย
                 </p>
               </div>
-              <button
-                type="button"
-                className="w-full py-2.5 rounded-xl border border-[#FF7A1A] text-[#FF7A1A] group-hover:bg-[#FF7A1A] group-hover:text-white font-['Kanit'] font-bold text-xs transition-all mt-4 text-center cursor-pointer"
+              <span
+                className="block w-full py-2.5 rounded-xl border border-[#FF7A1A] text-[#FF7A1A] group-hover:bg-[#FF7A1A] group-hover:text-white font-['Kanit'] font-bold text-xs transition-all mt-4 text-center cursor-pointer"
+                aria-hidden="true"
               >
                 แผงควบคุมอาจารย์ ›
-              </button>
+              </span>
             </div>
 
             {/* 3.05 Wallet Top-Up Confirmation */}
             <div
               className="p-5 rounded-2xl bg-white dark:bg-[#16100C] border border-orange-200/80 dark:border-[#FF7A1A]/25 hover:border-[#FF7A1A] hover:shadow-lg hover:shadow-orange-500/10 transition-all duration-300 flex flex-col justify-between cursor-pointer group hover:-translate-y-1 shadow-xs"
-              onClick={() => navigate("/campus/topup-approvals")}
+              aria-label="ยืนยันการเติมเงิน"
+              {...pressableProps(() => navigate("/campus/topup-approvals"))}
             >
               <div>
                 <div className="text-3xl mb-3 group-hover:scale-110 transition-transform inline-block">💰</div>
@@ -550,18 +555,19 @@ function Home() {
                   ตรวจคำขอเติมเงินจากผู้ปกครอง และยืนยันเมื่อได้รับเงินสดที่ห้องธุรการแล้ว
                 </p>
               </div>
-              <button
-                type="button"
-                className="w-full py-2.5 rounded-xl border border-[#FF7A1A] text-[#FF7A1A] group-hover:bg-[#FF7A1A] group-hover:text-white font-['Kanit'] font-bold text-xs transition-all mt-4 text-center cursor-pointer"
+              <span
+                className="block w-full py-2.5 rounded-xl border border-[#FF7A1A] text-[#FF7A1A] group-hover:bg-[#FF7A1A] group-hover:text-white font-['Kanit'] font-bold text-xs transition-all mt-4 text-center cursor-pointer"
+                aria-hidden="true"
               >
                 ตรวจคำขอเติมเงิน ›
-              </button>
+              </span>
             </div>
 
             {/* 3.1 Guardian Link Verification */}
             <div
               className="p-5 rounded-2xl bg-white dark:bg-[#16100C] border border-orange-200/80 dark:border-[#FF7A1A]/25 hover:border-[#FF7A1A] hover:shadow-lg hover:shadow-orange-500/10 transition-all duration-300 flex flex-col justify-between cursor-pointer group hover:-translate-y-1 shadow-xs"
-              onClick={() => navigate("/campus/guardian-links")}
+              aria-label="ยืนยันบัญชีผู้ปกครอง"
+              {...pressableProps(() => navigate("/campus/guardian-links"))}
             >
               <div>
                 <div className="text-3xl mb-3 group-hover:scale-110 transition-transform inline-block">👪</div>
@@ -570,18 +576,19 @@ function Home() {
                   ตรวจสอบความสัมพันธ์ผู้ปกครอง–นักเรียน ก่อนให้สิทธิ์เข้าถึงกระเป๋าเงินและข้อมูลสุขภาพ
                 </p>
               </div>
-              <button
-                type="button"
-                className="w-full py-2.5 rounded-xl border border-[#FF7A1A] text-[#FF7A1A] group-hover:bg-[#FF7A1A] group-hover:text-white font-['Kanit'] font-bold text-xs transition-all mt-4 text-center cursor-pointer"
+              <span
+                className="block w-full py-2.5 rounded-xl border border-[#FF7A1A] text-[#FF7A1A] group-hover:bg-[#FF7A1A] group-hover:text-white font-['Kanit'] font-bold text-xs transition-all mt-4 text-center cursor-pointer"
+                aria-hidden="true"
               >
                 ตรวจสอบคำขอผูกบัญชี ›
-              </button>
+              </span>
             </div>
 
             {/* 4. Live Canteen Monitor */}
             <div
               className="p-5 rounded-2xl bg-white dark:bg-[#16100C] border border-orange-200/80 dark:border-[#FF7A1A]/25 hover:border-[#FF7A1A] hover:shadow-lg hover:shadow-orange-500/10 transition-all duration-300 flex flex-col justify-between cursor-pointer group hover:-translate-y-1 shadow-xs"
-              onClick={() => navigate("/campus/monitor")}
+              aria-label="จอแสดงคิวสด"
+              {...pressableProps(() => navigate("/campus/monitor"))}
             >
               <div>
                 <div className="text-3xl mb-3 group-hover:scale-110 transition-transform inline-block">📺</div>
@@ -590,18 +597,19 @@ function Home() {
                   จอแสดงผลคิวปรุงเสร็จแบบเรียลไทม์ในโรงอาหาร
                 </p>
               </div>
-              <button
-                type="button"
-                className="w-full py-2.5 rounded-xl border border-[#FF7A1A] text-[#FF7A1A] group-hover:bg-[#FF7A1A] group-hover:text-white font-['Kanit'] font-bold text-xs transition-all mt-4 text-center cursor-pointer"
+              <span
+                className="block w-full py-2.5 rounded-xl border border-[#FF7A1A] text-[#FF7A1A] group-hover:bg-[#FF7A1A] group-hover:text-white font-['Kanit'] font-bold text-xs transition-all mt-4 text-center cursor-pointer"
+                aria-hidden="true"
               >
                 เปิดจอคิวสด ›
-              </button>
+              </span>
             </div>
 
             {/* 5. Medical & Emergency */}
             <div
               className="p-5 rounded-2xl bg-white dark:bg-[#16100C] border border-red-200 dark:border-red-500/35 hover:border-red-500 hover:shadow-lg hover:shadow-red-500/10 transition-all duration-300 flex flex-col justify-between cursor-pointer group hover:-translate-y-1 shadow-xs"
-              onClick={() => navigate("/emergency")}
+              aria-label="พยาบาล & ฉุกเฉิน"
+              {...pressableProps(() => navigate("/emergency"))}
             >
               <div>
                 <div className="text-3xl mb-3 group-hover:scale-110 transition-transform inline-block">🚨</div>
@@ -610,12 +618,12 @@ function Home() {
                   ค้นหาประวัติแพ้อาหาร โรคประจำตัว และบันทึก Audit
                 </p>
               </div>
-              <button
-                type="button"
-                className="w-full py-2.5 rounded-xl border border-red-500 text-red-500 dark:text-red-400 group-hover:bg-red-500 group-hover:text-white font-['Kanit'] font-bold text-xs transition-all mt-4 text-center cursor-pointer"
+              <span
+                className="block w-full py-2.5 rounded-xl border border-red-500 text-red-500 dark:text-red-400 group-hover:bg-red-500 group-hover:text-white font-['Kanit'] font-bold text-xs transition-all mt-4 text-center cursor-pointer"
+                aria-hidden="true"
               >
                 ข้อมูลฉุกเฉิน ›
-              </button>
+              </span>
             </div>
           </div>
         </section>
@@ -633,14 +641,14 @@ function Home() {
                 className={`queue-category-item ${
                   selectedCategory === cat.id ? "active" : ""
                 }`}
-                onClick={() => {
+                {...pressableProps(() => {
                   setSelectedCategory(cat.id);
                   if (cat.id === "all") {
                     navigate("/search?keyword=ทั้งหมด");
                   } else {
                     navigate(`/search?keyword=${encodeURIComponent(cat.label)}`);
                   }
-                }}
+                }, { pressed: selectedCategory === cat.id })}
               >
                 <div className="queue-category-circle">
                   <img loading="lazy" decoding="async"
@@ -827,7 +835,7 @@ function Home() {
               <div
                 key={shop.id}
                 className="queue-ai-shop-card"
-                onClick={() => navigate(`/search?keyword=${encodeURIComponent(shop.storeName || shop.name || shop.id)}`)}
+                {...pressableProps(() => navigate(`/search?keyword=${encodeURIComponent(shop.storeName || shop.name || shop.id)}`))}
               >
                 <span className="queue-ai-badge-rank bg-emerald-600">
                   <i className="bi bi-door-open-fill text-warning me-1" /> เปิดรับออเดอร์

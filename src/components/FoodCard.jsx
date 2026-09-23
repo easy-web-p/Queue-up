@@ -1,4 +1,5 @@
 import "./FoodCard.css";
+import { pressableProps } from "../utils/pressable.js";
 
 function FoodCard({
   item,
@@ -25,7 +26,7 @@ function FoodCard({
   const foodTitle = name || title || "เมนูอาหารน่าทาน";
 
   return (
-    <div className="shopee-food-card bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-sm hover:shadow-md hover:border-[#FF7A1A]/50 transition-all overflow-hidden flex flex-col cursor-pointer group" onClick={onClick}>
+    <div className="shopee-food-card bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-sm hover:shadow-md hover:border-[#FF7A1A]/50 transition-all overflow-hidden flex flex-col cursor-pointer group" {...pressableProps(onClick)}>
       {/* 1. Image Wrapper with Badges & Floating Heart Button */}
       <div className="shopee-food-img-wrapper relative aspect-[4/3] w-full overflow-hidden bg-slate-100 dark:bg-slate-900">
         <img loading="lazy" decoding="async"

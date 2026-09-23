@@ -1,4 +1,5 @@
 import React from 'react';
+import { pressableProps } from "../utils/pressable.js";
 
 interface QueueUpLogoProps {
   className?: string;
@@ -109,7 +110,10 @@ export const QueueUpLogo: React.FC<QueueUpLogoProps> = ({
 
   return (
     <div
-      onClick={onClick}
+      // Only a logo that does something becomes a control. Without a handler
+      // this is decoration, and a decorative tab stop announced as "button"
+      // is worse than no tab stop at all.
+      {...(onClick ? pressableProps(onClick) : {})}
       className={`flex items-center gap-2.5 shrink-0 ${onClick ? 'cursor-pointer hover:opacity-95 transition-all' : ''} ${className}`}
     >
       <div className="w-10 h-10 sm:w-11 sm:h-11 bg-white rounded-2xl flex items-center justify-center p-1 shadow-md shadow-black/10 border border-orange-100/50">

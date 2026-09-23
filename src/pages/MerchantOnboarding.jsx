@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { pressableProps } from "../utils/pressable.js";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { switchRole, clearUser } from "../store/authSlice.js";
@@ -165,7 +166,7 @@ function MerchantOnboarding() {
       {/* Top Header Bar */}
       <header className="shopee-onboarding-header">
         <div className="shopee-onboarding-header-container">
-          <div className="shopee-onboarding-brand cursor-pointer" onClick={() => navigate("/home")}>
+          <div className="shopee-onboarding-brand cursor-pointer" {...pressableProps(() => navigate("/home"))}>
             <img decoding="async" src="/logo.png" alt="QueueUp Logo" className="shopee-onboarding-logo" />
             <span className="shopee-onboarding-title">QueueUp Seller Centre</span>
           </div>

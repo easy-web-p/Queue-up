@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ClientQueueTicket } from "./ClientQueueTicket.jsx";
 import "./BookingCalendar.css";
 
 export default function BookingCalendar({
@@ -9,6 +10,10 @@ export default function BookingCalendar({
 }) {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [activeTab, setActiveTab] = useState(viewMode);
+  // "แสดงสลิปการจอง" was a button with no handler at all: it looked like the
+  // way to get your queue slip, and pressing it did nothing. The slip itself
+  // already exists as ClientQueueTicket, so the button now opens it in place.
+  const [openSlipId, setOpenSlipId] = useState(null);
 
   /**
    * The bookable pickup times, and how full each one is.
@@ -184,8 +189,11 @@ export default function BookingCalendar({
       {/* Content based on Active Tab */}
       {activeTab === "user" ? (
         <div className="booking-cards-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {bookingsForDay.map((booking) => (
-            <div key={booking.id || booking.orderId} className="booking-card bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
+          {bookingsForDay.map((booking) => {
+            const bookingKey = booking.id || booking.orderId;
+            const isSlipOpen = openSlipId === bookingKey;
+            return (
+            <div key={bookingKey} className="booking-card bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
               <div className="booking-card-head flex items-start justify-between gap-2 pb-3 border-b border-slate-200/80 dark:border-slate-700/80">
                 <div>
                   <span className="booking-id inline-block text-[11px] font-bold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 px-2 py-0.5 rounded-md mb-1">เลขคิว {booking.queueNumber || "—"}</span>
@@ -232,13 +240,28 @@ export default function BookingCalendar({
                 <span className="text-xs text-slate-500 dark:text-slate-400">ราคารวมทั้งสิ้น: <strong className="text-orange-600 dark:text-orange-400 text-base font-black">
                   ฿{((Number(booking.finalAmountSatang) || Number(booking.totalAmountSatang) || 0) / 100).toFixed(2)}
                 </strong></span>
-                <button className="booking-action-btn px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-xs border-0">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOpenSlipId((current) => (current === bookingKey ? null : bookingKey))
+                  }
+                  aria-expanded={isSlipOpen}
+                  aria-controls={`booking-slip-${bookingKey}`}
+                  className="booking-action-btn px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-xs border-0"
+                >
                   <i className="bi bi-qr-code-scan" />
-                  แสดงสลิปการจอง
+                  {isSlipOpen ? "ซ่อนสลิปการจอง" : "แสดงสลิปการจอง"}
                 </button>
               </div>
+
+              {isSlipOpen && (
+                <div id={`booking-slip-${bookingKey}`} className="booking-slip-panel pt-3">
+                  <ClientQueueTicket activeOrder={booking} compact />
+                </div>
+              )}
             </div>
-          ))}
+            );
+          })}
 
           {bookingsForDay.length === 0 && (
             <div className="booking-empty-state col-span-full py-12 text-center text-slate-400 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
