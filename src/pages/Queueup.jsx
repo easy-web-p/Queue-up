@@ -309,8 +309,8 @@ export default function Queueup() {
             <div className="qup-float-badge qup-float-2">
               <i className="bi bi-shield-check text-success me-2 text-[1.2rem]" />
               <div>
-                <div className="text-emerald-400 font-bold">Zero-Trust Security</div>
-                <div className="text-slate-400 text-xs">SHA-256 & AES-256</div>
+                <div className="text-emerald-400 font-bold">Server-Authoritative</div>
+                <div className="text-slate-400 text-xs">Firestore Rules & Cloud Functions</div>
               </div>
             </div>
           </div>
@@ -390,7 +390,7 @@ export default function Queueup() {
               <i className="bi bi-shield-lock-fill text-success me-2" /> Enterprise Security
             </h4>
             <p className="text-slate-400 text-[0.92rem] leading-relaxed">
-              ปกป้องข้อมูลผู้ใช้ด้วย Salted SHA-256 Hashing, AES-256 Encryption และ DNS MX Domain Verification
+              ปกป้องข้อมูลผู้ใช้ด้วย Firestore Security Rules ที่ทดสอบอัตโนมัติ การประมวลผลเรื่องเงินฝั่งเซิร์ฟเวอร์เท่านั้น และการตรวจสอบโดเมนอีเมลจริงผ่าน DNS MX
             </p>
           </div>
 
@@ -443,9 +443,10 @@ export default function Queueup() {
 
           <div className="qup-feature-card">
             <div className="qup-feature-icon bg-gradient-to-br from-green-500 to-green-700"><i className="bi bi-lock-fill" /></div>
-            <h3 className="qup-feature-title">Zero-Trust Cryptography</h3>
+            <h3 className="qup-feature-title">Server-Authoritative Security</h3>
             <p className="qup-feature-text">
-              ความปลอดภัยระดับสากล แฮชรหัสผ่านด้วย Salted SHA-256 และเข้ารหัสข้อมูลด้วย AES-256-GCM
+              การยืนยันตัวตนใช้ Firebase Authentication (แอปไม่เคยเก็บรหัสผ่านเอง) สิทธิ์การเข้าถึงบังคับด้วย
+              Firestore Security Rules และการเคลื่อนไหวของเงินทุกรายการเกิดใน Cloud Functions แบบทรานแซกชัน
             </p>
           </div>
 
@@ -474,17 +475,33 @@ export default function Queueup() {
             <span className="qup-section-sub text-emerald-400">SECURITY FIRST</span>
             <h2 className="qup-section-title text-3xl">ความปลอดภัยระดับสากลเพื่อความมั่นใจ 100%</h2>
             <p className="qup-section-desc">
-              QueueUp ใช้สถาปัตยกรรมความปลอดภัยแบบ Zero-Trust ในการปกป้องข้อมูลส่วนบุคคล รหัสผ่าน และธุรกรรมทางการเงินของผู้ใช้ทุกคน
+              QueueUp ไม่เชื่อข้อมูลที่ส่งมาจากเบราว์เซอร์ ทุกการตัดสินใจเรื่องสิทธิ์ ราคา และยอดเงิน เกิดขึ้นฝั่งเซิร์ฟเวอร์
             </p>
 
             <ul className="qup-sec-list">
+              {/* These two lines claimed Salted SHA-256 password hashing and
+                  AES-256-GCM storage encryption. The app does neither: the
+                  hand-rolled "crypto suite" that once backed the claim used one
+                  hard-coded salt for every user and an AES key sitting in the
+                  client bundle, and it was removed — correctly, because a
+                  browser cannot keep a secret from its own user. Credentials
+                  belong to Firebase Auth and encryption at rest to Google Cloud.
+                  What is listed now is what this codebase actually does. */}
               <li>
                 <div className="qup-sec-check"><i className="bi bi-check-lg" /></div>
-                <span>เข้ารหัสรหัสผ่านด้วย <strong>Salted SHA-256 Cryptographic Hashing</strong></span>
+                <span>ยืนยันตัวตนด้วย <strong>Firebase Authentication</strong> — แอปไม่เคยรับหรือเก็บรหัสผ่านเอง</span>
               </li>
               <li>
                 <div className="qup-sec-check"><i className="bi bi-check-lg" /></div>
-                <span>จัดเก็บข้อมูลด้วยมาตรฐานความปลอดภัยสมมาตร <strong>AES-256-GCM</strong></span>
+                <span>บังคับสิทธิ์การเข้าถึงด้วย <strong>Firestore Security Rules</strong> ที่มีชุดทดสอบอัตโนมัติรันกับ Rules Engine จริง</span>
+              </li>
+              <li>
+                <div className="qup-sec-check"><i className="bi bi-check-lg" /></div>
+                <span>ยอดเงินและราคาคำนวณใน <strong>Cloud Functions</strong> แบบทรานแซกชันเท่านั้น เบราว์เซอร์เขียนกระเป๋าเงินไม่ได้</span>
+              </li>
+              <li>
+                <div className="qup-sec-check"><i className="bi bi-check-lg" /></div>
+                <span>บันทึกความปลอดภัยและการเข้าถึงข้อมูลสุขภาพเป็น <strong>Append-Only</strong> (<code>allow write: if false</code>)</span>
               </li>
               <li>
                 <div className="qup-sec-check"><i className="bi bi-check-lg" /></div>
@@ -499,8 +516,11 @@ export default function Queueup() {
 
           <div className="qup-sec-graphic">
             <div className="qup-shield-icon"><i className="bi bi-shield-lock-fill text-success" /></div>
-            <div className="text-white font-bold mt-4">Zero-Trust Certified</div>
-            <div className="text-slate-400 text-sm">Encrypted End-to-End</div>
+            {/* "Zero-Trust Certified" named no certifier, and nothing in this
+                app is end-to-end encrypted — the school can read what it stores,
+                which is what a canteen system needs to do. */}
+            <div className="text-white font-bold mt-4">Server-Authoritative</div>
+            <div className="text-slate-400 text-sm">HTTPS in transit · Google Cloud encryption at rest</div>
           </div>
         </div>
       </section>
@@ -1070,7 +1090,7 @@ export default function Queueup() {
 
         <div className="qup-copyright-bar">
           <div>© 2026 QueueUp Smart School Food CRM. กลุ่ม 23 (91) GE341511. All rights reserved.</div>
-          <div>พัฒนาด้วยมาตรฐาน Zero-Trust, Salted SHA-256 & AES-256 Cryptography</div>
+          <div>พัฒนาแบบ Server-Authoritative · Firestore Security Rules · Cloud Functions Transactions</div>
         </div>
       </footer>
 

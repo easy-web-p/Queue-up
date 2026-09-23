@@ -886,6 +886,17 @@ await runTest('🚨 A coupon predating isPublic is not silently unusable', async
   if (!/isPublic: true/.test(body)) throw new Error('the seeder does not backfill isPublic');
 });
 
+await runTest('🚨 A merchant cannot write a coupon from the browser', async () => {
+  // deployStoreCoupon runs through the Admin SDK precisely because this stays
+  // shut: a client that could write coupons/{code} could mint a 100% discount,
+  // or overwrite another stall's campaign by choosing its name.
+  await assertFails(
+    setDoc(doc(asMerchant, 'coupons', 'FORGED99'), {
+      type: 'PERCENT', percent: 99, active: true, isPublic: true, storeId: 'shop_merchant',
+    })
+  );
+});
+
 await runTest('🚨 A student cannot delete their own loyalty redemption', async () => {
   // The balance is earned minus redeemed. Deleting the row gives the points
   // back and the same reward can be taken forever.

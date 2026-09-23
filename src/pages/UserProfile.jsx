@@ -10,7 +10,6 @@ import ClientQueueTicket from "../components/ClientQueueTicket.jsx";
 import { ClientLoyaltyDrawer } from "../components/ClientLoyaltyDrawer.jsx";
 import Footer from "../components/Footer.jsx";
 import { getUserBehaviorInsights } from "../services/aiBehaviorEngine.js";
-import { getSecurityHealthReport } from "../services/aiSecurityShield.js";
 import { calculateUserTrustScore } from "../services/aiUserVerificationEngine.js";
 import { useToast } from "../components/ToastProvider.jsx";
 import {
@@ -172,7 +171,6 @@ function UserProfile() {
 
   // 🛡️ AI Security Shield & 🧠 AI Behavior Learning States
   const [aiBehaviorProfile] = useState(() => getUserBehaviorInsights());
-  const [securityHealth] = useState(() => getSecurityHealthReport());
 
 
   const getMembershipTierInfo = (pts) => {
@@ -1099,40 +1097,34 @@ function UserProfile() {
                 </div>
               </div>
 
-              {/* 🛡️ AI SECURITY SENTINEL STATUS CARD */}
-              {securityHealth && (
-                <div className="p-3 rounded-3 mb-3 text-dark border bg-slate-50 border-slate-200">
-                  <div className="d-flex align-items-center justify-content-between mb-2">
-                    <div className="fw-bold text-primary">
-                      <i className="bi bi-shield-lock-fill me-2" />
-                      {securityHealth.shieldVersion}
-                    </div>
-                    <span className="badge bg-success">
-                      {securityHealth.status === "HEALTHY" ? "🛡️ เกราะป้องกันสมบูรณ์ 100%" : "⚠️ มีคำขอสุ่มเสี่ยงถูกบล็อก"}
-                    </span>
-                  </div>
-                  <div className="row g-2 text-center text-xs">
-                    <div className="col-4">
-                      <div className="bg-white p-2 rounded border">
-                        <div className="text-muted">ภัยคุกคามที่ถูกบล็อก</div>
-                        <div className="fw-bold text-danger fs-6">{securityHealth.threatsBlocked} ครั้ง</div>
-                      </div>
-                    </div>
-                    <div className="col-4">
-                      <div className="bg-white p-2 rounded border">
-                        <div className="text-muted">Rate Limits ยับยั้ง</div>
-                        <div className="fw-bold text-warning fs-6">{securityHealth.rateLimitsTriggered} ครั้ง</div>
-                      </div>
-                    </div>
-                    <div className="col-4">
-                      <div className="bg-white p-2 rounded border">
-                        <div className="text-muted">การเข้ารหัส PII</div>
-                        <div className="fw-bold text-success fs-6">AES-256-GCM</div>
-                      </div>
-                    </div>
-                  </div>
+              {/* A "QueueUp AI Security Sentinel v2.5" card stood here,
+                  reporting "🛡️ เกราะป้องกันสมบูรณ์ 100%", a count of threats
+                  blocked, and "การเข้ารหัส PII: AES-256-GCM". Every number came
+                  from this visitor's own localStorage — which an attacker owns
+                  by definition — and nothing in the app encrypts anything with
+                  AES. The protections that do exist are the Firestore rules and
+                  the Cloud Functions, and neither is something a profile page
+                  can measure. */}
+              <div className="p-3 rounded-3 mb-3 text-dark border bg-slate-50 border-slate-200">
+                <div className="fw-bold text-primary mb-2">
+                  <i className="bi bi-shield-lock-fill me-2" />
+                  ความปลอดภัยของข้อมูลคุณ
                 </div>
-              )}
+                <ul className="small text-muted mb-0 ps-3">
+                  <li>เข้าสู่ระบบผ่าน Firebase Authentication — แอปไม่เก็บรหัสผ่านของคุณ</li>
+                  <li>สิทธิ์การอ่านข้อมูลบังคับด้วย Firestore Security Rules ฝั่งเซิร์ฟเวอร์</li>
+                  <li>ยอดเงินในกระเป๋าเปลี่ยนได้เฉพาะใน Cloud Functions เท่านั้น</li>
+                  <li>
+                    คุณลบบัญชีและข้อมูลส่วนบุคคลได้เองที่ปุ่มด้านล่าง —{" "}
+                    <span
+                      className="text-primary text-decoration-underline cursor-pointer"
+                      onClick={() => navigate("/pdpa")}
+                    >
+                      อ่านรายละเอียดในนโยบาย PDPA
+                    </span>
+                  </li>
+                </ul>
+              </div>
 
               {/* 🧠 AI USER BEHAVIOR INTELLIGENCE CARD */}
               {aiBehaviorProfile && (

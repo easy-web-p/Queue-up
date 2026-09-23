@@ -1,6 +1,4 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
-import { getSecurityHealthReport } from "../services/aiSecurityShield.js";
 import "./Footer.css";
 
 /**
@@ -9,8 +7,6 @@ import "./Footer.css";
  * All PDPA and Terms links navigate to standalone /pdpa page.
  */
 export default function Footer() {
-  const [securityReport] = useState(() => getSecurityHealthReport());
-
   // Scroll window smooth to top on footer link click
   const scrollToTop = () => {
     window.scrollTo({
@@ -32,12 +28,16 @@ export default function Footer() {
             <p className="qup-footer-brand-tagline text-xs text-slate-400 leading-relaxed">
               ระบบจองคิวอาหารและสั่งซื้อล่วงหน้าอัจฉริยะ ช่วยให้นักเรียนและบุคลากรประหยัดเวลา ไม่ต้องยืนต่อคิวยาวที่โรงอาหาร
             </p>
+            {/* This badge read "QueueUp AI Security Sentinel v2.5 / สถานะระบบ:
+                HEALTHY" on every page, from a status counted out of the
+                visitor's own localStorage. A status an attacker can set by
+                clearing site data is not a status. */}
             <div className="qup-footer-shield-badge inline-flex items-center gap-2.5 p-2.5 bg-slate-900 border border-slate-800 rounded-2xl text-xs text-emerald-400 shadow-sm">
               <i className="bi bi-shield-check-fill text-lg text-emerald-400" />
               <div>
-                <div className="leading-tight font-bold text-slate-200">{securityReport.shieldVersion}</div>
+                <div className="leading-tight font-bold text-slate-200">ข้อมูลของคุณอยู่ภายใต้ PDPA</div>
                 <div className="text-[11px] text-slate-400 mt-0.5">
-                  สถานะระบบ: {securityReport.status}
+                  สิทธิ์การเข้าถึงบังคับฝั่งเซิร์ฟเวอร์ · ลบบัญชีได้เองทุกเมื่อ
                 </div>
               </div>
             </div>

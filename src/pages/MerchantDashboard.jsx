@@ -32,9 +32,8 @@ import {
   generateAIMarketingRecommendations,
   getActiveMerchantCoupons,
   deployAICoupon,
-  toggleCouponState,
+  setMerchantCouponActive,
 } from "../services/aiMarketingService.js";
-import { getSecurityHealthReport } from "../services/aiSecurityShield.js";
 import { recordAuditLog } from "../services/storeIsolationEngine.js";
 import Footer from "../components/Footer.jsx";
 import { useToast } from "../components/ToastProvider.jsx";
@@ -219,22 +218,81 @@ function MerchantDashboard() {
   };
 
   const [aiMarketingCoupons] = useState(() => generateAIMarketingRecommendations());
-  const [activeCouponsList, setActiveCouponsList] = useState(() => getActiveMerchantCoupons(initialStore.storeId));
-  const [securityReport] = useState(() => getSecurityHealthReport());
+  const [activeCouponsList, setActiveCouponsList] = useState([]);
   const [marketingSuccessMsg, setMarketingSuccessMsg] = useState("");
+  const [deployingCode, setDeployingCode] = useState(null);
 
-  const handleDeployCoupon = (coupon) => {
-    const success = deployAICoupon(coupon, currentStoreId);
-    if (success) {
-      setActiveCouponsList(getActiveMerchantCoupons(currentStoreId));
-      setMarketingSuccessMsg(`เปิดใช้งานคูปอง "${coupon.code}" เรียบร้อยแล้ว! ลูกค้าสามารถใช้ส่วนลดได้ทันที`);
-      setTimeout(() => setMarketingSuccessMsg(""), 4000);
+  const refreshStoreCoupons = useCallback(async () => {
+    if (!currentStoreId) return;
+    try {
+      setActiveCouponsList(await getActiveMerchantCoupons(currentStoreId));
+    } catch (err) {
+      console.warn("[MerchantDashboard] could not load store coupons:", err);
+    }
+  }, [currentStoreId]);
+
+  useEffect(() => {
+    if (!currentStoreId) return undefined;
+    let cancelled = false;
+    async function load() {
+      try {
+        const rows = await getActiveMerchantCoupons(currentStoreId);
+        if (!cancelled) setActiveCouponsList(rows);
+      } catch (err) {
+        console.warn("[MerchantDashboard] could not load store coupons:", err);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentStoreId]);
+
+  /**
+   * Publish a coupon customers can actually use.
+   *
+   * This wrote to localStorage and then said "ลูกค้าสามารถใช้ส่วนลดได้ทันที".
+   * The order transaction prices coupons from Firestore, so nobody could —
+   * the promotion existed on this laptop and nowhere else.
+   */
+  const handleDeployCoupon = async (coupon) => {
+    setDeployingCode(coupon.code);
+    try {
+      const res = await deployAICoupon(
+        {
+          code: coupon.code,
+          title: coupon.title,
+          description: coupon.description,
+          type: coupon.discountType === "PERCENT" ? "PERCENT" : "FIXED",
+          percent: coupon.discountType === "PERCENT" ? coupon.discountValue : undefined,
+          // Satang, because that is what the order transaction subtracts.
+          amountSatang:
+            coupon.discountType === "PERCENT" ? undefined : Math.round(coupon.discountValue * 100),
+          maxDiscountSatang:
+            coupon.discountType === "PERCENT" ? Math.round(coupon.discountValue * 100) * 5 : undefined,
+          minSpendSatang: Math.round((Number(coupon.minSpend) || 0) * 100),
+        },
+        currentStoreId
+      );
+      await refreshStoreCoupons();
+      setMarketingSuccessMsg(res.message);
+      setTimeout(() => setMarketingSuccessMsg(""), 6000);
+    } catch (err) {
+      // A refused deploy must not read as a live promotion.
+      toast.error(`เปิดใช้งานคูปองไม่สำเร็จ: ${errorMessage(err)}`);
+    } finally {
+      setDeployingCode(null);
     }
   };
 
-  const handleToggleCoupon = (code) => {
-    const updated = toggleCouponState(code, currentStoreId);
-    setActiveCouponsList(updated);
+  const handleToggleCoupon = async (code) => {
+    const current = activeCouponsList.find((c) => c.code === code);
+    try {
+      await setMerchantCouponActive(code, currentStoreId, !(current?.active ?? true));
+      await refreshStoreCoupons();
+    } catch (err) {
+      toast.error(`แก้ไขสถานะคูปองไม่สำเร็จ: ${errorMessage(err)}`);
+    }
   };
 
   // Track Registration Status cleanly
@@ -1163,13 +1221,15 @@ function MerchantDashboard() {
           <div className="merchant-panel-box">
             <div className="d-flex align-items-center justify-content-between mb-4">
               <h3 className="merchant-panel-title mb-0">
-                <i className="bi bi-robot text-primary me-2" />
-                AI การตลาดอัตโนมัติ & ระบบความปลอดภัยของร้านค้า
+                <i className="bi bi-ticket-percent text-primary me-2" />
+                คูปองส่วนลดของร้าน
               </h3>
-              <span className="badge bg-success-subtle text-success p-2">
-                <i className="bi bi-shield-check me-1" />
-                Security Health: {securityReport.healthScore}/100
-              </span>
+              {/* A "Security Health: {healthScore}/100" badge stood here. The
+                  function it read never returns healthScore, so it rendered
+                  "undefined/100" — and the numbers it does return are counted
+                  from the visitor's own localStorage, which is not a measure of
+                  anything. The protections are the Firestore rules and the
+                  Cloud Functions. */}
             </div>
 
             {marketingSuccessMsg && (
@@ -1196,9 +1256,10 @@ function MerchantDashboard() {
                         </div>
                         <button
                           className="btn btn-primary btn-sm font-weight-bold px-3 ms-2"
-                          onClick={() => handleDeployCoupon(c)}
+                          disabled={deployingCode === c.code}
+                          onClick={() => void handleDeployCoupon(c)}
                         >
-                          เปิดใช้งานคูปองนี้
+                          {deployingCode === c.code ? "กำลังเปิดใช้งาน…" : "เปิดใช้งานคูปองนี้"}
                         </button>
                       </div>
                     ))}
@@ -1214,19 +1275,28 @@ function MerchantDashboard() {
                   </h5>
 
                   <div className="d-flex flex-column gap-2 mb-3">
-                    {activeCouponsList.map((cp, idx) => (
-                      <div key={idx} className="p-2 bg-secondary rounded d-flex justify-content-between align-items-center">
+                    {activeCouponsList.length === 0 && (
+                      <div className="small text-slate-300">
+                        ยังไม่มีคูปองของร้านนี้ กดเปิดใช้งานจากข้อเสนอแนะทางซ้าย
+                      </div>
+                    )}
+                    {/* `active`, not `isActive`: the order transaction reads
+                        `coupon.active`, and the old local copy used a different
+                        field name — so a coupon shown as live here would have
+                        been refused at the counter had it ever reached one. */}
+                    {activeCouponsList.map((cp) => (
+                      <div key={cp.code} className="p-2 bg-secondary rounded d-flex justify-content-between align-items-center">
                         <div>
                           <strong className="text-warning">{cp.code}</strong> - {cp.title}
                           <div className="small text-slate-300">
-                            {cp.isActive ? "กำลังทำงานอยู่" : "ปิดใช้งานอยู่"}
+                            {cp.active ? "กำลังทำงานอยู่" : "ปิดใช้งานอยู่"}
                           </div>
                         </div>
                         <button
-                          className={`btn btn-sm ${cp.isActive ? "btn-outline-danger" : "btn-success"}`}
-                          onClick={() => handleToggleCoupon(cp.code)}
+                          className={`btn btn-sm ${cp.active ? "btn-outline-danger" : "btn-success"}`}
+                          onClick={() => void handleToggleCoupon(cp.code)}
                         >
-                          {cp.isActive ? "ปิด" : "เปิด"}
+                          {cp.active ? "ปิด" : "เปิด"}
                         </button>
                       </div>
                     ))}

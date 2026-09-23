@@ -1,7 +1,23 @@
 /**
- * ULTIMATE AI SECURITY SHIELD ENGINE (aiSecurityShield.js)
- * Intelligent Cybersecurity Shield for QueueUp Application.
- * Protection against XSS, Prompt Injection, CSRF/NoSQL Injection, Rate Limiting & PII Data Protection.
+ * ============================================================================
+ * 🧼 CLIENT-SIDE INPUT HYGIENE
+ * ============================================================================
+ *
+ * Input sanitisation, a throttle, and PII masking for logs. Useful, and not the
+ * security boundary — that is firestore.rules and the Cloud Functions, both of
+ * which a browser cannot reach around.
+ *
+ * The header here used to read "ULTIMATE AI SECURITY SHIELD ENGINE … Protection
+ * against XSS, Prompt Injection, CSRF/NoSQL Injection, Rate Limiting & PII Data
+ * Protection", and three screens reported a security posture from its
+ * localStorage counters. Naming matters on a file like this: anything that
+ * reads as "the app is protected" invites someone to stop checking the layer
+ * that actually protects it.
+ *
+ * The throttle in particular is a courtesy to the server, not a limit: it lives
+ * in localStorage and is cleared by anyone who wants to. The real ones are
+ * assistant_rate_limits, evaluation_rate_limits and pilot_lead_rate_limits,
+ * enforced server-side.
  */
 
 // Audit Log Storage Key
@@ -242,35 +258,22 @@ export function logSecurityEvent(eventType, payload = {}) {
   }
 }
 
-/**
- * 5. Get Security Audit Logs & Security Health Report
+/*
+ * `getSecurityHealthReport` used to live here, and three screens presented its
+ * output as the application's security status: a footer badge reading
+ * "QueueUp AI Security Sentinel v2.5 / สถานะระบบ: HEALTHY" on every page, a
+ * profile card claiming "🛡️ เกราะป้องกันสมบูรณ์ 100%" and "การเข้ารหัส PII:
+ * AES-256-GCM", and a merchant badge reading "Security Health: undefined/100"
+ * — healthScore was a field the function never returned.
+ *
+ * Every number came from this browser's own localStorage. An attacker owns that
+ * by definition: clear site data and the threat count is zero. And nothing in
+ * the app encrypts anything with AES; the hand-rolled crypto that once backed
+ * that claim was removed from utils/security.js precisely because a browser
+ * cannot keep a key from its own user.
+ *
+ * What remains in this file is real and worth keeping — input sanitisation and
+ * a client-side throttle — but it is defence in depth, not the boundary. The
+ * boundary is firestore.rules and the Cloud Functions, and neither is something
+ * a page can measure from the outside.
  */
-export function getSecurityHealthReport() {
-  try {
-    const rawLogs = localStorage.getItem(SECURITY_AUDIT_LOG_KEY);
-    const logs = rawLogs ? JSON.parse(rawLogs) : [];
-
-    const threatsBlocked = logs.filter((l) => l.eventType === "AI_THREAT_BLOCKED").length;
-    const rateLimitsTriggered = logs.filter((l) => l.eventType === "RATE_LIMIT_EXCEEDED").length;
-
-    return {
-      status: threatsBlocked > 10 ? "WARNING" : "HEALTHY",
-      totalLogs: logs.length,
-      threatsBlocked,
-      rateLimitsTriggered,
-      shieldVersion: "QueueUp AI Security Sentinel v2.5",
-      lastScanTime: new Date().toISOString(),
-      recentLogs: logs.slice(0, 5),
-    };
-  } catch {
-    return {
-      status: "HEALTHY",
-      totalLogs: 0,
-      threatsBlocked: 0,
-      rateLimitsTriggered: 0,
-      shieldVersion: "QueueUp AI Security Sentinel v2.5",
-      lastScanTime: new Date().toISOString(),
-      recentLogs: [],
-    };
-  }
-}

@@ -32,6 +32,10 @@ import {
 } from "./orderRequest.js";
 import { checkProductAvailability, priceOrder } from "./orderPricing.js";
 import {
+  validateStoreCoupon,
+  canStoreClaimCode,
+} from "./storeCoupons.js";
+import {
   LOYALTY_REWARDS,
   computeBalance,
   checkRedeemable,
@@ -2094,6 +2098,111 @@ export const updateCampusWalletLimits = onCall(
       studentId,
       message: "อัปเดตการตั้งค่าและวงเงินการใช้งานเรียบร้อยแล้ว",
     };
+  }
+);
+
+/**
+ * 🏪 Deploy a coupon for one stall
+ *
+ * The merchant dashboard's "1-Click Deploy" wrote the coupon to
+ * `localStorage['queueup_merchant_coupons_<storeId>']` and announced
+ * "ลูกค้าสามารถใช้ส่วนลดได้ทันที". No customer could ever use it — the order
+ * transaction prices coupons from `coupons/{code}`, and that collection is
+ * admin-write-only in the rules. A stall ran a promotion that existed on one
+ * laptop.
+ *
+ * Server-side because a coupon code is a global document id and this is where
+ * ownership can be checked: that the caller owns the stall, and that the code
+ * is not already somebody else's campaign. See storeCoupons.js for the rules.
+ */
+export const deployStoreCoupon = onCall(
+  { region: "asia-southeast1", cors: true },
+  async (request) => {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "กรุณาเข้าสู่ระบบก่อนสร้างคูปองร้านค้า");
+    }
+    const uid = request.auth.uid;
+    const { storeId, coupon } = request.data || {};
+
+    // Owning the stall is the whole authority here. Without it any signed-in
+    // student could publish a 90%-off coupon against any stall in the school.
+    const shopSnap = await db.collection("shops").doc(String(storeId || "")).get();
+    const isOwner = shopSnap.exists && shopSnap.data().ownerUid === uid;
+    if (!isOwner && !isCallerAdmin(request.auth.token, isBootstrapSuperAdmin)) {
+      throw new HttpsError(
+        "permission-denied",
+        "STORE_COUPON_FORBIDDEN: เฉพาะเจ้าของร้านเท่านั้นที่สร้างคูปองของร้านนี้ได้"
+      );
+    }
+
+    const check = validateStoreCoupon(coupon, String(storeId));
+    throwIfRefused(check);
+
+    const ref = db.collection("coupons").doc(check.coupon.id);
+    const created = await db.runTransaction(async (tx) => {
+      const existing = await tx.get(ref);
+      // Read and claim in one transaction: two stalls deploying the same code
+      // at the same moment would otherwise both see it free.
+      throwIfRefused(canStoreClaimCode(existing.exists ? existing.data() : null, String(storeId)));
+
+      tx.set(
+        ref,
+        {
+          ...check.coupon,
+          deployedBy: uid,
+          updatedAt: FieldValue.serverTimestamp(),
+          ...(existing.exists ? {} : { createdAt: FieldValue.serverTimestamp() }),
+        },
+        { merge: true }
+      );
+      return check.coupon;
+    });
+
+    return {
+      success: true,
+      coupon: created,
+      message: `เปิดใช้งานคูปอง ${created.id} แล้ว ลูกค้าใช้ได้ที่ร้านของคุณทันที`,
+    };
+  }
+);
+
+/**
+ * 🏪 Turn one of this stall's coupons on or off
+ *
+ * The toggle beside each deployed coupon flipped a boolean in localStorage, so
+ * retiring a promotion left it live for every customer.
+ */
+export const setStoreCouponActive = onCall(
+  { region: "asia-southeast1", cors: true },
+  async (request) => {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "กรุณาเข้าสู่ระบบก่อนแก้ไขคูปอง");
+    }
+    const uid = request.auth.uid;
+    const { storeId, code, active } = request.data || {};
+    if (typeof active !== "boolean") {
+      throw new HttpsError("invalid-argument", "กรุณาระบุสถานะ active");
+    }
+
+    const shopSnap = await db.collection("shops").doc(String(storeId || "")).get();
+    const isOwner = shopSnap.exists && shopSnap.data().ownerUid === uid;
+    if (!isOwner && !isCallerAdmin(request.auth.token, isBootstrapSuperAdmin)) {
+      throw new HttpsError("permission-denied", "STORE_COUPON_FORBIDDEN: ไม่มีสิทธิ์แก้ไขคูปองของร้านนี้");
+    }
+
+    const ref = db.collection("coupons").doc(String(code || ""));
+    const snap = await ref.get();
+    if (!snap.exists) {
+      throw new HttpsError("not-found", "ไม่พบคูปองนี้ในระบบ");
+    }
+    // A stall may only retune its own. The platform's built-ins and other
+    // stalls' campaigns are not theirs to switch off.
+    if (snap.data().storeId !== String(storeId)) {
+      throw new HttpsError("permission-denied", "STORE_COUPON_FORBIDDEN: คูปองนี้ไม่ใช่ของร้านนี้");
+    }
+
+    await ref.update({ active, updatedAt: FieldValue.serverTimestamp() });
+    return { success: true, code: String(code), active };
   }
 );
 
