@@ -88,6 +88,25 @@ runTest('🚨 Nothing links to a product id that cannot exist', () => {
   assert(!/\/product\/m1/.test(home), 'a link to the mock catalogue survives');
 });
 
+runTest('🚨 The welcome coupon is offered only while it exists', () => {
+  // The banner handed out "WELCOME50" to anyone who had not dismissed it. That
+  // code is a real built-in — but only once an administrator has installed the
+  // built-ins, and until then a student copied a code refused at checkout.
+  assert(home.includes('welcomeCouponExists'), 'the banner does not check the coupon exists');
+  assert(home.includes('fetchOfferedCoupons'), 'nothing reads the coupons collection');
+  assert(
+    /const showWelcomeBanner = welcomeCouponExists && !welcomeDismissed/.test(home),
+    'the banner shows regardless of whether the coupon is installed'
+  );
+});
+
+runTest('🚨 No second copy of a coupon lives in browser storage', () => {
+  // A "my coupons" list was written to localStorage and read by nothing,
+  // carrying an "expiry: 31 ธ.ค. 2026" no coupon document has.
+  assert(!home.includes('queueup_user_coupons'), 'the local coupon list is back');
+  assert(!home.includes('31 ธ.ค. 2026'), 'an invented expiry date is back');
+});
+
 runTest('The real catalogue section is still there', () => {
   // The point is not to empty the page — it is that what it shows is real.
   assert(home.includes('อาหารทั้งหมดในโรงอาหาร'), 'the real menu section went with them');

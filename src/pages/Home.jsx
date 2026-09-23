@@ -7,6 +7,7 @@ import {
   fetchShopsFromFirestore,
   fetchProductsFromFirestore,
 } from "../lib/firebase.js";
+import { fetchOfferedCoupons } from "../services/couponService";
 import FoodCard from "../components/FoodCard.jsx";
 import ShopeeSearchBar from "../components/ShopeeSearchBar.jsx";
 import ChatModal from "../components/ChatModal.jsx";
@@ -92,10 +93,43 @@ function Home() {
     }
   };
 
-  // First-time user welcome coupon state
-  const [showWelcomeBanner, setShowWelcomeBanner] = useState(() => {
-    return !localStorage.getItem("queueup_claimed_welcome_coupon");
+  /**
+   * The new-member banner, offered only while the coupon behind it exists.
+   *
+   * It used to be shown to anyone who had not dismissed it, handing out
+   * "WELCOME50" unconditionally. That code is a real built-in — but only once
+   * an administrator has installed the built-ins, and on a system where nobody
+   * has, a student copied a code that is refused at checkout with NOT_FOUND.
+   *
+   * The localStorage flag stays: it is a per-browser "already dismissed", which
+   * is exactly what browser storage is for.
+   */
+  const [welcomeCouponExists, setWelcomeCouponExists] = useState(false);
+  const [welcomeDismissed, setWelcomeDismissed] = useState(() => {
+    try {
+      return Boolean(localStorage.getItem("queueup_claimed_welcome_coupon"));
+    } catch {
+      return false;
+    }
   });
+  const showWelcomeBanner = welcomeCouponExists && !welcomeDismissed;
+
+  useEffect(() => {
+    let cancelled = false;
+    async function checkWelcomeCoupon() {
+      try {
+        const offered = await fetchOfferedCoupons();
+        if (!cancelled) setWelcomeCouponExists(offered.some((c) => c.code === "WELCOME50"));
+      } catch (err) {
+        // Not offered rather than offered-and-broken.
+        console.warn("[Home] could not check the welcome coupon:", err);
+      }
+    }
+    checkWelcomeCoupon();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // App New Updates & Features Ticker List (Unified Single Bar)
   const [activeUpdateIndex, setActiveUpdateIndex] = useState(0);
@@ -162,19 +196,18 @@ function Home() {
     } catch (err) {
       console.warn("Clipboard copy fallback:", err);
     }
-    localStorage.setItem("queueup_claimed_welcome_coupon", "true");
-
-    const existingCoupons = JSON.parse(localStorage.getItem("queueup_user_coupons") || "[]");
-    if (!existingCoupons.some((c) => c.code === couponCode)) {
-      existingCoupons.push({
-        code: couponCode,
-        discount: "50 บาท",
-        title: "คูปองส่วนลดสมาชิกใหม่ WELCOME50",
-        expiry: "31 ธ.ค. 2026",
-      });
-      localStorage.setItem("queueup_user_coupons", JSON.stringify(existingCoupons));
+    try {
+      localStorage.setItem("queueup_claimed_welcome_coupon", "true");
+    } catch {
+      // A private window cannot remember the dismissal. The banner reappearing
+      // is a smaller problem than the claim failing.
     }
-    setShowWelcomeBanner(false);
+
+    // A local "my coupons" list was written here and read by nothing, carrying
+    // an "expiry: 31 ธ.ค. 2026" no coupon document has. Whether this code still
+    // works is decided by evaluateCoupon against the real document, and a
+    // second copy in browser storage can only disagree with it.
+    setWelcomeDismissed(true);
 
     toast.success(
       language === "en"
