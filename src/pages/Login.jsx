@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { deriveAccountCode } from "../utils/accountCode.ts";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -17,7 +18,6 @@ import {
 } from "../firebase/config.js";
 import {
   sanitizeInput,
-  generateSecureAccountId,
   validateEmailSyntaxAndDomain,
 } from "../utils/security.js";
 import { getEffectiveRoles, isUserSuperAdmin } from "../utils/authRoles.js";
@@ -130,11 +130,13 @@ function Login() {
     if (isCreateProfile) {
       setLoading(true);
       const uidToUse = currentUid || (auth.currentUser ? auth.currentUser.uid : `user_${sanitizeInput(email).toLowerCase().replace(/[^a-z0-9]/g, "_")}`);
-      const finalAccountId = generateSecureAccountId(58140);
-
+      // No `accountId` field any more. It is derived from `uid`, which this
+      // document already carries, and a derived value stored beside its own
+      // input is exactly how the two drift: the old code was minted from the
+      // clock plus the literal constant 58140 plus 32 bits of entropy
+      // described in a comment as 128, and regenerated on some logins.
       const profileData = {
         uid: uidToUse,
-        accountId: finalAccountId, // 🔒 Cryptographically Random QUP-YYYYMMDD-... ID
         roles: ["customer"], // 👤 บัญชีเดียวเป็นลูกค้าโดยค่าเริ่มต้น (สามารถสมัครเป็นผู้ขายเพิ่มภายหลังได้)
         activeRole: "customer",
         isGoogleUser: isGoogleUser,
@@ -149,7 +151,6 @@ function Login() {
 
       try {
         await setDoc(doc(db, "users", uidToUse), profileData, { merge: true });
-        localStorage.setItem("queueup_secure_account_id", finalAccountId);
       } catch (err) {
         console.error("Firestore setDoc failed during profile creation:", err);
         setLoading(false);
@@ -247,8 +248,6 @@ function Login() {
           uData = userDocSnap.data();
         }
 
-        const accountId = uData.accountId || generateSecureAccountId(58140);
-        localStorage.setItem("queueup_secure_account_id", accountId);
 
         const mergedForRoles = { ...uData, uid: firebaseUid, email: sanitizeInput(email), isVerifiedAuth: true, isTokenVerified: true, isFromCache: false };
         const userRoles = getEffectiveRoles(mergedForRoles);
@@ -307,8 +306,10 @@ function Login() {
       const defaultName = existingData.displayName || existingData.fullName || gUser.displayName || "ผู้ใช้งาน Google";
       const defaultEmail = gUser.email || existingData.email || "";
       const defaultPhoto = existingData.photoURL || existingData.photo || gUser.photoURL || "/yeti_mascot.jpg";
-      const studentNum = parseInt(defaultEmail.replace(/\D/g, ""), 10) || Math.floor(10000 + Math.random() * 90000);
-      const accountId = existingData.accountId || generateSecureAccountId(studentNum);
+      // Derived from the uid wherever it is shown. It used to come from digits
+      // scraped out of the email address, or a random five-digit number when
+      // there were none, fed in as a "sequential user index".
+      const accountId = deriveAccountCode(gUser.uid);
 
       if (userSnap.exists()) {
         const updatePayload = {
@@ -323,7 +324,6 @@ function Login() {
       } else {
         const initialPayload = {
           uid: gUser.uid,
-          accountId: accountId,
           roles: ["customer"],
           activeRole: "customer",
           provider: "google.com",
@@ -372,7 +372,6 @@ function Login() {
         fullName: defaultName,
         photo: defaultPhoto,
         photoURL: defaultPhoto,
-        accountId: accountId,
         lastLoginAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
@@ -394,7 +393,6 @@ function Login() {
         });
       }
 
-      localStorage.setItem("queueup_secure_account_id", accountId);
       dispatch(setUser({
         uid: gUser.uid,
         accountId,

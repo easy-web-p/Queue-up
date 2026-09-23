@@ -21,6 +21,7 @@ import { errorMessage } from "../utils/errorMessage";
 import { cancelOrderWithRefund } from "../services/orderCancelService";
 import { CUSTOMER_CANCELLABLE_STATUSES as CUSTOMER_CANCELLABLE } from "../../functions/refundRules.js";
 import { fetchLoyaltyBalance, redeemLoyaltyReward } from "../services/loyaltyService";
+import { deriveAccountCode } from "../utils/accountCode.ts";
 import "./UserProfile.css";
 import "./UserPurchase.css";
 
@@ -47,10 +48,11 @@ function UserProfile() {
   const [email, setEmail] = useState(() => user ? user.email || "" : "");
   const [phone, setPhone] = useState("");
   
-  // Account ID State (Prioritizes user's set password/ID)
-  const [accountId, setAccountId] = useState(() => {
-    return localStorage.getItem("queueup_secure_account_id") || "";
-  });
+  // The account code is derived from the uid, not stored and not editable.
+  // It used to be read from localStorage, which made it a different string on
+  // every device — and on the email-login path a different string on every
+  // login, because it was regenerated whenever the profile lacked the field.
+  const accountId = deriveAccountCode(user?.uid);
   const [avatar, setAvatar] = useState(() => user?.photo || user?.photoURL || "/yeti_mascot.jpg");
 
   // Inline Editing Flags
@@ -194,10 +196,6 @@ function UserProfile() {
   const [autoSaveStatus, setAutoSaveStatus] = useState("บันทึกอัตโนมัติเรียบร้อย");
 
   // Account ID Password Verification Modal State
-  const [isPasswordVerifyModalOpen, setIsPasswordVerifyModalOpen] = useState(false);
-  const [newAccountIdInput, setNewAccountIdInput] = useState("");
-  const [verifyPasswordInput, setVerifyPasswordInput] = useState("");
-  const [showAccountId, setShowAccountId] = useState(false);
 
   // Delete Account Modal State
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -364,13 +362,6 @@ function UserProfile() {
           if (data.birthDate) setBirthDate(data.birthDate);
           if (data.phone) setPhone(data.phone);
           if (data.photo || data.photoURL) setAvatar(data.photo || data.photoURL);
-          
-          // 🔒 รหัสบัญชี (Account ID)
-          const savedId = data.accountId;
-          if (savedId) {
-            setAccountId(savedId);
-            localStorage.setItem("queueup_secure_account_id", savedId);
-          }
         }
       }).catch((err) => {
         console.warn("Error fetching user profile doc:", err);
@@ -501,43 +492,6 @@ function UserProfile() {
   const handleSaveField = async (fieldKey, value) => {
     triggerAutoSave(fieldKey, value);
     setEditingField(null);
-  };
-
-  // Open Password Security Verification Modal for Account ID Edit
-  const handleOpenAccountEdit = () => {
-    setNewAccountIdInput(accountId);
-    setVerifyPasswordInput("");
-    setIsPasswordVerifyModalOpen(true);
-  };
-
-  // Confirm Account ID Change after Password Verification
-  const handleConfirmAccountEdit = async (e) => {
-    e.preventDefault();
-    if (!verifyPasswordInput.trim()) {
-      toast.warning("กรุณากรอกรหัสผ่านเพื่อยืนยันตัวตนก่อนแก้ไขรหัสบัญชี");
-      return;
-    }
-
-    if (!newAccountIdInput.trim()) {
-      toast.warning("กรุณากรอกรหัสบัญชีใหม่");
-      return;
-    }
-
-    const cleanNewAccountId = newAccountIdInput.trim();
-    setAccountId(cleanNewAccountId);
-    localStorage.setItem("queueup_secure_account_id", cleanNewAccountId);
-
-    if (user && user.uid) {
-      try {
-        await setDoc(doc(db, "users", user.uid), { accountId: cleanNewAccountId }, { merge: true });
-      } catch (err) {
-        console.warn("Firestore update accountId error:", err);
-      }
-    }
-
-    setIsPasswordVerifyModalOpen(false);
-    setVerifyPasswordInput("");
-    toast.success(`ยืนยันรหัสผ่านสำเร็จ! เปลี่ยนรหัสบัญชีเป็น "${cleanNewAccountId}" เรียบร้อยแล้ว`);
   };
 
   // Step 1: prove it is really them, right now.
@@ -1592,36 +1546,35 @@ function UserProfile() {
             <div>
               <h2 className="shopee-panel-title">การตั้งค่าบัญชี</h2>
 
-              {/* รหัสบัญชี */}
+              {/* รหัสบัญชี — a reference to read out to staff, not a secret.
+                  It used to sit behind `••••••••••••••••` and an eye toggle,
+                  with a copy button beside them that handed over the whole
+                  value anyway. Nothing authenticates with it and nothing looks
+                  anything up by it, so masking it only taught people it was
+                  worth protecting. */}
               <div className="shopee-info-field-row">
                 <div className="shopee-field-header-row">
                   <span className="shopee-field-title">รหัสบัญชี</span>
-                  <button
-                    className="shopee-edit-btn"
-                    onClick={handleOpenAccountEdit}
-                  >
-                    แก้ไขรหัสบัญชี
-                  </button>
                 </div>
                 <div className="shopee-account-id-row">
-                  <span className={`shopee-field-value ${showAccountId ? "tracking-normal" : "tracking-[2px]"}`}>
-                    {showAccountId ? accountId : "••••••••••••••••"}
+                  <span className="shopee-field-value tracking-normal">
+                    {accountId || "—"}
                   </span>
-                  <button
-                    className="shopee-copy-icon-btn"
-                    onClick={() => setShowAccountId(!showAccountId)}
-                    title={showAccountId ? "ซ่อนรหัสบัญชี" : "แสดงรหัสบัญชี"}
-                  >
-                    <i className={`bi ${showAccountId ? "bi-eye-slash-fill" : "bi-eye-fill"}`} />
-                  </button>
-                  <button
-                    className="shopee-copy-icon-btn"
-                    onClick={handleCopyAccountId}
-                    title="คัดลอกรหัสบัญชี"
-                    aria-label="คัดลอกรหัสบัญชี"
-                  >
-                    <i className="bi bi-files" />
-                  </button>
+                  {accountId && (
+                    <button
+                      className="shopee-copy-icon-btn"
+                      onClick={handleCopyAccountId}
+                      title="คัดลอกรหัสบัญชี"
+                      aria-label="คัดลอกรหัสบัญชี"
+                    >
+                      <i className="bi bi-files" />
+                    </button>
+                  )}
+                </div>
+                <div className="text-muted small mt-1">
+                  ใช้แจ้งเจ้าหน้าที่โรงอาหารเวลามีปัญหากับคำสั่งซื้อ
+                  รหัสนี้ผูกกับบัญชีของคุณถาวรและเปลี่ยนเองไม่ได้ — ไม่ใช่รหัสผ่าน
+                  และไม่ต้องปิดเป็นความลับ
                 </div>
               </div>
 
@@ -1687,68 +1640,6 @@ function UserProfile() {
       </div>
 
       {/* 🔒 Password Security Verification Modal for Account ID Edit */}
-      {isPasswordVerifyModalOpen && (
-        <div className="security-modal-overlay">
-          <div className="security-modal-card">
-            <div className="security-modal-header">
-              <h3 className="security-modal-title">
-                <i className="bi bi-shield-lock-fill text-danger me-2" />
-                ยืนยันตัวตนด้วยรหัสผ่าน
-              </h3>
-              <button
-                className="security-modal-close-btn"
-                onClick={() => setIsPasswordVerifyModalOpen(false)}
-              >
-                <i className="bi bi-x-lg" />
-              </button>
-            </div>
-
-            <form onSubmit={handleConfirmAccountEdit} className="security-modal-body">
-              <div>
-                <label className="security-modal-label">
-                  รหัสผ่านปัจจุบัน (Current Password) *
-                </label>
-                <input
-                  type="password"
-                  className="security-modal-input"
-                  placeholder="กรอกรหัสผ่านเพื่อยืนยันสิทธิ์แก้ไข"
-                  value={verifyPasswordInput}
-                  onChange={(e) => setVerifyPasswordInput(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="security-modal-label">
-                  กำหนดรหัสบัญชีใหม่ (New Account ID) *
-                </label>
-                <input
-                  type="text"
-                  className="security-modal-input"
-                  placeholder="กรอกรหัสบัญชีใหม่ที่ต้องการเปลี่ยน"
-                  value={newAccountIdInput}
-                  onChange={(e) => setNewAccountIdInput(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="security-modal-actions">
-                <button
-                  type="button"
-                  className="security-btn-cancel"
-                  onClick={() => setIsPasswordVerifyModalOpen(false)}
-                >
-                  ยกเลิก
-                </button>
-                <button type="submit" className="security-btn-confirm">
-                  ยืนยันเปลี่ยนรหัสบัญชี
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* 🗑️ Step 1: Delete Account Form Modal */}
       {isDeleteModalOpen && (
         <div className="security-modal-overlay">

@@ -66,40 +66,19 @@ export const sanitizeOrderData = (order) => {
   };
 };
 
-/**
- * 5. Cryptographically Secure High-Entropy Account ID Generator
- * Generates an unguessable Account ID based on:
- * - Date & Time (ปี-เดือน-วัน-เวลา)
- * - Cryptographic Web Crypto API Random Bytes (window.crypto.getRandomValues)
- * - Sequential User Index / Student ID
+/*
+ * 5. (removed) generateSecureAccountId
  *
- * Example Format: QUP-20260810-58140-9F8A2B7C
+ * It built an "account ID" from the current date and time, a "sequential user
+ * index" that was the literal constant 58140 at two of its three call sites,
+ * and `array[0] ^ array[1]` of two Uint32 values — 32 bits — under a comment
+ * that claimed 128 bits of it. Two users signing up in the same minute shared
+ * every part of the string but those 32 bits.
+ *
+ * Nothing authenticated with it or looked anything up by it. A profile
+ * reference should be stable rather than unguessable, so it is now derived
+ * from the uid in src/utils/accountCode.ts and never generated at all.
  */
-export const generateSecureAccountId = (userIndex = 58140) => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  const hours = String(now.getHours()).padStart(2, "0");
-  const mins = String(now.getMinutes()).padStart(2, "0");
-
-  const datePart = `${year}${month}${day}`;
-  const timePart = `${hours}${mins}`;
-
-  // Web Crypto API Cryptographic Random Entropy (128-bit Security)
-  const array = new Uint32Array(2);
-  if (typeof window !== "undefined" && window.crypto && window.crypto.getRandomValues) {
-    window.crypto.getRandomValues(array);
-  } else {
-    array[0] = Math.floor(Math.random() * 4294967295);
-    array[1] = Math.floor(Math.random() * 4294967295);
-  }
-
-  const cryptoHex = ((array[0] ^ array[1]) >>> 0).toString(16).toUpperCase().padStart(8, "0");
-  const userSeq = String(userIndex || 58140).padStart(5, "0");
-
-  return `QUP-${datePart}-${timePart}-${userSeq}-${cryptoHex}`;
-};
 
 /**
  * 6. Validate Email Syntax & Check Real Domain MX Record via DNS over HTTPS
