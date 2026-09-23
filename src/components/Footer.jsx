@@ -139,40 +139,60 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Column 4: App Download & Social */}
-          <div>
-            <h4 className="qup-footer-heading font-black text-sm text-white mb-4">ติดตามเรา & ดาวน์โหลด</h4>
-            <p className="small text-slate-400 text-xs mb-3">ติดตามข่าวสารโปรโมชั่นอาหารโรงเรียน</p>
-            <div className="qup-footer-social-row flex items-center gap-2 mb-5">
-              <a href="#facebook" className="qup-footer-social-btn w-8 h-8 min-w-[44px] min-h-[44px] rounded-xl bg-slate-900 hover:bg-[#1877f2] border border-slate-800 flex items-center justify-center text-slate-300 hover:text-white transition-all shadow-xs" title="Facebook Page" aria-label="Facebook Page">
-                <i className="bi bi-facebook text-sm" />
-              </a>
-              <a href="#line" className="qup-footer-social-btn w-8 h-8 min-w-[44px] min-h-[44px] rounded-xl bg-slate-900 hover:bg-[#00c300] border border-slate-800 flex items-center justify-center text-slate-300 hover:text-white transition-all shadow-xs" title="Line Official Account" aria-label="Line Official Account">
-                <i className="bi bi-line text-sm" />
-              </a>
-              <a href="#instagram" className="qup-footer-social-btn w-8 h-8 min-w-[44px] min-h-[44px] rounded-xl bg-slate-900 hover:bg-gradient-to-tr hover:from-amber-500 hover:via-rose-500 hover:to-purple-600 border border-slate-800 flex items-center justify-center text-slate-300 hover:text-white transition-all shadow-xs" title="Instagram" aria-label="Instagram">
-                <i className="bi bi-instagram text-sm" />
-              </a>
-              <a href="#youtube" className="qup-footer-social-btn w-8 h-8 min-w-[44px] min-h-[44px] rounded-xl bg-slate-900 hover:bg-[#ff0000] border border-slate-800 flex items-center justify-center text-slate-300 hover:text-white transition-all shadow-xs" title="Youtube" aria-label="Youtube">
-                <i className="bi bi-youtube text-sm" />
-              </a>
-            </div>
+          {/* Column 4: How to reach us, and how to keep the app to hand.
+              This column used to carry four social buttons (#facebook, #line,
+              #instagram, #youtube) and an App Store and Google Play badge.
+              None of the five destinations exist: the hrefs were bare fragment
+              ids that scroll nowhere, and there is no native app to download —
+              QueueUp is a web app. A school handing this page to parents was
+              offering support channels nobody was reading.
 
-            <div className="qup-footer-app-badges flex flex-col gap-2">
-              <a href="#ios" className="qup-footer-app-btn flex items-center gap-3 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-white transition-all shadow-xs">
-                <i className="bi bi-apple text-xl" />
-                <div>
-                  <div className="text-[10px] text-slate-400 leading-none">Download on</div>
-                  <div className="font-bold text-xs">App Store</div>
-                </div>
-              </a>
-              <a href="#android" className="qup-footer-app-btn flex items-center gap-3 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-white transition-all shadow-xs">
-                <i className="bi bi-google-play text-lg text-emerald-400" />
-                <div>
-                  <div className="text-[10px] text-slate-400 leading-none">Get it on</div>
-                  <div className="font-bold text-xs">Google Play</div>
-                </div>
-              </a>
+              What replaces them is what is actually true: the two contact
+              routes the school really answers on, and the install prompt the
+              browser really offers, because public/manifest.json makes this
+              an installable PWA. */}
+          <div>
+            <h4 className="qup-footer-heading font-black text-sm text-white mb-4">ติดต่อเรา & ติดตั้งแอป</h4>
+            <p className="small text-slate-400 text-xs mb-3">
+              ช่องทางที่ติดต่อได้จริงในเวลาทำการของโรงเรียน
+            </p>
+
+            <ul className="list-none pl-0 mb-5 space-y-2">
+              <li>
+                <a
+                  href="tel:0921975525"
+                  className="qup-footer-contact-btn flex items-center gap-3 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-white transition-all shadow-xs min-h-[44px]"
+                >
+                  <i className="bi bi-telephone text-lg text-sky-400" />
+                  <div>
+                    <div className="text-[10px] text-slate-400 leading-none">โทรหาเจ้าหน้าที่</div>
+                    <div className="font-bold text-xs">092-197-5525</div>
+                  </div>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="mailto:hi00000087@gmail.com"
+                  className="qup-footer-contact-btn flex items-center gap-3 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-white transition-all shadow-xs min-h-[44px]"
+                >
+                  <i className="bi bi-envelope text-lg text-amber-400" />
+                  <div>
+                    <div className="text-[10px] text-slate-400 leading-none">อีเมลทีมงาน</div>
+                    <div className="font-bold text-xs">hi00000087@gmail.com</div>
+                  </div>
+                </a>
+              </li>
+            </ul>
+
+            <div className="qup-footer-install rounded-xl bg-slate-900 border border-slate-800 px-3.5 py-3">
+              <div className="flex items-center gap-2 mb-1">
+                <i className="bi bi-phone text-emerald-400" />
+                <span className="font-bold text-xs text-white">ติดตั้งเป็นแอปบนมือถือ</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mb-0">
+                ไม่ต้องติดตั้งจากสโตร์ใด — เปิดเว็บนี้บนมือถือ แล้วเลือก
+                &quot;เพิ่มไปยังหน้าจอโฮม&quot; (Add to Home Screen) จะใช้งานได้เหมือนแอปจริง
+              </p>
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 🧩 MerchantModifierManager.tsx (Wave 4.2.3)
  * Store-Isolated Modifier Groups & Options Management with Exact Satang Support.
  */

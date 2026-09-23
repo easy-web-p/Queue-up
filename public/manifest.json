@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "QueueUp - School Canteen Smart Pre-Order & Queue Platform",
   "short_name": "QueueUp",
   "description": "ระบบสั่งจองอาหารโรงอาหารล่วงหน้า ระบุเวลานัดรับ และจัดการคิวดิจิทัลอัจฉริยะ",
@@ -10,15 +10,9 @@
   "icons": [
     {
       "src": "/logo.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/logo.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }

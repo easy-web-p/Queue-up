@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 📦 QueueUp Catalog Service
  * Atomic Mutations, Strict Monetary Consistency, Referential Integrity & Option
  * Stock Management.
