@@ -38,6 +38,7 @@ import { recordAuditLog } from "../services/storeIsolationEngine.js";
 import Footer from "../components/Footer.jsx";
 import { useToast } from "../components/ToastProvider.jsx";
 import { errorMessage } from "../utils/errorMessage";
+import { cancelOrderWithRefund } from "../services/orderCancelService";
 import "./MerchantDashboard.css";
 
 function MerchantDashboard() {
@@ -428,6 +429,36 @@ function MerchantDashboard() {
     } else if (newStatus === 'cancelled' || newStatus === 'CANCELLED') {
       status = 'CANCELLED';
       queueStatus = 'cancelled';
+    }
+
+    // Cancelling is not a status change, it is a refund.
+    //
+    // This used to write `status: 'CANCELLED'` straight to the order. The
+    // wallet had been debited when the order was created and nothing credited
+    // it back — a browser cannot, `wallets` is closed to clients — so a stall
+    // that ran out of an ingredient cancelled the order and the student had
+    // paid for nothing.
+    if (status === 'CANCELLED') {
+      const order = merchantOrders.find((o) => o.id === orderId);
+      const paidFromWallet = order?.paymentMode === 'CAMPUS_WALLET';
+      const ok = await toast.confirm({
+        title: `ยกเลิกออเดอร์ ${order?.queueNumber || ''}`.trim(),
+        message: paidFromWallet
+          ? `ระบบจะคืนเงิน ฿${((Number(order?.finalAmountSatang) || 0) / 100).toFixed(2)} เข้ากระเป๋าของนักเรียนทันที`
+          : 'ออเดอร์นี้ชำระที่หน้าร้าน จึงไม่มียอดคืนในระบบ',
+        confirmLabel: 'ยกเลิกและคืนเงิน',
+        tone: 'error',
+      });
+      if (!ok) return;
+
+      try {
+        const res = await cancelOrderWithRefund(orderId);
+        toast.success(res.message, { duration: 12000 });
+      } catch (err) {
+        console.error('Failed to cancel and refund order:', err);
+        toast.error(`ยกเลิกออเดอร์ไม่สำเร็จ: ${errorMessage(err)}`);
+      }
+      return;
     }
 
     try {

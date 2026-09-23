@@ -132,6 +132,38 @@ await testEnv.withSecurityRulesDisabled(async (ctx) => {
     totalAmountSatang: 6900,
   });
 
+  // Same stall, same customer, but paid out of the campus wallet. Cancelling
+  // this one moves money, so no browser may do it from either side.
+  await setDoc(doc(db, 'orders', 'order_wallet'), {
+    id: 'order_wallet',
+    orderId: 'order_wallet',
+    userId: STUDENT,
+    studentId: STUDENT,
+    storeId: SHOP,
+    queueNumber: 'Q003',
+    status: 'PENDING',
+    queueStatus: 'waiting',
+    pickupDate: '2026-09-07',
+    paymentMode: 'CAMPUS_WALLET',
+    paymentStatus: 'PAID',
+    totalAmountSatang: 6900,
+    finalAmountSatang: 6900,
+  });
+
+  // Predates paymentMode entirely. Nothing about the refund guard may lock
+  // these out of the board — including the stall cancelling one.
+  await setDoc(doc(db, 'orders', 'order_legacy'), {
+    id: 'order_legacy',
+    orderId: 'order_legacy',
+    userId: STUDENT,
+    storeId: SHOP,
+    queueNumber: 'Q004',
+    status: 'PENDING',
+    queueStatus: 'waiting',
+    pickupDate: '2026-09-07',
+    totalAmountSatang: 4500,
+  });
+
   await setDoc(doc(db, 'orders', 'order_stranger'), {
     id: 'order_stranger',
     orderId: 'order_stranger',
@@ -288,6 +320,61 @@ await runTest('The merchant cannot skip a state transition', async () => {
     updateDoc(doc(asMerchant, 'orders', 'order_alice'), {
       status: 'COMPLETED',
       queueStatus: 'completed',
+    })
+  );
+});
+
+await runTest('🚨 A customer CANNOT cancel a wallet-paid order from the browser', async () => {
+  // The client write cancels the food; crediting `wallets` back is impossible
+  // from a browser, and correctly so. So this path kept the money every time.
+  await assertFails(
+    updateDoc(doc(asStudent, 'orders', 'order_wallet'), {
+      status: 'CANCELLED',
+      queueStatus: 'cancelled',
+      cancelReason: 'เปลี่ยนใจ',
+    })
+  );
+});
+
+await runTest('🚨 The stall CANNOT cancel a wallet-paid order from the browser either', async () => {
+  await assertFails(
+    updateDoc(doc(asMerchant, 'orders', 'order_wallet'), {
+      status: 'CANCELLED',
+      queueStatus: 'cancelled',
+    })
+  );
+});
+
+await runTest('A customer CAN still cancel an order the wallet never paid for', async () => {
+  // order_alice carries no paymentMode at all — the legacy shape. The guard
+  // must not lock those out; `.get(...,'')` is why it does not.
+  await assertSucceeds(
+    updateDoc(doc(asStudent, 'orders', 'order_alice'), {
+      status: 'CANCELLED',
+      queueStatus: 'cancelled',
+      cancelReason: 'เปลี่ยนใจ',
+    })
+  );
+});
+
+await runTest('The stall CAN still advance a wallet-paid order down the board', async () => {
+  // Blocking the refund must not stop the kitchen working.
+  await assertSucceeds(
+    updateDoc(doc(asMerchant, 'orders', 'order_wallet'), {
+      status: 'CONFIRMED',
+      queueStatus: 'waiting',
+    })
+  );
+});
+
+await runTest('The stall CAN still cancel an order the wallet never paid for', async () => {
+  // The merchant guard reads paymentMode only when the update is a cancellation,
+  // so this is the one write where a missing field would have denied the stall.
+  await assertSucceeds(
+    updateDoc(doc(asMerchant, 'orders', 'order_legacy'), {
+      status: 'CANCELLED',
+      queueStatus: 'cancelled',
+      merchantNote: 'ของหมด',
     })
   );
 });

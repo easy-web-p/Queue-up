@@ -32,6 +32,12 @@ import {
 } from "./orderRequest.js";
 import { checkProductAvailability, priceOrder } from "./orderPricing.js";
 import {
+  CANCEL_ACTOR,
+  checkCancellable,
+  computeRefund,
+  refundTargetStudentId,
+} from "./refundRules.js";
+import {
   validateStoreCoupon,
   canStoreClaimCode,
 } from "./storeCoupons.js";
@@ -2097,6 +2103,174 @@ export const updateCampusWalletLimits = onCall(
       success: true,
       studentId,
       message: "อัปเดตการตั้งค่าและวงเงินการใช้งานเรียบร้อยแล้ว",
+    };
+  }
+);
+
+/**
+ * ↩️ Cancel an order, and give the money back
+ *
+ * Money could enter this system and be spent, and never come back.
+ * createOrderAuthoritative debits the wallet inside the order transaction.
+ * Cancelling was a plain client-side write of `status: 'CANCELLED'` — allowed
+ * by the rules for the customer before the kitchen started, and for the stall
+ * at any point — and nothing anywhere credited the wallet. WalletTransaction
+ * has listed a 'REFUND' type since the beginning and no code ever wrote one.
+ * A stall that ran out of an ingredient cancelled the order and the student had
+ * paid for nothing.
+ *
+ * The status change and the refund are one transaction. Separately, a crash
+ * between them either cancels the food without returning the money — the bug
+ * this replaces — or returns the money on an order still being cooked.
+ *
+ * Idempotent by construction: the refund is recorded on the order itself, and a
+ * second call finds it already cancelled and pays nothing.
+ */
+export const cancelOrderWithRefund = onCall(
+  { region: "asia-southeast1", cors: true },
+  async (request) => {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "กรุณาเข้าสู่ระบบก่อนยกเลิกคำสั่งซื้อ");
+    }
+    const uid = request.auth.uid;
+    const { orderId, reason } = request.data || {};
+    if (!orderId || typeof orderId !== "string") {
+      throw new HttpsError("invalid-argument", "กรุณาระบุรหัสคำสั่งซื้อ");
+    }
+
+    const orderRef = db.collection("orders").doc(orderId);
+    const preSnap = await orderRef.get();
+    if (!preSnap.exists) {
+      throw new HttpsError("not-found", "ไม่พบคำสั่งซื้อนี้ในระบบ");
+    }
+    const preOrder = preSnap.data();
+
+    // Who is asking decides how late they may cancel. Resolved outside the
+    // transaction because it needs the shop document, and a transaction that
+    // reads a second collection to answer a question about the caller is a
+    // transaction holding locks while it thinks.
+    let actor = null;
+    if (preOrder.userId === uid) {
+      actor = CANCEL_ACTOR.CUSTOMER;
+    }
+    if (isCallerAdmin(request.auth.token, isBootstrapSuperAdmin)) {
+      actor = CANCEL_ACTOR.ADMIN;
+    } else if (preOrder.storeId) {
+      const shopSnap = await db.collection("shops").doc(String(preOrder.storeId)).get();
+      if (shopSnap.exists && shopSnap.data().ownerUid === uid) {
+        actor = CANCEL_ACTOR.STORE;
+      }
+    }
+    if (!actor) {
+      throw new HttpsError(
+        "permission-denied",
+        "CANCEL_FORBIDDEN: คำสั่งซื้อนี้ไม่ใช่ของคุณ และคุณไม่ใช่เจ้าของร้านนี้"
+      );
+    }
+
+    const studentId = refundTargetStudentId(preOrder);
+    const walletRef = studentId ? db.collection("wallets").doc(studentId) : null;
+
+    const outcome = await db.runTransaction(async (tx) => {
+      // Reads first, all of them, before any write.
+      const snap = await tx.get(orderRef);
+      if (!snap.exists) {
+        throw new HttpsError("not-found", "ไม่พบคำสั่งซื้อนี้ในระบบ");
+      }
+      const order = snap.data();
+
+      const allowed = checkCancellable(order, actor);
+      throwIfRefused(allowed);
+
+      const { refundSatang, reason: refundReason } = computeRefund(order);
+      const walletSnap = refundSatang > 0 && walletRef ? await tx.get(walletRef) : null;
+
+      // ---- writes ----
+      tx.update(orderRef, {
+        status: "CANCELLED",
+        queueStatus: "cancelled",
+        cancelledBy: uid,
+        cancelledByRole: actor,
+        cancelReason: typeof reason === "string" ? reason.slice(0, 500) : "",
+        cancelledAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+        // Recorded on the order, which is what makes a second call a no-op.
+        refundedSatang: refundSatang,
+        refundReason,
+      });
+
+      if (refundSatang <= 0 || !walletRef) {
+        return { cancelled: true, refundSatang: 0, refundReason };
+      }
+
+      const currentBal = walletSnap.exists ? Number(walletSnap.data().balanceSatang) || 0 : 0;
+      const newBal = currentBal + refundSatang;
+
+      // The spend counters move back too. Without this a cancelled order still
+      // counts against the child's daily limit — they are told they have spent
+      // money that was returned to them.
+      const spentToday = Math.max(
+        0,
+        (Number(walletSnap.exists ? walletSnap.data().spentTodaySatang : 0) || 0) - refundSatang
+      );
+      const spentWeek = Math.max(
+        0,
+        (Number(walletSnap.exists ? walletSnap.data().spentThisWeekSatang : 0) || 0) - refundSatang
+      );
+
+      tx.set(
+        walletRef,
+        {
+          studentId,
+          balanceSatang: newBal,
+          spentTodaySatang: spentToday,
+          spentThisWeekSatang: spentWeek,
+          // A merge write can bring a wallet into existence. One created
+          // without limits is unspendable, so every such path seeds them.
+          ...resolveMissingLimitDefaults(walletSnap.exists ? walletSnap.data() : null),
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      const txRef = db.collection("wallet_transactions").doc();
+      tx.set(txRef, {
+        id: txRef.id,
+        walletId: studentId,
+        studentId,
+        amountSatang: refundSatang,
+        type: "REFUND",
+        actorUid: uid,
+        actorRole: actor,
+        orderId,
+        storeId: order.storeId || null,
+        note: `คืนเงินจากการยกเลิกคำสั่งซื้อ ${order.queueNumber || orderId}`,
+        timestamp: FieldValue.serverTimestamp(),
+      });
+
+      const auditRef = db.collection("audit_logs").doc();
+      tx.set(auditRef, {
+        id: auditRef.id,
+        action: "ORDER_CANCELLED_REFUNDED",
+        actorUid: uid,
+        actorRole: actor,
+        orderId,
+        targetStudentId: studentId,
+        amountSatang: refundSatang,
+        timestamp: FieldValue.serverTimestamp(),
+      });
+
+      return { cancelled: true, refundSatang, refundReason, newBalanceSatang: newBal };
+    });
+
+    return {
+      success: true,
+      orderId,
+      ...outcome,
+      message:
+        outcome.refundSatang > 0
+          ? `ยกเลิกคำสั่งซื้อแล้ว และคืนเงิน ฿${outcome.refundSatang / 100} เข้ากระเป๋าเรียบร้อย`
+          : "ยกเลิกคำสั่งซื้อเรียบร้อยแล้ว (คำสั่งซื้อนี้ไม่ได้ชำระผ่านกระเป๋าเงิน จึงไม่มียอดคืน)",
     };
   }
 );

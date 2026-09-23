@@ -307,7 +307,11 @@ service cloud.firestore {
       // Direct client mutation of paymentStatus / totalAmount is blocked for all client users (Admin must use Backend Cloud Functions).
       allow update: if isAuthenticated() && (
         (
+          // 🔒 A stall drives its own board — but cancelling a wallet-paid order
+          // is a refund, and a refund is not something a browser can do. That
+          // goes through cancelOrderWithRefund; everything else stays here.
           (isAdmin() || (resource.data.storeId != null && isStoreOwner(resource.data.storeId))) &&
+          !(resource.data.get('paymentMode', '') == 'CAMPUS_WALLET' && request.resource.data.status == 'CANCELLED') &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['queueStatus', 'status', 'estimatedReadyTime', 'merchantNote', 'adminNote', 'updatedAt']) &&
           isValidOrderStateTransition(
             resource.data.status,
@@ -317,8 +321,17 @@ service cloud.firestore {
           )
         ) ||
         (
-          // 🔒 Customer can only cancel prior to kitchen preparation (PENDING/CONFIRMED & waiting)
+          // 🔒 A customer may cancel before the kitchen starts — but never an
+          // order the wallet paid for.
+          //
+          // createOrderAuthoritative debits the wallet inside the order
+          // transaction, and a client write cannot credit it back: `wallets` is
+          // closed to browsers, correctly. So this path cancelled the food and
+          // kept the money, every time. A wallet-paid order now goes through
+          // cancelOrderWithRefund, where the status change and the refund are
+          // one transaction.
           resource.data.userId == request.auth.uid &&
+          resource.data.get('paymentMode', '') != 'CAMPUS_WALLET' &&
           (resource.data.status == 'PENDING' || resource.data.status == 'CONFIRMED') &&
           (resource.data.queueStatus == 'waiting' || !('queueStatus' in resource.data)) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['cancelReason', 'status', 'queueStatus', 'updatedAt']) &&

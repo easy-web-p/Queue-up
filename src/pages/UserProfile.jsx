@@ -18,6 +18,8 @@ import {
   accountUsesPassword,
 } from "../services/accountService";
 import { errorMessage } from "../utils/errorMessage";
+import { cancelOrderWithRefund } from "../services/orderCancelService";
+import { CUSTOMER_CANCELLABLE_STATUSES as CUSTOMER_CANCELLABLE } from "../../functions/refundRules.js";
 import { fetchLoyaltyBalance, redeemLoyaltyReward } from "../services/loyaltyService";
 import "./UserProfile.css";
 import "./UserPurchase.css";
@@ -135,6 +137,41 @@ function UserProfile() {
       setRedeemingRewardId(null);
     }
   };
+  const [cancellingOrderId, setCancellingOrderId] = useState(null);
+
+  /**
+   * Cancel an order and get the money back.
+   *
+   * Through the server, because a wallet-paid order's refund is a wallet write
+   * and `wallets` is closed to browsers — which is why cancelling used to take
+   * the food away and keep the money.
+   */
+  const handleCancelOrder = async (order) => {
+    const paidFromWallet = order.paymentMode === "CAMPUS_WALLET";
+    const ok = await toast.confirm({
+      title: `ยกเลิกคำสั่งซื้อ ${order.queueNumber || ""}`.trim(),
+      message: paidFromWallet
+        ? "ระบบจะยกเลิกคำสั่งซื้อและคืนเงินเข้ากระเป๋านักเรียนทันที"
+        : "คำสั่งซื้อนี้ชำระที่หน้าร้าน จึงไม่มียอดคืนในระบบ",
+      confirmLabel: "ยกเลิกคำสั่งซื้อ",
+      tone: "error",
+    });
+    if (!ok) return;
+
+    setCancellingOrderId(order.id);
+    try {
+      const res = await cancelOrderWithRefund(order.id);
+      toast.success(res.message, { duration: 12000 });
+    } catch (err) {
+      // The kitchen may have started between the page loading and the tap. That
+      // refusal has to show: reported as success, someone walks off believing
+      // lunch is cancelled while a stall is still cooking it.
+      toast.error(errorMessage(err), { duration: 12000 });
+    } finally {
+      setCancellingOrderId(null);
+    }
+  };
+
   const [orderStatusTab, setOrderStatusTab] = useState("ALL");
   const [orderSearchQuery, setOrderSearchQuery] = useState("");
 
@@ -1479,6 +1516,18 @@ function UserProfile() {
                             onClick={() => toast.info("กรุณาแสดงหน้าจอนี้ให้เจ้าหน้าที่เคาน์เตอร์เพื่อรับอาหาร")}
                           >
                             รับอาหารที่เคาน์เตอร์
+                          </button>
+                        )}
+                        {/* The PDPA page has promised "ยกเลิกได้ก่อนที่ร้านค้าจะกด
+                            รับออเดอร์/เริ่มปรุงอาหาร" the whole time, and no screen
+                            in the app had a cancel button at all. */}
+                        {CUSTOMER_CANCELLABLE.includes(String(order.status || "").toUpperCase()) && (
+                          <button
+                            className="shopee-btn-action-secondary text-danger"
+                            disabled={cancellingOrderId === order.id}
+                            onClick={() => void handleCancelOrder(order)}
+                          >
+                            {cancellingOrderId === order.id ? "กำลังยกเลิก..." : "ยกเลิกคำสั่งซื้อ"}
                           </button>
                         )}
                         <button
