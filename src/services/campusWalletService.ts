@@ -17,6 +17,7 @@ import type {
   WalletTransaction,
   ParentChildLink,
   StudentProfile,
+  WalletTopupRequest,
 } from '../types/campus';
 
 /** Current Bangkok calendar date as "YYYY-MM-DD" (matches the server's day boundary). */
@@ -160,6 +161,42 @@ export async function reviewWalletTopupRequest(
   >(functions, 'reviewWalletTopupRequest');
   const res = await callable({ requestId, decision, note });
   return res.data;
+}
+
+/**
+ * A guardian's own top-up requests, newest first.
+ *
+ * Without this a parent records a request, walks to the office, and has no way
+ * to tell whether it exists or whether staff have settled it — the balance
+ * simply does not change and nothing says why.
+ *
+ * Filtered on `requestedBy` because that is the clause the security rule can
+ * prove: a guardian may read their own requests and nobody else's, so an
+ * unfiltered query is refused outright rather than silently trimmed.
+ *
+ * Ordered in the query rather than after it: `limit` applies before any sort
+ * done here, so a parent with more than `max` requests would get an arbitrary
+ * handful sorted, not their latest ones. The composite index this needs is in
+ * firestore.indexes.json.
+ */
+export async function fetchMyTopupRequests(
+  guardianUid: string,
+  max = 10
+): Promise<WalletTopupRequest[]> {
+  try {
+    const snap = await getDocs(
+      query(
+        collection(db, 'wallet_topup_requests'),
+        where('requestedBy', '==', guardianUid),
+        orderBy('createdAt', 'desc'),
+        limit(max)
+      )
+    );
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as WalletTopupRequest);
+  } catch (err) {
+    console.error('[fetchMyTopupRequests] Error:', err);
+    throw err;
+  }
 }
 
 /**

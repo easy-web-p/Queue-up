@@ -21,6 +21,7 @@ import {
   evaluateCoupon,
   normalizeCouponCode,
   describeCouponRefusal,
+  isWithinDailyWindow,
 } from '../../functions/couponRules.js';
 
 export interface CouponPreview {
@@ -126,17 +127,44 @@ export interface OfferedCoupon {
   code: string;
   title: string;
   description: string;
+  /** Minimum spend in satang, so a chip can say what it needs before it is tapped. */
+  minSpendSatang: number;
+  /** "14:00–17:00" when the coupon only runs at certain hours, otherwise null. */
+  windowLabel: string | null;
+  /** Whether that window is open right now, in Bangkok. */
+  inWindowNow: boolean;
 }
 
-/** The active coupons worth showing as suggestions. */
+/**
+ * The coupons a customer may actually be offered right now.
+ *
+ * FoodBooking used to hardcode three chips — WELCOME50, HAPPY15, STUDENT10 —
+ * straight into the JSX. They happened to match the three built-in coupons, so
+ * they looked right, but nothing kept them matching: retire one in the admin
+ * console and the chip stayed, offering a code the server would refuse; create
+ * a new one and no customer ever saw it. This reads the same `coupons`
+ * collection the evaluator reads.
+ *
+ * `active` filters server-side rather than here, because the security rule for
+ * this collection is what decides which documents a customer may list.
+ */
 export async function fetchOfferedCoupons(): Promise<OfferedCoupon[]> {
+  const { hhmm } = bangkokNow();
   const snap = await getDocs(query(collection(db, 'coupons'), where('active', '==', true)));
   return snap.docs.map((d) => {
     const data = d.data();
+    const win = data.dailyWindow;
+    const hasWindow =
+      win && typeof win.start === 'string' && typeof win.end === 'string';
     return {
       code: d.id,
       title: String(data.title ?? d.id),
       description: String(data.description ?? ''),
+      minSpendSatang: Number(data.minSpendSatang) || 0,
+      windowLabel: hasWindow ? `${win.start}–${win.end}` : null,
+      // The same predicate the evaluator uses, rather than a second reading of
+      // the clock that could disagree with the refusal the server would send.
+      inWindowNow: hasWindow ? isWithinDailyWindow(hhmm, win.start, win.end) : true,
     };
   });
 }

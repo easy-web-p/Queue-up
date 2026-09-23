@@ -98,3 +98,41 @@ export interface StaffSupervisor {
   canEmergencyLookup: boolean;
   createdAt: FirestoreTimestamp;
 }
+
+/**
+ * A claim that money is coming, and the record of who settled it.
+ *
+ * Written only by the backend (`allow write: if false;`). `source` decides who
+ * may complete it: a MANUAL row is settled by a member of staff, who is the one
+ * handed the cash, and a STRIPE row only by a verified webhook — staff
+ * confirming a Stripe payment would credit a wallet for money that may never
+ * have arrived.
+ */
+export interface WalletTopupRequest {
+  id: string;
+  studentId: string;
+  amountSatang: number;
+  status: 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'FAILED';
+  /** Absent on rows written before the field existed; those are all cash. */
+  source?: 'MANUAL' | 'STRIPE';
+  requestedBy: string;
+  requestedByName?: string;
+  requestedByRole?: string;
+  paymentMethod?: string;
+  note?: string;
+  createdAt: FirestoreTimestamp;
+
+  /** Set when staff settle a MANUAL row. */
+  reviewedBy?: string;
+  reviewedByName?: string;
+  reviewedAt?: FirestoreTimestamp;
+  reviewNote?: string;
+
+  /** Set when the Stripe webhook settles a STRIPE row. */
+  paymentIntentId?: string;
+  creditedSatang?: number;
+  confirmedBy?: string;
+  confirmedAt?: FirestoreTimestamp;
+  failureReason?: string;
+  failedAt?: FirestoreTimestamp;
+}

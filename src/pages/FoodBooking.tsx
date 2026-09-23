@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectCartItems, clearCart } from '../store/cartSlice';
@@ -13,7 +13,11 @@ import {
 } from '../services/orderCreationService';
 import { soundManager } from '../utils/audioNotification.js';
 import { ClientQueueTicket } from '../components/ClientQueueTicket.jsx';
-import { previewCoupon } from '../services/couponService';
+import {
+  previewCoupon,
+  fetchOfferedCoupons,
+  type OfferedCoupon,
+} from '../services/couponService';
 import { getEffectiveRoles } from '../utils/authRoles.js';
 import { errorMessage } from '../utils/errorMessage';
 import type { RootState } from '../store/store';
@@ -129,6 +133,8 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
   const [couponError, setCouponError] = useState<string | null>(null);
 
   const [couponChecking, setCouponChecking] = useState(false);
+  /** The active coupons, as the database has them — not as this file remembers them. */
+  const [offeredCoupons, setOfferedCoupons] = useState<OfferedCoupon[]>([]);
 
   /**
    * Asks the shared evaluator what this code is worth.
@@ -139,6 +145,24 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
    * discount shown here is the discount the order transaction will apply — and
    * a coupon an administrator retires or retunes takes effect without a deploy.
    */
+  useEffect(() => {
+    let cancelled = false;
+    async function loadOfferedCoupons() {
+      try {
+        const rows = await fetchOfferedCoupons();
+        if (!cancelled) setOfferedCoupons(rows);
+      } catch (err) {
+        // No chips rather than stale ones. The text field still works, so a
+        // customer who knows a code is not blocked by this failing.
+        console.warn('[FoodBooking] could not load offered coupons:', err);
+      }
+    }
+    loadOfferedCoupons();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const handleApplyCoupon = async (codeOverride?: string) => {
     const targetCode = (codeOverride || couponInput).trim().toUpperCase();
     if (!targetCode) {
@@ -577,34 +601,46 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
                       <p className="text-[11px] text-red-500 font-semibold mb-0">{couponError}</p>
                     )}
 
-                    {/* Quick coupon chips */}
-                    <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
-                      <span className="text-slate-400 font-medium">โค้ดยอดนิยม:</span>
-                      <button
-                        type="button"
-                        onClick={() => void handleApplyCoupon('WELCOME50')}
-                        disabled={couponChecking}
-                        className="bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 px-2 py-0.5 rounded-lg border border-amber-300 dark:border-amber-700/50 font-bold transition-all cursor-pointer"
-                      >
-                        WELCOME50 (ลด ฿50)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleApplyCoupon('HAPPY15')}
-                        disabled={couponChecking}
-                        className="bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-950/50 text-emerald-900 dark:text-emerald-200 px-2 py-0.5 rounded-lg border border-emerald-300 dark:border-emerald-700/50 font-bold transition-all cursor-pointer"
-                      >
-                        HAPPY15 (ลด 15%)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleApplyCoupon('STUDENT10')}
-                        disabled={couponChecking}
-                        className="bg-sky-100 hover:bg-sky-200 dark:bg-sky-950/50 text-sky-900 dark:text-sky-200 px-2 py-0.5 rounded-lg border border-sky-300 dark:border-sky-700/50 font-bold transition-all cursor-pointer"
-                      >
-                        STUDENT10 (ลด 10%)
-                      </button>
-                    </div>
+                    {/* Quick coupon chips, read from the coupons collection.
+                        These were three codes hardcoded here. They matched the
+                        built-ins by luck, not by construction: retiring one in
+                        the admin console left a chip that offered a code the
+                        server refuses, and a new coupon reached nobody. */}
+                    {offeredCoupons.length > 0 && (
+                      <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
+                        <span className="text-slate-400 font-medium">โค้ดที่ใช้ได้:</span>
+                        {offeredCoupons.map((c) => {
+                          // Outside its hours the code is still real, so the chip
+                          // stays and says when — rather than vanishing, or being
+                          // tapped for a refusal that looks like a broken app.
+                          const shut = !c.inWindowNow;
+                          return (
+                            <button
+                              key={c.code}
+                              type="button"
+                              onClick={() => void handleApplyCoupon(c.code)}
+                              disabled={couponChecking || shut}
+                              title={c.description || undefined}
+                              className={`px-2 py-0.5 rounded-lg border font-bold transition-all ${
+                                shut
+                                  ? 'bg-slate-100 dark:bg-white/5 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-white/10 cursor-not-allowed'
+                                  : 'bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 border-amber-300 dark:border-amber-700/50 cursor-pointer'
+                              }`}
+                            >
+                              {c.code}
+                              {c.windowLabel && (
+                                <span className="ml-1 font-normal">({c.windowLabel})</span>
+                              )}
+                              {!c.windowLabel && c.minSpendSatang > 0 && (
+                                <span className="ml-1 font-normal">
+                                  (ขั้นต่ำ ฿{c.minSpendSatang / 100})
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

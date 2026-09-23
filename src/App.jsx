@@ -33,6 +33,7 @@ const StudentVendorEarnings = lazy(() => import("./pages/StudentVendorEarnings.t
 const VendorApprovalPanel = lazy(() => import("./pages/VendorApprovalPanel.tsx"));
 const GuardianDashboard = lazy(() => import("./pages/GuardianDashboard.tsx"));
 const GuardianLinkApproval = lazy(() => import("./pages/GuardianLinkApproval.tsx"));
+const WalletTopupApproval = lazy(() => import("./pages/WalletTopupApproval.tsx"));
 const SpendingLimitSetting = lazy(() => import("./pages/SpendingLimitSetting.tsx"));
 const AllergyAlertSetting = lazy(() => import("./pages/AllergyAlertSetting.tsx"));
 const ChildOrderHistory = lazy(() => import("./pages/ChildOrderHistory.tsx"));
@@ -107,6 +108,7 @@ function App() {
             <Route path="/campus/earnings" element={<ProtectedRoute allowedRoles={["student_vendor", "merchant", "admin"]}><StudentVendorEarnings /></ProtectedRoute>} />
             <Route path="/campus/approvals" element={<ProtectedRoute allowedRoles={["staff_supervisor", "admin"]}><VendorApprovalPanel /></ProtectedRoute>} />
             <Route path="/campus/guardian-links" element={<ProtectedRoute allowedRoles={["staff_supervisor", "admin"]}><GuardianLinkApproval /></ProtectedRoute>} />
+            <Route path="/campus/topup-approvals" element={<ProtectedRoute allowedRoles={["staff_supervisor", "admin"]}><WalletTopupApproval /></ProtectedRoute>} />
             <Route path="/campus/guardian" element={<ProtectedRoute><GuardianDashboard /></ProtectedRoute>} />
             <Route path="/campus/emergency" element={<ProtectedRoute allowedRoles={["staff_supervisor", "admin"]}><EmergencyLookup /></ProtectedRoute>} />
             <Route path="/campus/monitor" element={<ProtectedRoute allowedRoles={["staff_supervisor", "admin"]}><CampusQueueMonitor /></ProtectedRoute>} />
@@ -125,6 +127,7 @@ function App() {
             <Route path="/campus/queue-monitor" element={<ProtectedRoute allowedRoles={["staff_supervisor", "admin"]}><CampusQueueMonitor /></ProtectedRoute>} />
             <Route path="/admin/vendor-approvals" element={<ProtectedRoute allowedRoles={["staff_supervisor", "admin"]}><VendorApprovalPanel /></ProtectedRoute>} />
             <Route path="/admin/guardian-links" element={<ProtectedRoute allowedRoles={["staff_supervisor", "admin"]}><GuardianLinkApproval /></ProtectedRoute>} />
+            <Route path="/admin/topup-approvals" element={<ProtectedRoute allowedRoles={["staff_supervisor", "admin"]}><WalletTopupApproval /></ProtectedRoute>} />
             <Route path="/emergency" element={<ProtectedRoute allowedRoles={["staff_supervisor", "admin"]}><EmergencyLookup /></ProtectedRoute>} />
             <Route path="/merchant/kds" element={<ProtectedRoute allowedRoles={["merchant", "student_vendor", "admin"]}><MerchantDashboard /></ProtectedRoute>} />
 

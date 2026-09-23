@@ -8,6 +8,7 @@ import {
   topupCampusWallet,
   createParentChildLink,
   getSpentTodaySatang,
+  fetchMyTopupRequests,
 } from '../services/campusWalletService';
 import {
   Wallet,
@@ -22,11 +23,19 @@ import {
   HeartPulse,
   Save,
   Sliders,
+  Clock,
 } from 'lucide-react';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase/config.js';
 import { Link } from 'react-router-dom';
-import type { ParentChildLink, StudentWallet, WalletTransaction, StudentProfile } from '../types/campus';
+import type {
+  ParentChildLink,
+  StudentWallet,
+  WalletTransaction,
+  StudentProfile,
+  WalletTopupRequest,
+} from '../types/campus';
+import { timestampToMillis } from '../types';
 import { useToast } from '../components/ToastProvider.jsx';
 import { errorMessage } from '../utils/errorMessage';
 import StripePaymentForm from '../components/StripePaymentForm';
@@ -82,6 +91,15 @@ export default function GuardianDashboard() {
   const [stripeIntent, setStripeIntent] = useState<TopupIntent | null>(null);
   /** Shown after a payment: what Stripe said, never what the wallet holds. */
   const [payNotice, setPayNotice] = useState<string | null>(null);
+  /**
+   * The parent's own top-up requests.
+   *
+   * A cash request is settled by a member of staff at the office, which can be
+   * hours later. Without this the parent has recorded something they can never
+   * see again: the balance simply does not change, and nothing says whether the
+   * request exists, is waiting, or was turned down.
+   */
+  const [myTopups, setMyTopups] = useState<WalletTopupRequest[]>([]);
 
   // Link Child Modal State
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
@@ -261,6 +279,35 @@ export default function GuardianDashboard() {
     return w;
   };
 
+  /** The parent's own requests, re-read whenever one of them may have changed. */
+  const refreshMyTopups = async () => {
+    if (!uid) return;
+    try {
+      setMyTopups(await fetchMyTopupRequests(uid));
+    } catch (err) {
+      // Not worth a toast: the wallet and its history are the page, and a
+      // failure here costs the parent a status list, not their money.
+      console.warn('[GuardianDashboard] could not load top-up requests:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (!uid) return;
+    let cancelled = false;
+    async function loadMyTopups(guardianUid: string) {
+      try {
+        const rows = await fetchMyTopupRequests(guardianUid);
+        if (!cancelled) setMyTopups(rows);
+      } catch (err) {
+        console.warn('[GuardianDashboard] could not load top-up requests:', err);
+      }
+    }
+    loadMyTopups(uid);
+    return () => {
+      cancelled = true;
+    };
+  }, [uid]);
+
   /**
    * Watch for the webhook's credit to land, for a few seconds.
    *
@@ -322,6 +369,7 @@ export default function GuardianDashboard() {
       credited = await waitForCredit(requestId, studentId);
     } finally {
       setPayNotice(null);
+      await refreshMyTopups();
     }
     if (credited) {
       // No amount when the parent came back from a redirect: this component was
@@ -382,12 +430,23 @@ export default function GuardianDashboard() {
       }
 
       await refreshWallet(selectedChild.studentId);
+      await refreshMyTopups();
     } catch (err) {
       toast.error('เติมเงินไม่สำเร็จ: ' + errorMessage(err));
     } finally {
       setIsTopupProcessing(false);
     }
   };
+
+  /**
+   * Only the requests for the child on screen, and only the unsettled ones.
+   *
+   * A CONFIRMED request already shows in the ledger below as a TOPUP; listing
+   * it here too would have the parent counting the same money twice.
+   */
+  const pendingTopups = myTopups.filter(
+    (r) => (r.status || 'PENDING') === 'PENDING' && r.studentId === selectedChild?.studentId
+  );
 
   const handleTopup = () =>
     topupMethod === 'STRIPE' ? handleStartStripeTopup() : handleCashTopupRequest();
@@ -826,6 +885,51 @@ export default function GuardianDashboard() {
 
             {/* Column 3: Transaction Feed */}
             <div className="bg-white dark:bg-[#241C16] border border-slate-200 dark:border-[#FF7A1A]/20 rounded-3xl p-6 shadow-md flex flex-col h-full">
+              {/* Requests that have not become money yet.
+                  A cash request is settled by staff at the office, possibly
+                  hours later, and a Stripe one only once the payment clears.
+                  Neither appears in the ledger below until it does, so without
+                  this the parent has recorded something they can never see
+                  again — the balance just fails to change. */}
+              {pendingTopups.length > 0 && (
+                <div className="border-b border-slate-100 dark:border-white/10 pb-4 mb-4">
+                  <h3 className="text-base font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2 mb-3">
+                    <Clock className="w-4 h-4 text-amber-500" />
+                    คำขอเติมเงินที่ยังไม่เข้ากระเป๋า
+                  </h3>
+                  <div className="space-y-2">
+                    {pendingTopups.map((r) => (
+                      <div
+                        key={r.id}
+                        className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded-2xl flex items-start justify-between gap-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-900 dark:text-white mb-0.5">
+                            ฿{((Number(r.amountSatang) || 0) / 100).toFixed(2)}
+                            <span className="ml-2 font-normal text-[10px] text-slate-500 dark:text-[#9CA3AF] font-['JetBrains_Mono']">
+                              {r.studentId}
+                            </span>
+                          </p>
+                          <p className="text-[10px] leading-relaxed text-amber-800 dark:text-amber-300 mb-0">
+                            {(r.source || 'MANUAL') === 'STRIPE'
+                              ? 'รอการชำระเงินผ่าน Stripe — เงินจะเข้าอัตโนมัติเมื่อชำระสำเร็จ'
+                              : 'รอเจ้าหน้าที่ยืนยันว่าได้รับเงินที่ห้องธุรการแล้ว'}
+                          </p>
+                        </div>
+                        <span className="shrink-0 text-[10px] text-slate-500 dark:text-[#9CA3AF] font-['JetBrains_Mono']">
+                          {timestampToMillis(r.createdAt)
+                            ? new Date(timestampToMillis(r.createdAt)).toLocaleDateString('th-TH', {
+                                day: 'numeric',
+                                month: 'short',
+                              })
+                            : ''}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/10 pb-4 mb-4">
                 <h3 className="text-base font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
                   <History className="w-4 h-4 text-[#FF7A1A]" />

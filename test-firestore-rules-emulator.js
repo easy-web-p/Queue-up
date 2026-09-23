@@ -759,6 +759,37 @@ await runTest('Staff can read a pending request in order to confirm it', async (
   await assertSucceeds(getDoc(doc(asTeacher, 'wallet_topup_requests', 'topup_1')));
 });
 
+// Reading one document by id and LISTING the collection are separate rule
+// evaluations, and both screens list rather than get. A rule that permits the
+// get and refuses the list leaves the staff approval page and the guardian's
+// pending list permanently, silently empty.
+
+await runTest('🚨 Staff can list every top-up request, which the approval screen needs', async () => {
+  await assertSucceeds(getDocs(query(collection(asTeacher, 'wallet_topup_requests'))));
+});
+
+await runTest('🚨 A guardian can list the requests they made', async () => {
+  await assertSucceeds(
+    getDocs(
+      query(collection(asGuardian, 'wallet_topup_requests'), where('requestedBy', '==', GUARDIAN))
+    )
+  );
+});
+
+await runTest('🚨 A guardian cannot list the whole collection', async () => {
+  // Without the requestedBy filter the rule cannot prove every matched document
+  // is theirs, so the query must be refused rather than trimmed.
+  await assertFails(getDocs(query(collection(asGuardian, 'wallet_topup_requests'))));
+});
+
+await runTest("🚨 A guardian cannot list another guardian's requests", async () => {
+  await assertFails(
+    getDocs(
+      query(collection(asGuardian, 'wallet_topup_requests'), where('requestedBy', '==', STRANGER))
+    )
+  );
+});
+
 console.log('\n🎟️  Coupon redemptions (the record behind "once per account")');
 
 await runTest('🚨 A user cannot reset their own redemption count', async () => {

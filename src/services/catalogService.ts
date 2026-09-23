@@ -1,6 +1,25 @@
 ﻿/**
- * 📦 QueueUp Catalog Service (Wave 4.2.4 Hardened & Verified)
- * Atomic Mutations, Strict Monetary Consistency, Referential Integrity & Option Stock Management.
+ * 📦 QueueUp Catalog Service
+ * Atomic Mutations, Strict Monetary Consistency, Referential Integrity & Option
+ * Stock Management.
+ *
+ * Every product write in the app goes through here. That was not true until
+ * recently: StoreAdminPage wrote `products` directly with `setDoc`, so none of
+ * the guards below ran, and two of them were load-bearing —
+ * `{ price: newPrice }` with merge left `priceSatang` stale while the order
+ * transaction charged from `priceSatang`, and a "delete" that only filtered
+ * React state left the dish orderable.
+ *
+ * Still not wired to anything, and deliberately left rather than deleted:
+ *
+ *   - `updateStoreOperationalProfile` writes the shop profile to `shops` alone.
+ *     MerchantDashboard writes the same profile to `users`, `merchantProfiles`
+ *     AND `shops`. Adopting this would silently drop two of the three copies,
+ *     so which one is canonical has to be settled first.
+ *   - `fetchStoreCategories` / `createStoreCategory` are store-scoped views of
+ *     `food_categories`, which `src/lib/firebase.js` currently reads and seeds
+ *     globally. No screen offers per-store categories yet.
+ *   - `fetchStoreProducts` duplicates a read the pages already do their own way.
  */
 
 import {

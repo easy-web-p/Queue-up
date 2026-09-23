@@ -22,7 +22,6 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import {
   TOPUP_SOURCE,
-  TOPUP_STATUS,
   STRIPE_CURRENCY,
   MIN_TOPUP_SATANG,
   validateTopupAmount,

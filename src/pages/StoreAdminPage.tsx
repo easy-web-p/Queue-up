@@ -102,6 +102,11 @@ import { functions } from '../firebase/config.js';
 import { httpsCallable } from 'firebase/functions';
 import { buildSeedProducts } from '../lib/seedCatalog.js';
 import { writeBatch, collection, getDocs, deleteDoc, query, orderBy, limit } from 'firebase/firestore';
+import {
+  createStoreProduct,
+  updateStoreProduct,
+  deleteStoreProduct,
+} from '../services/catalogService';
 import { useToast } from '../components/ToastProvider.jsx';
 import { Skeleton, EmptyState, ErrorState } from '../components/LoadingStates.jsx';
 import StaffRoleManager from '../components/StaffRoleManager';
@@ -482,7 +487,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
     const newAvail = !targetItem.isAvailable;
 
     try {
-      await setDoc(doc(db, "products", id), { isAvailable: newAvail }, { merge: true });
+      await updateStoreProduct(db, targetItem.storeId || '', id, { isAvailable: newAvail });
       if (propsOnToggleStock) {
         propsOnToggleStock(id);
       }
@@ -505,12 +510,23 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
     if (!targetItem) return;
 
     try {
-      await setDoc(doc(db, "products", id), { price: newPrice }, { merge: true });
+      // Through the service, because `setDoc({ price }, { merge: true })` wrote
+      // the baht field and left priceSatang untouched. The order function
+      // prices from `priceSatang ?? round(price * 100)`, so once a product had
+      // one — and every seeded or console-added product does — editing the
+      // price here changed the number on the menu and nothing a customer was
+      // charged. The category-wide adjuster below multiplied that across a
+      // whole menu. updateStoreProduct writes both, from one source.
+      await updateStoreProduct(db, targetItem.storeId || '', id, { price: newPrice });
       if (onUpdatePrice) {
         onUpdatePrice(id, newPrice);
       }
       setLocalMenuItems((prev) =>
-        prev.map((item) => (item.id === id ? { ...item, price: newPrice } : item))
+        prev.map((item) =>
+          item.id === id
+            ? { ...item, price: newPrice, priceSatang: Math.round(newPrice * 100) }
+            : item
+        )
       );
       setToastMsg(`อัปเดตราคา ${targetItem.name} เป็น ฿${newPrice} สำเร็จ`);
       setTimeout(() => setToastMsg(null), 2500);
@@ -532,6 +548,37 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
     setTimeout(() => setToastMsg(null), 2500);
   };
 
+  /**
+   * Remove a dish, from the database and not just from this screen.
+   *
+   * This button used to call `setLocalMenuItems(prev => prev.filter(...))` and
+   * nothing else. The row vanished, the toast never came, and the product was
+   * still in Firestore — so the dish reappeared on the next reload and remained
+   * orderable by every customer in the meantime. An admin had no way to take a
+   * menu item down at all, while believing they had.
+   */
+  const handleDeleteItem = async (item: MenuItem) => {
+    const ok = await toast.confirm({
+      title: `ลบเมนู "${item.name}"`,
+      message:
+        'เมนูนี้จะถูกลบออกจากฐานข้อมูลถาวร ลูกค้าจะไม่เห็นและสั่งไม่ได้อีก\n\n' +
+        'หากต้องการปิดขายชั่วคราว ให้กด "ของหมดชั่วคราว" แทน',
+      confirmLabel: 'ลบถาวร',
+      tone: 'error',
+    });
+    if (!ok) return;
+
+    try {
+      await deleteStoreProduct(db, item.storeId || '', item.id);
+      setLocalMenuItems((prev) => prev.filter((i) => i.id !== item.id));
+      setToastMsg(`ลบเมนู ${item.name} เรียบร้อยแล้ว`);
+      setTimeout(() => setToastMsg(null), 2500);
+    } catch (e) {
+      console.error('Firestore delete product error:', e);
+      toast.error(`ลบเมนูไม่สำเร็จ: ${errorMessage(e)}`);
+    }
+  };
+
   const handleAddNewItemSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newItemName.trim()) return;
@@ -543,34 +590,32 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
     }
 
     const price = Number(newItemPrice);
-    const item: MenuItem = {
-      // Firestore's own id. `ITEM-${Date.now().toString().slice(-4)}` is the
-      // last four digits of a millisecond clock, so it repeats every ten
-      // seconds — and the write below uses `merge: true`, so the second dish
-      // added inside that window silently overwrote the first.
-      id: doc(collection(db, 'products')).id,
-      name: newItemName,
-      price,
-      // 🔒 Satang is what the order function prices from; without it, it falls
-      // back to rounding the baht field on every order.
-      priceSatang: Math.round(price * 100),
-      // Without a storeId, checkProductAvailability refuses the item with
-      // CROSS_STORE_PRODUCT_VIOLATION — so every dish added through this screen
-      // appeared on the menu and could never be ordered. seedCatalog.js says
-      // exactly this in its own header; the manual path did not follow it.
-      storeId: targetStoreId,
-      category: newItemCategory,
-      image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80',
-      isAvailable: true,
-      stock: 30,
-      maxStock: 50,
-      prepTimeMinutes: 10,
-      description: newItemDesc || 'เมนูอร่อยปรุงสดใหม่ในโรงอาหาร',
-      popular: true,
-    };
 
     try {
-      await setDoc(doc(db, "products", item.id), item, { merge: true });
+      // Through the service rather than a setDoc here. It generates the id (the
+      // old `ITEM-${Date.now().toString().slice(-4)}` was the last four digits
+      // of a millisecond clock, so it repeated every ten seconds and the
+      // `merge: true` write silently overwrote the previous dish), derives
+      // priceSatang from one source so the two money fields cannot drift,
+      // refuses a negative stock, and checks any modifier group actually
+      // exists. None of that ran while this screen wrote Firestore directly.
+      //
+      // storeId matters more than it looks: without it
+      // checkProductAvailability refuses the item with
+      // CROSS_STORE_PRODUCT_VIOLATION, so a dish added here would appear on the
+      // menu and never be orderable.
+      const item = await createStoreProduct(db, targetStoreId, {
+        name: newItemName,
+        price,
+        category: newItemCategory,
+        image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80',
+        isAvailable: true,
+        stock: 30,
+        maxStock: 50,
+        prepTimeMinutes: 10,
+        description: newItemDesc || 'เมนูอร่อยปรุงสดใหม่ในโรงอาหาร',
+        popular: true,
+      });
       if (onAddNewItem) {
         onAddNewItem(item);
       }
@@ -1074,9 +1119,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
                       </td>
                       <td className="p-3 text-right">
                         <button
-                          onClick={() =>
-                            setLocalMenuItems((prev) => prev.filter((i) => i.id !== item.id))
-                          }
+                          onClick={() => void handleDeleteItem(item)}
                           className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
                           title="ลบรายการ"
                         >

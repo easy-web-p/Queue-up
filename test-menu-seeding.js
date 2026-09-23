@@ -239,6 +239,8 @@ console.log('\n✍️  Adding a menu item by hand');
 const adminSrc = readFileSync(new URL('./src/pages/StoreAdminPage.tsx', import.meta.url), 'utf8');
 const liveAdmin = adminSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
+const assertTop = (c, m) => { if (!c) throw new Error(m); };
+
 const addItemBody = (() => {
   // The whole handler, not just the object literal — the no-store guard runs
   // before it, and slicing from the literal missed it.
@@ -249,31 +251,66 @@ const addItemBody = (() => {
   return liveAdmin.slice(at, end);
 })();
 
+// These three properties used to be spelled out inline in the add-item
+// handler. They now live in catalogService.createStoreProduct, which the
+// handler calls — so each is asserted where it is enforced, plus the one thing
+// the call site is still responsible for: passing a real storeId.
+const liveCatalog = readFileSync(
+  new URL('./src/services/catalogService.ts', import.meta.url),
+  'utf8'
+)
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/(^|[^:])\/\/.*$/gm, '$1');
+
+const createProductBody = (() => {
+  const at = liveCatalog.indexOf('export async function createStoreProduct');
+  assertTop(at > 0, 'createStoreProduct is gone or renamed');
+  const end = liveCatalog.indexOf('export async function updateStoreProduct', at);
+  assertTop(end > at, 'could not find the end of createStoreProduct');
+  return liveCatalog.slice(at, end);
+})();
+
 runTest('🚨 A hand-added dish carries a storeId, or it can never be ordered', () => {
   // checkProductAvailability refuses any product whose storeId does not match
   // the store being ordered from — CROSS_STORE_PRODUCT_VIOLATION. A dish saved
   // without one appears on the menu and is unorderable forever.
-  assert(/storeId:\s*targetStoreId/.test(addItemBody), 'the new dish is saved without a storeId');
+  assert(
+    /createStoreProduct\(db,\s*targetStoreId/.test(addItemBody),
+    'the new dish is saved without the selected store'
+  );
   assert(
     /ไม่พบรหัสร้านค้า|Store ID Required/.test(addItemBody),
     'saving is not refused when no store is selected'
   );
+  assert(
+    createProductBody.includes('storeId is required'),
+    'the service would accept a product with no store'
+  );
+  assert(/\bstoreId,/.test(createProductBody), 'the service does not write storeId onto the product');
 });
 
 runTest('🚨 A hand-added dish carries priceSatang', () => {
   // Satang is what the order function prices from; without it, it rounds the
   // baht field on every single order instead.
-  assert(/priceSatang:\s*Math\.round/.test(addItemBody), 'the new dish has no satang price');
+  assert(
+    /priceSatang = Math\.round\(priceBaht \* 100\)/.test(createProductBody),
+    'the new dish has no satang price'
+  );
+  assert(/priceSatang,/.test(createProductBody), 'the satang price is not written');
 });
 
 runTest('🚨 Two dishes added seconds apart cannot collide', () => {
   // `ITEM-${Date.now().toString().slice(-4)}` is the last four digits of a
-  // millisecond clock — it repeats every ten seconds, and the write uses
+  // millisecond clock — it repeats every ten seconds, and the write used
   // `merge: true`, so the second dish silently overwrote the first.
   assert(!/Date\.now\(\)\.toString\(\)\.slice/.test(liveAdmin), 'the colliding id scheme is back');
   assert(
-    /id:\s*doc\(collection\(db, 'products'\)\)\.id/.test(addItemBody),
+    /doc\(collection\(db, 'products'\)\)/.test(createProductBody),
     'the id does not come from Firestore'
+  );
+  assert(
+    !/setDoc\(\s*doc\(db,\s*["']products["']/.test(addItemBody),
+    'the handler writes the product itself, bypassing the generated id'
   );
 });
 

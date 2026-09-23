@@ -239,6 +239,43 @@ runTest('🚨 The booking page no longer computes its own discount', () => {
   assert(liveBooking.includes('previewCoupon('), 'the page does not use the shared evaluator');
 });
 
+runTest('🚨 The suggested codes come from the database, not the JSX', () => {
+  // FoodBooking hardcoded WELCOME50, HAPPY15 and STUDENT10 as three literal
+  // chips. They matched the built-ins by luck: retire one in the admin console
+  // and the chip stayed, offering a code the server refuses; add a new coupon
+  // and no customer ever saw it.
+  for (const code of ['WELCOME50', 'HAPPY15', 'STUDENT10']) {
+    assert(
+      !new RegExp(`handleApplyCoupon\\(['"]${code}['"]\\)`).test(liveBooking),
+      `${code} is still hardcoded as a chip`
+    );
+  }
+  assert(liveBooking.includes('fetchOfferedCoupons'), 'nothing reads the coupons collection');
+  assert(liveBooking.includes('offeredCoupons.map('), 'the chips are not rendered from that read');
+});
+
+runTest('🚨 A coupon outside its hours is shown shut, not offered', () => {
+  // HAPPY15 runs 14:00–17:00. A chip that looks tappable at 10am produces a
+  // refusal that reads like a broken app; hiding it entirely would leave the
+  // customer wondering where the advertised discount went.
+  assert(liveBooking.includes('c.inWindowNow'), 'the chip ignores the coupon window');
+  assert(liveBooking.includes('c.windowLabel'), 'the chip does not say when the coupon runs');
+  assert(/disabled=\{couponChecking \|\| shut\}/.test(liveBooking), 'a shut coupon is still tappable');
+});
+
+runTest('🚨 Whether a window is open is decided by the shared predicate', () => {
+  // A second reading of the clock here could disagree with the refusal the
+  // server would send, which is how the discount maths drifted in the first
+  // place.
+  const svc = readFileSync(new URL('./src/services/couponService.ts', import.meta.url), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  assert(svc.includes('isWithinDailyWindow'), 'the service rolls its own window check');
+  assert(
+    /from '\.\.\/\.\.\/functions\/couponRules\.js'/.test(svc),
+    'the predicate is not the one the server uses'
+  );
+});
+
 runTest('The built-in coupons are installable as documents', () => {
   assert(live.includes('export const seedBuiltinCoupons'), 'there is no way to install them');
   assertEqual(BUILTIN_COUPONS.length, 3, 'the three advertised codes must all exist');
