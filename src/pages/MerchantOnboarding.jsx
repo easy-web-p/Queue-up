@@ -219,7 +219,7 @@ function MerchantOnboarding() {
                 className="shopee-onboarding-illustration-img"
               />
             </div>
-            <h2 className="shopee-onboarding-card-title">ยินดีต้อนรับผู้ใช้ใหม่</h2>
+            <h1 className="shopee-onboarding-card-title">ยินดีต้อนรับผู้ใช้ใหม่</h1>
             <p className="shopee-onboarding-card-subtitle">
               คุณสามารถเริ่มต้นการขายสินค้าใน QueueUp ได้โดยสร้างบัญชีผู้ขาย
             </p>
@@ -237,9 +237,9 @@ function MerchantOnboarding() {
           <div className="shopee-onboarding-card form-card fade-in">
             <div className="d-flex align-items-center justify-content-between mb-4 pb-2 border-bottom">
               <div>
-                <h3 className="fw-bold mb-1 text-neutral-900">
+                <h2 className="fs-3 fw-bold mb-1 text-neutral-900">
                   ขั้นตอนที่ 1/2: ข้อมูลร้านค้าและโรงอาหาร
-                </h3>
+                </h2>
                 <p className="text-muted small mb-0">กรอกข้อมูลร้านค้าของคุณสำหรับแสดงในระบบจองคิวโรงอาหาร</p>
               </div>
               <span className="badge bg-warning text-dark px-3 py-2 rounded-pill">ขั้นตอน 1 จาก 2</span>
@@ -314,9 +314,9 @@ function MerchantOnboarding() {
           <div className="shopee-onboarding-card form-card fade-in">
             <div className="d-flex align-items-center justify-content-between mb-4 pb-2 border-bottom">
               <div>
-                <h3 className="fw-bold mb-1 text-neutral-900">
+                <h2 className="fs-3 fw-bold mb-1 text-neutral-900">
                   ขั้นตอนที่ 2/2: ข้อมูลการรับเงิน (PromptPay)
-                </h3>
+                </h2>
                 <p className="text-muted small mb-0">กรอกข้อมูล PromptPay สำหรับรับเงินค่าอาหารจากนักเรียนและบุคลากร</p>
               </div>
               <span className="badge bg-success text-white px-3 py-2 rounded-pill">ขั้นตอน 2 จาก 2</span>
@@ -372,7 +372,7 @@ function MerchantOnboarding() {
             <div className="text-success mb-3">
               <i className="bi bi-check-circle-fill display-2 text-danger" />
             </div>
-            <h2 className="shopee-onboarding-card-title">สร้างบัญชีผู้ขายสำเร็จแล้ว! 🎉</h2>
+            <h1 className="shopee-onboarding-card-title">สร้างบัญชีผู้ขายสำเร็จแล้ว! 🎉</h1>
             <p className="shopee-onboarding-card-subtitle mb-4">
               ร้านค้า <b>"{storeName}"</b> ของคุณพร้อมรับคำสั่งจองคิวอาหารและบริหารจัดการเมนูแล้ว
             </p>

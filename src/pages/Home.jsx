@@ -469,9 +469,9 @@ function Home() {
               <span className="inline-block px-3 py-1 bg-[#FF7A1A] text-white font-['JetBrains_Mono'] font-bold text-xs rounded-full shadow-sm mb-2">
                 QUEUEUP FOR CAMPUS
               </span>
-              <h4 className="font-['Kanit'] font-black text-xl sm:text-2xl text-slate-900 dark:text-white mb-1">
+              <h2 className="font-['Kanit'] font-black text-xl sm:text-2xl text-slate-900 dark:text-white mb-1">
                 ศูนย์รวมบริการโรงอาหารอัจฉริยะในสถานศึกษา
-              </h4>
+              </h2>
               <p className="text-slate-600 dark:text-stone-400 text-xs sm:text-sm mb-0">
                 ระบบสนับสนุนผู้ประกอบการนักเรียน กระเป๋าเงินดิจิทัล และระบบดูแลสุขภาพผู้เรียน
               </p>
@@ -487,7 +487,7 @@ function Home() {
             >
               <div>
                 <div className="text-3xl mb-3 group-hover:scale-110 transition-transform inline-block">🧑‍🎓</div>
-                <h6 className="font-['Kanit'] font-bold text-slate-900 dark:text-white text-base mb-1">ร้านค้านักเรียน</h6>
+                <h3 className="font-['Kanit'] font-bold text-slate-900 dark:text-white text-base mb-1">ร้านค้านักเรียน</h3>
                 <p className="text-slate-600 dark:text-stone-400 text-xs leading-relaxed mb-0">
                   ยื่นขอเปิดร้านค้าในโรงอาหาร บ่มเพาะทักษะธุรกิจ
                 </p>
@@ -508,7 +508,7 @@ function Home() {
             >
               <div>
                 <div className="text-3xl mb-3 group-hover:scale-110 transition-transform inline-block">🛡️</div>
-                <h6 className="font-['Kanit'] font-bold text-slate-900 dark:text-white text-base mb-1">ผู้ปกครอง (Guardian)</h6>
+                <h3 className="font-['Kanit'] font-bold text-slate-900 dark:text-white text-base mb-1">ผู้ปกครอง (Guardian)</h3>
                 <p className="text-slate-600 dark:text-stone-400 text-xs leading-relaxed mb-0">
                   เติมเงิน กำหนดวงเงินรายวัน และบล็อกหมวดอาหาร
                 </p>
@@ -529,7 +529,7 @@ function Home() {
             >
               <div>
                 <div className="text-3xl mb-3 group-hover:scale-110 transition-transform inline-block">👨‍🏫</div>
-                <h6 className="font-['Kanit'] font-bold text-slate-900 dark:text-white text-base mb-1">อาจารย์ / ฝ่ายปกครอง</h6>
+                <h3 className="font-['Kanit'] font-bold text-slate-900 dark:text-white text-base mb-1">อาจารย์ / ฝ่ายปกครอง</h3>
                 <p className="text-slate-600 dark:text-stone-400 text-xs leading-relaxed mb-0">
                   อนุมัติร้านค้านักเรียน และตรวจสอบสุขอนามัย
                 </p>
@@ -550,7 +550,7 @@ function Home() {
             >
               <div>
                 <div className="text-3xl mb-3 group-hover:scale-110 transition-transform inline-block">💰</div>
-                <h6 className="font-['Kanit'] font-bold text-slate-900 dark:text-white text-base mb-1">ยืนยันการเติมเงิน</h6>
+                <h3 className="font-['Kanit'] font-bold text-slate-900 dark:text-white text-base mb-1">ยืนยันการเติมเงิน</h3>
                 <p className="text-slate-600 dark:text-stone-400 text-xs leading-relaxed mb-0">
                   ตรวจคำขอเติมเงินจากผู้ปกครอง และยืนยันเมื่อได้รับเงินสดที่ห้องธุรการแล้ว
                 </p>
@@ -571,7 +571,7 @@ function Home() {
             >
               <div>
                 <div className="text-3xl mb-3 group-hover:scale-110 transition-transform inline-block">👪</div>
-                <h6 className="font-['Kanit'] font-bold text-slate-900 dark:text-white text-base mb-1">ยืนยันบัญชีผู้ปกครอง</h6>
+                <h3 className="font-['Kanit'] font-bold text-slate-900 dark:text-white text-base mb-1">ยืนยันบัญชีผู้ปกครอง</h3>
                 <p className="text-slate-600 dark:text-stone-400 text-xs leading-relaxed mb-0">
                   ตรวจสอบความสัมพันธ์ผู้ปกครอง–นักเรียน ก่อนให้สิทธิ์เข้าถึงกระเป๋าเงินและข้อมูลสุขภาพ
                 </p>
@@ -592,7 +592,7 @@ function Home() {
             >
               <div>
                 <div className="text-3xl mb-3 group-hover:scale-110 transition-transform inline-block">📺</div>
-                <h6 className="font-['Kanit'] font-bold text-slate-900 dark:text-white text-base mb-1">จอแสดงคิวสด</h6>
+                <h3 className="font-['Kanit'] font-bold text-slate-900 dark:text-white text-base mb-1">จอแสดงคิวสด</h3>
                 <p className="text-slate-600 dark:text-stone-400 text-xs leading-relaxed mb-0">
                   จอแสดงผลคิวปรุงเสร็จแบบเรียลไทม์ในโรงอาหาร
                 </p>
@@ -613,7 +613,7 @@ function Home() {
             >
               <div>
                 <div className="text-3xl mb-3 group-hover:scale-110 transition-transform inline-block">🚨</div>
-                <h6 className="font-['Kanit'] font-bold text-slate-900 dark:text-white text-base mb-1">พยาบาล & ฉุกเฉิน</h6>
+                <h3 className="font-['Kanit'] font-bold text-slate-900 dark:text-white text-base mb-1">พยาบาล & ฉุกเฉิน</h3>
                 <p className="text-slate-600 dark:text-stone-400 text-xs leading-relaxed mb-0">
                   ค้นหาประวัติแพ้อาหาร โรคประจำตัว และบันทึก Audit
                 </p>
@@ -630,10 +630,10 @@ function Home() {
 
         {/* 4. Food Categories Carousel */}
         <section className="queue-category-section">
-          <h5 className="fw-bold queue-category-title mb-3">
+          <h3 className="fs-5 fw-bold queue-category-title mb-3">
             <i className="bi bi-grid-fill text-primary me-2" />
             {language === "en" ? "Food Categories" : "หมวดหมู่อาหาร"}
-          </h5>
+          </h3>
           <div className="queue-category-list">
             {categories.map((cat) => (
               <div
@@ -669,10 +669,10 @@ function Home() {
         <section className="bg-white p-4 rounded-4 shadow-sm border mb-4 queue-bestseller-section">
           <div className="d-flex align-items-center justify-content-between mb-3">
             <div>
-              <h5 className="fw-bold text-dark mb-0">
+              <h3 className="fs-5 fw-bold text-dark mb-0">
                 <i className="bi bi-fire text-danger me-1" />{" "}
                 {language === "en" ? "Top 10 Bestselling Canteen Dishes" : "10 อันดับเมนูขายดีประจำโรงอาหาร"}
-              </h5>
+              </h3>
               <p className="text-muted text-xs mb-0 mt-1">
                 {language === "en"
                   ? "Auto-scrolling popular canteen meals"
@@ -725,10 +725,10 @@ function Home() {
         {/* 6. AI Smart Behavior & Live Merchant Coupons */}
         <section className="bg-white p-4 rounded-4 shadow-sm border mb-4">
           <div className="d-flex align-items-center justify-content-between mb-3">
-            <h5 className="fw-bold text-dark mb-0">
+            <h3 className="fs-5 fw-bold text-dark mb-0">
               <i className="bi bi-cpu-fill text-primary me-2" />
               AI Smart Assistant & คูปองส่วนลดพิเศษประจำวัน
-            </h5>
+            </h3>
           </div>
 
           <div className="row g-3">
@@ -740,7 +740,7 @@ function Home() {
                       <i className="bi bi-lightning-charge-fill" />
                       AI Quick Re-order (สั่งต่อใน 1 คลิก)
                     </span>
-                    <h6 className="font-['Kanit'] font-bold text-sm mb-1">{aiInsights.lastOrderedItem.itemTitle}</h6>
+                    <h4 className="font-['Kanit'] font-bold text-sm mb-1">{aiInsights.lastOrderedItem.itemTitle}</h4>
                     <p className="text-slate-500 dark:text-slate-400 text-xs mb-0">
                       {aiInsights.lastOrderedItem.variant ? `ตัวเลือก: ${aiInsights.lastOrderedItem.variant} • ` : ""}
                       ราคา ฿{aiInsights.lastOrderedItem.price}
@@ -865,10 +865,10 @@ function Home() {
         <section className="bg-white p-4 rounded-4 shadow-sm border mb-4">
           <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
             <div>
-              <h5 className="fw-bold text-dark mb-0">
+              <h3 className="fs-5 fw-bold text-dark mb-0">
                 <i className="bi bi-grid-3x3-gap-fill text-primary me-2" />
                 🍽️ อาหารทั้งหมดในโรงอาหาร
-              </h5>
+              </h3>
               <p className="text-muted text-xs mb-0 mt-1">
                 {displayCatalogItems.length} รายการอาหาร • กรองตามหมวดหมู่และราคา
               </p>

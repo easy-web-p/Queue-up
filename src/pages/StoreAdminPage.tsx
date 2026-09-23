@@ -879,10 +879,10 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
 
             {/* Quick System Toggles Panel */}
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-              <h3 className="font-extrabold text-base text-slate-900 flex items-center gap-2">
+              <h2 className="font-extrabold text-base text-slate-900 flex items-center gap-2">
                 <Settings className="w-5 h-5 text-[#FF7A1A]" />
                 <span>การตั้งค่าการทำงานอัตโนมัติของร้านค้า</span>
-              </h3>
+              </h2>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
@@ -963,12 +963,12 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
                   <span>จัดการรายการอาหาร & บริหารราคา (Price Management)</span>
                   <span className="text-[10px] bg-orange-100 text-[#FF7A1A] font-bold px-2 py-0.5 rounded-full border border-orange-200">
                     อัปเดตเรียลไทม์
                   </span>
-                </h3>
+                </h2>
                 <p className="text-xs text-slate-500">ปรับเปลี่ยนราคาอาหารแบบรายตัว ปรับราคาด่วนยกหมวด เปิด/ปิดสต็อก และเพิ่มเมนูใหม่</p>
               </div>
 
@@ -1186,7 +1186,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-base font-extrabold text-slate-900">รายการออเดอร์ & หน้าจอทำอาหาร KDS</h3>
+                <h2 className="text-base font-extrabold text-slate-900">รายการออเดอร์ & หน้าจอทำอาหาร KDS</h2>
                 <p className="text-xs text-slate-500">จัดการสถานะทำอาหารและเตรียมแจกจ่ายตามลำดับคิว</p>
               </div>
               <span className="text-xs px-3 py-1 rounded-full bg-orange-100 text-[#FF7A1A] font-extrabold">
@@ -1264,7 +1264,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
         {activeTab === 'payments' && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-6">
             <div>
-              <h3 className="text-base font-extrabold text-slate-900">ตั้งค่าระบบ Zero-Payment & กำลังการผลิตคิว</h3>
+              <h2 className="text-base font-extrabold text-slate-900">ตั้งค่าระบบ Zero-Payment & กำลังการผลิตคิว</h2>
               <p className="text-xs text-slate-500">กำหนดขีดจำกัดออเดอร์ต่อสล็อตเวลาและสถานะเปิดปิดร้านค้า</p>
             </div>
 
@@ -1339,7 +1339,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
             <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <h3 className="text-base font-extrabold text-slate-900">พนักงานประจำร้าน</h3>
+                  <h2 className="text-base font-extrabold text-slate-900">พนักงานประจำร้าน</h2>
                   <p className="text-xs text-slate-500">ผู้ช่วย พ่อครัว และแคชเชียร์ที่เข้าถึงออเดอร์ของร้านนี้ได้</p>
                 </div>
                 <button
@@ -1455,7 +1455,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-5">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
-                <h3 className="text-base font-extrabold text-slate-900">ระบบ CRM & โค้ดคูปองส่วนลด</h3>
+                <h2 className="text-base font-extrabold text-slate-900">ระบบ CRM & โค้ดคูปองส่วนลด</h2>
                 <p className="text-xs text-slate-500">กำหนดอัตราการแจกแต้มและสร้างแคมเปญโปรโมชั่นดึงดูดลูกค้า</p>
               </div>
               <button
@@ -1469,13 +1469,13 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="p-4 rounded-xl border border-slate-200 bg-amber-50/50 space-y-2">
-                <h4 className="font-extrabold text-xs text-amber-900">กฎการสะสมคะแนน (Earning Points)</h4>
+                <h3 className="font-extrabold text-xs text-amber-900">กฎการสะสมคะแนน (Earning Points)</h3>
                 <p className="text-xs text-slate-600">ซื้อครบทุกๆ 10 บาท ได้รับคะแนนสะสม 1 แต้ม</p>
                 <div className="text-[11px] text-amber-700 font-bold">✓ คำนวณแต้มสะสมให้อัตโนมัติทุกคำสั่งซื้อ</div>
               </div>
 
               <div className="p-4 rounded-xl border border-slate-200 bg-blue-50/50 space-y-2">
-                <h4 className="font-extrabold text-xs text-blue-900">แคมเปญแลกส่วนลด (Redemption)</h4>
+                <h3 className="font-extrabold text-xs text-blue-900">แคมเปญแลกส่วนลด (Redemption)</h3>
                 <p className="text-xs text-slate-600">50 แต้ม = คูปองส่วนลด 5 บาทสำหรับมื้อถัดไป</p>
                 <div className="text-[11px] text-blue-700 font-bold">✓ ดึงดูดลูกค้าเดิมกลับมาซื้อซ้ำเป็นประจำ</div>
               </div>
@@ -1606,7 +1606,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
         {activeTab === 'logs' && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-4">
             <div>
-              <h3 className="text-base font-extrabold text-slate-900">บันทึกกิจกรรมและความปลอดภัยระบบ</h3>
+              <h2 className="text-base font-extrabold text-slate-900">บันทึกกิจกรรมและความปลอดภัยระบบ</h2>
               <p className="text-xs text-slate-500">ประวัติการปรับปรุงสต็อก แก้ไขราคา และการตรวจสอบสลิป</p>
             </div>
 
@@ -1664,7 +1664,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
             ref={addStaffDialogRef}
             {...addStaffDialogProps} className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[90dvh] overflow-y-auto overscroll-contain space-y-4 border border-slate-200 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 id="admin-add-staff-title" className="font-extrabold text-slate-900 text-base">เพิ่มพนักงานใหม่</h3>
+              <h2 id="admin-add-staff-title" className="font-extrabold text-slate-900 text-base">เพิ่มพนักงานใหม่</h2>
               <button
                 onClick={() => setShowAddStaffModal(false)}
                 className="text-slate-400 hover:text-slate-600 text-sm font-bold"
@@ -1738,7 +1738,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
             ref={addCouponDialogRef}
             {...addCouponDialogProps} className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[90dvh] overflow-y-auto overscroll-contain space-y-4 border border-slate-200 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 id="admin-add-coupon-title" className="font-extrabold text-slate-900 text-base">สร้างโค้ดคูปองส่วนลดใหม่</h3>
+              <h2 id="admin-add-coupon-title" className="font-extrabold text-slate-900 text-base">สร้างโค้ดคูปองส่วนลดใหม่</h2>
               <button
                 onClick={() => setShowAddCouponModal(false)}
                 className="text-slate-400 hover:text-slate-600 text-sm font-bold"
@@ -1812,7 +1812,7 @@ export const StoreAdminPage: React.FC<StoreAdminPageProps> = ({
             ref={addAdminItemDialogRef}
             {...addAdminItemDialogProps} className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[90dvh] overflow-y-auto overscroll-contain space-y-4 border border-slate-200 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 id="admin-add-item-title" className="font-extrabold text-slate-900 text-base">เพิ่มรายการอาหารใหม่</h3>
+              <h2 id="admin-add-item-title" className="font-extrabold text-slate-900 text-base">เพิ่มรายการอาหารใหม่</h2>
               <button
                 onClick={() => setShowAddItemModal(false)}
                 className="text-slate-400 hover:text-slate-600 text-sm font-bold"

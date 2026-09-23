@@ -171,9 +171,9 @@ export default function StudentVendorOnboarding() {
               )}
               <div className="flex-1">
                 <div className="flex items-center justify-between flex-wrap gap-2">
-                  <h3 className="text-lg font-bold font-['Kanit'] text-slate-900 dark:text-white">
+                  <h2 className="text-lg font-bold font-['Kanit'] text-slate-900 dark:text-white">
                     สถานะใบสมัคร: {existingRequest.shopName}
-                  </h3>
+                  </h2>
                   <span className={`px-3 py-1 rounded-full text-xs font-bold font-['JetBrains_Mono'] ${
                     existingRequest.status === 'APPROVED'
                       ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30'

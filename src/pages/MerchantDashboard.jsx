@@ -776,7 +776,7 @@ function MerchantDashboard() {
             </div>
             <div>
               <div className="d-flex align-items-center flex-wrap gap-2">
-                <h2 className="merchant-title mb-0">{storeName}</h2>
+                <h1 className="merchant-title mb-0">{storeName}</h1>
                 <span className="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
                   <i className="bi bi-patch-check-fill me-1" />
                   ร้านค้ายืนยันแล้ว
@@ -1001,15 +1001,15 @@ function MerchantDashboard() {
         {/* TAB 4: STORE PROFILE & PRIVATE FINANCE */}
         {activeTab === "profile" && (
           <div className="merchant-panel-box">
-            <h3 className="merchant-panel-title mb-4">
+            <h2 className="merchant-panel-title mb-4">
               <i className="bi bi-gear-wide-connected text-primary me-2" />
               ตั้งค่าข้อมูลร้านค้า & ข้อมูลบัญชีรับเงินโอน
-            </h3>
+            </h2>
 
             <div className="row g-4">
               <div className="col-md-6">
                 <form onSubmit={handleSaveStoreProfile} className="p-3 bg-light rounded-3 border">
-                  <h5 className="fw-bold mb-3">ข้อมูลร้านค้าที่แสดงสาธารณะ</h5>
+                  <h3 className="fs-5 fw-bold mb-3">ข้อมูลร้านค้าที่แสดงสาธารณะ</h3>
                   <div className="mb-3">
                     <label className="form-label font-weight-bold">ชื่อร้านค้า:</label>
                     <input autoComplete="organization" aria-label="ชื่อร้านค้า"
@@ -1048,9 +1048,9 @@ function MerchantDashboard() {
                   </div>
 
                   <hr className="my-3" />
-                  <h6 className="fw-bold mb-2 text-primary">
+                  <h4 className="fs-6 fw-bold mb-2 text-primary">
                     <i className="bi bi-shield-lock-fill me-1" /> ข้อมูลบัญชีรับเงิน (Private Finance)
-                  </h6>
+                  </h4>
                   <div className="mb-3">
                     <label className="form-label font-weight-bold">ชื่อธนาคาร / บริการ:</label>
                     <input aria-label="ชื่อธนาคาร / บริการ"
@@ -1097,10 +1097,10 @@ function MerchantDashboard() {
               <div className="col-md-6">
                 <div className="p-4 bg-dark text-white rounded-3 border border-secondary space-y-3">
                   <div className="d-flex align-items-center justify-content-between mb-3">
-                    <h5 className="fw-bold text-warning mb-0">
+                    <h3 className="fs-5 fw-bold text-warning mb-0">
                       <i className="bi bi-shield-check me-2" />
                       นโยบายการให้บริการแบบ Zero-Payment
-                    </h5>
+                    </h3>
                     <span className="badge bg-success">โหมดไร้สลิป 100%</span>
                   </div>
 
@@ -1131,10 +1131,10 @@ function MerchantDashboard() {
         {activeTab === "staff" && (
           <div className="merchant-panel-box">
             <div className="d-flex align-items-center justify-content-between mb-4">
-              <h3 className="merchant-panel-title mb-0">
+              <h2 className="merchant-panel-title mb-0">
                 <i className="bi bi-people-fill text-primary me-2" />
                 จัดการสิทธิ์พนักงานประจำร้าน
-              </h3>
+              </h2>
               <button
                 className="btn btn-primary font-weight-bold"
                 onClick={() => setIsAddStaffOpen(!isAddStaffOpen)}
@@ -1145,7 +1145,7 @@ function MerchantDashboard() {
 
             {isAddStaffOpen && (
               <form onSubmit={handleAddStaff} className="p-3 bg-light border rounded-3 mb-4">
-                <h6 className="fw-bold mb-3">เพิ่มข้อมูลพนักงานใหม่</h6>
+                <h3 className="fs-6 fw-bold mb-3">เพิ่มข้อมูลพนักงานใหม่</h3>
                 <div className="row g-3">
                   <div className="col-md-5">
                     <input autoComplete="off" aria-label="ชื่อ"
@@ -1251,10 +1251,10 @@ function MerchantDashboard() {
         {activeTab === "marketing" && (
           <div className="merchant-panel-box">
             <div className="d-flex align-items-center justify-content-between mb-4">
-              <h3 className="merchant-panel-title mb-0">
+              <h2 className="merchant-panel-title mb-0">
                 <i className="bi bi-ticket-percent text-primary me-2" />
                 คูปองส่วนลดของร้าน
-              </h3>
+              </h2>
               {/* A "Security Health: {healthScore}/100" badge stood here. The
                   function it read never returns healthScore, so it rendered
                   "undefined/100" — and the numbers it does return are counted
@@ -1270,10 +1270,10 @@ function MerchantDashboard() {
             <div className="row g-4">
               <div className="col-md-7">
                 <div className="p-3 bg-light rounded-3 border">
-                  <h5 className="fw-bold mb-3 text-dark">
+                  <h3 className="fs-5 fw-bold mb-3 text-dark">
                     <i className="bi bi-stars text-warning me-1" />
                     ข้อเสนอแนะคูปองส่วนลดจาก AI (AI Coupon Generator)
-                  </h5>
+                  </h3>
 
                   <div className="d-flex flex-column gap-3">
                     {aiMarketingCoupons.map((c, idx) => (
@@ -1300,10 +1300,10 @@ function MerchantDashboard() {
 
               <div className="col-md-5">
                 <div className="p-3 bg-dark text-white rounded-3 border border-secondary">
-                  <h5 className="fw-bold text-warning mb-3">
+                  <h3 className="fs-5 fw-bold text-warning mb-3">
                     <i className="bi bi-ticket-perforated-fill me-2" />
                     คูปองร้านค้าที่กำลังเปิดใช้งาน (Live)
-                  </h5>
+                  </h3>
 
                   <div className="d-flex flex-column gap-2 mb-3">
                     {activeCouponsList.length === 0 && (

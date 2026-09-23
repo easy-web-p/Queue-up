@@ -633,9 +633,9 @@ export default function Queueup() {
 
         {/* Real User Evaluation Comments Carousel / Grid */}
         <div className="mb-5">
-          <h4 className="fw-bold text-light mb-3">
+          <h3 className="fs-4 fw-bold text-light mb-3">
             <i className="bi bi-chat-quote-fill text-warning me-2" /> ความคิดเห็นและผลประเมินจากผู้ใช้งานจริงล่าสุด ({evaluations.length} ความคิดเห็น)
-          </h4>
+          </h3>
           {evalLoadFailed && (
             <div role="alert" className="p-3 rounded-3 bg-slate-800/60 border border-amber-500/40 text-amber-200 small">
               ไม่สามารถโหลดผลประเมินได้ในขณะนี้ กรุณารีเฟรชหน้าอีกครั้ง
@@ -902,7 +902,7 @@ export default function Queueup() {
                 <div className="qup-team-icon-box" style={{ background: m.bg, color: m.color }}>
                   <i className={`bi ${m.icon}`} />
                 </div>
-                <h4 className="qup-team-name">{m.name}</h4>
+                <h3 className="qup-team-name">{m.name}</h3>
                 <div className="qup-team-id">รหัสประจำตัว: {m.id}</div>
                 <div className="qup-team-role" style={{ color: m.color }}>
                   {m.role}

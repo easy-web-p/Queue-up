@@ -612,6 +612,12 @@ function UserProfile() {
       />
 
       <div className="shopee-profile-container">
+        {/* The page's own heading. It had none, so the panel titles were the
+            shallowest headings and every panel read as a top-level section of
+            nothing. Hidden, because the avatar card beside it already says
+            whose account this is. */}
+        <h1 className="sr-only">บัญชีของฉัน</h1>
+
         {/* ==================== LEFT SIDEBAR MENU ==================== */}
         <aside className="shopee-user-sidebar">
           {/* Top User Card with Avatar Upload & Image Fallback */}
@@ -1302,9 +1308,12 @@ function UserProfile() {
                     <span className="text-warning small fw-bold text-uppercase tracking-wider">
                       คลังแต้มสะสมของคุณ (QueueUp Points Balance)
                     </span>
-                    <h1 className="fw-bold display-6 mb-0 text-warning mt-1">
+                    {/* A points total is data, not a heading. As the page's
+                        only level-1 heading it made heading navigation
+                        announce the whole profile as "🪙 0 แต้ม". */}
+                    <div className="fw-bold display-6 mb-0 text-warning mt-1">
                       🪙 {userPoints.toLocaleString()} <span className="fs-5 text-slate-300">แต้ม</span>
-                    </h1>
+                    </div>
                     <div className="small text-slate-300 mt-2">
                       <i className="bi bi-info-circle me-1" />
                       {membershipInfo.nextInfo}
@@ -1336,12 +1345,12 @@ function UserProfile() {
               </div>
 
               {/* Tier Comparison Grid */}
-              <h5 className="fw-bold mb-3 text-slate-800">สิทธิพิเศษประจำระดับสมาชิก (Membership Tier Privileges)</h5>
+              <h3 className="fs-5 fw-bold mb-3 text-slate-800">สิทธิพิเศษประจำระดับสมาชิก (Membership Tier Privileges)</h3>
               <div className="row g-3 mb-4">
                 <div className="col-md-3 col-6">
                   <div className={`p-3 rounded-4 border text-center h-100 ${membershipInfo.name === "Bronze Member" ? "border-warning bg-amber-50" : "border-slate-200 bg-white"}`}>
                     <div className="fs-2 mb-1">🥉</div>
-                    <h6 className="fw-bold mb-1 text-amber-600">Bronze Member</h6>
+                    <h4 className="fs-6 fw-bold mb-1 text-amber-600">Bronze Member</h4>
                     <div className="small text-muted mb-2">0 - 499 แต้ม</div>
                     <span className="badge bg-warning text-dark rounded-pill small">ส่วนลด 5%</span>
                   </div>
@@ -1350,7 +1359,7 @@ function UserProfile() {
                 <div className="col-md-3 col-6">
                   <div className={`p-3 rounded-4 border text-center h-100 ${membershipInfo.name === "Silver Member" ? "border-secondary bg-slate-100" : "border-slate-200 bg-white"}`}>
                     <div className="fs-2 mb-1">🥈</div>
-                    <h6 className="fw-bold mb-1 text-slate-500">Silver Member</h6>
+                    <h4 className="fs-6 fw-bold mb-1 text-slate-500">Silver Member</h4>
                     <div className="small text-muted mb-2">500 - 1,499 แต้ม</div>
                     <span className="badge bg-secondary text-white rounded-pill small">ส่วนลด 10% + จองคิวด่วน</span>
                   </div>
@@ -1359,7 +1368,7 @@ function UserProfile() {
                 <div className="col-md-3 col-6">
                   <div className={`p-3 rounded-4 border text-center h-100 ${membershipInfo.name === "Gold Member" ? "border-warning bg-warning-50" : "border-slate-200 bg-white"}`}>
                     <div className="fs-2 mb-1">🥇</div>
-                    <h6 className="fw-bold mb-1 text-yellow-500">Gold Member</h6>
+                    <h4 className="fs-6 fw-bold mb-1 text-yellow-500">Gold Member</h4>
                     <div className="small text-muted mb-2">1,500 - 3,499 แต้ม</div>
                     <span className="badge bg-warning text-dark rounded-pill small">ส่วนลด 15% + สปีดคิว</span>
                   </div>
@@ -1368,7 +1377,7 @@ function UserProfile() {
                 <div className="col-md-3 col-6">
                   <div className={`p-3 rounded-4 border text-center h-100 ${membershipInfo.name === "Platinum Member" ? "border-purple bg-purple-50" : "border-slate-200 bg-white"}`}>
                     <div className="fs-2 mb-1">💎</div>
-                    <h6 className="fw-bold mb-1 text-purple-500">Platinum Member</h6>
+                    <h4 className="fs-6 fw-bold mb-1 text-purple-500">Platinum Member</h4>
                     <div className="small text-muted mb-2">3,500+ แต้ม</div>
                     <span className="badge bg-purple text-white rounded-pill small">VIP School Executive 20%</span>
                   </div>

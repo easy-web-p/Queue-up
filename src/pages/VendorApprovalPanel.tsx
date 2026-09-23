@@ -140,7 +140,7 @@ export default function VendorApprovalPanel() {
         {filteredRequests.length === 0 ? (
           <div className="p-12 text-center bg-white dark:bg-[#241C16] border border-slate-200 dark:border-[#FF7A1A]/20 rounded-3xl shadow-sm">
             <Clock className="w-12 h-12 text-slate-400 dark:text-[#9CA3AF] mx-auto mb-3 opacity-40" />
-            <h3 className="text-lg font-bold font-['Kanit'] text-slate-800 dark:text-[#E5E7EB]">ไม่พบรายการคำขอในหมวดหมู่นี้</h3>
+            <h2 className="text-lg font-bold font-['Kanit'] text-slate-800 dark:text-[#E5E7EB]">ไม่พบรายการคำขอในหมวดหมู่นี้</h2>
             <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-1">คำขอเปิดร้านค้านักเรียนใหม่จะแสดงที่นี่โดยอัตโนมัติ</p>
           </div>
         ) : (
@@ -156,9 +156,9 @@ export default function VendorApprovalPanel() {
                       <span className="text-xs font-bold text-[#FF7A1A] font-['JetBrains_Mono']">
                         {req.studentCode || 'N/A'}
                       </span>
-                      <h3 className="text-lg font-bold font-['Kanit'] text-slate-900 dark:text-white mt-1">
+                      <h2 className="text-lg font-bold font-['Kanit'] text-slate-900 dark:text-white mt-1">
                         {req.shopName}
-                      </h3>
+                      </h2>
                       <p className="text-xs text-slate-600 dark:text-[#E5E7EB] flex items-center gap-1 mt-0.5">
                         <UserCheck className="w-3.5 h-3.5 text-slate-400 dark:text-[#9CA3AF]" />
                         {req.studentName} ({req.class || 'N/A'})
@@ -229,10 +229,10 @@ export default function VendorApprovalPanel() {
             <div
             ref={rejectDialogRef}
             {...rejectDialogProps} className="bg-white dark:bg-[#241C16] border border-slate-200 dark:border-[#FF7A1A]/30 rounded-3xl p-6 max-w-md w-full max-h-[90dvh] overflow-y-auto overscroll-contain shadow-2xl space-y-4">
-              <h3 id="vendor-reject-title" className="text-lg font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
+              <h2 id="vendor-reject-title" className="text-lg font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
                 <AlertCircle className="w-5 h-5 text-red-500" />
                 ระบุเหตุผลในการปฏิเสธคำขอ
-              </h3>
+              </h2>
               <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">
                 ร้านค้า: <strong className="text-slate-900 dark:text-white">{selectedRequest.shopName}</strong> ({selectedRequest.studentName})
               </p>

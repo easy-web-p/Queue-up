@@ -168,7 +168,10 @@ function SearchResults() {
 
       <div className="shopee-search-container max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 flex-1">
         {/* Keyword Result Header Hint */}
-        <div className="shopee-search-hint-header text-sm text-slate-600 dark:text-slate-400 mb-5 flex items-center gap-2">
+        {/* The page's heading. The only heading on this page used to be the
+            "no results" message inside the grid, so a search that DID find
+            something produced a page with no headings at all. */}
+        <h1 className="shopee-search-hint-header text-sm text-slate-600 dark:text-slate-400 mb-5 flex items-center gap-2">
           <i className="bi bi-lightbulb text-warning" />
           <span>
             ผลการค้นหาสำหรับคำว่า{" "}
@@ -176,7 +179,7 @@ function SearchResults() {
               "{keyword}"
             </span>
           </span>
-        </div>
+        </h1>
 
         {/* Main Search Grid */}
         <div className="shopee-search-main-grid flex flex-col lg:flex-row gap-6">
@@ -358,9 +361,9 @@ function SearchResults() {
                   <div className="shopee-empty-icon-circle w-16 h-16 rounded-full bg-orange-50 dark:bg-orange-950/50 text-orange-500 flex items-center justify-center text-2xl mx-auto mb-4">
                     <i className="bi bi-search" />
                   </div>
-                  <h3 className="shopee-empty-title text-base sm:text-lg font-black text-slate-900 dark:text-white mb-2">
+                  <h2 className="shopee-empty-title text-base sm:text-lg font-black text-slate-900 dark:text-white mb-2">
                     ไม่พบข้อมูลเมนูนี้ที่คุณค้นหาสำหรับ "{keyword}"
-                  </h3>
+                  </h2>
                   <p className="shopee-empty-sub text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-4">
                     ลองตรวจสอบตัวสะกด หรือค้นหาด้วยคีย์เวิร์ดยอดนิยม เช่น "ไก่ทอด", "ชานม", "ก๋วยเตี๋ยว", "เบอร์เกอร์"
                   </p>

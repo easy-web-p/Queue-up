@@ -182,10 +182,10 @@ export default function StudentVendorEarnings() {
           {/* Team Revenue Split */}
           <div className="bg-white dark:bg-[#241C16] border border-slate-200 dark:border-[#FF7A1A]/20 rounded-3xl p-6 shadow-md space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/10 pb-3">
-              <h3 className="text-lg font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
+              <h2 className="text-lg font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
                 <Users className="w-5 h-5 text-[#FF7A1A]" />
                 ระบบจัดสรรรายได้สมาชิกทีม (Team Revenue Share)
-              </h3>
+              </h2>
             </div>
 
             <div className="space-y-3">
@@ -194,7 +194,7 @@ export default function StudentVendorEarnings() {
                 return (
                   <div key={idx} className="p-4 bg-slate-50 dark:bg-[#16100C] border border-slate-200 dark:border-white/10 rounded-2xl flex items-center justify-between">
                     <div>
-                      <h4 className="text-sm font-bold text-slate-900 dark:text-white">{member.name}</h4>
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white">{member.name}</h3>
                       <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">{member.role} • สัดส่วน {member.sharePercent}%</p>
                       <button
                         type="button"
@@ -254,10 +254,10 @@ export default function StudentVendorEarnings() {
           {/* Cost Ratio & Financial Calculator */}
           <div className="bg-white dark:bg-[#241C16] border border-slate-200 dark:border-[#FF7A1A]/20 rounded-3xl p-6 shadow-md space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/10 pb-3">
-              <h3 className="text-lg font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
+              <h2 className="text-lg font-bold font-['Kanit'] text-slate-900 dark:text-white flex items-center gap-2">
                 <Calculator className="w-5 h-5 text-[#FF7A1A]" />
                 ปรับแต่งสัดส่วนต้นทุนวัตถุดิบ (Cost Percentage)
-              </h3>
+              </h2>
             </div>
 
             <div>

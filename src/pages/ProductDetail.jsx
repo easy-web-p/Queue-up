@@ -1042,10 +1042,10 @@ function ProductDetail() {
             {/* Special Terms & Discount Notice */}
             <div className="queue-pd-recommend-box">
               <div className="queue-pd-recommend-header">
-                <h3 className="queue-pd-recommend-title">
+                <h2 className="queue-pd-recommend-title">
                   <i className="bi bi-info-circle-fill me-1 text-primary" />
                   เงื่อนไขการสั่งจองและรับส่วนลด
-                </h3>
+                </h2>
               </div>
               <p className="queue-pd-recommend-desc">
                 {/* "-50% QueueUp Early Bird" and "รับแต้มสะสมฟรี 2 เท่า" were both
@@ -1105,7 +1105,7 @@ function ProductDetail() {
             {/* Store Meta */}
             <div className="d-flex justify-content-between align-items-center">
               <div>
-                <h1 className="queue-pd-shop-title mb-0">{store?.name || product.shopName || store?.id || "ร้านค้า"}</h1>
+                <h2 className="queue-pd-shop-title mb-0">{store?.name || product.shopName || store?.id || "ร้านค้า"}</h2>
                 <div className="queue-pd-shop-hours small text-muted">
                   <i className="bi bi-clock me-1 text-primary" /> เวลาทำการ: {store?.hours || "ไม่ระบุ"}
                 </div>
@@ -1127,7 +1127,11 @@ function ProductDetail() {
             <div className="d-flex justify-content-between align-items-center bg-light p-2.5 rounded-3">
               <div>
                 <span className="badge bg-danger-subtle text-danger text-xs fw-bold mb-1">เมนูแนะนำ</span>
-                <h2 className="fs-5 fw-bold text-dark mb-0">{product.name}</h2>
+                {/* The dish is what this page is about. The stall's name above
+                    was the page's level-1 heading and the dish sat under it,
+                    so the outline said the page was about the stall and the
+                    food was a detail of it. */}
+                <h1 className="fs-5 fw-bold text-dark mb-0">{product.name}</h1>
               </div>
               <div className="text-end">
                 {/* A struck-through `basePrice + 40` used to sit here — ฿40 added
@@ -1707,10 +1711,10 @@ function ProductDetail() {
               <div className="modal-content rounded-4 border-0 shadow-lg p-3">
                 <div className="modal-header border-0 pb-1">
                   <div>
-                    <h5 className="modal-title fw-bold text-dark mb-0">
+                    <h3 className="fs-5 modal-title fw-bold text-dark mb-0">
                       <i className="bi bi-calendar-event text-primary me-2" />
                       ปฏิทินเลือกรอบวันที่สั่งอาหาร
-                    </h5>
+                    </h3>
                     <p className="text-xs text-muted mb-0 mt-1">
                       {MONTHS_TH[curMonth]} {curYear + 543} (สั่งล่วงหน้าได้ตลอดทั้งเดือน)
                     </p>
@@ -1810,9 +1814,9 @@ function ProductDetail() {
             <div className="modal-content rounded-4 border-0 shadow-xl p-3">
               <div className="modal-header border-0 pb-2">
                 <div>
-                  <h5 className="modal-title fw-bold text-dark d-flex align-items-center gap-2">
+                  <h3 className="fs-5 modal-title fw-bold text-dark d-flex align-items-center gap-2">
                     <i className="bi bi-pencil-square text-warning" /> เขียนรีวิวและให้คะแนน
-                  </h5>
+                  </h3>
                   <p className="text-muted small mb-0">{product?.name || "เมนูอาหาร"}</p>
                 </div>
                 <button
@@ -1927,9 +1931,9 @@ function ProductDetail() {
                     <i className="bi bi-exclamation-triangle-fill fs-4" />
                   </div>
                   <div>
-                    <h5 className="modal-title fw-bold text-warning mb-0">
+                    <h3 className="fs-5 modal-title fw-bold text-warning mb-0">
                       ไม่สามารถทำการสั่งจองคิวอาหารได้
-                    </h5>
+                    </h3>
                     <span className="text-slate-300 small">
                       มาตรการความปลอดภัยและแจ้งเตือนคิวโรงอาหาร
                     </span>

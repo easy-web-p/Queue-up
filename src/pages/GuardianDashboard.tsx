@@ -697,9 +697,9 @@ export default function GuardianDashboard() {
                     <div className="w-10 h-10 rounded-xl bg-orange-100 dark:bg-[#FF7A1A]/10 text-[#FF7A1A] flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                       <Sliders className="w-5 h-5" />
                     </div>
-                    <h4 className="text-base font-bold font-['Kanit'] text-slate-900 dark:text-white group-hover:text-[#FF7A1A] transition-colors">
+                    <h3 className="text-base font-bold font-['Kanit'] text-slate-900 dark:text-white group-hover:text-[#FF7A1A] transition-colors">
                       ตั้งค่าวงเงิน & บล็อกหมวด
-                    </h4>
+                    </h3>
                     <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-1 line-clamp-2">
                       กำหนดวงเงินรายวัน/สัปดาห์ และบล็อกอาหารต้องห้าม
                     </p>
@@ -717,9 +717,9 @@ export default function GuardianDashboard() {
                     <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-500/10 text-red-500 dark:text-red-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                       <HeartPulse className="w-5 h-5" />
                     </div>
-                    <h4 className="text-base font-bold font-['Kanit'] text-slate-900 dark:text-white group-hover:text-red-500 transition-colors">
+                    <h3 className="text-base font-bold font-['Kanit'] text-slate-900 dark:text-white group-hover:text-red-500 transition-colors">
                       ข้อมูลแพ้อาหาร & สุขภาพ
-                    </h4>
+                    </h3>
                     <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-1 line-clamp-2">
                       บันทึกรายการสารก่อภูมิแพ้และคำแนะนำสำหรับห้องพยาบาล
                     </p>
@@ -737,9 +737,9 @@ export default function GuardianDashboard() {
                     <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                       <History className="w-5 h-5" />
                     </div>
-                    <h4 className="text-base font-bold font-['Kanit'] text-slate-900 dark:text-white group-hover:text-amber-500 transition-colors">
+                    <h3 className="text-base font-bold font-['Kanit'] text-slate-900 dark:text-white group-hover:text-amber-500 transition-colors">
                       ประวัติการกินย้อนหลัง
-                    </h4>
+                    </h3>
                     <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-1 line-clamp-2">
                       แสดงรายการอาหารที่บุตรหลานสั่งจริงแบบเรียลไทม์
                     </p>

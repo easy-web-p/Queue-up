@@ -408,11 +408,11 @@ export const FoodBooking: React.FC<FoodBookingPageProps> = ({
             <div className="flex items-start gap-3">
               <AlertCircle className="w-6 h-6 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
               <div>
-                <h3 id="allergen-alert-title" className="text-sm font-black font-['Kanit']">
+                <h2 id="allergen-alert-title" className="text-sm font-black font-['Kanit']">
                   {allergenAlert.hasDeclaredMatch
                     ? '🛑 ร้านค้าระบุว่าเมนูนี้มีส่วนผสมที่แพ้'
                     : '⚠️ คำเตือน: อาจมีส่วนผสมที่แพ้'}
-                </h3>
+                </h2>
                 <p className="text-xs mt-1 leading-relaxed">
                   {allergenAlert.hasDeclaredMatch
                     ? 'ร้านค้าแจ้งว่าเมนูที่เลือกมีส่วนผสมตรงกับข้อมูลการแพ้อาหารที่บันทึกไว้ ไม่ใช่การคาดเดาจากชื่อเมนู'
