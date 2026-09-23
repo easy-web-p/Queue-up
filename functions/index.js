@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase-admin/app";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getFirestore, FieldValue, FieldPath } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { onRequest, onCall, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
@@ -31,6 +31,12 @@ import {
   nextQueueNumber,
 } from "./orderRequest.js";
 import { checkProductAvailability, priceOrder } from "./orderPricing.js";
+import {
+  OPEN_ORDER_STATUSES,
+  DELETION_PLAN,
+  checkDeletable,
+  buildOrderAnonymisationPatch,
+} from "./accountDeletion.js";
 
 /**
  * Turns a refusal from one of the pure rule modules into an HttpsError.
@@ -2048,6 +2054,192 @@ export const updateCampusWalletLimits = onCall(
       success: true,
       studentId,
       message: "อัปเดตการตั้งค่าและวงเงินการใช้งานเรียบร้อยแล้ว",
+    };
+  }
+);
+
+/**
+ * 🗑️ Delete my account, and mean it
+ *
+ * The screen behind this deleted `users/{uid}` and nothing else. The Firebase
+ * Auth account survived — so signing in again recreated the profile — and so
+ * did the wallet, the orders, the guardian links and the child's allergy
+ * record. A failed delete was swallowed with `console.warn` and the success
+ * message showed either way. The PDPA page promises erasure; that was a
+ * sign-out with a paragraph attached.
+ *
+ * Server-side because a browser cannot do this. It cannot delete an Auth user,
+ * it cannot read another collection's documents to know what to remove, and
+ * every collection involved is either closed to clients or closed to this kind
+ * of sweep. A client-driven deletion would also be a client deciding which of
+ * its own records to keep.
+ *
+ * Refused rather than done when something would be destroyed with it — money in
+ * the wallet, an order a stall is cooking, the last admin account. See
+ * accountDeletion.js, where those rules live and are tested.
+ *
+ * Deliberately not idempotent-by-accident: the Auth user is deleted LAST, so a
+ * failure part-way leaves the account signed-in-able and the call can be
+ * retried. Deleting it first would strand whatever remained with no owner and
+ * no way back in.
+ */
+export const deleteMyAccount = onCall(
+  { region: "asia-southeast1", cors: true },
+  async (request) => {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "กรุณาเข้าสู่ระบบก่อนลบบัญชี");
+    }
+    const uid = request.auth.uid;
+    const claims = request.auth.token || {};
+
+    // ------------------------------------------------------------------
+    // 1. Is there anything deletion would destroy?
+    // ------------------------------------------------------------------
+    const [walletSnap, openOrdersSnap, pendingTopupsSnap, shopsSnap] = await Promise.all([
+      db.collection("wallets").doc(uid).get(),
+      db
+        .collection("orders")
+        .where("userId", "==", uid)
+        .where("status", "in", OPEN_ORDER_STATUSES)
+        .limit(50)
+        .get(),
+      db
+        .collection("wallet_topup_requests")
+        .where("requestedBy", "==", uid)
+        .where("status", "==", TOPUP_STATUS.PENDING)
+        .limit(10)
+        .get(),
+      db.collection("shops").where("ownerUid", "==", uid).where("isOpen", "==", true).limit(5).get(),
+    ]);
+
+    // Only asked when this account is itself an admin; listing users is
+    // expensive and answers a question nobody else has.
+    //
+    // A bootstrap super-admin counts. Their admin rights come from an email in
+    // config/super-admins.js rather than from a custom claim, so counting
+    // claims alone would report "no admins left" while one is a sign-in away —
+    // and, the other way round, would block the last claim-admin from leaving
+    // when a bootstrap admin can still get back in.
+    let isLastAdmin = false;
+    if (isCallerAdmin(claims, isBootstrapSuperAdmin)) {
+      const admins = await getAuth().listUsers(1000);
+      const others = admins.users.filter((u) => {
+        if (u.uid === uid) return false;
+        const c = u.customClaims || {};
+        return c.admin === true || c.role === "admin" || isBootstrapSuperAdmin(u.email || "");
+      });
+      isLastAdmin = others.length === 0;
+    }
+
+    throwIfRefused(
+      checkDeletable({
+        walletBalanceSatang: Number(walletSnap.exists ? walletSnap.data().balanceSatang : 0) || 0,
+        openOrderCount: openOrdersSnap.size,
+        pendingTopupCount: pendingTopupsSnap.size,
+        activeShopCount: shopsSnap.size,
+        isLastAdmin,
+      })
+    );
+
+    // ------------------------------------------------------------------
+    // 2. The audit entry goes FIRST, and is awaited.
+    // ------------------------------------------------------------------
+    // Written before anything is removed, because a deletion that fails
+    // half-way still happened to whatever it reached, and an entry written
+    // afterwards would be missing for exactly the cases that matter most.
+    // audit_logs is `allow write: if false;` and is not itself deleted — a
+    // record kept to prove a legal obligation is outside the right to erasure,
+    // and the policy page says so rather than this code quietly deciding it.
+    const auditRef = db.collection("audit_logs").doc();
+    await auditRef.set({
+      id: auditRef.id,
+      action: "ACCOUNT_DELETED",
+      actorUid: uid,
+      actorName: claims.name || claims.email || uid,
+      targetUid: uid,
+      requestedAt: FieldValue.serverTimestamp(),
+      timestamp: FieldValue.serverTimestamp(),
+    });
+
+    const deleted = {};
+    const anonymised = {};
+
+    // ------------------------------------------------------------------
+    // 3. Purge, one collection at a time.
+    // ------------------------------------------------------------------
+    for (const entry of DELETION_PLAN.purge) {
+      let docs = [];
+      if (entry.byId) {
+        const snap = await db.collection(entry.collection).doc(uid).get();
+        if (snap.exists) docs = [snap.ref];
+      } else if (entry.byIdPrefix) {
+        // The uid is in the document id (`<uid>_<code>`, `<uid>_<storeId>`),
+        // not in a field, so this is a key-range scan rather than a where.
+        const snap = await db
+          .collection(entry.collection)
+          .orderBy(FieldPath.documentId())
+          .startAt(`${uid}_`)
+          .endAt(`${uid}_\uf8ff`)
+          .get();
+        docs = snap.docs.map((d) => d.ref);
+      } else {
+        const snap = await db.collection(entry.collection).where(entry.where, "==", uid).get();
+        docs = snap.docs.map((d) => d.ref);
+      }
+
+      for (const ref of docs) {
+        if (entry.subcollection) {
+          // recursiveDelete rather than a delete: a document's subcollections
+          // survive their parent in Firestore, so a chat deleted on its own
+          // leaves every message in it readable by id.
+          await db.recursiveDelete(ref);
+        } else {
+          await ref.delete();
+        }
+      }
+
+      deleted[entry.collection] = (deleted[entry.collection] || 0) + docs.length;
+    }
+
+    // users/{uid} has a favourites subcollection, which the loop above would
+    // orphan the same way.
+    await db.recursiveDelete(db.collection("users").doc(uid));
+
+    // ------------------------------------------------------------------
+    // 4. Anonymise what has to stay.
+    // ------------------------------------------------------------------
+    // The stall's sales history and the school's settlement with it both rest
+    // on these orders. A vendor losing a day's takings because a customer
+    // closed their account is not erasure, it is data loss for someone else.
+    const patch = buildOrderAnonymisationPatch(FieldValue.delete());
+    for (const entry of DELETION_PLAN.anonymise) {
+      const snap = await db.collection(entry.collection).where(entry.where, "==", uid).get();
+      for (const d of snap.docs) {
+        await d.ref.update(patch);
+      }
+      anonymised[entry.collection] = snap.size;
+    }
+
+    // ------------------------------------------------------------------
+    // 5. The Auth account, last.
+    // ------------------------------------------------------------------
+    await getAuth().deleteUser(uid);
+
+    await auditRef.update({
+      deleted,
+      anonymised,
+      completedAt: FieldValue.serverTimestamp(),
+    });
+
+    return {
+      success: true,
+      deleted,
+      anonymised,
+      retained: DELETION_PLAN.retain.map((r) => r.collection),
+      message:
+        "ลบบัญชีและข้อมูลส่วนบุคคลของคุณเรียบร้อยแล้ว " +
+        "ประวัติคำสั่งซื้อถูกเก็บไว้แบบไม่ระบุตัวตนเพื่อการบัญชีของร้านค้า " +
+        "และบันทึกความปลอดภัยถูกเก็บไว้ตามข้อกำหนดทางกฎหมาย",
     };
   }
 );

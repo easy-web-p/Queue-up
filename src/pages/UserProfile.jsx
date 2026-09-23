@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { setUser, clearUser } from "../store/authSlice.js";
-import { db, doc, setDoc, getDoc, deleteDoc } from "../firebase/config.js";
+import { db, doc, setDoc, getDoc } from "../firebase/config.js";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import ShopeeSearchBar from "../components/ShopeeSearchBar.jsx";
 import ChatModal from "../components/ChatModal.jsx";
@@ -13,6 +13,12 @@ import { getUserBehaviorInsights } from "../services/aiBehaviorEngine.js";
 import { getSecurityHealthReport } from "../services/aiSecurityShield.js";
 import { calculateUserTrustScore } from "../services/aiUserVerificationEngine.js";
 import { useToast } from "../components/ToastProvider.jsx";
+import {
+  deleteMyAccount,
+  reauthenticateForDeletion,
+  accountUsesPassword,
+} from "../services/accountService";
+import { errorMessage } from "../utils/errorMessage";
 import "./UserProfile.css";
 import "./UserPurchase.css";
 
@@ -119,9 +125,9 @@ function UserProfile() {
   // Delete Account Modal State
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isFinalConfirmModalOpen, setIsFinalConfirmModalOpen] = useState(false);
-  const [deleteUsername, setDeleteUsername] = useState("");
-  const [deleteEmail, setDeleteEmail] = useState("");
   const [deletePassword, setDeletePassword] = useState("");
+  const [isReauthenticating, setIsReauthenticating] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   // 🛡️ AI Security Shield & 🧠 AI Behavior Learning States
   const [aiBehaviorProfile] = useState(() => getUserBehaviorInsights());
@@ -458,31 +464,62 @@ function UserProfile() {
     toast.success(`ยืนยันรหัสผ่านสำเร็จ! เปลี่ยนรหัสบัญชีเป็น "${cleanNewAccountId}" เรียบร้อยแล้ว`);
   };
 
-  // Step 1 Delete Account Verification Handler
-  const handleStep1DeleteSubmit = (e) => {
+  // Step 1: prove it is really them, right now.
+  //
+  // This form used to check that the three boxes were non-empty and then throw
+  // the values away — a password field guarding the one irreversible action in
+  // the app, authenticating nothing. Anyone at an unlocked screen could type
+  // four characters and erase the account. Firebase calls this reauthentication
+  // and wants it for exactly this; deleting through the Admin SDK skips the
+  // check, so it has to happen here and has to actually happen.
+  const handleStep1DeleteSubmit = async (e) => {
     e.preventDefault();
-    if (!deleteUsername.trim() || !deleteEmail.trim() || !deletePassword.trim()) {
-      toast.warning("กรุณากรอก ชื่อผู้ใช้, Email และ รหัสผ่าน ให้ครบถ้วน");
+    const needsPassword = accountUsesPassword();
+    if (needsPassword && !deletePassword.trim()) {
+      toast.warning("กรุณากรอกรหัสผ่านเพื่อยืนยันตัวตน");
       return;
     }
-    setIsDeleteModalOpen(false);
-    setIsFinalConfirmModalOpen(true);
+
+    setIsReauthenticating(true);
+    try {
+      await reauthenticateForDeletion(deletePassword);
+      setDeletePassword("");
+      setIsDeleteModalOpen(false);
+      setIsFinalConfirmModalOpen(true);
+    } catch (err) {
+      // Stops here. A failed identity check that let the flow continue would
+      // make the whole step decorative.
+      toast.error(`ยืนยันตัวตนไม่สำเร็จ: ${errorMessage(err)}`);
+    } finally {
+      setIsReauthenticating(false);
+    }
   };
 
-  // Step 2 Final Confirmation - Delete Account and History Permanently
+  // Step 2: the deletion itself, on the server.
+  //
+  // The browser cannot delete a Firebase Auth account, cannot reach the
+  // collections holding this person's records, and does not get to decide which
+  // of its own records to keep. What was here deleted `users/{uid}`, swallowed
+  // any failure with console.warn, and reported success either way — while the
+  // Auth account, the wallet, the orders, the guardian links and the child's
+  // allergy record all stayed exactly where they were.
   const handleFinalDeleteAccount = async () => {
-    if (user && user.uid) {
-      try {
-        await deleteDoc(doc(db, "users", user.uid));
-      } catch (err) {
-        console.warn("Firestore delete user error:", err);
-      }
+    setIsDeletingAccount(true);
+    try {
+      const result = await deleteMyAccount();
+      setIsFinalConfirmModalOpen(false);
+      dispatch(clearUser());
+      toast.success(result.message, { duration: 15000 });
+      navigate("/login", { replace: true });
+    } catch (err) {
+      // The server refuses while there is money in the wallet, an order a stall
+      // is still cooking, or this is the last admin account. That message is the
+      // whole point of the call and must reach the person — reported as success
+      // it would have them walk away believing their data was gone.
+      toast.error(errorMessage(err), { duration: 15000 });
+    } finally {
+      setIsDeletingAccount(false);
     }
-
-    dispatch(clearUser());
-    setIsFinalConfirmModalOpen(false);
-    toast.success("ระบบได้ทำการลบข้อมูลบัญชีและประวัติต่างๆ ของคุณทั้งหมดออกจากระบบเรียบร้อยแล้ว", { duration: 10000 });
-    navigate("/login", { replace: true });
   };
 
   // Copy Account ID to Clipboard
@@ -1538,8 +1575,6 @@ function UserProfile() {
                   <button
                     className="btn btn-outline-danger font-weight-bold px-4 py-2"
                     onClick={() => {
-                      setDeleteUsername(fullName);
-                      setDeleteEmail(email);
                       setDeletePassword("");
                       setIsDeleteModalOpen(true);
                     }}
@@ -1634,52 +1669,51 @@ function UserProfile() {
             </div>
 
             <form onSubmit={handleStep1DeleteSubmit} className="security-modal-body">
-              <div>
-                <label className="security-modal-label">ชื่อผู้ใช้ (Username / Full Name) *</label>
-                <input
-                  type="text"
-                  className="security-modal-input"
-                  placeholder="กรอกชื่อผู้ใช้ของคุณ"
-                  value={deleteUsername}
-                  onChange={(e) => setDeleteUsername(e.target.value)}
-                  required
-                />
-              </div>
+              {/* The username and email boxes that used to be here were never
+                  checked against anything. Firebase authenticates the account
+                  that is already signed in, so asking someone to retype their
+                  own name proved nothing and implied a check that never ran. */}
+              <p className="text-muted fs-6 mb-3">
+                ยืนยันว่าเป็นเจ้าของบัญชี{" "}
+                <strong className="text-dark">{user?.email || user?.displayName}</strong> จริง
+                ก่อนดำเนินการต่อ
+              </p>
 
-              <div>
-                <label className="security-modal-label">Email *</label>
-                <input
-                  type="email"
-                  className="security-modal-input"
-                  placeholder="กรอกอีเมลของคุณ"
-                  value={deleteEmail}
-                  onChange={(e) => setDeleteEmail(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="security-modal-label">รหัสผ่าน (Password) *</label>
-                <input
-                  type="password"
-                  className="security-modal-input"
-                  placeholder="กรอกรหัสผ่านของคุณ"
-                  value={deletePassword}
-                  onChange={(e) => setDeletePassword(e.target.value)}
-                  required
-                />
-              </div>
+              {accountUsesPassword() ? (
+                <div>
+                  <label className="security-modal-label">รหัสผ่าน (Password) *</label>
+                  <input
+                    type="password"
+                    className="security-modal-input"
+                    placeholder="กรอกรหัสผ่านของคุณ"
+                    value={deletePassword}
+                    onChange={(e) => setDeletePassword(e.target.value)}
+                    autoComplete="current-password"
+                    required
+                  />
+                </div>
+              ) : (
+                <p className="text-muted fs-6 mb-0">
+                  บัญชีนี้เข้าสู่ระบบด้วย Google — กด &ldquo;ยืนยันตัวตน&rdquo;
+                  แล้วเลือกบัญชีของคุณอีกครั้งเพื่อยืนยัน
+                </p>
+              )}
 
               <div className="security-modal-actions">
                 <button
                   type="button"
                   className="security-btn-cancel"
                   onClick={() => setIsDeleteModalOpen(false)}
+                  disabled={isReauthenticating}
                 >
                   ยกเลิก
                 </button>
-                <button type="submit" className="security-btn-confirm">
-                  ยืนยัน
+                <button
+                  type="submit"
+                  className="security-btn-confirm"
+                  disabled={isReauthenticating}
+                >
+                  {isReauthenticating ? "กำลังยืนยันตัวตน..." : "ยืนยันตัวตน"}
                 </button>
               </div>
             </form>
@@ -1695,22 +1729,39 @@ function UserProfile() {
               <i className="bi bi-exclamation-triangle-fill text-danger text-5xl" />
             </div>
             <h4 className="fw-bold text-dark mb-2">ยืนยันการลบข้อมูลบัญชีถาวร</h4>
-            <p className="text-muted fs-6 mb-4 px-2 leading-relaxed">
-              ระบบจะทำการลบข้อมูลและประวัติต่างๆ ของผู้ใช้ทั้งหมดออกจากระบบอย่างถาวร
-            </p>
+            {/* Spelled out rather than "ลบทุกอย่างถาวร". Some of this is kept,
+                and a promise of total erasure that the system does not keep is
+                worse than a shorter one it does. */}
+            <div className="text-start mx-auto mb-4 px-2" style={{ maxWidth: "26rem" }}>
+              <p className="text-muted fs-6 mb-2">
+                <strong className="text-danger">ลบถาวร:</strong> บัญชีเข้าสู่ระบบ โปรไฟล์
+                ข้อมูลการแพ้อาหารและสุขภาพ การผูกบัญชีผู้ปกครอง แชท รีวิว
+                และประวัติการใช้คูปอง
+              </p>
+              <p className="text-muted fs-6 mb-2">
+                <strong className="text-dark">เก็บไว้แบบไม่ระบุตัวตน:</strong> ประวัติคำสั่งซื้อ
+                (ร้านค้าต้องใช้สรุปยอดขาย จึงลบชื่อและข้อมูลติดต่อออกแทนการลบทั้งรายการ)
+              </p>
+              <p className="text-muted fs-6 mb-0">
+                <strong className="text-dark">เก็บไว้ตามกฎหมาย:</strong> บันทึกความปลอดภัย
+                และบันทึกรายการเงินในระบบ
+              </p>
+            </div>
 
             <div className="d-flex justify-content-center gap-3">
               <button
                 className="security-btn-cancel px-4 py-2"
                 onClick={() => setIsFinalConfirmModalOpen(false)}
+                disabled={isDeletingAccount}
               >
                 ยกเลิก
               </button>
               <button
                 className="security-btn-confirm px-4 py-2"
                 onClick={handleFinalDeleteAccount}
+                disabled={isDeletingAccount}
               >
-                ตกลง
+                {isDeletingAccount ? "กำลังลบบัญชี..." : "ลบบัญชีถาวร"}
               </button>
             </div>
           </div>
