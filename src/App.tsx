@@ -40,6 +40,7 @@ import { AppSidebar } from './components/layout/AppSidebar';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { ScrollToTop } from './components/common/ScrollToTop';
 import { PageRouteLoaderView } from './components/common/PageRouteLoader';
+import { RequireRole } from './components/common/RequireRole';
 
 // Maps AppView in state to URL pathname
 const VIEW_TO_PATH_MAP: Record<AppView, string> = {
@@ -236,16 +237,28 @@ const MainAppContent: React.FC = () => {
                   <Route path="/chat" element={currentUser ? <ChatPage /> : <Navigate to="/landing" replace />} />
 
                   {/* Merchant & Kitchen Display Flow - Requires Login */}
-                  <Route path="/kds" element={currentUser ? <KitchenDisplaySystem /> : <Navigate to="/landing" replace />} />
-                  <Route path="/merchant-dashboard" element={currentUser ? <MerchantDashboard /> : <Navigate to="/landing" replace />} />
-                  <Route path="/merchant" element={currentUser ? <MerchantDashboard /> : <Navigate to="/landing" replace />} />
+                  <Route path="/kds" element={
+                    <RequireRole allow={['merchant']}><KitchenDisplaySystem /></RequireRole>
+                  } />
+                  <Route path="/merchant-dashboard" element={
+                    <RequireRole allow={['merchant']}><MerchantDashboard /></RequireRole>
+                  } />
+                  <Route path="/merchant" element={
+                    <RequireRole allow={['merchant']}><MerchantDashboard /></RequireRole>
+                  } />
                   <Route path="/create-store" element={currentUser ? <CreateStorePage /> : <Navigate to="/landing" replace />} />
-                  <Route path="/store-admin" element={currentUser ? <StoreAdminPage /> : <Navigate to="/landing" replace />} />
+                  <Route path="/store-admin" element={
+                    <RequireRole allow={['merchant']}><StoreAdminPage /></RequireRole>
+                  } />
                   <Route path="/store-chat" element={currentUser ? <ChatPage /> : <Navigate to="/landing" replace />} />
 
                   {/* System Admin - Requires Super Admin */}
-                  <Route path="/admin-dashboard" element={currentUser && isAdmin ? <AdminDashboard /> : <Navigate to="/landing" replace />} />
-                  <Route path="/admin" element={currentUser && isAdmin ? <AdminDashboard /> : <Navigate to="/landing" replace />} />
+                  <Route path="/admin-dashboard" element={
+                    <RequireRole allow={['admin']}><AdminDashboard /></RequireRole>
+                  } />
+                  <Route path="/admin" element={
+                    <RequireRole allow={['admin']}><AdminDashboard /></RequireRole>
+                  } />
 
                   {/* Fallback */}
                   <Route path="*" element={<Navigate to={currentUser ? "/home" : "/landing"} replace />} />

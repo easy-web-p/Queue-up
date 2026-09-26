@@ -76,6 +76,51 @@ test.describe('QueueUp production build', () => {
     await expect(page).toHaveURL(/\/landing$/, { timeout: 15_000 });
   });
 
+  test('keeps a merchant-only page away from a customer account', async ({ page }) => {
+    // The app restores a cached session synchronously on first render, so
+    // seeding one lets this exercise the signed-in guards without Firebase.
+    await page.addInitScript(() => {
+      localStorage.setItem('queueup_session_v1', JSON.stringify({
+        id: 'e2e-customer', fullName: 'ลูกค้าทดสอบ', email: 'customer@e2e.test',
+        role: 'customer', registeredAt: new Date().toISOString()
+      }));
+    });
+
+    await page.goto('/kds', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('#root')).not.toBeEmpty({ timeout: 20_000 });
+
+    // Turned away, but told why — not bounced to the landing page as if the
+    // session had expired.
+    await expect(page.getByText('หน้านี้สำหรับร้านค้าเท่านั้น')).toBeVisible({ timeout: 15_000 });
+    expect(new URL(page.url()).pathname).toBe('/kds');
+  });
+
+  test('lets a merchant account into the kitchen display', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('queueup_session_v1', JSON.stringify({
+        id: 'e2e-merchant', fullName: 'เจ้าของร้านทดสอบ', email: 'merchant@e2e.test',
+        role: 'merchant', storeId: 'store-1', registeredAt: new Date().toISOString()
+      }));
+    });
+
+    await page.goto('/kds', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('#root')).not.toBeEmpty({ timeout: 20_000 });
+    await expect(page.getByText('หน้านี้สำหรับร้านค้าเท่านั้น')).toHaveCount(0);
+  });
+
+  test('keeps the admin dashboard away from a merchant account', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('queueup_session_v1', JSON.stringify({
+        id: 'e2e-merchant', fullName: 'เจ้าของร้านทดสอบ', email: 'merchant@e2e.test',
+        role: 'merchant', storeId: 'store-1', registeredAt: new Date().toISOString()
+      }));
+    });
+
+    await page.goto('/admin', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('#root')).not.toBeEmpty({ timeout: 20_000 });
+    await expect(page.getByText('หน้านี้สำหรับผู้ดูแลระบบเท่านั้น')).toBeVisible({ timeout: 15_000 });
+  });
+
   test('sends security headers on the document response', async ({ page }) => {
     const response = await page.goto('/landing', { waitUntil: 'domcontentloaded' });
     const headers = response!.headers();

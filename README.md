@@ -12,6 +12,8 @@ QueueUp เป็นแพลตฟอร์ม Web Application ทันสม�
   - **Layer 1** Intent Router แบบ deterministic ตอบคำถามที่พบบ่อยทันที ไม่มีค่าใช้จ่ายและไม่หลอน
   - **Layer 2** Scope-Bound Tool Calling (เปิดใช้เมื่อตั้ง `GEMINI_API_KEY`) โมเดลเรียกได้เฉพาะ tool อ่านข้อมูลของร้านนั้น และไม่มีพารามิเตอร์ใดที่ระบุร้านอื่นได้
   - **Layer 3** ส่งต่อให้ทางร้านเมื่อไม่แน่ใจ พร้อม hard-block เรื่องสารก่อภูมิแพ้และการรับปากแทนร้าน
+- 💬 **Typing Indicator แบบเรียลไทม์**: เห็นว่าอีกฝ่ายกำลังพิมพ์อยู่จริง ผ่าน presence ใน `chats/{chatId}/typing/{uid}` (ไม่ใช่แอนิเมชันจำลอง)
+- 🔐 **สิทธิ์เข้าถึงหน้าตาม Role**: `/kds`, `/merchant-dashboard`, `/store-admin` เปิดได้เฉพาะร้านค้า · `/admin` เฉพาะผู้ดูแลระบบ
 - 💬 **Real-time Merchant-Customer Chat**: ระบบแชทสนทนาระหว่างลูกค้าและร้านค้าแบบเรียลไทม์ พร้อมระบบแจ้งเตือนออเดอร์และการจัดการสถานะ
 - 📋 **Live Queue & Booking System**: จองคิวและจองโต๊ะล่วงหน้า ระบุวัน เวลา จำนวนคน และรายการอาหาร พร้อมอัปเดตสถานะแบบสดๆ
 - 💳 **Seamless Checkout & Payment**: ระบบชำระเงิน สรุปยอดค่าบริการ และแนบสลิป/หลักฐานการชำระเงิน
@@ -117,7 +119,8 @@ npm run test:e2e  # ทดสอบ end-to-end ด้วย Playwright บน pr
 | `schoolRoutes.test.js` | การอนุมัติสถานศึกษา, นำเข้า Roster แบบ batch, การ claim สิทธิ์ และการออก Custom Claims |
 | `customerWallet.test.js` | Campus Wallet: เติมเงินแบบ idempotent, ยอดติดลบไม่ได้, ตัดยอดตอนสั่ง และคืนเงินเมื่อร้านปฏิเสธ |
 | `firestoreRules.test.js` | การแยกข้อมูลระหว่างสถาบันและร้านค้าในระดับ Security Rules |
-| `e2e/smoke.spec.ts` | แอปบูตได้จริงบน production build, lazy chunk โหลดได้, CSP ไม่บล็อกแอป, route guard ทำงาน |
+| `e2e/smoke.spec.ts` | แอปบูตได้จริงบน production build, lazy chunk โหลดได้, CSP ไม่บล็อกแอป และ **สิทธิ์เข้าถึงหน้าตาม role** (ลูกค้าเปิด /kds ไม่ได้, ร้านค้าเปิด /admin ไม่ได้) |
+| `aiIntentRouter.test.js` | คุณภาพคำตอบของ AI: ถามราคาต้องได้ราคา, เมนูหมดต้องบอกว่าหมด, เรื่องที่ร้านไม่ได้ระบุต้องส่งต่อให้คนแทนการเดา |
 | `deployment.test.js` | รูปแบบการ deploy ทั้งสองแบบ (serverless / process) และ cron endpoint |
 
 > `npm run test:rules` จะดาวน์โหลด Firestore Emulator ในครั้งแรก จึงแยกออกจาก `npm test`
