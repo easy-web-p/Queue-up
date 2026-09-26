@@ -14,7 +14,8 @@ import { SlotTransactionService } from '../services/slotTransactionService.js';
 import { findMenuItem } from '../services/menuCatalog.js';
 import { computeFeeBreakdown, resolveOrderBreakdown } from '../services/orderPricing.js';
 import { applyWalletDelta, isWalletPayment } from '../services/customerWalletService.js';
-import { reverseOrderPayment, customerMayCancel } from '../services/orderRefundService.js';
+import { reverseOrderPayment, customerMayCancel, readSlotRelease } from '../services/orderRefundService.js';
+import { MERCHANT_RESPONSE_WINDOW_MS } from '../services/paymentSettlement.js';
 
 export const orderRouter = Router();
 
@@ -272,6 +273,14 @@ orderRouter.post('/', optionalAuthenticate, async (req, res) => {
       // Statuses decoupled
       const settlesImmediately = paymentMethod === 'cash' || paidFromWallet;
       const initialStatus = settlesImmediately ? 'PAID_AWAITING_MERCHANT' : 'PAYMENT_PENDING';
+
+      // An order that starts out awaiting the merchant needs the same response
+      // deadline a gateway payment gets. Without it a wallet order had no
+      // merchant window at all, so an unresponsive shop could hold a student's
+      // money indefinitely and no sweep could ever reach it.
+      const initialMerchantDeadline = settlesImmediately
+        ? new Date(Date.now() + MERCHANT_RESPONSE_WINDOW_MS).toISOString()
+        : null;
       const initialPaymentStatus = paidFromWallet ? 'PAID' : 'REQUIRES_PAYMENT';
       const initialSettlementStatus = paymentMethod === 'cash'
         ? 'NOT_APPLICABLE'
@@ -304,6 +313,7 @@ orderRouter.post('/', optionalAuthenticate, async (req, res) => {
 
         status: initialStatus,
         canonicalStatus: 'AWAITING_CONFIRMATION',
+        merchantResponseDeadlineAt: initialMerchantDeadline,
         paymentMethod,
         paymentStatus: initialPaymentStatus,
         settlementStatus: initialSettlementStatus,
@@ -535,19 +545,8 @@ orderRouter.patch('/:id/status', authenticate, async (req, res) => {
       let slotRef = null;
       let slotUpdates = null;
 
-      if (isReversal && orderData.storeId && orderData.slotId) {
-        const candidateRef = SlotTransactionService.getSlotRef(orderData.storeId, orderData.slotId);
-        const slotSnap = await t.get(candidateRef);
-        if (slotSnap.exists) {
-          const slotData = slotSnap.data();
-          const currentConfirmed = slotData.confirmedWorkload ?? 0;
-          const orderWorkload = Number(orderData.workload) || (Array.isArray(orderData.items) ? orderData.items.reduce((s, it) => s + (it.quantity || 1), 0) : 1);
-          slotRef = candidateRef;
-          slotUpdates = {
-            confirmedWorkload: Math.max(0, currentConfirmed - orderWorkload),
-            updatedAt: now
-          };
-        }
+      if (isReversal) {
+        ({ slotRef, slotUpdates } = await readSlotRelease(t, adminDb, { order: orderData, now }));
       }
 
       // 3. Reverse the payment on cancellation / rejection.

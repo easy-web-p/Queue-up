@@ -97,6 +97,43 @@ export async function reverseOrderPayment(t, adminDb, { orderId, order, reason, 
 }
 
 /**
+ * Reads what a slot release would change, without writing it.
+ *
+ * Split in two because a Firestore transaction must finish reading before it
+ * writes, and every caller has writes of its own to interleave. The workload
+ * arithmetic lives here so the route and the expiry sweep cannot disagree about
+ * how much capacity an order was holding.
+ *
+ * @returns {Promise<{ slotRef: object|null, slotUpdates: object|null }>}
+ */
+export async function readSlotRelease(t, adminDb, { order, now }) {
+  if (!order?.storeId || !order?.slotId) {
+    return { slotRef: null, slotUpdates: null };
+  }
+
+  const slotRef = adminDb
+    .collection('stores').doc(order.storeId)
+    .collection('pickup_slots').doc(order.slotId);
+  const slotSnap = await t.get(slotRef);
+  if (!slotSnap.exists) {
+    return { slotRef: null, slotUpdates: null };
+  }
+
+  const slotData = slotSnap.data();
+  const currentConfirmed = slotData.confirmedWorkload ?? 0;
+  const orderWorkload = Number(order.workload)
+    || (Array.isArray(order.items) ? order.items.reduce((s, it) => s + (it.quantity || 1), 0) : 1);
+
+  return {
+    slotRef,
+    slotUpdates: {
+      confirmedWorkload: Math.max(0, currentConfirmed - orderWorkload),
+      updatedAt: now
+    }
+  };
+}
+
+/**
  * Statuses a customer may still cancel from.
  *
  * Once the kitchen has started cooking, the food exists and the store's own

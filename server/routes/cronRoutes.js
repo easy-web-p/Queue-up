@@ -13,6 +13,7 @@
 
 import { Router } from 'express';
 import { runPickupReminderCheck } from '../services/pickupReminderWorker.js';
+import { runStaleOrderSweep, releaseDueHeldFunds } from '../services/settlementSweeps.js';
 import { isProduction } from '../config/secrets.js';
 
 export const cronRouter = Router();
@@ -70,3 +71,36 @@ async function handlePickupReminders(req, res) {
 
 cronRouter.get('/pickup-reminders', handlePickupReminders);
 cronRouter.post('/pickup-reminders', handlePickupReminders);
+
+/**
+ * GET|POST /api/cron/settlement
+ * Returns money nobody is holding on purpose: refunds orders whose merchant
+ * never answered, drops abandoned unpaid orders so they stop holding a pickup
+ * slot, and releases merchant funds whose hold period has elapsed.
+ */
+async function handleSettlement(req, res) {
+  if (!authorizeCron(req, res)) return;
+
+  try {
+    const startedAt = Date.now();
+    const stale = await runStaleOrderSweep();
+    const released = await releaseDueHeldFunds();
+
+    return res.status(200).json({
+      success: true,
+      job: 'settlement',
+      expiredPaidOrders: stale.expiredPaid.length,
+      expiredUnpaidOrders: stale.expiredUnpaid.length,
+      refundedSatang: stale.refundedSatang,
+      releasedOrders: released.releasedOrders.length,
+      releasedSatang: released.releasedSatang,
+      durationMs: Date.now() - startedAt
+    });
+  } catch (err) {
+    console.error('[Cron] Settlement sweep failed:', err);
+    return res.status(500).json({ success: false, error: 'CRON_RUN_FAILED', message: err.message });
+  }
+}
+
+cronRouter.get('/settlement', handleSettlement);
+cronRouter.post('/settlement', handleSettlement);

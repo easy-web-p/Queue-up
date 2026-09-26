@@ -6,10 +6,9 @@ import { optionalSecret } from '../config/secrets.js';
 import {
   recordPayoutReserved,
   recordPayoutCompleted,
-  recordPayoutFailed,
-  recordFundsReleased
+  recordPayoutFailed
 } from '../services/ledgerService.js';
-import { resolveOrderBreakdown } from '../services/orderPricing.js';
+import { releaseDueHeldFunds } from '../services/settlementSweeps.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -95,44 +94,14 @@ walletRouter.get('/wallet/:storeId/ledger', authenticate, requireStoreOwnership(
  */
 walletRouter.post('/wallet/release-held-funds', authenticate, requireStoreOwnership(), async (req, res) => {
   try {
-    const storeId = req.storeId;
-    const now = new Date().toISOString();
-    const ordersSnap = await adminDb
-      .collection('orders')
-      .where('storeId', '==', storeId)
-      .where('settlementStatus', '==', 'ON_HOLD')
-      .get();
-
-    const releasedOrders = [];
-
-    for (const doc of ordersSnap.docs) {
-      const order = doc.data();
-      const releaseTime = order.fundReleaseAt ? new Date(order.fundReleaseAt) : new Date(0);
-      if (new Date() < releaseTime) continue;
-
-      const orderRef = adminDb.collection('orders').doc(doc.id);
-      const { merchantNetSatang } = resolveOrderBreakdown(order);
-
-      await adminDb.runTransaction(async (t) => {
-        t.update(orderRef, {
-          settlementStatus: 'AVAILABLE',
-          updatedAt: now
-        });
-
-        await recordFundsReleased(t, adminDb, {
-          orderId: doc.id,
-          storeId,
-          merchantNetSatang,
-          now
-        });
-      });
-
-      releasedOrders.push(doc.id);
-    }
+    // Same implementation the scheduled sweep uses, so pressing the button and
+    // waiting for the sweep produce the same books.
+    const { releasedOrders, releasedSatang } = await releaseDueHeldFunds({ storeId: req.storeId });
 
     return res.status(200).json({
       success: true,
       releasedCount: releasedOrders.length,
+      releasedSatang,
       releasedOrders
     });
   } catch (err) {
