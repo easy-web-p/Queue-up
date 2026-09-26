@@ -32,11 +32,13 @@ function updateBalance(t, adminDb, storeId, deltaFields, now) {
 
 /**
  * 1. Record Customer Payment
- * Debit: PLATFORM_CASH (totalSatang)
+ * Debit:  PLATFORM_CASH    (totalSatang)
  * Credit: MERCHANT_PENDING (merchantNetSatang)
  * Credit: PLATFORM_REVENUE (platformFeeSatang)
- * Debit: GATEWAY_FEE_EXPENSE (gatewayFeeSatang)
  * Credit: PAYMENT_CLEARING (gatewayFeeSatang)
+ *
+ * Balances because total === merchantNet + platformFee + gatewayFee, the
+ * invariant computeFeeBreakdown() guarantees.
  */
 export async function recordCustomerPayment(t, adminDb, {
   orderId,
@@ -88,33 +90,24 @@ export async function recordCustomerPayment(t, adminDb, {
     }
   ];
 
+  // The gateway fee is borne by the merchant: it is already subtracted from
+  // merchantNetSatang. The platform therefore holds the full total in cash and
+  // owes three parties — the merchant, itself, and the gateway. Posting a
+  // GATEWAY_FEE_EXPENSE debit as well counted the fee twice and left every
+  // payment group out of balance by exactly that amount.
   if (gatewayFeeSatang > 0) {
-    entries.push(
-      {
-        id: generateEntryId(),
-        transactionGroupId,
-        orderId,
-        storeId,
-        account: 'GATEWAY_FEE_EXPENSE',
-        debitSatang: gatewayFeeSatang,
-        creditSatang: 0,
-        type: 'CUSTOMER_PAYMENT',
-        description: `Payment gateway fee for order ${orderId}`,
-        createdAt: now
-      },
-      {
-        id: generateEntryId(),
-        transactionGroupId,
-        orderId,
-        storeId,
-        account: 'PAYMENT_CLEARING',
-        debitSatang: 0,
-        creditSatang: gatewayFeeSatang,
-        type: 'CUSTOMER_PAYMENT',
-        description: `Payment gateway clearing for order ${orderId}`,
-        createdAt: now
-      }
-    );
+    entries.push({
+      id: generateEntryId(),
+      transactionGroupId,
+      orderId,
+      storeId,
+      account: 'PAYMENT_CLEARING',
+      debitSatang: 0,
+      creditSatang: gatewayFeeSatang,
+      type: 'CUSTOMER_PAYMENT',
+      description: `Payment gateway fee owed for order ${orderId}`,
+      createdAt: now
+    });
   }
 
   for (const entry of entries) {
@@ -337,6 +330,61 @@ export async function recordPayoutCompleted(t, adminDb, {
 }
 
 /**
+ * 5b. Record Payout Failed / Cancelled
+ * Reverses a reservation: MERCHANT_PAYOUT_RESERVE -> MERCHANT_AVAILABLE.
+ *
+ * Without this, a payout that never completes leaves the merchant's money
+ * reserved forever — neither paid out nor withdrawable again.
+ */
+export async function recordPayoutFailed(t, adminDb, {
+  payoutId,
+  storeId,
+  amountSatang,
+  reason = '',
+  now = new Date().toISOString()
+}) {
+  const transactionGroupId = `txg_payout_failed_${payoutId}_${Date.now()}`;
+
+  const entries = [
+    {
+      id: generateEntryId(),
+      transactionGroupId,
+      payoutId,
+      storeId,
+      account: 'MERCHANT_PAYOUT_RESERVE',
+      debitSatang: amountSatang,
+      creditSatang: 0,
+      type: 'PAYOUT_FAILED',
+      description: `Payout ${payoutId} released back to available${reason ? `: ${reason}` : ''}`,
+      createdAt: now
+    },
+    {
+      id: generateEntryId(),
+      transactionGroupId,
+      payoutId,
+      storeId,
+      account: 'MERCHANT_AVAILABLE',
+      debitSatang: 0,
+      creditSatang: amountSatang,
+      type: 'PAYOUT_FAILED',
+      description: `Funds returned to available balance for payout ${payoutId}`,
+      createdAt: now
+    }
+  ];
+
+  for (const entry of entries) {
+    t.set(adminDb.collection('ledger_entries').doc(entry.id), entry);
+  }
+
+  updateBalance(t, adminDb, storeId, {
+    payoutReservedSatang: -amountSatang,
+    availableSatang: amountSatang
+  }, now);
+
+  return transactionGroupId;
+}
+
+/**
  * 6. Record Refund (Order rejected or cancelled)
  * Reverses customer payment
  */
@@ -346,6 +394,7 @@ export async function recordRefund(t, adminDb, {
   totalSatang,
   merchantNetSatang,
   platformFeeSatang,
+  gatewayFeeSatang = 0,
   now = new Date().toISOString()
 }) {
   const transactionGroupId = `txg_refund_${orderId}_${Date.now()}`;
@@ -373,6 +422,18 @@ export async function recordRefund(t, adminDb, {
       creditSatang: 0,
       type: 'REFUND',
       description: `Reverse platform fee for refunded order ${orderId}`,
+      createdAt: now
+    },
+    {
+      id: generateEntryId(),
+      transactionGroupId,
+      orderId,
+      storeId,
+      account: 'PAYMENT_CLEARING',
+      debitSatang: gatewayFeeSatang,
+      creditSatang: 0,
+      type: 'REFUND',
+      description: `Reverse gateway fee owed for order ${orderId}`,
       createdAt: now
     },
     {

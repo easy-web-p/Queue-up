@@ -12,6 +12,7 @@ import { recordOrderFulfilled } from '../services/ledgerService.js';
 import { NotificationEngine } from '../services/notificationEngine.js';
 import { SlotTransactionService } from '../services/slotTransactionService.js';
 import { findMenuItem } from '../services/menuCatalog.js';
+import { computeFeeBreakdown, resolveOrderBreakdown } from '../services/orderPricing.js';
 import { applyWalletDelta, isWalletPayment } from '../services/customerWalletService.js';
 
 export const orderRouter = Router();
@@ -189,12 +190,13 @@ orderRouter.post('/', optionalAuthenticate, async (req, res) => {
       const discountSatang = calculatedSubtotalSatang >= 20000 ? 2000 : 0;
       const totalSatang = Math.max(0, calculatedSubtotalSatang - discountSatang);
 
-      // Financial breakdown calculations
-      const platformFeeSatang = Math.round(totalSatang * 0.10); // 10% platform fee
-      const estimatedGatewayFeeSatang = (paymentMethod === 'cash' || isWalletPayment(paymentMethod))
-        ? 0
-        : Math.round(totalSatang * 0.0165 * 1.07);
-      const merchantNetSatang = Math.max(0, totalSatang - platformFeeSatang - estimatedGatewayFeeSatang);
+      // Financial breakdown. Single source of truth, so the split stored here is
+      // the same one the webhook and the ledger will later post against.
+      const { platformFeeSatang, gatewayFeeSatang, merchantNetSatang } = computeFeeBreakdown(
+        totalSatang,
+        { chargedByGateway: paymentMethod !== 'cash' && !isWalletPayment(paymentMethod) }
+      );
+      const estimatedGatewayFeeSatang = gatewayFeeSatang;
 
       // 4-digit pickup PIN with HMAC SHA-256 hash (never store plain PIN in DB)
       const exchangePin = `${Math.floor(1000 + Math.random() * 9000)}`;
@@ -466,7 +468,7 @@ orderRouter.patch('/:id/status', authenticate, async (req, res) => {
           orderUpdates.settlementStatus = 'ON_HOLD';
           orderUpdates.fundReleaseAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
 
-          const merchantNetSatang = orderData.merchantNetSatang || Math.max(0, (orderData.totalSatang || (orderData.total * 100)) - (orderData.platformFeeSatang || 0));
+          const { merchantNetSatang } = resolveOrderBreakdown(orderData);
           await recordOrderFulfilled(t, adminDb, {
             orderId,
             storeId: orderData.storeId,

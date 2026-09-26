@@ -55,6 +55,32 @@ export const MerchantWalletTab: React.FC<MerchantWalletTabProps> = ({
   const [refreshing, setRefreshing] = useState(false);
   const [showPayoutModal, setShowPayoutModal] = useState(false);
   const [payoutAmountBaht, setPayoutAmountBaht] = useState<string>('');
+
+  // Destination bank account. The modal used to display a hardcoded
+  // "ธนาคารกสิกรไทย xxx-x-xx892-1" as though it were the merchant's own, and
+  // the API recorded an equally invented default when none was sent — so a
+  // payout's money trail pointed at an account nobody had configured.
+  const bankStorageKey = `queueup_payout_bank_${storeId}`;
+  const [bankName, setBankName] = useState<string>('');
+  const [bankAccountName, setBankAccountName] = useState<string>('');
+  const [bankAccountNumber, setBankAccountNumber] = useState<string>('');
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(bankStorageKey);
+      if (!saved) return;
+      const parsed = JSON.parse(saved);
+      setBankName(parsed.bankName || '');
+      setBankAccountName(parsed.accountName || '');
+      setBankAccountNumber(parsed.accountNumber || '');
+    } catch {
+      // A device with storage blocked simply retypes the details.
+    }
+  }, [bankStorageKey]);
+
+  const bankDetailsComplete = Boolean(
+    bankName.trim() && bankAccountName.trim() && bankAccountNumber.trim()
+  );
   const [submittingPayout, setSubmittingPayout] = useState(false);
   const [connectingStripe, setConnectingStripe] = useState(false);
 
@@ -95,7 +121,22 @@ export const MerchantWalletTab: React.FC<MerchantWalletTabProps> = ({
 
     try {
       setSubmittingPayout(true);
-      await apiClient.requestMerchantPayout(storeId, amountSatang);
+      const bankAccountSnapshot = {
+        bankName: bankName.trim(),
+        accountName: bankAccountName.trim(),
+        accountNumberMasked: bankAccountNumber.trim()
+      };
+      await apiClient.requestMerchantPayout(storeId, amountSatang, bankAccountSnapshot);
+
+      try {
+        localStorage.setItem(bankStorageKey, JSON.stringify({
+          bankName: bankAccountSnapshot.bankName,
+          accountName: bankAccountSnapshot.accountName,
+          accountNumber: bankAccountSnapshot.accountNumberMasked
+        }));
+      } catch {
+        // Convenience only; the payout has already been submitted.
+      }
       addToast('ส่งคำขอถอนเงินแล้ว!', `ระบบได้บันทึกคำขอถอนเงิน ฿${amountNum.toFixed(2)} ยอดจะโอนเข้าบัญชีภายใน 1-2 วันทำการ`, 'success');
       setShowPayoutModal(false);
       setPayoutAmountBaht('');
@@ -446,18 +487,38 @@ export const MerchantWalletTab: React.FC<MerchantWalletTabProps> = ({
               </div>
             </div>
 
-            <div className="p-3 rounded-2xl bg-stone-50 dark:bg-zinc-800/70 border border-stone-200 dark:border-zinc-700/80 flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-emerald-600/10 text-emerald-600 flex items-center justify-center shrink-0">
-                <Landmark className="w-4 h-4" />
-              </div>
-              <div className="text-xs">
-                <span className="font-bold text-stone-800 dark:text-zinc-200 block">
-                  บัญชีธนาคารกสิกรไทย (KBANK)
-                </span>
-                <span className="text-stone-500 dark:text-zinc-400 text-[11px]">
-                  เลขที่บัญชี: xxx-x-xx892-1 ({storeName})
-                </span>
-              </div>
+            <div className="flex flex-col gap-2 pt-1 border-t border-stone-200 dark:border-zinc-800">
+              <label className="text-xs font-semibold text-stone-700 dark:text-zinc-300 flex items-center gap-1.5 pt-2">
+                <Landmark className="w-3.5 h-3.5 text-emerald-600" />
+                บัญชีธนาคารปลายทาง
+              </label>
+
+              <input
+                type="text"
+                placeholder="ชื่อธนาคาร เช่น ธนาคารกสิกรไทย"
+                value={bankName}
+                onChange={(e) => setBankName(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-2xl bg-stone-50 dark:bg-zinc-800 border border-stone-200 dark:border-zinc-700 text-stone-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+              <input
+                type="text"
+                placeholder={`ชื่อบัญชี เช่น ${storeName}`}
+                value={bankAccountName}
+                onChange={(e) => setBankAccountName(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-2xl bg-stone-50 dark:bg-zinc-800 border border-stone-200 dark:border-zinc-700 text-stone-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="เลขที่บัญชี"
+                value={bankAccountNumber}
+                onChange={(e) => setBankAccountNumber(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-2xl bg-stone-50 dark:bg-zinc-800 border border-stone-200 dark:border-zinc-700 text-stone-900 dark:text-white text-xs font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+
+              <p className="text-[11px] text-stone-500 dark:text-zinc-500">
+                ระบบจะจำบัญชีนี้ไว้ในเครื่องนี้ เพื่อไม่ต้องกรอกใหม่ทุกครั้ง
+              </p>
             </div>
 
             <div className="flex items-center gap-2 pt-2">
@@ -472,7 +533,12 @@ export const MerchantWalletTab: React.FC<MerchantWalletTabProps> = ({
                 variant="primary"
                 className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
                 onClick={handleRequestPayout}
-                disabled={submittingPayout || !payoutAmountBaht || parseFloat(payoutAmountBaht) < 100}
+                disabled={
+                  submittingPayout ||
+                  !payoutAmountBaht ||
+                  parseFloat(payoutAmountBaht) < 100 ||
+                  !bankDetailsComplete
+                }
               >
                 {submittingPayout ? 'กำลังส่งคำขอ...' : 'ยืนยันการถอนเงิน'}
               </Button>

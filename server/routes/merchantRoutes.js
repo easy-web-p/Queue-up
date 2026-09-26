@@ -9,6 +9,7 @@ import {
 } from '../middleware/authenticate.js';
 import { requireSecret, optionalSecret } from '../config/secrets.js';
 import { recordOrderFulfilled, recordRefund } from '../services/ledgerService.js';
+import { resolveOrderBreakdown } from '../services/orderPricing.js';
 import { NotificationEngine } from '../services/notificationEngine.js';
 import { applyWalletDelta } from '../services/customerWalletService.js';
 import dotenv from 'dotenv';
@@ -219,10 +220,8 @@ merchantRouter.post('/orders/:id/reject', authenticate, requireStoreOwnership(st
 
       // Reverse pending ledger entry if previously credited
       if (order.paymentStatus === 'PAID') {
-        const totalSatang = order.totalSatang || Math.round((order.total || 0) * 100);
-        const platformFeeSatang = order.platformFeeSatang || Math.round(totalSatang * 0.10);
-        const gatewayFeeSatang = order.estimatedGatewayFeeSatang || Math.round(totalSatang * 0.0165 * 1.07);
-        const merchantNetSatang = order.merchantNetSatang || Math.max(0, totalSatang - platformFeeSatang - gatewayFeeSatang);
+        const { totalSatang, platformFeeSatang, gatewayFeeSatang, merchantNetSatang } =
+          resolveOrderBreakdown(order);
 
         await recordRefund(t, adminDb, {
           orderId,
@@ -399,7 +398,7 @@ merchantRouter.post('/orders/:id/complete', authenticate, requireStoreOwnership(
 
       // Hold period for dispute & safety: 60 minutes
       const fundReleaseAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-      const merchantNetSatang = order.merchantNetSatang || Math.max(0, (order.totalSatang || (order.total * 100)) - (order.platformFeeSatang || 0));
+      const { merchantNetSatang } = resolveOrderBreakdown(order);
 
       const isOnlinePaid = order.paymentMethod !== 'cash' && order.paymentStatus === 'PAID';
       const newSettlementStatus = isOnlinePaid ? 'ON_HOLD' : 'NOT_APPLICABLE';

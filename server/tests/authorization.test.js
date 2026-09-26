@@ -77,6 +77,11 @@ const RIVAL = 'merchant-owner-beta';
 const CUSTOMER = 'customer-somchai';
 const OUTSIDER = 'customer-outsider';
 const STORE = 'store-auth-alpha';
+const PAYOUT_BANK = {
+  bankName: 'ธนาคารกสิกรไทย',
+  accountName: 'ร้านอัลฟ่า',
+  accountNumberMasked: '111-2-33333-4'
+};
 const RIVAL_STORE = 'store-auth-beta';
 
 async function seed() {
@@ -120,11 +125,11 @@ async function runTests() {
     check(res.status === 401, 'Anonymous payout request is rejected', `status ${res.status}`);
 
     res = await request(baseUrl, '/api/merchant/payouts', 'POST',
-      { storeId: STORE, amountSatang: 100000 }, as(RIVAL, 'merchant'));
+      { storeId: STORE, amountSatang: 100000, bankAccountSnapshot: PAYOUT_BANK }, as(RIVAL, 'merchant'));
     check(res.status === 403, 'A rival merchant cannot withdraw from another store', `status ${res.status}`);
 
     res = await request(baseUrl, '/api/merchant/payouts', 'POST',
-      { storeId: STORE, amountSatang: 100000 }, as(OWNER, 'merchant'));
+      { storeId: STORE, amountSatang: 100000, bankAccountSnapshot: PAYOUT_BANK }, as(OWNER, 'merchant'));
     check(res.status === 201, 'The store owner can still withdraw their own funds', `status ${res.status}`);
 
     // --- Wallet reads ---

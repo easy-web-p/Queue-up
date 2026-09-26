@@ -373,12 +373,16 @@ class ApiClient {
   /**
    * Merchant Wallet: Request payout
    */
-  async requestMerchantPayout(storeId: string, amountSatang: number): Promise<any> {
+  async requestMerchantPayout(
+    storeId: string,
+    amountSatang: number,
+    bankAccountSnapshot: { bankName: string; accountName: string; accountNumberMasked: string }
+  ): Promise<any> {
     const headers = await this.getAuthHeaders();
     const response = await fetch(`${this.baseUrl}/merchant/payouts`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ storeId, amountSatang })
+      body: JSON.stringify({ storeId, amountSatang, bankAccountSnapshot })
     });
     const data = await response.json();
     if (!response.ok || !data.success) {

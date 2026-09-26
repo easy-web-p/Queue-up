@@ -2,6 +2,7 @@ import { Router } from 'express';
 import Stripe from 'stripe';
 import { adminDb } from '../firebaseAdmin.js';
 import { recordCustomerPayment, recordRefund } from '../services/ledgerService.js';
+import { resolveOrderBreakdown } from '../services/orderPricing.js';
 import { optionalSecret, isProduction } from '../config/secrets.js';
 import dotenv from 'dotenv';
 
@@ -107,10 +108,8 @@ webhookRouter.post('/stripe', async (req, res) => {
 
           // 5-minute deadline for merchant to accept/reject
           const merchantDeadline = new Date(Date.now() + 5 * 60 * 1000).toISOString();
-          const totalSatang = order.totalSatang || Math.round((order.total || 0) * 100);
-          const platformFeeSatang = order.platformFeeSatang || Math.round(totalSatang * 0.10);
-          const gatewayFeeSatang = order.estimatedGatewayFeeSatang || Math.round(totalSatang * 0.0165 * 1.07);
-          const merchantNetSatang = order.merchantNetSatang || Math.max(0, totalSatang - platformFeeSatang - gatewayFeeSatang);
+          const { totalSatang, platformFeeSatang, gatewayFeeSatang, merchantNetSatang } =
+            resolveOrderBreakdown(order);
 
           // Update Order State
           t.update(orderRef, {

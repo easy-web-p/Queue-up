@@ -1,9 +1,15 @@
 import { Router } from 'express';
 import Stripe from 'stripe';
 import { adminDb } from '../firebaseAdmin.js';
-import { authenticate, requireStoreOwnership } from '../middleware/authenticate.js';
+import { authenticate, requireStoreOwnership, requireSuperAdmin } from '../middleware/authenticate.js';
 import { optionalSecret } from '../config/secrets.js';
-import { recordPayoutReserved, recordPayoutCompleted, recordFundsReleased } from '../services/ledgerService.js';
+import {
+  recordPayoutReserved,
+  recordPayoutCompleted,
+  recordPayoutFailed,
+  recordFundsReleased
+} from '../services/ledgerService.js';
+import { resolveOrderBreakdown } from '../services/orderPricing.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -105,7 +111,7 @@ walletRouter.post('/wallet/release-held-funds', authenticate, requireStoreOwners
       if (new Date() < releaseTime) continue;
 
       const orderRef = adminDb.collection('orders').doc(doc.id);
-      const merchantNetSatang = order.merchantNetSatang || Math.max(0, (order.totalSatang || (order.total * 100)) - (order.platformFeeSatang || 0));
+      const { merchantNetSatang } = resolveOrderBreakdown(order);
 
       await adminDb.runTransaction(async (t) => {
         t.update(orderRef, {
@@ -144,6 +150,23 @@ walletRouter.post('/payouts', authenticate, requireStoreOwnership(), async (req,
     const storeId = req.storeId;
     const { amountSatang, bankAccountSnapshot } = req.body;
 
+    // A payout needs a real destination. Defaulting to a placeholder account
+    // meant a request with no bank details recorded a fabricated one, which is
+    // the worst possible thing to find in a money trail afterwards.
+    const bank = bankAccountSnapshot || {};
+    const hasBankDetails = Boolean(
+      String(bank.bankName || '').trim() &&
+      String(bank.accountName || '').trim() &&
+      String(bank.accountNumberMasked || bank.accountNumber || '').trim()
+    );
+    if (!hasBankDetails) {
+      return res.status(400).json({
+        success: false,
+        error: 'MISSING_BANK_ACCOUNT',
+        message: 'กรุณาระบุบัญชีธนาคารปลายทาง (ชื่อธนาคาร, ชื่อบัญชี และเลขบัญชี) ก่อนขอถอนเงิน'
+      });
+    }
+
     if (!storeId || !amountSatang || amountSatang < 10000) {
       return res.status(400).json({
         success: false,
@@ -172,11 +195,7 @@ walletRouter.post('/payouts', authenticate, requireStoreOwnership(), async (req,
         amountSatang,
         currency: 'thb',
         status: 'REQUESTED',
-        bankAccountSnapshot: bankAccountSnapshot || {
-          bankName: 'ธนาคารกสิกรไทย',
-          accountNumberMasked: 'xxx-x-xx123-x',
-          accountName: 'ร้านค้า QueueUp'
-        },
+        bankAccountSnapshot: bank,
         requestedBy: req.user.uid,
         createdAt: now,
         updatedAt: now
@@ -195,37 +214,128 @@ walletRouter.post('/payouts', authenticate, requireStoreOwnership(), async (req,
       return newPayout;
     });
 
-    // 2. Dispatch Payout (Simulated or via Stripe Connect if connected)
-    setTimeout(async () => {
-      try {
-        await adminDb.runTransaction(async (t) => {
-          t.update(payoutRef, {
-            status: 'PAID',
-            updatedAt: new Date().toISOString()
-          });
-
-          await recordPayoutCompleted(t, adminDb, {
-            payoutId,
-            storeId,
-            amountSatang,
-            now: new Date().toISOString()
-          });
-        });
-        console.log(`[Payout Worker] Payout ${payoutId} completed successfully.`);
-      } catch (workerErr) {
-        console.error('[Payout Worker] Payout dispatch error:', workerErr);
-      }
-    }, 1500);
-
+    // The payout stays REQUESTED with the funds reserved until a transfer is
+    // actually confirmed, through /payouts/:id/complete.
+    //
+    // This used to auto-complete on a setTimeout 1.5 seconds after the response
+    // was sent, which was wrong twice over: a serverless instance is frozen the
+    // moment it responds, so the callback would usually never run and the
+    // money would sit reserved forever — and when it did run it marked the
+    // payout PAID without any transfer having happened.
     return res.status(201).json({
       success: true,
       payoutId,
       payout: payoutRecord,
-      message: 'คำขอถอนเงินถูกส่งเรียบร้อยแล้ว ยอดเงินจะโอนเข้าบัญชีภายใน 1-2 วันทำการ'
+      status: 'REQUESTED',
+      message: 'ส่งคำขอถอนเงินเรียบร้อยแล้ว ยอดเงินถูกกันไว้รอการโอน ทีมงานจะดำเนินการให้ภายใน 1-2 วันทำการ'
     });
   } catch (err) {
     console.error('[Payout API] Payout error:', err);
     return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/merchant/payouts/:payoutId/complete
+ * Confirms that the transfer actually left the platform's account.
+ *
+ * Restricted to platform administrators: only whoever performed the transfer
+ * can attest that it happened. Idempotent, so a repeated confirmation after a
+ * network blip does not pay the merchant twice.
+ */
+walletRouter.post('/payouts/:payoutId/complete', authenticate, requireSuperAdmin, async (req, res) => {
+  try {
+    const { payoutId } = req.params;
+    const { providerTransferId = null } = req.body;
+    const payoutRef = adminDb.collection('payout_requests').doc(payoutId);
+    const now = new Date().toISOString();
+
+    const result = await adminDb.runTransaction(async (t) => {
+      const snap = await t.get(payoutRef);
+      if (!snap.exists) throw new Error('PAYOUT_NOT_FOUND');
+
+      const payout = snap.data();
+      if (payout.status === 'PAID') {
+        return { alreadyPaid: true, payoutId, amountSatang: payout.amountSatang };
+      }
+      if (payout.status !== 'REQUESTED') {
+        throw new Error(`PAYOUT_NOT_PENDING: payout is ${payout.status}`);
+      }
+
+      t.update(payoutRef, {
+        status: 'PAID',
+        providerTransferId,
+        completedBy: req.user.uid,
+        completedAt: now,
+        updatedAt: now
+      });
+
+      await recordPayoutCompleted(t, adminDb, {
+        payoutId,
+        storeId: payout.storeId,
+        amountSatang: payout.amountSatang,
+        now
+      });
+
+      return { alreadyPaid: false, payoutId, amountSatang: payout.amountSatang };
+    });
+
+    return res.status(200).json({ success: true, ...result });
+  } catch (err) {
+    console.error('[Payout API] Complete error:', err);
+    const notFound = /PAYOUT_NOT_FOUND/.test(err.message);
+    return res.status(notFound ? 404 : 400).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/merchant/payouts/:payoutId/fail
+ * Marks a payout as failed and returns the reserved funds to the merchant's
+ * available balance, so a transfer that bounced does not strand their money.
+ */
+walletRouter.post('/payouts/:payoutId/fail', authenticate, requireSuperAdmin, async (req, res) => {
+  try {
+    const { payoutId } = req.params;
+    const { reason = 'ไม่สามารถโอนเงินได้' } = req.body;
+    const payoutRef = adminDb.collection('payout_requests').doc(payoutId);
+    const now = new Date().toISOString();
+
+    const result = await adminDb.runTransaction(async (t) => {
+      const snap = await t.get(payoutRef);
+      if (!snap.exists) throw new Error('PAYOUT_NOT_FOUND');
+
+      const payout = snap.data();
+      if (payout.status === 'FAILED') {
+        return { alreadyFailed: true, payoutId, amountSatang: payout.amountSatang };
+      }
+      if (payout.status !== 'REQUESTED') {
+        throw new Error(`PAYOUT_NOT_PENDING: payout is ${payout.status}`);
+      }
+
+      t.update(payoutRef, {
+        status: 'FAILED',
+        failureReason: reason,
+        failedBy: req.user.uid,
+        failedAt: now,
+        updatedAt: now
+      });
+
+      await recordPayoutFailed(t, adminDb, {
+        payoutId,
+        storeId: payout.storeId,
+        amountSatang: payout.amountSatang,
+        reason,
+        now
+      });
+
+      return { alreadyFailed: false, payoutId, amountSatang: payout.amountSatang };
+    });
+
+    return res.status(200).json({ success: true, ...result });
+  } catch (err) {
+    console.error('[Payout API] Fail error:', err);
+    const notFound = /PAYOUT_NOT_FOUND/.test(err.message);
+    return res.status(notFound ? 404 : 400).json({ success: false, error: err.message });
   }
 });
 

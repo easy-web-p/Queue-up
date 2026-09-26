@@ -3,7 +3,9 @@ import Stripe from 'stripe';
 import { adminDb } from '../firebaseAdmin.js';
 import { optionalAuthenticate } from '../middleware/authenticate.js';
 import { optionalSecret } from '../config/secrets.js';
+import { verifySessionAgainstOrder } from '../services/paymentVerification.js';
 import { recordCustomerPayment } from '../services/ledgerService.js';
+import { resolveOrderBreakdown } from '../services/orderPricing.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -233,6 +235,16 @@ paymentRouter.post('/verify-session', optionalAuthenticate, async (req, res) => 
 
         const data = orderSnap.data();
 
+        // A paid session proves only that something was paid: bind it to this
+        // order, this customer and this amount before settling anything.
+        const verdict = verifySessionAgainstOrder({
+          session, orderId, order: data, user: req.user
+        });
+        if (!verdict.ok) {
+          console.warn(`[Payment API] Session ${sessionId} rejected for ${orderId}: ${verdict.error}`);
+          throw new Error(`${verdict.error}: ${verdict.message}`);
+        }
+
         // If already paid, do not repeat ledger write
         if (data.paymentStatus === 'PAID') {
           return;
@@ -240,10 +252,8 @@ paymentRouter.post('/verify-session', optionalAuthenticate, async (req, res) => 
 
         // Set status to PAID_AWAITING_MERCHANT (5-minute deadline for merchant to respond)
         const merchantDeadline = new Date(Date.now() + 5 * 60 * 1000).toISOString();
-        const totalSatang = data.totalSatang || Math.round((data.total || 0) * 100);
-        const platformFeeSatang = data.platformFeeSatang || Math.round(totalSatang * 0.10);
-        const gatewayFeeSatang = data.estimatedGatewayFeeSatang || Math.round(totalSatang * 0.0165 * 1.07);
-        const merchantNetSatang = data.merchantNetSatang || Math.max(0, totalSatang - platformFeeSatang - gatewayFeeSatang);
+        const { totalSatang, platformFeeSatang, gatewayFeeSatang, merchantNetSatang } =
+          resolveOrderBreakdown(data);
 
         const newVersion = (data.version || 1) + 1;
 
