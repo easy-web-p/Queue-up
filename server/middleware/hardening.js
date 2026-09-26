@@ -21,8 +21,15 @@ const contentSecurityPolicy = {
   reportOnly: process.env.CSP_ENFORCE !== 'true',
   directives: {
     defaultSrc: ["'self'"],
-    // Firebase compat SDK for the messaging service worker.
-    scriptSrc: ["'self'", 'https://www.gstatic.com', 'https://js.stripe.com'],
+    // gstatic: the Firebase compat SDK for the messaging service worker.
+    // googletagmanager: Firebase Analytics loads gtag.js from there, so a policy
+    // without it blocks a script the app itself asks for.
+    scriptSrc: [
+      "'self'",
+      'https://www.gstatic.com',
+      'https://js.stripe.com',
+      'https://www.googletagmanager.com'
+    ],
     // Tailwind and the Google Fonts stylesheet inject inline styles.
     styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://cdn.jsdelivr.net'],
     fontSrc: ["'self'", 'https://fonts.gstatic.com', 'https://cdn.jsdelivr.net', 'data:'],
@@ -34,7 +41,11 @@ const contentSecurityPolicy = {
       'https://*.firebaseio.com',
       'wss://*.firebaseio.com',
       'https://*.firebasestorage.app',
-      'https://api.stripe.com'
+      'https://api.stripe.com',
+      // Where gtag.js reports to, once it is allowed to load.
+      'https://www.googletagmanager.com',
+      'https://*.google-analytics.com',
+      'https://*.analytics.google.com'
     ],
     frameSrc: ['https://js.stripe.com', 'https://checkout.stripe.com'],
     objectSrc: ["'none'"],

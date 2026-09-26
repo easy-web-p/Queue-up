@@ -46,6 +46,14 @@ test.describe('QueueUp production build', () => {
     await expect(root).not.toBeEmpty({ timeout: 20_000 });
     await expect(page).toHaveTitle(/QueueUp/i);
 
+    // Firebase Analytics is imported dynamically, so its gtag.js load lands
+    // after first paint. Without waiting for it, whether this test saw the
+    // violation came down to timing — it passed locally and failed in CI on the
+    // same policy. Bounded, because analytics is optional: if it never loads
+    // there is simply nothing more to check.
+    await page.waitForRequest(/googletagmanager\.com/, { timeout: 4_000 }).catch(() => {});
+    await page.waitForTimeout(250);
+
     expect(problems.cspViolations, 'enforced CSP blocked the app\'s own resources').toEqual([]);
     expect(problems.failedAppRequests, 'an app asset failed to load').toEqual([]);
   });
