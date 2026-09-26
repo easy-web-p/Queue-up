@@ -46,6 +46,11 @@ jobs:
       - name: Firestore rules tests
         run: npx --yes firebase-tools@latest emulators:exec --only firestore --project demo-queueup-rules "node server/tests/firestoreRules.test.js"
 
+      # The serverless entry point must stay importable: a broken api/index.js
+      # only surfaces as a 500 on every API route after deploy.
+      - name: Verify the serverless entry point loads
+        run: node --check api/index.js && node --check server/app.js
+
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 

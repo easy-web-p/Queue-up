@@ -1,35 +1,23 @@
-import express from 'express';
+/**
+ * Standalone server entry point.
+ *
+ * Used by local development, Cloud Run, and any platform that runs a
+ * long-lived process. Serverless deployments import the app factory directly
+ * (see api/index.js) and never reach this file.
+ */
+
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
-import { orderRouter } from './server/routes/orderRoutes.js';
-import { paymentRouter } from './server/routes/paymentRoutes.js';
-import { webhookRouter } from './server/routes/webhookRoutes.js';
-import { merchantRouter } from './server/routes/merchantRoutes.js';
-import { walletRouter } from './server/routes/walletRoutes.js';
-import { notificationRouter } from './server/routes/notificationRoutes.js';
-import { capacityRouter } from './server/routes/capacityRoutes.js';
-import { chatRouter } from './server/routes/chatRoutes.js';
-import { schoolRouter } from './server/routes/schoolRoutes.js';
-import { catalogRouter } from './server/routes/catalogRoutes.js';
-import { customerWalletRouter } from './server/routes/customerWalletRoutes.js';
+import { createApp } from './server/app.js';
 import { startPickupReminderWorker } from './server/services/pickupReminderWorker.js';
-import {
-  applyHardening,
-  errorHandler,
-  apiLimiter,
-  writeLimiter,
-  pinLimiter
-} from './server/middleware/hardening.js';
 import { isProduction } from './server/config/secrets.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const app = express();
-const distDir = path.join(__dirname, 'dist');
-const indexPath = path.join(distDir, 'index.html');
+const indexPath = path.join(__dirname, 'dist', 'index.html');
 
 // Ensure dist exists before serving. A production image is expected to have
 // been built already; rebuilding at boot there would mask a broken deployment
@@ -48,89 +36,11 @@ if (!fs.existsSync(indexPath)) {
   }
 }
 
-// 0. Security headers and cross-origin policy, before anything else.
-applyHardening(app);
-
-// 1. Mount Webhook routes with RAW body parser BEFORE express.json()
-// This is strictly required by Stripe to verify webhook cryptographic signatures.
-app.use('/api/webhooks', express.raw({ type: 'application/json' }), webhookRouter);
-
-// 2. Parse JSON body for all standard API requests
-app.use(express.json());
-
-// Health check endpoint for Cloud Run
-app.get(['/healthz', '/_health', '/api/health'], (req, res) => {
-  res.status(200).send('OK');
-});
-
-// 3. Rate limits, tightest first so the specific rules win.
-app.post('/api/merchant/orders/:id/complete', pinLimiter);
-app.post('/api/orders', writeLimiter);
-app.post('/api/chat/messages', writeLimiter);
-app.post('/api/capacity/reserve', writeLimiter);
-app.post('/api/merchant/payouts', writeLimiter);
-app.post('/api/schools/membership/claim', writeLimiter);
-app.use('/api', apiLimiter);
-
-// 4. Mount Command & Financial API routes
-app.use('/api/orders', orderRouter);
-app.use('/api/payment', paymentRouter);
-app.use('/api/merchant', merchantRouter);
-app.use('/api/merchant', walletRouter);
-app.use('/api/capacity', capacityRouter);
-app.use('/api/chat', chatRouter);
-app.use('/api/schools', schoolRouter);
-app.use('/api/catalog', catalogRouter);
-app.use('/api/wallet', customerWalletRouter);
-app.use('/api', notificationRouter);
-
-// Unmatched API paths must not fall through to the SPA fallback below, which
-// would answer an API client with index.html and a 200.
-app.use('/api', (req, res) => {
-  res.status(404).json({
-    success: false,
-    error: 'NOT_FOUND',
-    message: `No API route matches ${req.method} ${req.originalUrl}`
-  });
-});
-
-// Explicit route for Firebase Messaging Service Worker (prevents SPA rewrite hijacking)
-app.get('/firebase-messaging-sw.js', (req, res) => {
-  const swDistPath = path.join(distDir, 'firebase-messaging-sw.js');
-  const swPublicPath = path.join(__dirname, 'public', 'firebase-messaging-sw.js');
-  const targetPath = fs.existsSync(swDistPath) ? swDistPath : swPublicPath;
-
-  if (fs.existsSync(targetPath)) {
-    res.setHeader('Content-Type', 'application/javascript; charset=UTF-8');
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Service-Worker-Allowed', '/');
-    res.sendFile(targetPath);
-  } else {
-    res.status(404).send('Service worker file not found');
-  }
-});
-
-// Serve static assets from dist
-app.use(express.static(distDir, {
-  maxAge: '1h',
-  index: false
-}));
-
-// SPA routing fallback
-app.get('*', (req, res) => {
-  if (fs.existsSync(indexPath)) {
-    res.sendFile(indexPath);
-  } else {
-    res.status(500).send('Application build in progress or failed. Please refresh shortly.');
-  }
-});
+const app = createApp({ serveStatic: true });
 
 // The vite dev server owns port 3000 and proxies /api here, so the API must
 // not default to the same port.
 const DEFAULT_PORT = 8080;
-
-// Terminal error handler: must be registered after every route.
-app.use(errorHandler);
 
 function startServer(preferredPort) {
   const server = app.listen(preferredPort, '0.0.0.0', () => {
@@ -155,13 +65,11 @@ function startServer(preferredPort) {
   });
 }
 
-const targetPort = process.env.PORT
-  ? parseInt(process.env.PORT, 10)
-  : DEFAULT_PORT;
+const targetPort = process.env.PORT ? parseInt(process.env.PORT, 10) : DEFAULT_PORT;
 
 startServer(targetPort);
 
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason) => {
   console.warn('[QueueUp Server] Unhandled Promise Rejection:', reason?.message || reason);
 });
 

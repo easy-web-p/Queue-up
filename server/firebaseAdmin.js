@@ -23,9 +23,43 @@ if (fs.existsSync(configPath)) {
 
 const isProduction = process.env.NODE_ENV === 'production';
 const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-const hasServiceAccountFile = serviceAccountPath && fs.existsSync(serviceAccountPath);
+const hasServiceAccountFile = Boolean(serviceAccountPath) && fs.existsSync(serviceAccountPath);
 const isCloudRun = Boolean(process.env.K_SERVICE || process.env.CLOUD_RUN_JOB || process.env.GAE_ENV);
-const useLiveAdmin = hasServiceAccountFile || isCloudRun;
+
+// Serverless platforms have no writable path to drop a key file on, so the
+// service account arrives as an environment variable instead. Accepts raw JSON
+// or base64, since dashboards differ on whether they preserve newlines.
+function readServiceAccountFromEnv() {
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT || process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+  if (!raw || !raw.trim()) return null;
+
+  const text = raw.trim().startsWith('{')
+    ? raw.trim()
+    : Buffer.from(raw.trim(), 'base64').toString('utf8');
+
+  try {
+    const parsed = JSON.parse(text);
+    if (!parsed.project_id || !parsed.private_key || !parsed.client_email) {
+      throw new Error('missing project_id, private_key or client_email');
+    }
+    // Dashboards that store the value as a single line turn newlines into \n.
+    if (typeof parsed.private_key === 'string') {
+      parsed.private_key = parsed.private_key.replace(/\\n/g, '\n');
+    }
+    return parsed;
+  } catch (err) {
+    throw new Error(
+      `[FirebaseAdmin] FIREBASE_SERVICE_ACCOUNT is set but could not be parsed: ${err.message}`
+    );
+  }
+}
+
+const serviceAccountFromEnv = readServiceAccountFromEnv();
+
+// Vercel and similar platforms set no ADC of their own, so a deployment there
+// without a service account has no path to Firestore at all.
+const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const useLiveAdmin = Boolean(serviceAccountFromEnv) || hasServiceAccountFile || isCloudRun;
 
 let adminApp = null;
 let adminDb = null;
@@ -35,7 +69,13 @@ let adminMessaging = null;
 if (useLiveAdmin) {
   try {
     if (!getApps().length) {
-      if (hasServiceAccountFile) {
+      if (serviceAccountFromEnv) {
+        adminApp = initializeApp({
+          credential: cert(serviceAccountFromEnv),
+          projectId: serviceAccountFromEnv.project_id || projectConfig.projectId
+        });
+        console.log('[FirebaseAdmin] Initialized from FIREBASE_SERVICE_ACCOUNT.');
+      } else if (hasServiceAccountFile) {
         const sa = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
         adminApp = initializeApp({
           credential: cert(sa),
@@ -74,11 +114,13 @@ if (useLiveAdmin) {
 // A production deployment that reaches this point has no credentials at all
 // (no GOOGLE_APPLICATION_CREDENTIALS and no Cloud Run ADC). Silently degrading
 // to .local_db.json would accept orders and payments onto ephemeral disk.
-if (!adminDb && isProduction) {
+if (!adminDb && (isProduction || isServerless)) {
   throw new Error(
-    '[FirebaseAdmin] No Firebase Admin credentials available in production. ' +
-    'Set GOOGLE_APPLICATION_CREDENTIALS, or run on a platform that provides ' +
-    'Application Default Credentials, before starting the server.'
+    '[FirebaseAdmin] No Firebase Admin credentials available. Set ' +
+    'FIREBASE_SERVICE_ACCOUNT to the service account JSON (or base64 of it), ' +
+    'or GOOGLE_APPLICATION_CREDENTIALS to a key file, or run on a platform ' +
+    'that provides Application Default Credentials. Refusing to start on the ' +
+    'local file-backed store — orders and payments would be lost.'
   );
 }
 

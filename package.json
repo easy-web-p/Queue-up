@@ -13,7 +13,7 @@
     "test:capacity": "node server/tests/capacityService.test.js",
     "test:concurrency": "node server/tests/capacityTransaction.test.js",
     "test:ai": "node server/tests/aiChatEngine.test.js && node server/tests/aiLayer2.test.js",
-    "test": "node server/tests/capacityService.test.js && node server/tests/capacityTransaction.test.js && node server/tests/aiChatEngine.test.js && node server/tests/aiLayer2.test.js && node server/tests/chatRoutes.test.js && node server/tests/authorization.test.js && node server/tests/schoolRoutes.test.js && node server/tests/customerWallet.test.js",
+    "test": "node server/tests/capacityService.test.js && node server/tests/capacityTransaction.test.js && node server/tests/aiChatEngine.test.js && node server/tests/aiLayer2.test.js && node server/tests/chatRoutes.test.js && node server/tests/authorization.test.js && node server/tests/schoolRoutes.test.js && node server/tests/customerWallet.test.js && node server/tests/deployment.test.js",
     "dev:server": "node server.js",
     "test:utc": "TZ=UTC npm test",
     "test:chat": "node server/tests/chatRoutes.test.js",
@@ -21,7 +21,8 @@
     "test:rules": "firebase emulators:exec --only firestore --project demo-queueup-rules \"node server/tests/firestoreRules.test.js\"",
     "test:e2e": "playwright test",
     "test:school": "node server/tests/schoolRoutes.test.js",
-    "test:wallet": "node server/tests/customerWallet.test.js"
+    "test:wallet": "node server/tests/customerWallet.test.js",
+    "test:deploy": "node server/tests/deployment.test.js"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -54,5 +55,8 @@
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
     "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

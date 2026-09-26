@@ -118,8 +118,52 @@ npm run test:e2e  # ทดสอบ end-to-end ด้วย Playwright บน pr
 | `customerWallet.test.js` | Campus Wallet: เติมเงินแบบ idempotent, ยอดติดลบไม่ได้, ตัดยอดตอนสั่ง และคืนเงินเมื่อร้านปฏิเสธ |
 | `firestoreRules.test.js` | การแยกข้อมูลระหว่างสถาบันและร้านค้าในระดับ Security Rules |
 | `e2e/smoke.spec.ts` | แอปบูตได้จริงบน production build, lazy chunk โหลดได้, CSP ไม่บล็อกแอป, route guard ทำงาน |
+| `deployment.test.js` | รูปแบบการ deploy ทั้งสองแบบ (serverless / process) และ cron endpoint |
 
 > `npm run test:rules` จะดาวน์โหลด Firestore Emulator ในครั้งแรก จึงแยกออกจาก `npm test`
+
+## ☁️ การ Deploy ขึ้น Vercel
+
+โปรเจกต์นี้ deploy เป็น **SPA บน CDN + Express API เป็น Serverless Function**
+
+| ไฟล์ | หน้าที่ |
+|---|---|
+| `vercel.json` | build เป็น `dist/`, rewrite `/api/*` ไปที่ function, ที่เหลือไปที่ `index.html` |
+| `api/index.js` | จุดเข้า Serverless — เรียก `createApp({ serveStatic: false })` เพราะ CDN เสิร์ฟไฟล์ static ให้อยู่แล้ว |
+| `server/app.js` | ตัวสร้าง Express app ใช้ร่วมกันทั้งแบบ serverless และแบบรันเป็น process |
+| `server.js` | จุดเข้าแบบ process ยาว (local, Cloud Run, VM) — เสิร์ฟ SPA เองและรัน background worker |
+
+### ⚠️ ตัวแปรที่ต้องตั้งใน Vercel ก่อน ไม่งั้น API จะ 500 ทั้งหมด
+
+ตั้งที่ **Vercel → Project → Settings → Environment Variables** (เลือก Production + Preview)
+
+| ตัวแปร | จำเป็น | ค่า |
+|---|---|---|
+| `FIREBASE_SERVICE_ACCOUNT` | ✅ | JSON ของ Service Account ทั้งก้อน (หรือ base64) — ดาวน์โหลดจาก Firebase Console → Project settings → Service accounts → Generate new private key |
+| `HMAC_SECRET` | ✅ | สตริงสุ่มยาว ๆ เช่น `openssl rand -hex 32` |
+| `STRIPE_WEBHOOK_SECRET` | ✅ | จาก Stripe Dashboard → Webhooks (เซิร์ฟเวอร์จะไม่สตาร์ทถ้าไม่ตั้ง เพราะ webhook จะรับ payload ที่ไม่ได้เซ็น) |
+| `STRIPE_SECRET_KEY` | ตามการใช้งาน | ถ้าไม่ตั้ง endpoint ชำระเงินจะตอบ 503 อย่างชัดเจน |
+| `CRON_SECRET` | ✅ ถ้าใช้ cron | `openssl rand -hex 32` — Vercel Cron จะส่งมาเป็น `Authorization: Bearer` |
+| `SUPER_ADMIN_EMAILS` | ❌ | อีเมลผู้ดูแลระบบ คั่นด้วยจุลภาค |
+| `GEMINI_API_KEY` | ❌ | เปิด AI Layer 2 |
+| `ALLOWED_ORIGINS` | ❌ | เว้นว่างได้ เพราะ SPA กับ API อยู่โดเมนเดียวกัน |
+| `CSP_ENFORCE` | ❌ | ตั้ง `true` เพื่อบังคับใช้ CSP (ชุด E2E รันแบบ enforce ผ่านแล้ว) |
+
+> ห้ามตั้ง `ALLOW_MOCK_AUTH` บน production — ถึงตั้งไปก็ถูกปิดโดย `NODE_ENV=production` อยู่ดี
+
+### Background job
+`server.js` รัน pickup reminder ด้วย `setInterval` แต่ serverless ทำแบบนั้นไม่ได้
+จึงเปิดเป็น endpoint `/api/cron/pickup-reminders` และตั้ง Vercel Cron ทุก 5 นาทีใน `vercel.json`
+(แพ็กเกจ Hobby จำกัด cron วันละครั้ง — ถ้าอยู่บน Hobby ให้ใช้ตัวตั้งเวลาภายนอกยิงมาที่ endpoint นี้พร้อม header `Authorization: Bearer $CRON_SECRET`)
+
+### หลัง deploy ตรวจอะไรบ้าง
+```bash
+curl https://<your-domain>/api/health                 # ควรได้ {"status":"ok",...}
+curl https://<your-domain>/api/does-not-exist         # ควรได้ 404 JSON ไม่ใช่ HTML
+curl -X POST https://<your-domain>/api/merchant/payouts \
+     -H 'Content-Type: application/json' -d '{"storeId":"x","amountSatang":10000}'
+                                                       # ควรได้ 401
+```
 
 ## 📂 โครงสร้างโปรเจกต์ (Project Structure)
 

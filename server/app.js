@@ -1,0 +1,132 @@
+/**
+ * Express application factory.
+ *
+ * Kept separate from server.js so the same app can be used two ways:
+ * - a long-lived process that listens on a port (local dev, Cloud Run, any VM)
+ * - a serverless handler that is invoked per request (Vercel)
+ *
+ * A serverless platform serves the built SPA from its own CDN, so static file
+ * handling is opt-out via `serveStatic`.
+ */
+
+import express from 'express';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+import { orderRouter } from './routes/orderRoutes.js';
+import { paymentRouter } from './routes/paymentRoutes.js';
+import { webhookRouter } from './routes/webhookRoutes.js';
+import { merchantRouter } from './routes/merchantRoutes.js';
+import { walletRouter } from './routes/walletRoutes.js';
+import { notificationRouter } from './routes/notificationRoutes.js';
+import { capacityRouter } from './routes/capacityRoutes.js';
+import { chatRouter } from './routes/chatRoutes.js';
+import { schoolRouter } from './routes/schoolRoutes.js';
+import { catalogRouter } from './routes/catalogRoutes.js';
+import { customerWalletRouter } from './routes/customerWalletRoutes.js';
+import { cronRouter } from './routes/cronRoutes.js';
+import {
+  applyHardening,
+  errorHandler,
+  apiLimiter,
+  writeLimiter,
+  pinLimiter
+} from './middleware/hardening.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const projectRoot = path.resolve(path.dirname(__filename), '..');
+
+/**
+ * @param {object} [options]
+ * @param {boolean} [options.serveStatic=true] Serve dist/ and the SPA fallback.
+ *        False on platforms whose CDN already serves the build.
+ * @returns {import('express').Express}
+ */
+export function createApp({ serveStatic = true } = {}) {
+  const app = express();
+  const distDir = path.join(projectRoot, 'dist');
+  const indexPath = path.join(distDir, 'index.html');
+
+  // 0. Security headers and cross-origin policy, before anything else.
+  applyHardening(app);
+
+  // 1. Mount Webhook routes with RAW body parser BEFORE express.json()
+  // This is strictly required by Stripe to verify webhook cryptographic signatures.
+  app.use('/api/webhooks', express.raw({ type: 'application/json' }), webhookRouter);
+
+  // 2. Parse JSON body for all standard API requests
+  app.use(express.json({ limit: '5mb' }));
+
+  // Health check, used by platform probes and by the E2E harness
+  app.get(['/healthz', '/_health', '/api/health'], (req, res) => {
+    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  // 3. Rate limits, tightest first so the specific rules win.
+  app.post('/api/merchant/orders/:id/complete', pinLimiter);
+  app.post('/api/orders', writeLimiter);
+  app.post('/api/chat/messages', writeLimiter);
+  app.post('/api/capacity/reserve', writeLimiter);
+  app.post('/api/merchant/payouts', writeLimiter);
+  app.post('/api/schools/membership/claim', writeLimiter);
+  app.use('/api', apiLimiter);
+
+  // 4. Mount Command & Financial API routes
+  app.use('/api/orders', orderRouter);
+  app.use('/api/payment', paymentRouter);
+  app.use('/api/merchant', merchantRouter);
+  app.use('/api/merchant', walletRouter);
+  app.use('/api/capacity', capacityRouter);
+  app.use('/api/chat', chatRouter);
+  app.use('/api/schools', schoolRouter);
+  app.use('/api/catalog', catalogRouter);
+  app.use('/api/wallet', customerWalletRouter);
+  app.use('/api/cron', cronRouter);
+  app.use('/api', notificationRouter);
+
+  // Unmatched API paths must not fall through to the SPA fallback below, which
+  // would answer an API client with index.html and a 200.
+  app.use('/api', (req, res) => {
+    res.status(404).json({
+      success: false,
+      error: 'NOT_FOUND',
+      message: `No API route matches ${req.method} ${req.originalUrl}`
+    });
+  });
+
+  if (serveStatic) {
+    // Explicit route for the Firebase Messaging service worker, so the SPA
+    // rewrite below cannot hijack it.
+    app.get('/firebase-messaging-sw.js', (req, res) => {
+      const swDistPath = path.join(distDir, 'firebase-messaging-sw.js');
+      const swPublicPath = path.join(projectRoot, 'public', 'firebase-messaging-sw.js');
+      const targetPath = fs.existsSync(swDistPath) ? swDistPath : swPublicPath;
+
+      if (fs.existsSync(targetPath)) {
+        res.setHeader('Content-Type', 'application/javascript; charset=UTF-8');
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Service-Worker-Allowed', '/');
+        res.sendFile(targetPath);
+      } else {
+        res.status(404).send('Service worker file not found');
+      }
+    });
+
+    app.use(express.static(distDir, { maxAge: '1h', index: false }));
+
+    // SPA routing fallback
+    app.get('*', (req, res) => {
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(500).send('Application build in progress or failed. Please refresh shortly.');
+      }
+    });
+  }
+
+  // Terminal error handler: must be registered after every route.
+  app.use(errorHandler);
+
+  return app;
+}
