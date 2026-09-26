@@ -272,7 +272,22 @@ service cloud.firestore {
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
     }
 
-    // 13. Catch-all: Deny all by default
+    // 13. Campus Wallet: balances and their ledger are server authoritative.
+    // The owner may read their own so the UI can subscribe to live updates;
+    // every write goes through /api/wallet and the Admin SDK.
+    match /customer_wallets/{walletUid} {
+      allow read: if isOwner(walletUid) || isAdmin();
+      allow write: if false;
+    }
+
+    match /wallet_transactions/{transactionId} {
+      allow read: if isAuthenticated() && (
+        resource.data.uid == request.auth.uid || isAdmin()
+      );
+      allow write: if false;
+    }
+
+    // 14. Catch-all: Deny all by default
     match /{document=**} {
       allow read, write: if false;
     }

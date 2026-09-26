@@ -1,4 +1,4 @@
-import { QueueStatus, FulfillmentStatus, StoreContactChannels, StoreExchangeTerms, UserRole } from './index';
+import { QueueStatus, FulfillmentStatus, StoreContactChannels, StoreExchangeTerms, UserRole, PaymentMethodId } from './index';
 
 /**
  * Public User Profile
@@ -292,7 +292,7 @@ export interface AuthoritativeOrder {
 
   status: QueueStatus;
   canonicalStatus?: FulfillmentStatus;
-  paymentMethod: 'promptpay' | 'credit_card' | 'cash';
+  paymentMethod: PaymentMethodId;
   paymentStatus: PaymentStatus | 'PAID' | 'PENDING';
   settlementStatus: SettlementStatus;
 

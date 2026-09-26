@@ -13,6 +13,7 @@ import { capacityRouter } from './server/routes/capacityRoutes.js';
 import { chatRouter } from './server/routes/chatRoutes.js';
 import { schoolRouter } from './server/routes/schoolRoutes.js';
 import { catalogRouter } from './server/routes/catalogRoutes.js';
+import { customerWalletRouter } from './server/routes/customerWalletRoutes.js';
 import { startPickupReminderWorker } from './server/services/pickupReminderWorker.js';
 import {
   applyHardening,
@@ -80,6 +81,7 @@ app.use('/api/capacity', capacityRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/schools', schoolRouter);
 app.use('/api/catalog', catalogRouter);
+app.use('/api/wallet', customerWalletRouter);
 app.use('/api', notificationRouter);
 
 // Unmatched API paths must not fall through to the SPA fallback below, which

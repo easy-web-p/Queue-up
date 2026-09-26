@@ -80,6 +80,10 @@ async function run() {
       await setDoc(doc(db, 'chats', 'chat-rules-1'), {
         storeId: STORE, customerId: CUSTOMER, participantIds: [CUSTOMER, OWNER], lastMessage: 'สวัสดีครับ'
       });
+      await setDoc(doc(db, 'customer_wallets', CUSTOMER), { uid: CUSTOMER, balanceSatang: 25000 });
+      await setDoc(doc(db, 'wallet_transactions', 'wtx-rules-1'), {
+        id: 'wtx-rules-1', uid: CUSTOMER, type: 'TOPUP', amountSatang: 25000, balanceAfterSatang: 25000
+      });
       await setDoc(doc(db, 'school_members', 'member-rules-1'), {
         schoolId: SCHOOL, role: 'student', email: 'somchai@kku.ac.th',
         identifier: 'STD-6501094', fullName: 'สมชาย รักเรียน',
@@ -153,6 +157,20 @@ async function run() {
       getDoc(doc(outsider.firestore(), 'school_members', 'member-rules-1')));
     await expectDenied('A merchant cannot enumerate the roster',
       getDoc(doc(rival.firestore(), 'school_members', 'member-rules-1')));
+
+    console.log('\n--- Campus Wallet ---');
+    await expectAllowed('The owner can read their own wallet balance',
+      getDoc(doc(customer.firestore(), 'customer_wallets', CUSTOMER)));
+    await expectDenied('Another account cannot read that wallet',
+      getDoc(doc(outsider.firestore(), 'customer_wallets', CUSTOMER)));
+    await expectDenied('A merchant cannot read a customer wallet',
+      getDoc(doc(rival.firestore(), 'customer_wallets', CUSTOMER)));
+    await expectDenied('Nobody can write a wallet balance from a client',
+      setDoc(doc(customer.firestore(), 'customer_wallets', CUSTOMER), { balanceSatang: 9999999 }));
+    await expectAllowed('The owner can read their own wallet transactions',
+      getDoc(doc(customer.firestore(), 'wallet_transactions', 'wtx-rules-1')));
+    await expectDenied('Another account cannot read those transactions',
+      getDoc(doc(outsider.firestore(), 'wallet_transactions', 'wtx-rules-1')));
 
     console.log('\n--- Server-authoritative collections stay closed to clients ---');
     await expectDenied('Clients cannot read merchant balances',

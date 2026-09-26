@@ -10,6 +10,7 @@ import {
 import { requireSecret, optionalSecret } from '../config/secrets.js';
 import { recordOrderFulfilled, recordRefund } from '../services/ledgerService.js';
 import { NotificationEngine } from '../services/notificationEngine.js';
+import { applyWalletDelta } from '../services/customerWalletService.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -181,12 +182,26 @@ merchantRouter.post('/orders/:id/reject', authenticate, requireStoreOwnership(st
         status: 'MERCHANT_REJECTED',
         canonicalStatus: 'CANCELLED',
         settlementStatus: 'REVERSED',
-        paymentStatus: 'REFUND_PENDING',
+        paymentStatus: order.paidFromWallet ? 'REFUNDED' : 'REFUND_PENDING',
         cancellationReason: reasonMessage,
         rejectionReasonCode: reasonCode,
         version: (order.version || 1) + 1,
         updatedAt: now
       });
+
+      // Campus Wallet settles at order time, so a rejection must put the money
+      // straight back rather than queueing a gateway refund that never comes.
+      if (order.paidFromWallet && order.paymentStatus === 'PAID') {
+        await applyWalletDelta(t, adminDb, {
+          uid: order.customerId,
+          deltaSatang: Number(order.totalSatang) || 0,
+          type: 'REFUND',
+          orderId,
+          note: `คืนเงินอัตโนมัติ: ร้านปฏิเสธออเดอร์ (${reasonMessage})`,
+          actorUid: req.user?.uid || null,
+          now
+        });
+      }
 
       // Write Outbox record for refund
       const refundId = `ref_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;

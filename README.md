@@ -15,6 +15,7 @@ QueueUp เป็นแพลตฟอร์ม Web Application ทันสม�
 - 💬 **Real-time Merchant-Customer Chat**: ระบบแชทสนทนาระหว่างลูกค้าและร้านค้าแบบเรียลไทม์ พร้อมระบบแจ้งเตือนออเดอร์และการจัดการสถานะ
 - 📋 **Live Queue & Booking System**: จองคิวและจองโต๊ะล่วงหน้า ระบุวัน เวลา จำนวนคน และรายการอาหาร พร้อมอัปเดตสถานะแบบสดๆ
 - 💳 **Seamless Checkout & Payment**: ระบบชำระเงิน สรุปยอดค่าบริการ และแนบสลิป/หลักฐานการชำระเงิน
+- 🎓 **Campus Wallet**: กระเป๋าเงินนักศึกษา เติมที่เคาน์เตอร์ ตัดยอดทันทีตอนสั่ง และคืนเงินอัตโนมัติเมื่อร้านปฏิเสธออเดอร์
 - 🔐 **Secure Firebase Architecture**: ขับเคลื่อนด้วย Firebase Firestore, Authentication และ Storage พร้อม Security Rules ที่ผ่านการตรวจสอบความปลอดภัยอย่างเข้มงวด
 - 📱 **Responsive & Smooth UI**: รองรับการใช้งานทั้งบนมือถือ แท็บเล็ต และคอมพิวเตอร์ พร้อม Transition และ Scroll Animation ที่นุ่มนวล
 
@@ -114,6 +115,7 @@ npm run test:e2e  # ทดสอบ end-to-end ด้วย Playwright บน pr
 | `chatRoutes.test.js` | ห้องแชทและการซิงก์ข้อความแบบ end-to-end |
 | `authorization.test.js` | ขอบเขตสิทธิ์ของ API: การถอนเงิน, วงจรชีวิตออเดอร์, การปลอมบทบาทในแชท, ยอดชำระเงิน, การแก้เมนูข้ามร้าน และการคิดราคาจากเมนูจริง |
 | `schoolRoutes.test.js` | การอนุมัติสถานศึกษา, นำเข้า Roster แบบ batch, การ claim สิทธิ์ และการออก Custom Claims |
+| `customerWallet.test.js` | Campus Wallet: เติมเงินแบบ idempotent, ยอดติดลบไม่ได้, ตัดยอดตอนสั่ง และคืนเงินเมื่อร้านปฏิเสธ |
 | `firestoreRules.test.js` | การแยกข้อมูลระหว่างสถาบันและร้านค้าในระดับ Security Rules |
 | `e2e/smoke.spec.ts` | แอปบูตได้จริงบน production build, lazy chunk โหลดได้, CSP ไม่บล็อกแอป, route guard ทำงาน |
 

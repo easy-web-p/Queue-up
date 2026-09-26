@@ -11,7 +11,7 @@
  * 8. Dual-state coupling & audit tracking
  */
 
-import { CartItem, QueueOrder, QueueStatus, Store } from '../types';
+import { CartItem, QueueOrder, QueueStatus, Store, PaymentMethodId } from '../types';
 import { scanOrderForAllergens, AllergenMatchResult } from './engines/allergenGuard';
 import { analyzeAndShieldInput } from './engines/securityShield';
 import { getCanonicalSlotId, calculateEstimatedCompletionTime } from './engines/slotHelper';
@@ -25,7 +25,7 @@ export interface CreateOrderParams {
   customerSchoolId?: string;
   customerAllergies?: string[];
   pickupTime?: string;
-  paymentMethod: 'promptpay' | 'credit_card' | 'cash';
+  paymentMethod: PaymentMethodId;
   specialNote?: string;
   cart: CartItem[];
   store: Store;

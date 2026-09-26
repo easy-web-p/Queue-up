@@ -1,21 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { orderRepository } from '../repositories/orderRepository';
-import {
-  Store,
-  FoodItem,
-  CartItem,
-  QueueOrder,
-  QueueStatus,
-  UserRole,
-  AuthUser,
-  ThemeMode,
-  AppNotification,
-  StoreChatMessage,
-  StoreCustomerChatThread,
-  CustomerChatMessage,
-  StoreContactChannels,
-  StoreExchangeTerms
-} from '../types';
+import { Store, FoodItem, CartItem, QueueOrder, QueueStatus, UserRole, AuthUser, ThemeMode, AppNotification, StoreChatMessage, StoreCustomerChatThread, CustomerChatMessage, StoreContactChannels, StoreExchangeTerms, PaymentMethodId } from '../types';
 import { STORES, FOOD_ITEMS, INITIAL_QUEUES } from '../data/mockData';
 import { INITIAL_NOTIFICATIONS } from '../data/mockNotifications';
 import { OrderAuthoritativeService } from '../services/orderAuthoritativeService';
@@ -128,7 +113,7 @@ interface QueueContextType {
     customerName: string;
     customerPhone: string;
     pickupTime: string;
-    paymentMethod: 'promptpay' | 'credit_card' | 'cash';
+    paymentMethod: PaymentMethodId;
     specialNote?: string;
     reservationId?: string;
     slotId?: string;
@@ -2921,7 +2906,7 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     customerName: string;
     customerPhone: string;
     pickupTime: string;
-    paymentMethod: 'promptpay' | 'credit_card' | 'cash';
+    paymentMethod: PaymentMethodId;
     specialNote?: string;
     reservationId?: string;
     slotId?: string;

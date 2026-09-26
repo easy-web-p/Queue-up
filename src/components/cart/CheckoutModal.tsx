@@ -3,7 +3,8 @@ import { useQueue } from '../../context/QueueContext';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { apiClient } from '../../services/apiClient';
+import { apiClient, type CampusWallet } from '../../services/apiClient';
+import { PaymentMethodId } from '../../types';
 import {
   QrCode,
   CreditCard,
@@ -15,7 +16,8 @@ import {
   ShoppingBag,
   FileText,
   ExternalLink,
-  Lock
+  Lock,
+  Wallet
 } from 'lucide-react';
 
 interface CheckoutModalProps {
@@ -38,7 +40,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [customerPhone, setCustomerPhone] = useState(currentUser?.phone || '089-123-4567');
   const [diningType, setDiningType] = useState<'dine-in' | 'takeaway'>('dine-in');
   const [specialNote, setSpecialNote] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'promptpay' | 'credit_card' | 'cash'>('promptpay');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodId>('promptpay');
+  const [wallet, setWallet] = useState<CampusWallet | null>(null);
   const [payOnlineViaStripe, setPayOnlineViaStripe] = useState<boolean>(true);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -50,8 +53,33 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   }, [currentUser, isOpen]);
 
+  // Load the Campus Wallet balance when the modal opens. A null result simply
+  // hides the option: the wallet is optional and must never block checkout.
+  useEffect(() => {
+    if (!isOpen || !currentUser) {
+      setWallet(null);
+      return;
+    }
+    let cancelled = false;
+    apiClient.getWallet().then((result) => {
+      if (!cancelled) setWallet(result);
+    });
+    return () => { cancelled = true; };
+  }, [isOpen, currentUser]);
+
   const discountAmount = cartTotal > 200 ? 20 : 0;
   const grandTotal = Math.max(0, cartTotal - discountAmount);
+
+  const walletBalanceBaht = wallet?.balanceBaht ?? 0;
+  const walletCoversOrder = wallet !== null && walletBalanceBaht >= grandTotal;
+
+  // Never leave a disabled method selected: if the balance drops below the
+  // order total while the modal is open, fall back to PromptPay.
+  useEffect(() => {
+    if (paymentMethod === 'CAMPUS_WALLET' && !walletCoversOrder) {
+      setPaymentMethod('promptpay');
+    }
+  }, [paymentMethod, walletCoversOrder]);
 
   const activeStoreName = cart[0]?.food?.storeName || 'ร้านค้าพาร์ทเนอร์';
 
@@ -105,7 +133,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       }
 
       // 2. If online payment is selected for PromptPay or Card, initiate Stripe Checkout
-      if (payOnlineViaStripe && (paymentMethod === 'promptpay' || paymentMethod === 'credit_card')) {
+      if (paymentMethod === 'CAMPUS_WALLET') {
+        addToast('ชำระด้วย Campus Wallet สำเร็จ', 'ตัดยอดจากกระเป๋าเงินเรียบร้อย รอร้านค้ายืนยันออเดอร์', 'success');
+      } else if (payOnlineViaStripe && (paymentMethod === 'promptpay' || paymentMethod === 'credit_card')) {
         addToast('กำลังเชื่อมต่อไปยัง Stripe...', 'เปิดระบบชำระเงินปลอดภัยเพื่อสแกน QR หรือใส่บัตร', 'info');
 
         try {
@@ -227,25 +257,57 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
           <div className="grid grid-cols-3 gap-2">
             {[
-              { id: 'promptpay', label: 'พร้อมเพย์ QR', icon: <QrCode className="w-4 h-4" /> },
-              { id: 'credit_card', label: 'บัตรเครดิต', icon: <CreditCard className="w-4 h-4" /> },
-              { id: 'cash', label: 'เงินสดหน้าร้าน', icon: <Banknote className="w-4 h-4" /> },
+              { id: 'promptpay', label: 'พร้อมเพย์ QR', icon: <QrCode className="w-4 h-4" />, disabled: false },
+              { id: 'credit_card', label: 'บัตรเครดิต', icon: <CreditCard className="w-4 h-4" />, disabled: false },
+              { id: 'cash', label: 'เงินสดหน้าร้าน', icon: <Banknote className="w-4 h-4" />, disabled: false },
+              ...(wallet ? [{
+                id: 'CAMPUS_WALLET',
+                label: `Campus Wallet ฿${walletBalanceBaht.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+                icon: <Wallet className="w-4 h-4" />,
+                disabled: !walletCoversOrder
+              }] : [])
             ].map(method => (
               <button
                 key={method.id}
                 type="button"
-                onClick={() => setPaymentMethod(method.id as any)}
-                className={`flex flex-col items-center justify-center p-3 rounded-2xl border text-center transition-all cursor-pointer ${
-                  paymentMethod === method.id
-                    ? 'bg-orange-500/15 border-orange-500 text-orange-600 dark:text-orange-400 font-bold'
-                    : 'bg-stone-50 dark:bg-zinc-900/60 border-stone-200 dark:border-zinc-800 text-stone-600 dark:text-zinc-400 hover:border-stone-300'
+                disabled={method.disabled}
+                title={method.disabled ? 'ยอดเงินในกระเป๋าไม่พอสำหรับออเดอร์นี้' : undefined}
+                onClick={() => setPaymentMethod(method.id as PaymentMethodId)}
+                className={`flex flex-col items-center justify-center p-3 rounded-2xl border text-center transition-all ${
+                  method.disabled
+                    ? 'bg-stone-100 dark:bg-zinc-900/30 border-stone-200 dark:border-zinc-800 text-stone-400 dark:text-zinc-600 cursor-not-allowed'
+                    : paymentMethod === method.id
+                      ? 'bg-orange-500/15 border-orange-500 text-orange-600 dark:text-orange-400 font-bold cursor-pointer'
+                      : 'bg-stone-50 dark:bg-zinc-900/60 border-stone-200 dark:border-zinc-800 text-stone-600 dark:text-zinc-400 hover:border-stone-300 cursor-pointer'
                 }`}
               >
                 <div className="mb-1.5">{method.icon}</div>
-                <span className="text-xs">{method.label}</span>
+                <span className="text-xs leading-tight">{method.label}</span>
               </button>
             ))}
           </div>
+
+          {/* Campus Wallet summary */}
+          {paymentMethod === 'CAMPUS_WALLET' && wallet && (
+            <div className="p-3.5 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 space-y-1.5 mt-1">
+              <div className="flex items-center justify-between text-xs font-bold text-stone-800 dark:text-zinc-200">
+                <span className="flex items-center gap-1.5">
+                  <Wallet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  ยอดคงเหลือปัจจุบัน
+                </span>
+                <span>฿{walletBalanceBaht.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs text-stone-600 dark:text-zinc-400">
+                <span>คงเหลือหลังชำระ</span>
+                <span className="font-semibold">
+                  ฿{(walletBalanceBaht - grandTotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <p className="text-[11px] text-emerald-700 dark:text-emerald-400 pt-0.5">
+                ตัดยอดทันทีเมื่อยืนยันออเดอร์ หากร้านปฏิเสธ ระบบคืนเงินเข้ากระเป๋าอัตโนมัติ
+              </p>
+            </div>
+          )}
 
           {/* Stripe Online Payment Option Card */}
           {(paymentMethod === 'promptpay' || paymentMethod === 'credit_card') && (
@@ -300,9 +362,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             size="lg"
             isLoading={isProcessing}
             onClick={handleConfirmOrder}
-            leftIcon={payOnlineViaStripe && paymentMethod !== 'cash' ? <ExternalLink className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+            leftIcon={payOnlineViaStripe && paymentMethod !== 'cash' && paymentMethod !== 'CAMPUS_WALLET' ? <ExternalLink className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
           >
-            {payOnlineViaStripe && paymentMethod !== 'cash'
+            {payOnlineViaStripe && paymentMethod !== 'cash' && paymentMethod !== 'CAMPUS_WALLET'
               ? `ชำระผ่าน Stripe (฿${grandTotal})`
               : `ยืนยัน & รับบัตรคิว (฿${grandTotal})`}
           </Button>

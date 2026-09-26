@@ -12,6 +12,7 @@ import { recordOrderFulfilled } from '../services/ledgerService.js';
 import { NotificationEngine } from '../services/notificationEngine.js';
 import { SlotTransactionService } from '../services/slotTransactionService.js';
 import { findMenuItem } from '../services/menuCatalog.js';
+import { applyWalletDelta, isWalletPayment } from '../services/customerWalletService.js';
 
 export const orderRouter = Router();
 
@@ -190,19 +191,48 @@ orderRouter.post('/', optionalAuthenticate, async (req, res) => {
 
       // Financial breakdown calculations
       const platformFeeSatang = Math.round(totalSatang * 0.10); // 10% platform fee
-      const estimatedGatewayFeeSatang = paymentMethod === 'cash' ? 0 : Math.round(totalSatang * 0.0165 * 1.07);
+      const estimatedGatewayFeeSatang = (paymentMethod === 'cash' || isWalletPayment(paymentMethod))
+        ? 0
+        : Math.round(totalSatang * 0.0165 * 1.07);
       const merchantNetSatang = Math.max(0, totalSatang - platformFeeSatang - estimatedGatewayFeeSatang);
 
       // 4-digit pickup PIN with HMAC SHA-256 hash (never store plain PIN in DB)
       const exchangePin = `${Math.floor(1000 + Math.random() * 9000)}`;
       const exchangePinHash = crypto.createHmac('sha256', HMAC_SECRET).update(exchangePin).digest('hex');
 
-      // Statuses decoupled
-      const initialStatus = paymentMethod === 'cash' ? 'PAID_AWAITING_MERCHANT' : 'PAYMENT_PENDING';
-      const initialPaymentStatus = 'REQUIRES_PAYMENT';
-      const initialSettlementStatus = paymentMethod === 'cash' ? 'NOT_APPLICABLE' : 'PENDING_ORDER_ACCEPTANCE';
-
       const now = new Date().toISOString();
+
+      // Campus Wallet settles immediately: the balance is debited inside this
+      // same transaction, so an order can never exist without the money having
+      // moved, and a debit can never happen without the order being written.
+      const paidFromWallet = isWalletPayment(paymentMethod);
+      let walletTransactionId = null;
+      let walletBalanceAfterSatang = null;
+
+      if (paidFromWallet) {
+        if (!req.user?.uid) {
+          throw new Error('WALLET_REQUIRES_SIGN_IN: กรุณาเข้าสู่ระบบก่อนใช้กระเป๋าเงิน Campus Wallet');
+        }
+        const debit = await applyWalletDelta(t, adminDb, {
+          uid: customerId,
+          deltaSatang: -totalSatang,
+          type: 'SPEND',
+          orderId,
+          note: `ชำระค่าอาหารร้าน ${storeData.name || storeId}`,
+          actorUid: customerId,
+          now
+        });
+        walletTransactionId = debit.transactionId;
+        walletBalanceAfterSatang = debit.balanceSatang;
+      }
+
+      // Statuses decoupled
+      const settlesImmediately = paymentMethod === 'cash' || paidFromWallet;
+      const initialStatus = settlesImmediately ? 'PAID_AWAITING_MERCHANT' : 'PAYMENT_PENDING';
+      const initialPaymentStatus = paidFromWallet ? 'PAID' : 'REQUIRES_PAYMENT';
+      const initialSettlementStatus = paymentMethod === 'cash'
+        ? 'NOT_APPLICABLE'
+        : 'PENDING_ORDER_ACCEPTANCE';
 
       const newOrder = {
         id: orderId,
@@ -248,6 +278,8 @@ orderRouter.post('/', optionalAuthenticate, async (req, res) => {
         exchangeTermsSnapshot: storeData.exchangeTerms || null,
         reservationId: reservationId || null,
         slotId: req.body.slotId || null,
+        walletTransactionId,
+        paidFromWallet,
         workload: req.body.workload || (Array.isArray(items) ? items.reduce((s, it) => s + (it.quantity || 1), 0) : 1),
         version: 1,
         idempotencyKey: key,
@@ -315,7 +347,9 @@ orderRouter.post('/', optionalAuthenticate, async (req, res) => {
           ...newOrder,
           exchangePin // Only returned to client on creation
         },
-        exchangePin
+        exchangePin,
+        // Lets the wallet UI update without a refetch.
+        walletBalanceSatang: walletBalanceAfterSatang
       };
 
       // Save idempotency record inside transaction

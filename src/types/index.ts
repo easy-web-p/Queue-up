@@ -269,6 +269,12 @@ export const customerStatusLabels: Record<FulfillmentStatus, string> = {
 };
 
 export type PaymentMode = 'PAY_AT_STORE' | 'CAMPUS_WALLET' | 'PROMPTPAY';
+
+/**
+ * Payment method as it travels to the API and is stored on the order.
+ * 'CAMPUS_WALLET' settles from the student's wallet balance at order time.
+ */
+export type PaymentMethodId = 'promptpay' | 'credit_card' | 'cash' | 'CAMPUS_WALLET';
 export type ExtendedPaymentStatus =
   | 'NOT_REQUIRED'
   | 'PENDING'
@@ -309,7 +315,7 @@ export interface QueueOrder {
   createdAt: string; // ISO string
   estimatedCompletionTime: string; // e.g. "12:45"
   pickupTime: string; // e.g. "ทันที" or "12:30 น."
-  paymentMethod: 'promptpay' | 'credit_card' | 'cash';
+  paymentMethod: PaymentMethodId;
   paymentStatus: 'PAID' | 'PENDING';
   specialNote?: string;
   // Exchange and buyer-seller fulfillment fields

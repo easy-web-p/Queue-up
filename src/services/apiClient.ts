@@ -1,5 +1,5 @@
 import { auth } from '../config/firebase';
-import { QueueStatus } from '../types';
+import { QueueStatus, PaymentMethodId } from '../types';
 import { AuthoritativeOrder } from '../types/schema';
 
 export interface CreateOrderItemInput {
@@ -16,7 +16,7 @@ export interface CreateOrderItemInput {
 export interface CreateOrderRequest {
   storeId: string;
   items: CreateOrderItemInput[];
-  paymentMethod: 'promptpay' | 'credit_card' | 'cash';
+  paymentMethod: PaymentMethodId;
   allergenAcknowledged: boolean;
   customerId?: string;
   customerEmail?: string;
@@ -70,9 +70,28 @@ export interface ReserveCapacityResponse {
   remainingWorkload: number;
 }
 
+export interface CampusWalletTransaction {
+  id: string;
+  type: 'TOPUP' | 'SPEND' | 'REFUND' | 'ADJUSTMENT';
+  amountSatang: number;
+  balanceAfterSatang: number;
+  orderId?: string | null;
+  note?: string;
+  createdAt: string;
+}
+
+export interface CampusWallet {
+  uid: string;
+  balanceSatang: number;
+  balanceBaht: number;
+  transactions: CampusWalletTransaction[];
+}
+
 export interface CreateOrderResponse {
   success: boolean;
   orderId: string;
+  /** Present when the order was paid from the Campus Wallet. */
+  walletBalanceSatang?: number | null;
   orderNumber: string;
   order: AuthoritativeOrder;
   exchangePin?: string;
@@ -416,6 +435,44 @@ class ApiClient {
     const data = await response.json();
     if (!response.ok || !data.success) {
       throw new Error(data.message || data.error || 'Failed to create onboarding link');
+    }
+    return data;
+  }
+
+  /**
+   * Campus Wallet: the signed-in user's balance and recent transactions.
+   * Returns null when the endpoint is unreachable, so callers can simply hide
+   * the wallet option rather than blocking checkout.
+   */
+  async getWallet(): Promise<CampusWallet | null> {
+    try {
+      const headers = await this.getAuthHeaders();
+      const response = await fetch(`${this.baseUrl}/wallet`, { method: 'GET', headers });
+      if (!response.ok) return null;
+      const data = await response.json();
+      return data?.success ? { ...data.wallet, transactions: data.transactions || [] } : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Campus Wallet: campus counter top-up. Restricted to institution admins by
+   * the server; the idempotency key stops a retried request crediting twice.
+   */
+  async creditWallet(uid: string, amountSatang: number, idempotencyKey?: string): Promise<{ balanceSatang: number }> {
+    const headers = await this.getAuthHeaders();
+    const response = await fetch(`${this.baseUrl}/wallet/${encodeURIComponent(uid)}/credit`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        amountSatang,
+        idempotencyKey: idempotencyKey || generateIdempotencyKey()
+      })
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || data.error || 'Wallet top-up failed');
     }
     return data;
   }
