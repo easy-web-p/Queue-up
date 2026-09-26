@@ -46,7 +46,7 @@
   "crons": [
     {
       "path": "/api/cron/pickup-reminders",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }

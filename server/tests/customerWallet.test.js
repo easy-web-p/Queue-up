@@ -62,8 +62,9 @@ async function request(baseUrl, path, method = 'GET', body = null, headers = {})
 const SCHOOL = 'KKU';
 const STORE = 'store-wallet-1';
 const OWNER = 'merchant-wallet-owner';
-const STUDENT = 'uid-student-wallet';
-const OTHER = 'uid-other-student';
+const suffix = Date.now();
+const STUDENT = `uid-student-wallet-${suffix}`;
+const OTHER = `uid-other-student-${suffix}`;
 
 function as(uid, extra = {}) {
   return {
@@ -112,12 +113,12 @@ async function runTests() {
       'A mistyped enormous top-up is refused', `error ${res.data?.error}`);
 
     res = await request(baseUrl, `/api/wallet/${STUDENT}/credit`, 'POST',
-      { amountSatang: 20000, idempotencyKey: 'topup-key-1' }, COUNTER);
+      { amountSatang: 20000, idempotencyKey: `topup-key-${suffix}` }, COUNTER);
     check(res.status === 201 && res.data?.balanceSatang === 20000,
       'The campus counter credits ฿200', `balance ${res.data?.balanceSatang}`);
 
     res = await request(baseUrl, `/api/wallet/${STUDENT}/credit`, 'POST',
-      { amountSatang: 20000, idempotencyKey: 'topup-key-1' }, COUNTER);
+      { amountSatang: 20000, idempotencyKey: `topup-key-${suffix}` }, COUNTER);
     check(res.data?.balanceSatang === 20000,
       'A retried top-up with the same key credits only once',
       `balance ${res.data?.balanceSatang}`);
