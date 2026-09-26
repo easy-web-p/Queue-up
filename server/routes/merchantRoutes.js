@@ -333,7 +333,8 @@ merchantRouter.post('/orders/:id/ready', authenticate, requireStoreOwnership(sto
             storeId: o.storeId,
             storeName: o.storeName || 'ร้านอาหาร',
             customerId: o.customerId,
-            schoolId: o.schoolId
+            schoolId: o.schoolId,
+            lineNotifyToken: o.lineNotifyToken
           }).catch(e => console.warn('[Merchant API] Ready notification note:', e.message));
         }
       }

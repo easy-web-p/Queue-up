@@ -5,6 +5,7 @@ import { listStoreMenu } from '../services/menuCatalog.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { NotificationEngine } from '../services/notificationEngine.js';
 import { processAssistantReply } from '../services/aiChatEngine.js';
+import { LineNotifyService } from '../services/lineNotifyService.js';
 
 export const notificationRouter = express.Router();
 
@@ -270,6 +271,44 @@ notificationRouter.post('/chat/messages', authenticate, async (req, res) => {
     });
   } catch (err) {
     console.error('[NotificationRoutes] Error dispatching chat push:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * 6.1 Test LINE Notify Endpoint
+ * Sends a test message to verify the provided LINE Notify token
+ */
+notificationRouter.post('/test-line', authenticate, async (req, res) => {
+  try {
+    const { token, message } = req.body;
+    const testToken = token || req.user.lineNotifyToken || process.env.LINE_NOTIFY_TOKEN;
+    if (!testToken) {
+      return res.status(400).json({
+        success: false,
+        error: 'NO_TOKEN',
+        message: 'กรุณาระบุ LINE Notify Token เพื่อทดสอบ'
+      });
+    }
+
+    const result = await LineNotifyService.send({
+      token: testToken,
+      message: message || '🟢 [QueueUp] ทดสอบการเชื่อมต่อ LINE Notify สำเร็จเรียบร้อยแล้วค่ะ!'
+    });
+
+    if (result.success) {
+      return res.status(200).json({
+        success: true,
+        message: 'ส่งการแจ้งเตือนไปยัง LINE สำเร็จแล้ว'
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: result.error || 'LINE_DISPATCH_FAILED',
+        message: 'ไม่สามารถส่งข้อความได้ กรุณาตรวจสอบความถูกต้องของ Token'
+      });
+    }
+  } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
 });

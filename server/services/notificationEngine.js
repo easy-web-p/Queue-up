@@ -1,5 +1,6 @@
 import { adminDb } from '../firebaseAdmin.js';
 import { sendPushToDevices } from './pushSender.js';
+import { LineNotifyService } from './lineNotifyService.js';
 
 /**
  * Core Notification Engine for QueueUp
@@ -142,10 +143,11 @@ export class NotificationEngine {
     customerId,
     recipientId,
     userId,
-    schoolId
+    schoolId,
+    lineNotifyToken
   }) {
     const targetRecipient = recipientId || customerId || userId;
-    return this.send({
+    const res = await this.send({
       recipientId: targetRecipient,
       schoolId,
       type: 'ORDER_READY',
@@ -162,6 +164,65 @@ export class NotificationEngine {
         storeName
       }
     });
+
+    // Optional LINE alert dispatch
+    if (lineNotifyToken || process.env.LINE_NOTIFY_TOKEN) {
+      LineNotifyService.notifyOrderReady({
+        token: lineNotifyToken,
+        storeName,
+        queueNumber
+      }).catch(err => console.warn('[NotificationEngine] LINE alert error:', err.message));
+    }
+
+    return res;
+  }
+
+  /**
+   * Helper: Send Queue Approaching event (e.g. 2 queues remaining)
+   */
+  static async sendQueueApproaching({
+    orderId,
+    queueNumber,
+    storeId,
+    storeName,
+    customerId,
+    recipientId,
+    userId,
+    schoolId,
+    remainingQueues = 2,
+    lineNotifyToken
+  }) {
+    const targetRecipient = recipientId || customerId || userId;
+    const res = await this.send({
+      recipientId: targetRecipient,
+      schoolId,
+      type: 'QUEUE_APPROACHING',
+      title: '⏳ ใกล้ถึงคิวของคุณแล้ว!',
+      message: `คิว #${queueNumber} ร้าน "${storeName}" เหลืออีก ${remainingQueues} คิวจะถึงตาคุณแล้ว กรุณาเตรียมตัวนะคะ`,
+      idempotencyKey: `order_${orderId}_QUEUE_APPROACHING`,
+      deepLink: `/queue-tracking?orderId=${orderId}`,
+      relatedId: orderId,
+      relatedType: 'order',
+      metadata: {
+        orderId,
+        queueNumber,
+        storeId,
+        storeName,
+        remainingQueues
+      }
+    });
+
+    // Optional LINE alert dispatch
+    if (lineNotifyToken || process.env.LINE_NOTIFY_TOKEN) {
+      LineNotifyService.notifyQueueApproaching({
+        token: lineNotifyToken,
+        storeName,
+        queueNumber,
+        remainingQueues
+      }).catch(err => console.warn('[NotificationEngine] LINE alert error:', err.message));
+    }
+
+    return res;
   }
 
   /**
