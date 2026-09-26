@@ -8,6 +8,8 @@
  * - Layer 3: Human Escalation & Inviolable Safety Hard-Blocks (Allergens & Store commitments)
  */
 
+import { runLayer2, isLayer2Enabled } from './aiLayer2.js';
+
 /**
  * 1. Scope-Bound Store Tools Factory
  * Enforces server-side binding of storeId, customerId, and schoolId.
@@ -472,6 +474,27 @@ export async function processAssistantReply({
   if (layer1Result) {
     layer1Result.aiMeta.latencyMs = Date.now() - startTime;
     return layer1Result;
+  }
+
+  // Layer 2: Scope-bound tool calling. Only reached when Layer 1 did not
+  // recognise the question, and only after both safety hard-blocks have run,
+  // so the model is never the thing clearing an allergen or promising on the
+  // store's behalf. Disabled unless GEMINI_API_KEY is configured.
+  if (isLayer2Enabled()) {
+    const layer2Result = await runLayer2({ message, tools });
+    if (layer2Result) {
+      return {
+        handled: true,
+        replyText: layer2Result.replyText,
+        senderRole: 'ai_assistant',
+        aiMeta: {
+          layer: 2,
+          toolsUsed: layer2Result.toolsUsed,
+          escalated: false,
+          latencyMs: Date.now() - startTime
+        }
+      };
+    }
   }
 
   // Layer 3 Fallback: Unrecognized question -> escalate politely

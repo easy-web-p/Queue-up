@@ -9,6 +9,9 @@ QueueUp เป็นแพลตฟอร์ม Web Application ทันสม�
 ## 🌟 จุดเด่นและฟังก์ชันหลัก (Key Features)
 
 - 🤖 **AI Butler Smart Assistant**: แชทสอบถาม แนะนำเมนู คำนวณยอดเงิน และทำรายการจองโต๊ะ/สั่งอาหารล่วงหน้าพร้อมปุ่มชำระเงินอัตโนมัติ
+  - **Layer 1** Intent Router แบบ deterministic ตอบคำถามที่พบบ่อยทันที ไม่มีค่าใช้จ่ายและไม่หลอน
+  - **Layer 2** Scope-Bound Tool Calling (เปิดใช้เมื่อตั้ง `GEMINI_API_KEY`) โมเดลเรียกได้เฉพาะ tool อ่านข้อมูลของร้านนั้น และไม่มีพารามิเตอร์ใดที่ระบุร้านอื่นได้
+  - **Layer 3** ส่งต่อให้ทางร้านเมื่อไม่แน่ใจ พร้อม hard-block เรื่องสารก่อภูมิแพ้และการรับปากแทนร้าน
 - 💬 **Real-time Merchant-Customer Chat**: ระบบแชทสนทนาระหว่างลูกค้าและร้านค้าแบบเรียลไทม์ พร้อมระบบแจ้งเตือนออเดอร์และการจัดการสถานะ
 - 📋 **Live Queue & Booking System**: จองคิวและจองโต๊ะล่วงหน้า ระบุวัน เวลา จำนวนคน และรายการอาหาร พร้อมอัปเดตสถานะแบบสดๆ
 - 💳 **Seamless Checkout & Payment**: ระบบชำระเงิน สรุปยอดค่าบริการ และแนบสลิป/หลักฐานการชำระเงิน
@@ -65,6 +68,7 @@ QueueUp เป็นแพลตฟอร์ม Web Application ทันสม�
    | `ALLOWED_ORIGINS` | ❌ | รายชื่อ origin ที่อนุญาต CORS คั่นด้วยจุลภาค (เว้นว่าง = same-origin เท่านั้นบน production) |
    | `SUPER_ADMIN_EMAILS` | ❌ | อีเมลผู้ดูแลระบบคั่นด้วยจุลภาค (ค่าเริ่มต้นตรงกับ break-glass ใน `firestore.rules`) |
    | `QUEUEUP_TIMEZONE` | ❌ | โซนเวลาของรอบรับอาหาร (ค่าเริ่มต้น `Asia/Bangkok`) |
+   | `GEMINI_API_KEY` | ❌ | เปิดใช้ AI Layer 2 — ถ้าไม่ตั้ง ระบบจะใช้ Layer 1 อย่างเดียว |
 
    > ⚠️ `npm start` ตั้ง `NODE_ENV=production` ให้อัตโนมัติ ซึ่งจะปิด mock auth และปิดการ fallback ไปใช้ฐานข้อมูลไฟล์
 
@@ -106,6 +110,7 @@ npm run test:e2e  # ทดสอบ end-to-end ด้วย Playwright บน pr
 | `capacityService.test.js` | การคำนวณ Workload, Lazy Expiration, Oversell Prevention และรอบเวลา 15 นาทีที่ไม่ขึ้นกับโซนเวลาของเซิร์ฟเวอร์ |
 | `capacityTransaction.test.js` | Firestore ACID Transaction และ Race Condition |
 | `aiChatEngine.test.js` | Intent Router, Allergen Guard, Commitment Guard, Booking Card |
+| `aiLayer2.test.js` | Layer 2: เครื่องมือถูกผูกกับร้านเดียว, มีแต่ tool อ่านอย่างเดียว, ล้มเหลวแล้วส่งต่อให้คนแทนที่จะพัง |
 | `chatRoutes.test.js` | ห้องแชทและการซิงก์ข้อความแบบ end-to-end |
 | `authorization.test.js` | ขอบเขตสิทธิ์ของ API: การถอนเงิน, วงจรชีวิตออเดอร์, การปลอมบทบาทในแชท, ยอดชำระเงิน, การแก้เมนูข้ามร้าน และการคิดราคาจากเมนูจริง |
 | `schoolRoutes.test.js` | การอนุมัติสถานศึกษา, นำเข้า Roster แบบ batch, การ claim สิทธิ์ และการออก Custom Claims |
