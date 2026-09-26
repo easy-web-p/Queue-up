@@ -15,7 +15,7 @@
       "destination": "/api/index"
     },
     {
-      "source": "/((?!assets/|favicon|logo|icons|manifest|firebase-messaging-sw|.*\\.[a-zA-Z0-9]+$).*)",
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ],
