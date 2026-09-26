@@ -111,6 +111,20 @@ async function runTests() {
       { Authorization: 'Bearer test-cron-secret' });
     check(res.status === 200 && res.body?.job === 'pickup-reminders',
       'The correct secret runs the pickup reminder sweep', `status ${res.status}`);
+
+    // A schedule pointing at a path that does not exist would never run and
+    // never complain, which for the settlement sweep means money left sitting.
+    const vercelConfig = JSON.parse(
+      await (await import('fs/promises')).readFile(new URL('../../vercel.json', import.meta.url), 'utf8')
+    );
+    const cronPaths = (vercelConfig.crons || []).map((c) => c.path);
+    check(cronPaths.length > 0, 'vercel.json declares scheduled jobs', `${cronPaths.length} declared`);
+    for (const path of cronPaths) {
+      const probe = await request(cron.baseUrl, path, 'POST',
+        { Authorization: 'Bearer test-cron-secret' });
+      check(probe.status === 200 && probe.body?.success === true,
+        `The scheduled path ${path} is actually served`, `status ${probe.status}`);
+    }
   } finally {
     cron.server.close();
     if (priorSecret === undefined) delete process.env.CRON_SECRET;

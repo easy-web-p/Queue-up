@@ -1,7 +1,19 @@
+import { existsSync } from 'node:fs';
 import { defineConfig, devices } from '@playwright/test';
 
 const PORT = Number(process.env.E2E_PORT || 8123);
 const baseURL = `http://127.0.0.1:${PORT}`;
+
+/**
+ * Some environments ship a Chromium build that does not match the revision this
+ * Playwright version would download. Using the one that is already there beats
+ * failing every test with "browser not found" — and beats downloading a second
+ * copy of Chromium on a machine that has one.
+ */
+const preinstalledChromium = [
+  process.env.PLAYWRIGHT_CHROMIUM_PATH,
+  process.env.PLAYWRIGHT_BROWSERS_PATH ? `${process.env.PLAYWRIGHT_BROWSERS_PATH}/chromium` : null
+].find((candidate) => candidate && existsSync(candidate));
 
 /**
  * End-to-end smoke suite.
@@ -20,8 +32,7 @@ export default defineConfig({
   use: {
     baseURL,
     trace: 'retain-on-failure',
-    // Chromium is preinstalled in this environment; do not download another.
-    launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined }
+    launchOptions: { executablePath: preinstalledChromium || undefined }
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
