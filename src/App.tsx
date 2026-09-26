@@ -4,22 +4,25 @@ import { QueueProvider, useQueue, AppView } from './context/QueueContext';
 import { Navbar } from './components/layout/Navbar';
 import { MobileNavigation } from './components/layout/MobileNavigation';
 import { Footer } from './components/layout/Footer';
-import { HomePage } from './pages/customer/HomePage';
-import { LandingPage } from './pages/customer/LandingPage';
-import Queueup from './pages/Queueup';
-import { SearchPage } from './pages/customer/SearchPage';
-import { StoreDetailPage } from './pages/customer/StoreDetailPage';
-import { FoodDetailPage } from './pages/customer/FoodDetailPage';
-import { UserProfilePage } from './pages/customer/UserProfilePage';
-import { QueueTrackingPage } from './pages/customer/QueueTrackingPage';
-import { KitchenDisplaySystem } from './pages/merchant/KitchenDisplaySystem';
-import { MerchantDashboard } from './pages/merchant/MerchantDashboard';
-import { CreateStorePage } from './pages/merchant/CreateStorePage';
-import { StoreAdminPage } from './pages/merchant/StoreAdminPage';
-import { AdminDashboard } from './pages/admin/AdminDashboard';
-import { ChatPage } from './pages/customer/ChatPage';
-import { StoreChatPage } from './pages/merchant/StoreChatPage';
-import { RegisterSchoolPage } from './pages/school/RegisterSchoolPage';
+import { PageRouteLoaderView } from './components/common/PageRouteLoader';
+
+// Lazy-loaded route pages for optimal initial bundle size and instant navigation
+const HomePage = React.lazy(() => import('./pages/customer/HomePage').then(m => ({ default: m.HomePage })));
+const LandingPage = React.lazy(() => import('./pages/customer/LandingPage').then(m => ({ default: m.LandingPage })));
+const Queueup = React.lazy(() => import('./pages/Queueup'));
+const SearchPage = React.lazy(() => import('./pages/customer/SearchPage').then(m => ({ default: m.SearchPage })));
+const StoreDetailPage = React.lazy(() => import('./pages/customer/StoreDetailPage').then(m => ({ default: m.StoreDetailPage })));
+const FoodDetailPage = React.lazy(() => import('./pages/customer/FoodDetailPage').then(m => ({ default: m.FoodDetailPage })));
+const UserProfilePage = React.lazy(() => import('./pages/customer/UserProfilePage').then(m => ({ default: m.UserProfilePage })));
+const QueueTrackingPage = React.lazy(() => import('./pages/customer/QueueTrackingPage').then(m => ({ default: m.QueueTrackingPage })));
+const KitchenDisplaySystem = React.lazy(() => import('./pages/merchant/KitchenDisplaySystem').then(m => ({ default: m.KitchenDisplaySystem })));
+const MerchantDashboard = React.lazy(() => import('./pages/merchant/MerchantDashboard').then(m => ({ default: m.MerchantDashboard })));
+const CreateStorePage = React.lazy(() => import('./pages/merchant/CreateStorePage').then(m => ({ default: m.CreateStorePage })));
+const StoreAdminPage = React.lazy(() => import('./pages/merchant/StoreAdminPage').then(m => ({ default: m.StoreAdminPage })));
+const AdminDashboard = React.lazy(() => import('./pages/admin/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
+const ChatPage = React.lazy(() => import('./pages/customer/ChatPage').then(m => ({ default: m.ChatPage })));
+const StoreChatPage = React.lazy(() => import('./pages/merchant/StoreChatPage').then(m => ({ default: m.StoreChatPage })));
+const RegisterSchoolPage = React.lazy(() => import('./pages/school/RegisterSchoolPage').then(m => ({ default: m.RegisterSchoolPage })));
 import { FoodDetailModal } from './components/food/FoodDetailModal';
 import { CartDrawer } from './components/cart/CartDrawer';
 import { ToastContainer } from './components/ui/ToastContainer';
@@ -204,44 +207,46 @@ const MainAppContent: React.FC = () => {
           <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-20 md:pb-10 transition-all duration-300">
             {/* Animated Screen Container - Displays gracefully from Top down to Bottom */}
             <div key={location.pathname + '-' + currentView} className="screen-enter-top w-full">
-              {/* Complete Route Declarations with Strict Auth Guard */}
-              <Routes>
-                {/* Landing Page & Public Pages - Open to all */}
-                <Route path="/" element={<LandingPage />} />
-                <Route path="/landing" element={<LandingPage />} />
-                <Route path="/about" element={<Queueup />} />
-                <Route path="/queueup" element={<Queueup />} />
-                <Route path="/register-school" element={<RegisterSchoolPage />} />
+              {/* Complete Route Declarations with Strict Auth Guard & Smooth Lazy Load Suspense */}
+              <React.Suspense fallback={<PageRouteLoaderView message="กำลังโหลดหน้าจอ..." />}>
+                <Routes>
+                  {/* Landing Page & Public Pages - Open to all */}
+                  <Route path="/" element={<LandingPage />} />
+                  <Route path="/landing" element={<LandingPage />} />
+                  <Route path="/about" element={<Queueup />} />
+                  <Route path="/queueup" element={<Queueup />} />
+                  <Route path="/register-school" element={<RegisterSchoolPage />} />
 
-                {/* Customer Flow - Requires Login */}
-                <Route path="/home" element={currentUser ? <HomePage /> : <Navigate to="/landing" replace />} />
-                <Route path="/search" element={currentUser ? <SearchPage /> : <Navigate to="/landing" replace />} />
-                <Route path="/store/:storeId" element={currentUser ? <StoreDetailPage /> : <Navigate to="/landing" replace />} />
-                <Route path="/store" element={currentUser ? <StoreDetailPage /> : <Navigate to="/landing" replace />} />
-                <Route path="/food/:foodId" element={currentUser ? <FoodDetailPage /> : <Navigate to="/landing" replace />} />
-                <Route path="/food" element={currentUser ? <FoodDetailPage /> : <Navigate to="/landing" replace />} />
-                <Route path="/user-profile" element={currentUser ? <UserProfilePage /> : <Navigate to="/landing" replace />} />
-                <Route path="/profile" element={currentUser ? <UserProfilePage /> : <Navigate to="/landing" replace />} />
-                <Route path="/queue-tracking" element={currentUser ? <QueueTrackingPage /> : <Navigate to="/landing" replace />} />
-                <Route path="/tracking" element={currentUser ? <QueueTrackingPage /> : <Navigate to="/landing" replace />} />
-                <Route path="/order-history" element={currentUser ? <UserProfilePage /> : <Navigate to="/landing" replace />} />
-                <Route path="/chat" element={currentUser ? <ChatPage /> : <Navigate to="/landing" replace />} />
+                  {/* Customer Flow - Requires Login */}
+                  <Route path="/home" element={currentUser ? <HomePage /> : <Navigate to="/landing" replace />} />
+                  <Route path="/search" element={currentUser ? <SearchPage /> : <Navigate to="/landing" replace />} />
+                  <Route path="/store/:storeId" element={currentUser ? <StoreDetailPage /> : <Navigate to="/landing" replace />} />
+                  <Route path="/store" element={currentUser ? <StoreDetailPage /> : <Navigate to="/landing" replace />} />
+                  <Route path="/food/:foodId" element={currentUser ? <FoodDetailPage /> : <Navigate to="/landing" replace />} />
+                  <Route path="/food" element={currentUser ? <FoodDetailPage /> : <Navigate to="/landing" replace />} />
+                  <Route path="/user-profile" element={currentUser ? <UserProfilePage /> : <Navigate to="/landing" replace />} />
+                  <Route path="/profile" element={currentUser ? <UserProfilePage /> : <Navigate to="/landing" replace />} />
+                  <Route path="/queue-tracking" element={currentUser ? <QueueTrackingPage /> : <Navigate to="/landing" replace />} />
+                  <Route path="/tracking" element={currentUser ? <QueueTrackingPage /> : <Navigate to="/landing" replace />} />
+                  <Route path="/order-history" element={currentUser ? <UserProfilePage /> : <Navigate to="/landing" replace />} />
+                  <Route path="/chat" element={currentUser ? <ChatPage /> : <Navigate to="/landing" replace />} />
 
-                {/* Merchant & Kitchen Display Flow - Requires Login */}
-                <Route path="/kds" element={currentUser ? <KitchenDisplaySystem /> : <Navigate to="/landing" replace />} />
-                <Route path="/merchant-dashboard" element={currentUser ? <MerchantDashboard /> : <Navigate to="/landing" replace />} />
-                <Route path="/merchant" element={currentUser ? <MerchantDashboard /> : <Navigate to="/landing" replace />} />
-                <Route path="/create-store" element={currentUser ? <CreateStorePage /> : <Navigate to="/landing" replace />} />
-                <Route path="/store-admin" element={currentUser ? <StoreAdminPage /> : <Navigate to="/landing" replace />} />
-                <Route path="/store-chat" element={currentUser ? <ChatPage /> : <Navigate to="/landing" replace />} />
+                  {/* Merchant & Kitchen Display Flow - Requires Login */}
+                  <Route path="/kds" element={currentUser ? <KitchenDisplaySystem /> : <Navigate to="/landing" replace />} />
+                  <Route path="/merchant-dashboard" element={currentUser ? <MerchantDashboard /> : <Navigate to="/landing" replace />} />
+                  <Route path="/merchant" element={currentUser ? <MerchantDashboard /> : <Navigate to="/landing" replace />} />
+                  <Route path="/create-store" element={currentUser ? <CreateStorePage /> : <Navigate to="/landing" replace />} />
+                  <Route path="/store-admin" element={currentUser ? <StoreAdminPage /> : <Navigate to="/landing" replace />} />
+                  <Route path="/store-chat" element={currentUser ? <ChatPage /> : <Navigate to="/landing" replace />} />
 
-                {/* System Admin - Requires Super Admin */}
-                <Route path="/admin-dashboard" element={currentUser && isAdmin ? <AdminDashboard /> : <Navigate to="/landing" replace />} />
-                <Route path="/admin" element={currentUser && isAdmin ? <AdminDashboard /> : <Navigate to="/landing" replace />} />
+                  {/* System Admin - Requires Super Admin */}
+                  <Route path="/admin-dashboard" element={currentUser && isAdmin ? <AdminDashboard /> : <Navigate to="/landing" replace />} />
+                  <Route path="/admin" element={currentUser && isAdmin ? <AdminDashboard /> : <Navigate to="/landing" replace />} />
 
-                {/* Fallback */}
-                <Route path="*" element={<Navigate to={currentUser ? "/home" : "/landing"} replace />} />
-              </Routes>
+                  {/* Fallback */}
+                  <Route path="*" element={<Navigate to={currentUser ? "/home" : "/landing"} replace />} />
+                </Routes>
+              </React.Suspense>
             </div>
           </main>
           {/* Global Footer */}
