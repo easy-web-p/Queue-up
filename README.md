@@ -21,9 +21,10 @@ QueueUp เป็นแพลตฟอร์ม Web Application ทันสม�
 
 - **Frontend**: [React 19](https://react.dev/), [TypeScript](https://www.typescriptlang.org/), [Vite](https://vitejs.dev/), [Tailwind CSS](https://tailwindcss.com/)
 - **Icons & Animation**: [Lucide React](https://lucide.dev/), [Framer Motion](https://www.framer.com/motion/)
-- **Backend & Database**: [Firebase](https://firebase.google.com/) (Firestore, Auth, Storage, Analytics) + Express / SQLite (Local/Hybrid fallback)
-- **AI Integration**: [Google Gemini API](https://ai.google.dev/) (`@google/genai`)
-- **Testing**: [Vitest](https://vitest.dev/), Testing Library
+- **Backend & Database**: [Firebase](https://firebase.google.com/) (Firestore, Auth, Storage, Analytics) + Express
+  - หากไม่มี Firebase Admin credentials ในโหมด development เซิร์ฟเวอร์จะใช้ไฟล์ `.local_db.json` แทน (โหมด production จะหยุดทำงานทันทีแทนการ fallback)
+- **AI Chat**: Deterministic Intent Router ฝั่งเซิร์ฟเวอร์ (`server/services/aiChatEngine.js`) — ยังไม่ได้เชื่อมต่อ LLM
+- **Testing**: ชุดทดสอบ Node.js แบบ built-in (`npm test`) + Firestore Rules Emulator (`npm run test:rules`)
 
 ---
 
@@ -51,13 +52,30 @@ QueueUp เป็นแพลตฟอร์ม Web Application ทันสม�
    ```bash
    cp .env.example .env
    ```
-   กำหนดค่า API Key เช่น `GEMINI_API_KEY` และการตั้งค่า Firebase ที่เกี่ยวข้อง
+   ตัวแปรที่จำเป็นสำหรับการรันเซิร์ฟเวอร์:
+
+   | ตัวแปร | จำเป็น | คำอธิบาย |
+   |---|---|---|
+   | `HMAC_SECRET` | ✅ production | กุญแจเซ็นรหัส PIN รับอาหาร — production จะไม่สตาร์ทถ้าไม่ตั้ง |
+   | `GOOGLE_APPLICATION_CREDENTIALS` | ✅ production | Service Account ของ Firebase Admin (ยกเว้นแพลตฟอร์มที่ให้ ADC เช่น Cloud Run) |
+   | `STRIPE_SECRET_KEY` | ตามการใช้งาน | ปิดใช้งานการชำระเงินถ้าไม่ตั้ง (API จะตอบ 503) |
+   | `STRIPE_WEBHOOK_SECRET` | ✅ production | production จะไม่สตาร์ทถ้าไม่ตั้ง เพราะ webhook จะรับ payload ที่ไม่ได้เซ็น |
+   | `ALLOW_MOCK_AUTH` | ❌ | development เท่านั้น: รับ header `x-mock-*` แทน Firebase ID Token |
+   | `QUEUEUP_TIMEZONE` | ❌ | โซนเวลาของรอบรับอาหาร (ค่าเริ่มต้น `Asia/Bangkok`) |
+
+   > ⚠️ `npm start` ตั้ง `NODE_ENV=production` ให้อัตโนมัติ ซึ่งจะปิด mock auth และปิดการ fallback ไปใช้ฐานข้อมูลไฟล์
 
 4. **รันเซิร์ฟเวอร์สำหรับพัฒนา (Run Development Server)**
    ```bash
    npm run dev
    ```
-   เปิดเบราว์เซอร์ไปที่ [http://localhost:5173](http://localhost:5173)
+   เปิดเบราว์เซอร์ไปที่ [http://localhost:3000](http://localhost:3000)
+
+   หากต้องการใช้งาน API ฝั่งเซิร์ฟเวอร์ด้วย ให้เปิดอีกเทอร์มินัลแล้วรัน:
+   ```bash
+   npm run dev:server
+   ```
+   เซิร์ฟเวอร์ Express จะรันที่พอร์ต 8080 ซึ่งตรงกับ proxy `/api` ของ Vite
 
 5. **รันการทดสอบ (Run Tests)**
    ```bash
@@ -70,6 +88,25 @@ QueueUp เป็นแพลตฟอร์ม Web Application ทันสม�
    ```
 
 ---
+
+## 🧪 การทดสอบ (Testing)
+
+```bash
+npm test          # ชุดทดสอบหลัก: Capacity, Concurrency, AI Chat, Chat API, Authorization
+npm run test:utc  # ชุดเดียวกันภายใต้ TZ=UTC (จำลองคอนเทนเนอร์จริง)
+npm run test:rules # ทดสอบ firestore.rules ด้วย Firestore Emulator (ต้องมี Java)
+```
+
+| ชุดทดสอบ | ครอบคลุม |
+|---|---|
+| `capacityService.test.js` | การคำนวณ Workload, Lazy Expiration, Oversell Prevention และรอบเวลา 15 นาทีที่ไม่ขึ้นกับโซนเวลาของเซิร์ฟเวอร์ |
+| `capacityTransaction.test.js` | Firestore ACID Transaction และ Race Condition |
+| `aiChatEngine.test.js` | Intent Router, Allergen Guard, Commitment Guard, Booking Card |
+| `chatRoutes.test.js` | ห้องแชทและการซิงก์ข้อความแบบ end-to-end |
+| `authorization.test.js` | ขอบเขตสิทธิ์ของ API: การถอนเงิน, วงจรชีวิตออเดอร์, การปลอมบทบาทในแชท, ยอดชำระเงิน |
+| `firestoreRules.test.js` | การแยกข้อมูลระหว่างสถาบันและร้านค้าในระดับ Security Rules |
+
+> `npm run test:rules` จะดาวน์โหลด Firestore Emulator ในครั้งแรก จึงแยกออกจาก `npm test`
 
 ## 📂 โครงสร้างโปรเจกต์ (Project Structure)
 

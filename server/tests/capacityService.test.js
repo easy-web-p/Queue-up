@@ -330,6 +330,29 @@ console.log('\n--- TEST 8: Workload Calculation & Slot Window Resolution ---');
   assertEquals(slot.endTimeStr, '12:15', 'Slot end time is 12:15');
 }
 
+// -------------------------------------------------------------------
+// TEST 9: Slot boundaries are time-zone independent
+// A UTC container must file a 12:08 Bangkok pickup under the 12:00 slot,
+// not the 05:00 one, and must roll the date over at Bangkok midnight.
+// -------------------------------------------------------------------
+console.log('\n--- TEST 9: Time-zone Independent Slot Resolution ---');
+{
+  const noon = new Date('2026-09-26T12:08:00+07:00').getTime();
+  const noonSlot = resolveCurrentSlot(noon, 15);
+  assertEquals(noonSlot.slotId, '2026-09-26_12-00', 'Bangkok noon resolves to the 12:00 slot on any host');
+  assertEquals(
+    new Date(noonSlot.startTimeMs).toISOString(),
+    '2026-09-26T05:00:00.000Z',
+    'Slot start instant is the real 12:00 Bangkok moment'
+  );
+
+  const beforeMidnight = resolveCurrentSlot(new Date('2026-09-26T23:58:00+07:00').getTime(), 15);
+  assertEquals(beforeMidnight.slotId, '2026-09-26_23-45', 'Late evening stays on the same Bangkok date');
+
+  const afterMidnight = resolveCurrentSlot(new Date('2026-09-27T00:03:00+07:00').getTime(), 15);
+  assertEquals(afterMidnight.slotId, '2026-09-27_00-00', 'The date rolls over at Bangkok midnight, not UTC midnight');
+}
+
 console.log('\n===============================================================');
 console.log(`📊 TEST RESULTS: ${passedTests}/${totalTests} Passed (${passedTests === totalTests ? 'ALL PASSED' : 'FAILURES DETECTED'})`);
 console.log('===============================================================\n');

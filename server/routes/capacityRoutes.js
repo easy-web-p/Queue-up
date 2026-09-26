@@ -10,7 +10,7 @@
 
 import { Router } from 'express';
 import { adminDb } from '../firebaseAdmin.js';
-import { optionalAuthenticate } from '../middleware/authenticate.js';
+import { optionalAuthenticate, isStoreOperator } from '../middleware/authenticate.js';
 import { SlotTransactionService } from '../services/slotTransactionService.js';
 import { calculateWorkload, resolveCurrentSlot } from '../services/capacityService.js';
 
@@ -136,8 +136,10 @@ capacityRouter.post('/reserve', optionalAuthenticate, async (req, res) => {
     const workload = calculateWorkload(sanitizedItems);
 
     // 4. Authenticated / Guest User & School Context
-    const uid = req.user?.uid || req.headers['x-mock-user-id'] || req.headers['x-customer-id'] || customerId || 'guest-user';
-    const schoolId = req.user?.schoolId || req.headers['x-mock-school-id'] || req.headers['x-customer-school-id'] || clientSchoolId || 'school-default';
+    // Header- and body-supplied identity carries no authority: req.user is
+    // populated only from a verified token (or the dev mock-auth path).
+    const uid = req.user?.uid || 'guest-user';
+    const schoolId = req.user?.schoolId || 'school-default';
 
     // 5. Generate or use Reservation ID
     const reservationId = clientReservationId || `res_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
@@ -213,6 +215,23 @@ capacityRouter.post('/release', optionalAuthenticate, async (req, res) => {
         error: 'MISSING_PARAMS',
         message: 'storeId, slotId, and reservationId are required.'
       });
+    }
+
+    // Releasing someone else's hold would hand their slot to the caller.
+    const reservationSnap = await adminDb.collection('reservations').doc(reservationId).get();
+    if (reservationSnap.exists) {
+      const reservation = reservationSnap.data();
+      const callerUid = req.user?.uid || 'guest-user';
+      const isHolder = reservation.uid === callerUid;
+      const operatesStore = await isStoreOperator(req.user, storeId);
+
+      if (!isHolder && !operatesStore) {
+        return res.status(403).json({
+          success: false,
+          error: 'FORBIDDEN',
+          message: 'This reservation belongs to another customer.'
+        });
+      }
     }
 
     const result = await SlotTransactionService.releaseSlot({

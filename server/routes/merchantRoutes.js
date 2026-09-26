@@ -2,7 +2,12 @@ import { Router } from 'express';
 import crypto from 'crypto';
 import Stripe from 'stripe';
 import { adminDb } from '../firebaseAdmin.js';
-import { optionalAuthenticate } from '../middleware/authenticate.js';
+import {
+  authenticate,
+  requireStoreOwnership,
+  storeIdFromOrderParam
+} from '../middleware/authenticate.js';
+import { requireSecret, optionalSecret } from '../config/secrets.js';
 import { recordOrderFulfilled, recordRefund } from '../services/ledgerService.js';
 import { NotificationEngine } from '../services/notificationEngine.js';
 import dotenv from 'dotenv';
@@ -11,33 +16,33 @@ dotenv.config();
 
 export const merchantRouter = Router();
 
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY || 'dummy_stripe_secret_key';
-const stripe = new Stripe(stripeSecretKey);
-const HMAC_SECRET = process.env.HMAC_SECRET || 'queueup-pin-secret-key-2026';
+const stripeSecretKey = optionalSecret('STRIPE_SECRET_KEY');
+const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
+const HMAC_SECRET = requireSecret('HMAC_SECRET', 'dev-only-insecure-hmac-secret');
 
 /**
  * GET /api/merchant/orders
  * Retrieve list of orders for a store with merchant financial breakdown
  */
-merchantRouter.get('/orders', optionalAuthenticate, async (req, res) => {
+merchantRouter.get('/orders', authenticate, requireStoreOwnership(), async (req, res) => {
   try {
-    const storeId = req.query.storeId || req.user?.storeId;
-    if (!storeId) {
-      return res.status(400).json({ success: false, error: 'MISSING_STORE_ID' });
-    }
+    // requireStoreOwnership resolved and authorised this storeId.
+    const storeId = req.storeId;
+    const limit = Math.min(Number(req.query.limit) || 200, 500);
 
-    const snapshot = await adminDb.collection('orders').get();
+    const snapshot = await adminDb
+      .collection('orders')
+      .where('storeId', '==', storeId)
+      .get();
+
     const orders = [];
-
     snapshot.forEach((doc) => {
-      const data = doc.data();
-      if (data.storeId === storeId) {
-        orders.push({ id: doc.id, ...data });
-      }
+      orders.push({ id: doc.id, ...doc.data() });
     });
 
     // Sort by createdAt desc
     orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    orders.splice(limit);
 
     return res.status(200).json({ success: true, orders });
   } catch (err) {
@@ -49,7 +54,7 @@ merchantRouter.get('/orders', optionalAuthenticate, async (req, res) => {
  * POST /api/merchant/orders/:id/accept
  * Merchant accepts paid order, triggers monotonic Queue Number generation and transitions to PREPARING
  */
-merchantRouter.post('/orders/:id/accept', optionalAuthenticate, async (req, res) => {
+merchantRouter.post('/orders/:id/accept', authenticate, requireStoreOwnership(storeIdFromOrderParam), async (req, res) => {
   try {
     const { id: orderId } = req.params;
     const orderRef = adminDb.collection('orders').doc(orderId);
@@ -150,7 +155,7 @@ merchantRouter.post('/orders/:id/accept', optionalAuthenticate, async (req, res)
  * POST /api/merchant/orders/:id/reject
  * Merchant rejects order -> marks MERCHANT_REJECTED -> initiates Stripe refund
  */
-merchantRouter.post('/orders/:id/reject', optionalAuthenticate, async (req, res) => {
+merchantRouter.post('/orders/:id/reject', authenticate, requireStoreOwnership(storeIdFromOrderParam), async (req, res) => {
   try {
     const { id: orderId } = req.params;
     const { reasonCode = 'ITEM_SOLD_OUT', reasonMessage = 'ร้านค้าไม่สามารถรับออเดอร์ได้' } = req.body;
@@ -229,7 +234,7 @@ merchantRouter.post('/orders/:id/reject', optionalAuthenticate, async (req, res)
     });
 
     // Execute Stripe Refund asynchronously (Outbox/Saga pattern)
-    if (orderDataToRefund?.stripePaymentIntentId) {
+    if (stripe && orderDataToRefund?.stripePaymentIntentId) {
       try {
         const refund = await stripe.refunds.create({
           payment_intent: orderDataToRefund.stripePaymentIntentId,
@@ -273,7 +278,7 @@ merchantRouter.post('/orders/:id/reject', optionalAuthenticate, async (req, res)
  * POST /api/merchant/orders/:id/ready
  * Mark food prepared and ready for customer pickup
  */
-merchantRouter.post('/orders/:id/ready', optionalAuthenticate, async (req, res) => {
+merchantRouter.post('/orders/:id/ready', authenticate, requireStoreOwnership(storeIdFromOrderParam), async (req, res) => {
   try {
     const { id: orderId } = req.params;
     const orderRef = adminDb.collection('orders').doc(orderId);
@@ -330,7 +335,7 @@ merchantRouter.post('/orders/:id/ready', optionalAuthenticate, async (req, res) 
  * Verifies customer 4-digit pickup PIN via HMAC and marks COMPLETED.
  * Moves settlement status to ON_HOLD (holding period before release).
  */
-merchantRouter.post('/orders/:id/complete', optionalAuthenticate, async (req, res) => {
+merchantRouter.post('/orders/:id/complete', authenticate, requireStoreOwnership(storeIdFromOrderParam), async (req, res) => {
   try {
     const { id: orderId } = req.params;
     const { exchangePin } = req.body;

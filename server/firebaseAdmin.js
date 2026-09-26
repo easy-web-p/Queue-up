@@ -21,6 +21,7 @@ if (fs.existsSync(configPath)) {
   }
 }
 
+const isProduction = process.env.NODE_ENV === 'production';
 const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 const hasServiceAccountFile = serviceAccountPath && fs.existsSync(serviceAccountPath);
 const isCloudRun = Boolean(process.env.K_SERVICE || process.env.CLOUD_RUN_JOB || process.env.GAE_ENV);
@@ -60,8 +61,25 @@ if (useLiveAdmin) {
     adminAuth = getAuth(adminApp);
     adminMessaging = getMessaging(adminApp);
   } catch (err) {
+    if (isProduction) {
+      throw new Error(
+        `[FirebaseAdmin] Failed to initialize Firebase Admin in production: ${err.message}. ` +
+        'Refusing to start on the local file-backed store — orders and payments would be lost.'
+      );
+    }
     console.warn('[FirebaseAdmin] Failed to initialize live Firebase Admin, falling back to local store:', err.message);
   }
+}
+
+// A production deployment that reaches this point has no credentials at all
+// (no GOOGLE_APPLICATION_CREDENTIALS and no Cloud Run ADC). Silently degrading
+// to .local_db.json would accept orders and payments onto ephemeral disk.
+if (!adminDb && isProduction) {
+  throw new Error(
+    '[FirebaseAdmin] No Firebase Admin credentials available in production. ' +
+    'Set GOOGLE_APPLICATION_CREDENTIALS, or run on a platform that provides ' +
+    'Application Default Credentials, before starting the server.'
+  );
 }
 
 // -------------------------------------------------------------

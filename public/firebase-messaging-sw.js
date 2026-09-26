@@ -3,14 +3,16 @@
 importScripts('https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js');
 
+// Kept in sync with firebase-applet-config.json. A service worker pointed at a
+// different project registers FCM tokens that the app's Admin SDK cannot reach,
+// which silently breaks every push notification.
 const firebaseConfig = {
-  projectId: "numeric-citron-7mn89",
-  appId: "1:342098953506:web:32a00e3f979498a57e517b",
-  apiKey: "AIzaSyDkk9woQ_y_qviXSA6XRutef3CoZyAddKw",
-  authDomain: "numeric-citron-7mn89.firebaseapp.com",
-  firestoreDatabaseId: "ai-studio-queueup-ca15cbf8-a12a-45c9-92ff-2fa662c472b6",
-  storageBucket: "numeric-citron-7mn89.firebasestorage.app",
-  messagingSenderId: "342098953506"
+  projectId: "queueup-65e82",
+  appId: "1:324920233384:web:4871f18891e27fbc8f219d",
+  apiKey: "AIzaSyCWCpdSksHY_mU5rqZWHob1rLRws7RB8nA",
+  authDomain: "queueup-65e82.firebaseapp.com",
+  storageBucket: "queueup-65e82.firebasestorage.app",
+  messagingSenderId: "324920233384"
 };
 
 firebase.initializeApp(firebaseConfig);

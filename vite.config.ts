@@ -19,6 +19,7 @@ export default defineConfig(() => {
       port: 3000,
       host: '0.0.0.0',
       proxy: {
+        // Matches DEFAULT_PORT in server.js — run `npm run dev:server` alongside.
         '/api': {
           target: 'http://localhost:8080',
           changeOrigin: true

@@ -6,14 +6,19 @@
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
-    "start": "node server.js",
+    "start": "NODE_ENV=production node server.js",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "test:capacity": "node server/tests/capacityService.test.js",
     "test:concurrency": "node server/tests/capacityTransaction.test.js",
     "test:ai": "node server/tests/aiChatEngine.test.js",
-    "test": "node server/tests/capacityService.test.js && node server/tests/capacityTransaction.test.js && node server/tests/aiChatEngine.test.js"
+    "test": "node server/tests/capacityService.test.js && node server/tests/capacityTransaction.test.js && node server/tests/aiChatEngine.test.js && node server/tests/chatRoutes.test.js && node server/tests/authorization.test.js",
+    "dev:server": "node server.js",
+    "test:utc": "TZ=UTC npm test",
+    "test:chat": "node server/tests/chatRoutes.test.js",
+    "test:auth": "node server/tests/authorization.test.js",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-queueup-rules \"node server/tests/firestoreRules.test.js\""
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -33,12 +38,12 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.0",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "autoprefixer": "^10.4.21",
-    "esbuild": "^0.25.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
     "typescript": "^7.0.2"

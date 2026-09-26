@@ -83,6 +83,10 @@ app.get('*', (req, res) => {
   }
 });
 
+// The vite dev server owns port 3000 and proxies /api here, so the API must
+// not default to the same port.
+const DEFAULT_PORT = 8080;
+
 function startServer(preferredPort) {
   const server = app.listen(preferredPort, '0.0.0.0', () => {
     console.log(`[QueueUp Server] Running on http://0.0.0.0:${preferredPort}`);
@@ -92,7 +96,7 @@ function startServer(preferredPort) {
 
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
-      const fallbackPort = preferredPort === 3000 ? 8080 : (preferredPort === 8080 ? 8081 : preferredPort + 1);
+      const fallbackPort = preferredPort + 1;
       console.warn(`[QueueUp Server] Port ${preferredPort} in use, trying fallback port ${fallbackPort}...`);
       const fallbackServer = app.listen(fallbackPort, '0.0.0.0', () => {
         console.log(`[QueueUp Server] Running on http://0.0.0.0:${fallbackPort}`);
@@ -108,7 +112,7 @@ function startServer(preferredPort) {
 
 const targetPort = process.env.PORT
   ? parseInt(process.env.PORT, 10)
-  : 3000;
+  : DEFAULT_PORT;
 
 startServer(targetPort);
 

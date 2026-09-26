@@ -11,24 +11,51 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    // Custom claims are read with .get(key, default): a plain
+    // request.auth.token.<missing> raises an evaluation error, and an error in
+    // one arm of an `||` chain aborts the whole rule, so a later legitimate arm
+    // (isSchoolAdmin, for instance) would never be reached.
+    function claimRole() {
+      return request.auth.token.get('role', '');
+    }
+
+    function claimAdminFlag() {
+      return request.auth.token.get('admin', false) == true;
+    }
+
     function isAdmin() {
-      return isAuthenticated() && (request.auth.token.role == 'admin' || request.auth.token.role == 'super_admin' || request.auth.token.admin == true);
+      return isAuthenticated() && (
+        claimRole() == 'admin' ||
+        claimRole() == 'super_admin' ||
+        claimAdminFlag()
+      );
     }
 
     function isSuperAdmin() {
       return isAuthenticated() && (
         // Primary: Custom Claims issued by Backend
-        request.auth.token.role == 'super_admin' || 
-        request.auth.token.admin == true ||
+        claimRole() == 'super_admin' ||
+        claimAdminFlag() ||
         // Temporary Break-Glass Recovery Access (Must be verified email)
-        (request.auth.token.email == 'hi00000087@gmail.com' && request.auth.token.email_verified == true)
+        (request.auth.token.get('email', '') == 'hi00000087@gmail.com' &&
+         request.auth.token.get('email_verified', false) == true)
       );
     }
 
     function isSchoolAdmin(schoolId) {
       return isAuthenticated() && (
-        isSuperAdmin() || 
-        (request.auth.token.role == 'admin' && request.auth.token.schoolId == schoolId)
+        isSuperAdmin() ||
+        (claimRole() == 'admin' && request.auth.token.get('schoolId', '') == schoolId)
+      );
+    }
+
+    // A caller who operates a given store: platform admin, an account pinned to
+    // that store by custom claims, or the store's registered owner.
+    function isStoreOperator(storeId) {
+      return isAuthenticated() && (
+        isSuperAdmin() ||
+        request.auth.token.get('storeId', '') == storeId ||
+        get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid
       );
     }
 
@@ -93,7 +120,11 @@ service cloud.firestore {
     // 4. Menu Items: Top-level collection for cross-store query
     match /menu_items/{menuItemId} {
       allow read: if true;
-      allow write: if isSuperAdmin() || (isAuthenticated() && request.auth.token.role == 'merchant');
+      // A merchant may only touch menu items belonging to a store they operate.
+      allow create: if isStoreOperator(request.resource.data.storeId);
+      allow update: if isStoreOperator(resource.data.storeId) &&
+                       request.resource.data.storeId == resource.data.storeId;
+      allow delete: if isStoreOperator(resource.data.storeId);
     }
 
     // 5. Orders: Server authoritative (Command Model via Express API)
@@ -101,8 +132,7 @@ service cloud.firestore {
       // Readable by customer who placed it, store merchant, super admin, or school admin of that school
       allow read: if isAuthenticated() && (
         resource.data.customerId == request.auth.uid ||
-        request.auth.token.storeId == resource.data.storeId ||
-        request.auth.token.role == 'merchant' ||
+        isStoreOperator(resource.data.storeId) ||
         isSuperAdmin() ||
         isSchoolAdmin(resource.data.schoolId)
       );
@@ -113,7 +143,7 @@ service cloud.firestore {
       match /events/{eventId} {
         allow read: if isAuthenticated() && (
           get(/databases/$(database)/documents/orders/$(orderId)).data.customerId == request.auth.uid ||
-          request.auth.token.role == 'merchant' ||
+          isStoreOperator(get(/databases/$(database)/documents/orders/$(orderId)).data.storeId) ||
           isAdmin()
         );
         allow write: if false;
@@ -122,38 +152,39 @@ service cloud.firestore {
 
     // 6. Chats and Messages
     match /chats/{chatId} {
+      // A thread is visible to its participants and to operators of ITS store.
+      // A blanket "any merchant" clause here would expose every customer
+      // conversation in every canteen to every registered merchant.
       allow read: if isAuthenticated() && (
         request.auth.uid in resource.data.participantIds ||
-        request.auth.token.role in ['merchant', 'admin'] ||
-        request.auth.token.admin == true ||
-        isAdmin()
+        isStoreOperator(resource.data.storeId) ||
+        isSuperAdmin()
       );
       // Create: user must be in the participantIds array and match customerId
       allow create: if isAuthenticated() && (
         (request.auth.uid in request.resource.data.participantIds &&
          request.resource.data.customerId == request.auth.uid) ||
-        request.auth.token.role in ['merchant', 'admin'] ||
-        isAdmin()
+        isStoreOperator(request.resource.data.storeId) ||
+        isSuperAdmin()
       );
-      // Update: MUST be an existing participant, participantIds, storeId, customerId CANNOT be modified
-      allow update: if isAuthenticated() && (
+      // Update: MUST be an existing participant or the store's operator, and
+      // participantIds, storeId, customerId can never be modified.
+      allow update: if isAuthenticated() &&
+        request.resource.data.participantIds == resource.data.participantIds &&
+        request.resource.data.storeId == resource.data.storeId &&
+        request.resource.data.customerId == resource.data.customerId &&
         (
-          request.auth.uid in resource.data.participantIds &&
-          request.resource.data.participantIds == resource.data.participantIds &&
-          request.resource.data.storeId == resource.data.storeId &&
-          request.resource.data.customerId == resource.data.customerId
-        ) ||
-        request.auth.token.role in ['merchant', 'admin'] ||
-        isAdmin()
-      );
+          request.auth.uid in resource.data.participantIds ||
+          isStoreOperator(resource.data.storeId) ||
+          isSuperAdmin()
+        );
       allow delete: if isAdmin();
 
       match /messages/{messageId} {
         allow read: if isAuthenticated() && (
           request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds ||
-          request.auth.token.role in ['merchant', 'admin'] ||
-          request.auth.token.admin == true ||
-          isAdmin()
+          isStoreOperator(get(/databases/$(database)/documents/chats/$(chatId)).data.storeId) ||
+          isSuperAdmin()
         );
         // Message creation: MUST be an authentic participant of the chat room
         // senderRole restricted to customer/merchant only (ai_assistant/system can ONLY be written by Admin SDK)
@@ -187,7 +218,17 @@ service cloud.firestore {
 
     // 10. School Members: Institutional Authorized Roster with Field-Level Immutability
     match /school_members/{memberId} {
-      allow read: if isAuthenticated();
+      // The roster holds fullName, email and student identifiers. Exposing it to
+      // every signed-in account would let any user enumerate a whole institution.
+      // A member may read their own record (by uid or by verified email, so an
+      // unclaimed record can still be found during claiming); admins read all.
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() ||
+        isSchoolAdmin(resource.data.schoolId) ||
+        resource.data.claimedByUid == request.auth.uid ||
+        (request.auth.token.get('email_verified', false) == true &&
+         resource.data.email == request.auth.token.get('email', ''))
+      );
       allow create: if isSuperAdmin() || isSchoolAdmin(request.resource.data.schoolId);
       allow update: if isSuperAdmin() || 
         // Case 1: School Admin update (Restricted to non-security fields; CANNOT alter role, schoolId, email, identifier, or claiming state)
@@ -200,8 +241,8 @@ service cloud.firestore {
         // Case 2: Self-Claim by verified user (Only claiming previously unclaimed roster record)
         (
           isAuthenticated() &&
-          request.auth.token.email_verified == true &&
-          resource.data.email == request.auth.token.email &&
+          request.auth.token.get('email_verified', false) == true &&
+          resource.data.email == request.auth.token.get('email', '') &&
           resource.data.status == 'active' &&
           isMemberIdentityUnchanged() &&
           (resource.data.claimedByUid == null || resource.data.claimedByUid == request.auth.uid) &&

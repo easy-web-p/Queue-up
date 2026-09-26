@@ -1,3 +1,5 @@
+process.env.ALLOW_MOCK_AUTH = 'true';
+
 import assert from 'assert';
 import http from 'http';
 import express from 'express';
@@ -39,7 +41,9 @@ async function request(baseUrl, path, method = 'GET', body = null, headers = {})
 }
 
 let totalPassed = 0;
+let totalChecks = 0;
 function pass(testName, detail = '') {
+  totalChecks++;
   console.log(`  ✅ [PASS] ${testName} ${detail ? `(${detail})` : ''}`);
   totalPassed++;
 }
@@ -156,7 +160,13 @@ async function runTests() {
     console.log('\n--- TEST 4: Stream messages for thread ---');
     const msgsRes = await request(
       baseUrl,
-      `/api/chat/messages/${testChatId}`
+      `/api/chat/messages/${testChatId}`,
+      'GET',
+      null,
+      {
+        'x-mock-user-id': 'merchant-admin-1',
+        'x-mock-user-role': 'merchant'
+      }
     );
 
     assert.strictEqual(msgsRes.status, 200);
@@ -178,6 +188,10 @@ async function runTests() {
       {
         chatId: testChatId,
         role: 'merchant'
+      },
+      {
+        'x-mock-user-id': 'merchant-admin-1',
+        'x-mock-user-role': 'merchant'
       }
     );
     assert.strictEqual(readRes.status, 200);
@@ -185,7 +199,7 @@ async function runTests() {
     pass('Thread marked as read');
 
     console.log('\n===============================================================');
-    console.log(`📊 CHAT INTEGRATION TEST RESULTS: ${totalPassed}/5 Passed (ALL PASSED)`);
+    console.log(`📊 CHAT INTEGRATION TEST RESULTS: ${totalPassed}/${totalChecks} Passed (ALL PASSED)`);
     console.log('===============================================================');
   } finally {
     server.close();

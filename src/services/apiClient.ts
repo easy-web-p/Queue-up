@@ -130,13 +130,11 @@ class ApiClient {
           const userData = session?.user || session;
           if (userData?.id) {
             headers['X-Mock-User-Id'] = userData.id;
-            headers['X-Customer-Id'] = userData.id;
             headers['X-Mock-User-Email'] = userData.email || 'customer@queueup.app';
             headers['X-Mock-User-Name'] = encodeURIComponent(userData.fullName || userData.name || 'คุณลูกค้า');
             headers['X-Mock-User-Role'] = userData.role || 'customer';
             if (userData.schoolId) {
               headers['X-Mock-School-Id'] = userData.schoolId;
-              headers['X-Customer-School-Id'] = userData.schoolId;
             }
           }
         }
@@ -370,6 +368,58 @@ class ApiClient {
     return data;
   }
 
+  /**
+   * Merchant Wallet: Release funds whose hold period has elapsed
+   */
+  async releaseHeldFunds(storeId: string): Promise<{ success: boolean; releasedCount: number; releasedOrders: string[] }> {
+    const headers = await this.getAuthHeaders();
+    const response = await fetch(`${this.baseUrl}/merchant/wallet/release-held-funds`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ storeId })
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || data.error || 'Failed to release held funds');
+    }
+    return data;
+  }
+
+  /**
+   * Merchant Wallet: Create the store's Stripe Connect account
+   */
+  async createStripeConnectAccount(storeId: string, storeName?: string, storeEmail?: string): Promise<{ success: boolean; accountId: string }> {
+    const headers = await this.getAuthHeaders();
+    const response = await fetch(`${this.baseUrl}/merchant/connect/account`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ storeId, storeName, storeEmail })
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || data.error || 'Failed to create Stripe account');
+    }
+    return data;
+  }
+
+  /**
+   * Merchant Wallet: Generate a Stripe Connect onboarding link.
+   * storeId is required so the server can verify the account belongs to it.
+   */
+  async createStripeOnboardingLink(storeId: string, accountId: string): Promise<{ success: boolean; url: string }> {
+    const headers = await this.getAuthHeaders();
+    const response = await fetch(`${this.baseUrl}/merchant/connect/onboarding-link`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ storeId, accountId })
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || data.error || 'Failed to create onboarding link');
+    }
+    return data;
+  }
+
   async patch<T = any>(endpoint: string, body?: any): Promise<T> {
     const headers = await this.getAuthHeaders();
     const url = endpoint.startsWith('http') ? endpoint : `${this.baseUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
@@ -431,17 +481,13 @@ class ApiClient {
     if (payload.idempotencyKey) {
       headers['X-Idempotency-Key'] = payload.idempotencyKey;
     }
-    if (payload.customerId) {
-      headers['X-Customer-Id'] = payload.customerId;
-      if (!headers['X-Mock-User-Id']) {
-        headers['X-Mock-User-Id'] = payload.customerId;
-      }
+    // Identity headers are honoured only by the server's development mock-auth
+    // path; in production the reservation is attributed from the verified token.
+    if (payload.customerId && !headers['X-Mock-User-Id']) {
+      headers['X-Mock-User-Id'] = payload.customerId;
     }
-    if (payload.schoolId) {
-      headers['X-Customer-School-Id'] = payload.schoolId;
-      if (!headers['X-Mock-School-Id']) {
-        headers['X-Mock-School-Id'] = payload.schoolId;
-      }
+    if (payload.schoolId && !headers['X-Mock-School-Id']) {
+      headers['X-Mock-School-Id'] = payload.schoolId;
     }
     const response = await fetch(`${this.baseUrl}/capacity/reserve`, {
       method: 'POST',

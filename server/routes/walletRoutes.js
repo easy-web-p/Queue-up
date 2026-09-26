@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import Stripe from 'stripe';
 import { adminDb } from '../firebaseAdmin.js';
-import { optionalAuthenticate } from '../middleware/authenticate.js';
+import { authenticate, requireStoreOwnership } from '../middleware/authenticate.js';
+import { optionalSecret } from '../config/secrets.js';
 import { recordPayoutReserved, recordPayoutCompleted, recordFundsReleased } from '../services/ledgerService.js';
 import dotenv from 'dotenv';
 
@@ -9,14 +10,25 @@ dotenv.config();
 
 export const walletRouter = Router();
 
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY || 'dummy_stripe_secret_key';
-const stripe = new Stripe(stripeSecretKey);
+const stripeSecretKey = optionalSecret('STRIPE_SECRET_KEY');
+const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
+
+/** Guard for endpoints that cannot work without a configured Stripe key. */
+function requireStripe(res) {
+  if (stripe) return true;
+  res.status(503).json({
+    success: false,
+    error: 'STRIPE_NOT_CONFIGURED',
+    message: 'Stripe is not configured on this server.'
+  });
+  return false;
+}
 
 /**
  * GET /api/merchant/wallet/:storeId
  * Retrieve merchant balance summary
  */
-walletRouter.get('/wallet/:storeId', optionalAuthenticate, async (req, res) => {
+walletRouter.get('/wallet/:storeId', authenticate, requireStoreOwnership(), async (req, res) => {
   try {
     const { storeId } = req.params;
     const balanceSnap = await adminDb.collection('merchant_balances').doc(storeId).get();
@@ -51,17 +63,17 @@ walletRouter.get('/wallet/:storeId', optionalAuthenticate, async (req, res) => {
  * GET /api/merchant/wallet/:storeId/ledger
  * Retrieve double-entry financial ledger history for store
  */
-walletRouter.get('/wallet/:storeId/ledger', optionalAuthenticate, async (req, res) => {
+walletRouter.get('/wallet/:storeId/ledger', authenticate, requireStoreOwnership(), async (req, res) => {
   try {
-    const { storeId } = req.params;
-    const snapshot = await adminDb.collection('ledger_entries').get();
-    const entries = [];
+    const storeId = req.storeId;
+    const snapshot = await adminDb
+      .collection('ledger_entries')
+      .where('storeId', '==', storeId)
+      .get();
 
+    const entries = [];
     snapshot.forEach((doc) => {
-      const data = doc.data();
-      if (data.storeId === storeId) {
-        entries.push({ id: doc.id, ...data });
-      }
+      entries.push({ id: doc.id, ...doc.data() });
     });
 
     entries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -75,40 +87,41 @@ walletRouter.get('/wallet/:storeId/ledger', optionalAuthenticate, async (req, re
  * POST /api/merchant/wallet/release-held-funds
  * Release held funds when fundReleaseAt deadline passes
  */
-walletRouter.post('/wallet/release-held-funds', optionalAuthenticate, async (req, res) => {
+walletRouter.post('/wallet/release-held-funds', authenticate, requireStoreOwnership(), async (req, res) => {
   try {
-    const { storeId } = req.body;
+    const storeId = req.storeId;
     const now = new Date().toISOString();
-    const ordersSnap = await adminDb.collection('orders').get();
+    const ordersSnap = await adminDb
+      .collection('orders')
+      .where('storeId', '==', storeId)
+      .where('settlementStatus', '==', 'ON_HOLD')
+      .get();
 
     const releasedOrders = [];
 
     for (const doc of ordersSnap.docs) {
       const order = doc.data();
-      if (order.storeId === storeId && order.settlementStatus === 'ON_HOLD') {
-        const releaseTime = order.fundReleaseAt ? new Date(order.fundReleaseAt) : new Date(0);
+      const releaseTime = order.fundReleaseAt ? new Date(order.fundReleaseAt) : new Date(0);
+      if (new Date() < releaseTime) continue;
 
-        if (new Date() >= releaseTime) {
-          const orderRef = adminDb.collection('orders').doc(doc.id);
-          const merchantNetSatang = order.merchantNetSatang || Math.max(0, (order.totalSatang || (order.total * 100)) - (order.platformFeeSatang || 0));
+      const orderRef = adminDb.collection('orders').doc(doc.id);
+      const merchantNetSatang = order.merchantNetSatang || Math.max(0, (order.totalSatang || (order.total * 100)) - (order.platformFeeSatang || 0));
 
-          await adminDb.runTransaction(async (t) => {
-            t.update(orderRef, {
-              settlementStatus: 'AVAILABLE',
-              updatedAt: now
-            });
+      await adminDb.runTransaction(async (t) => {
+        t.update(orderRef, {
+          settlementStatus: 'AVAILABLE',
+          updatedAt: now
+        });
 
-            await recordFundsReleased(t, adminDb, {
-              orderId: doc.id,
-              storeId,
-              merchantNetSatang,
-              now
-            });
-          });
+        await recordFundsReleased(t, adminDb, {
+          orderId: doc.id,
+          storeId,
+          merchantNetSatang,
+          now
+        });
+      });
 
-          releasedOrders.push(doc.id);
-        }
-      }
+      releasedOrders.push(doc.id);
     }
 
     return res.status(200).json({
@@ -125,9 +138,11 @@ walletRouter.post('/wallet/release-held-funds', optionalAuthenticate, async (req
  * POST /api/merchant/payouts
  * Request Payout: Atomically reserves available funds and dispatches payout
  */
-walletRouter.post('/payouts', optionalAuthenticate, async (req, res) => {
+walletRouter.post('/payouts', authenticate, requireStoreOwnership(), async (req, res) => {
   try {
-    const { storeId, amountSatang, bankAccountSnapshot } = req.body;
+    // requireStoreOwnership authorised this storeId; never trust req.body.storeId.
+    const storeId = req.storeId;
+    const { amountSatang, bankAccountSnapshot } = req.body;
 
     if (!storeId || !amountSatang || amountSatang < 10000) {
       return res.status(400).json({
@@ -162,7 +177,7 @@ walletRouter.post('/payouts', optionalAuthenticate, async (req, res) => {
           accountNumberMasked: 'xxx-x-xx123-x',
           accountName: 'ร้านค้า QueueUp'
         },
-        requestedBy: req.user?.uid || 'merchant-owner',
+        requestedBy: req.user.uid,
         createdAt: now,
         updatedAt: now
       };
@@ -218,9 +233,11 @@ walletRouter.post('/payouts', optionalAuthenticate, async (req, res) => {
  * POST /api/merchant/connect/account
  * Create Stripe Connected Account for merchant onboarding
  */
-walletRouter.post('/connect/account', optionalAuthenticate, async (req, res) => {
+walletRouter.post('/connect/account', authenticate, requireStoreOwnership(), async (req, res) => {
   try {
-    const { storeId, storeEmail, storeName } = req.body;
+    if (!requireStripe(res)) return;
+    const storeId = req.storeId;
+    const { storeEmail, storeName } = req.body;
 
     // Create Stripe standard/express connected account
     const account = await stripe.accounts.create({
@@ -255,9 +272,20 @@ walletRouter.post('/connect/account', optionalAuthenticate, async (req, res) => 
  * POST /api/merchant/connect/onboarding-link
  * Generate Stripe Account Link for onboarding
  */
-walletRouter.post('/connect/onboarding-link', optionalAuthenticate, async (req, res) => {
+walletRouter.post('/connect/onboarding-link', authenticate, requireStoreOwnership(), async (req, res) => {
   try {
+    if (!requireStripe(res)) return;
     const { accountId, returnUrl, refreshUrl } = req.body;
+
+    // The account must be the one registered to the store the caller operates.
+    const accountSnap = await adminDb.collection('merchant_accounts').doc(req.storeId).get();
+    if (!accountSnap.exists || accountSnap.data().stripeAccountId !== accountId) {
+      return res.status(403).json({
+        success: false,
+        error: 'ACCOUNT_MISMATCH',
+        message: 'This Stripe account is not registered to your store.'
+      });
+    }
     const origin = req.headers.origin || 'http://localhost:3000';
 
     const accountLink = await stripe.accountLinks.create({

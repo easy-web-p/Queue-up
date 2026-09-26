@@ -111,16 +111,9 @@ export const MerchantWalletTab: React.FC<MerchantWalletTabProps> = ({
   const handleReleaseHeldFunds = async () => {
     try {
       setRefreshing(true);
-      const res = await fetch('/api/merchant/wallet/release-held-funds', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storeId })
-      }).then(r => r.json());
-
-      if (res.success) {
-        addToast('ตรวจสอบยอดเงินสำเร็จ', `ปล่อยยอดที่พ้นระยะพักตรวจจำนวน ${res.releasedCount} ออเดอร์เรียบร้อย`, 'success');
-        await fetchWalletData();
-      }
+      const res = await apiClient.releaseHeldFunds(storeId);
+      addToast('ตรวจสอบยอดเงินสำเร็จ', `ปล่อยยอดที่พ้นระยะพักตรวจจำนวน ${res.releasedCount} ออเดอร์เรียบร้อย`, 'success');
+      await fetchWalletData();
     } catch (err: any) {
       addToast('เกิดข้อผิดพลาด', err.message, 'error');
     } finally {
@@ -132,18 +125,10 @@ export const MerchantWalletTab: React.FC<MerchantWalletTabProps> = ({
   const handleStripeConnect = async () => {
     try {
       setConnectingStripe(true);
-      const accountRes = await fetch('/api/merchant/connect/account', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storeId, storeName })
-      }).then(r => r.json());
+      const accountRes = await apiClient.createStripeConnectAccount(storeId, storeName);
 
-      if (accountRes.success && accountRes.accountId) {
-        const linkRes = await fetch('/api/merchant/connect/onboarding-link', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ accountId: accountRes.accountId })
-        }).then(r => r.json());
+      if (accountRes.accountId) {
+        const linkRes = await apiClient.createStripeOnboardingLink(storeId, accountRes.accountId);
 
         if (linkRes.url) {
           window.open(linkRes.url, '_blank');

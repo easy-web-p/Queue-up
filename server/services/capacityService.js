@@ -361,22 +361,60 @@ export function releaseConfirmedWorkload(confirmedWorkload = 0, amount = 0) {
 }
 
 /**
- * Resolves the 15-minute slot window for a given timestamp.
- * 
+ * Canteen-local time zone used for every slot boundary.
+ *
+ * Slot ids are shared between the server, the client and Firestore documents,
+ * so they must NOT depend on the host's local time. A server running UTC would
+ * otherwise file a 12:00 Bangkok pickup under the 05:00 slot and roll the date
+ * over at 07:00 local time.
+ */
+export const SLOT_TIME_ZONE = process.env.QUEUEUP_TIMEZONE || 'Asia/Bangkok';
+
+const slotPartsFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: SLOT_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false
+});
+
+/** Wall-clock fields of an instant, read in SLOT_TIME_ZONE. */
+function zonedParts(timestamp) {
+  const parts = slotPartsFormatter.formatToParts(new Date(timestamp));
+  const read = (type) => Number(parts.find((part) => part.type === type)?.value);
+  return {
+    year: read('year'),
+    month: read('month'),
+    day: read('day'),
+    // Some ICU builds render midnight as hour 24 under hour12: false.
+    hour: read('hour') % 24,
+    minute: read('minute')
+  };
+}
+
+/** Offset of SLOT_TIME_ZONE from UTC, in ms, at the given instant. */
+function zoneOffsetMs(timestamp) {
+  const { year, month, day, hour, minute } = zonedParts(timestamp);
+  const wallClockAsUtc = Date.UTC(year, month - 1, day, hour, minute);
+  return wallClockAsUtc - Math.floor(timestamp / 60000) * 60000;
+}
+
+/**
+ * Resolves the 15-minute slot window for a given timestamp, always in
+ * SLOT_TIME_ZONE regardless of the host's own time zone.
+ *
  * @param {number} [timestamp=Date.now()]
  * @param {number} [slotDurationMinutes=15]
  * @returns {{ slotId: string, dateStr: string, startTimeStr: string, endTimeStr: string, startTimeMs: number, endTimeMs: number }}
  */
 export function resolveCurrentSlot(timestamp = Date.now(), slotDurationMinutes = 15) {
-  const d = new Date(timestamp);
-  
-  // Format YYYY-MM-DD
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const dateStr = `${year}-${month}-${day}`;
+  const { year, month, day, hour, minute } = zonedParts(timestamp);
 
-  const currentMinutes = d.getHours() * 60 + d.getMinutes();
+  const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+  const currentMinutes = hour * 60 + minute;
   const slotIndex = Math.floor(currentMinutes / slotDurationMinutes);
   const slotStartMinutes = slotIndex * slotDurationMinutes;
   const slotEndMinutes = slotStartMinutes + slotDurationMinutes;
@@ -389,7 +427,8 @@ export function resolveCurrentSlot(timestamp = Date.now(), slotDurationMinutes =
   const endMin = String(slotEndMinutes % 60).padStart(2, '0');
   const endTimeStr = `${endHour}:${endMin}`;
 
-  const startTimeMs = new Date(year, d.getMonth(), d.getDate(), Number(startHour), Number(startMin)).getTime();
+  const startTimeMs =
+    Date.UTC(year, month - 1, day, Number(startHour), Number(startMin)) - zoneOffsetMs(timestamp);
   const endTimeMs = startTimeMs + (slotDurationMinutes * 60 * 1000);
 
   const slotId = `${dateStr}_${startHour}-${startMin}`;

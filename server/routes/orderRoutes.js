@@ -2,14 +2,19 @@ import { Router } from 'express';
 import crypto from 'crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '../firebaseAdmin.js';
-import { optionalAuthenticate } from '../middleware/authenticate.js';
+import {
+  authenticate,
+  optionalAuthenticate,
+  isStoreOperator
+} from '../middleware/authenticate.js';
+import { requireSecret } from '../config/secrets.js';
 import { recordOrderFulfilled } from '../services/ledgerService.js';
 import { NotificationEngine } from '../services/notificationEngine.js';
 import { SlotTransactionService } from '../services/slotTransactionService.js';
 
 export const orderRouter = Router();
 
-const HMAC_SECRET = process.env.HMAC_SECRET || 'queueup-pin-secret-key-2026';
+const HMAC_SECRET = requireSecret('HMAC_SECRET', 'dev-only-insecure-hmac-secret');
 
 // State Machine Definition for Orders
 const VALID_TRANSITIONS = {
@@ -45,7 +50,9 @@ orderRouter.post('/', optionalAuthenticate, async (req, res) => {
       idempotencyKey
     } = req.body;
 
-    const customerId = req.user?.uid || req.headers['x-customer-id'] || 'guest-user';
+    // Identity is taken from the verified token only. Header-supplied ids are
+    // honoured solely by the dev mock-auth path, which populates req.user.
+    const customerId = req.user?.uid || 'guest-user';
     const resolvedCustomerName = req.user?.name || customerName || 'คุณลูกค้า';
     const resolvedPhone = customerPhone || '08x-xxx-xxxx';
 
@@ -100,7 +107,7 @@ orderRouter.post('/', optionalAuthenticate, async (req, res) => {
       }
 
       // 1.1 Tenant Boundary Cross-Order Verification (Backend Authorization Layer)
-      const customerSchoolId = req.user?.schoolId || req.headers['x-customer-school-id'];
+      const customerSchoolId = req.user?.schoolId || null;
       if (customerSchoolId && storeData.schoolId && customerSchoolId !== storeData.schoolId) {
         throw new Error(`TENANT_MISMATCH: บัญชีของคุณสังกัดสถานศึกษา ${customerSchoolId} ไม่สามารถสั่งซื้ออาหารจากร้านของ ${storeData.schoolId} ได้`);
       }
@@ -298,7 +305,7 @@ orderRouter.post('/', optionalAuthenticate, async (req, res) => {
 
     // Send ORDER_CREATED notification asynchronously after transaction commit
     if (customerId && customerId !== 'guest-user') {
-      const customerSchoolId = req.user?.schoolId || req.headers['x-customer-school-id'];
+      const customerSchoolId = req.user?.schoolId || null;
       NotificationEngine.send({
         recipientId: customerId,
         schoolId: customerSchoolId,
@@ -328,18 +335,36 @@ orderRouter.post('/', optionalAuthenticate, async (req, res) => {
  * PATCH /api/orders/:id/status
  * State Machine Queue Transition with Optimistic Locking
  */
-orderRouter.patch('/:id/status', optionalAuthenticate, async (req, res) => {
+orderRouter.patch('/:id/status', authenticate, async (req, res) => {
   try {
     const { id: orderId } = req.params;
     const { status: nextStatus, note = '', version: expectedVersion } = req.body;
-    const changerUid = req.user?.uid || 'merchant-staff';
-    const changerRole = req.user?.role || 'merchant';
+    const changerUid = req.user.uid;
+    const changerRole = req.user.role || 'customer';
 
     if (!nextStatus) {
       return res.status(400).json({ success: false, error: 'MISSING_STATUS', message: 'Target status is required.' });
     }
 
     const orderRef = adminDb.collection('orders').doc(orderId);
+
+    // Authorise before opening the transaction: store operators may drive any
+    // transition; the customer who placed the order may only cancel it.
+    const preSnap = await orderRef.get();
+    if (!preSnap.exists) {
+      return res.status(404).json({ success: false, error: 'ORDER_NOT_FOUND' });
+    }
+    const preOrder = preSnap.data();
+    const operatesStore = await isStoreOperator(req.user, preOrder.storeId);
+    const isOrderCustomer = req.user.uid === preOrder.customerId;
+
+    if (!operatesStore && !(isOrderCustomer && nextStatus === 'CANCELLED')) {
+      return res.status(403).json({
+        success: false,
+        error: 'FORBIDDEN',
+        message: 'You do not have permission to change this order.'
+      });
+    }
 
     const updatedResult = await adminDb.runTransaction(async (t) => {
       const orderSnap = await t.get(orderRef);
@@ -349,13 +374,6 @@ orderRouter.patch('/:id/status', optionalAuthenticate, async (req, res) => {
 
       const orderData = orderSnap.data();
       const currentStatus = orderData.status;
-
-      // 0. Merchant Resource Boundary Enforcement
-      if (req.user && req.user.role === 'merchant') {
-        if (req.user.storeId && orderData.storeId !== req.user.storeId) {
-          throw new Error('FORBIDDEN_RESOURCE: คุณไม่มีสิทธิ์จัดการหรือดูข้อมูลออเดอร์ของร้านค้าอื่น');
-        }
-      }
 
       // 1. Verify State Machine Transition
       const allowedNext = VALID_TRANSITIONS[currentStatus] || [];
@@ -509,7 +527,28 @@ orderRouter.get('/:id', optionalAuthenticate, async (req, res) => {
     if (!docSnap.exists) {
       return res.status(404).json({ success: false, error: 'NOT_FOUND' });
     }
-    return res.status(200).json({ success: true, order: docSnap.data() });
+
+    const order = docSnap.data();
+    const isOrderCustomer = Boolean(req.user?.uid) && req.user.uid === order.customerId;
+    const isGuestOrder = order.customerId === 'guest-user';
+    const operatesStore = await isStoreOperator(req.user, order.storeId);
+
+    if (!isOrderCustomer && !operatesStore && !isGuestOrder) {
+      return res.status(403).json({
+        success: false,
+        error: 'FORBIDDEN',
+        message: 'You do not have permission to view this order.'
+      });
+    }
+
+    // The pickup PIN is the customer's proof of collection: it is returned once
+    // at creation and is never re-exposed to anyone else, staff included.
+    if (!isOrderCustomer) {
+      delete order.exchangePin;
+      delete order.exchangePinHash;
+    }
+
+    return res.status(200).json({ success: true, order });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }

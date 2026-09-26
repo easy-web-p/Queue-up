@@ -3,6 +3,10 @@
 > เอกสารนี้คือผลการ **ตรวจสอบจากโค้ดจริง** ในคอมมิต `7b45bd0` (branch `main`)
 > ทุกตัวเลขและทุกข้อความในเอกสารนี้ผ่านการรันคำสั่งจริงหรืออ่านไฟล์จริงแล้ว
 > วันที่ตรวจสอบ: 26 กันยายน 2026
+>
+> **สถานะการแก้ไข:** Sprint 1 และ Sprint 2 ดำเนินการเสร็จแล้ว — ดู
+> [ส่วนที่ 6 — สถานะการแก้ไข](#ส่วนที่-6--สถานะการแก้ไข-remediation-status)
+> ข้อค้นพบทั้งหมดในส่วนที่ 3 ยังคงไว้ตามเดิมเพื่อเป็นบันทึกว่าพบอะไรและแก้อย่างไร
 
 ---
 
@@ -13,11 +17,11 @@
 | โครงสร้างโค้ดตรงกับรายงานเดิม | ⚠️ ตรงประมาณ 80% มีจุดคลาดเคลื่อน 18 จุด |
 | Production Build | ✅ ผ่าน (1.77 วินาที) |
 | TypeScript Type Check | ✅ ผ่าน 0 error (ต้องติดตั้ง dependencies ก่อน) |
-| Unit Tests | ⚠️ 77/77 ผ่าน **เฉพาะเมื่อ `TZ=Asia/Bangkok`** / 75/77 บนเซิร์ฟเวอร์ UTC |
-| `npm install` บน clean clone | ❌ **ล้มเหลว** (peer dependency conflict) |
-| ความปลอดภัยชั้น API | ❌ **มีช่องโหว่ระดับวิกฤต 6 จุด** รวมถึงถอนเงินได้โดยไม่ต้องล็อกอิน |
-| ความปลอดภัยชั้น Firestore Rules | ⚠️ Multi-tenant isolation รั่ว 4 จุด |
-| ความพร้อม Deploy จริง | ❌ **ยังไม่พร้อม** ต้องแก้ P0 ทั้งหมดก่อน |
+| Unit Tests | ⚠️ 77/77 ผ่าน **เฉพาะเมื่อ `TZ=Asia/Bangkok`** / 75/77 บนเซิร์ฟเวอร์ UTC → ✅ **111/111 ผ่านทุกโซนเวลา** |
+| `npm install` บน clean clone | ❌ **ล้มเหลว** (peer dependency conflict) → ✅ **แก้แล้ว** |
+| ความปลอดภัยชั้น API | ❌ **มีช่องโหว่ระดับวิกฤต 6 จุด** รวมถึงถอนเงินได้โดยไม่ต้องล็อกอิน → ✅ **แก้แล้ว** |
+| ความปลอดภัยชั้น Firestore Rules | ⚠️ Multi-tenant isolation รั่ว 4 จุด → ✅ **แก้แล้ว** |
+| ความพร้อม Deploy จริง | ❌ ยังไม่พร้อม ต้องแก้ P0 ทั้งหมดก่อน → ✅ **P0/P1 แก้ครบแล้ว** |
 
 **ข้อสรุป:** แกนสถาปัตยกรรม (Authoritative Pricing, Capacity Engine, ACID Transaction, State Machine, Double-entry Ledger) **ออกแบบมาดีและทำงานถูกต้องจริง** แต่ **ชั้นบังคับใช้สิทธิ์ (Authorization Layer) ยังไม่ได้ถูกต่อเข้ากับ API** ทำให้ตรรกะที่ดีเหล่านั้นถูกข้ามได้ทั้งหมดด้วย `curl` คำสั่งเดียว
 
@@ -402,3 +406,86 @@ grep -rn "requireRole" server/ | grep -v middleware   # (ว่าง) — ย�
 grep -rn "@google/genai" src/ server/                 # (ว่าง) — ยืนยัน P2-6
 grep -n "projectId" firebase-applet-config.json public/firebase-messaging-sw.js  # ยืนยัน P1-7
 ```
+
+---
+
+## ส่วนที่ 6 — สถานะการแก้ไข (Remediation Status)
+
+แก้ไขและตรวจสอบแล้วเมื่อ 26 กันยายน 2026 ทุกข้อด้านล่างมีเทสต์ที่รันจริงรองรับ
+
+### ผลการตรวจสอบหลังแก้ไข
+
+| คำสั่ง | ก่อนแก้ | หลังแก้ |
+|---|---|---|
+| `npm install` (clean clone) | ❌ ERESOLVE | ✅ สำเร็จ (398 packages, 31s) |
+| `npm run lint` | ✅ 0 error | ✅ 0 error |
+| `npm run build` | ✅ 1.77s | ✅ 1.88s |
+| `TZ=UTC npm test` | ❌ 75/77 (exit 1) | ✅ **111/111 (exit 0)** |
+| `TZ=Asia/Bangkok npm test` | ✅ 77/77 | ✅ **111/111** |
+| `npm run test:rules` | ไม่มี | ✅ **23/23** (Firestore Emulator) |
+
+ชุดทดสอบเพิ่มจาก 77 เป็น **134 รายการ** (111 + 23 rules)
+
+### P0 — วิกฤต (แก้ครบ 7/7)
+
+| # | ปัญหา | การแก้ไข | เทสต์ที่ยืนยัน |
+|---|---|---|---|
+| P0-1 | ถอนเงินร้านได้โดยไม่ล็อกอิน | `requireStoreOwnership()` บนทุก endpoint ของ `walletRoutes.js`; `storeId` มาจาก `req.storeId` ที่ผ่านการอนุมัติแล้ว ไม่ใช่ `req.body` | anonymous → 401, รายอื่น → 403, เจ้าของ → 201 |
+| P0-2 | Mock auth bypass บน production | เปลี่ยนเป็น opt-in `ALLOW_MOCK_AUTH=true` และปิดตายเมื่อ `NODE_ENV=production`; `npm start` ตั้ง `NODE_ENV=production` ให้เอง | ตรวจ gate ทั้ง 3 กรณี |
+| P0-3 | `requireRole()` ไม่เคยถูกใช้ | เพิ่ม `isStoreOperator()` / `requireStoreOwnership()` และบังคับใช้จริงทุก route; ลบ middleware ที่ไม่ได้ใช้ทิ้ง | ทั้ง 24 เคสใน `authorization.test.js` |
+| P0-4 | วงจรชีวิตออเดอร์ไม่ตรวจสิทธิ์ | `authenticate` + `requireStoreOwnership(storeIdFromOrderParam)` บน accept/reject/ready/complete | 401 / 403 / 200 ครบ |
+| P0-5 | ปลอมเป็นร้านค้าในแชท | `senderRole` มาจาก `isStoreOperator(req.user, storeId)` ไม่อ่านจาก body อีกต่อไป | ลูกค้าส่ง `senderRole: 'merchant'` → บันทึกเป็น `customer` |
+| P0-6 | `HMAC_SECRET` hardcode | `server/config/secrets.js` — production throw ตอน boot ถ้าไม่ตั้ง | ตรวจ boot ทั้ง production/dev |
+| P0-7 | ตัวตนปลอมผ่าน header | ตัด `x-customer-id` / `x-customer-school-id` ออกจากทุก route; ตัวตนมาจาก `req.user` เท่านั้น | ไม่มี header trust หลงเหลือในโค้ด production |
+
+### ช่องโหว่เพิ่มเติมที่พบระหว่างแก้ (ไม่อยู่ในรายงานรอบแรก)
+
+| ปัญหา | ความรุนแรง | การแก้ไข |
+|---|---|---|
+| **ราคาที่ชาร์จมาจาก client** — `POST /api/payment/create-checkout-session` และ `create-payment-intent` รับ `amount` จาก request body ตรง ๆ → จ่าย ฿1 แทน ฿500 ได้ | 🔴 วิกฤต | `loadPayableOrder()` โหลดออเดอร์จาก Firestore และใช้ `order.totalSatang` เสมอ พร้อมตรวจว่าผู้เรียกเป็นเจ้าของออเดอร์และออเดอร์ยังไม่ถูกชำระ |
+| **Webhook รับ payload ที่ไม่ได้เซ็น** — ถ้าไม่ตั้ง `STRIPE_WEBHOOK_SECRET` จะ parse JSON ดิบ → ใครก็ mark ออเดอร์เป็น PAID ได้ฟรี | 🔴 วิกฤต | production throw ตอน boot ถ้าไม่มี secret; dev เตือนชัดเจน |
+| **รหัส PIN รับอาหารรั่วผ่าน `GET /api/orders/:id`** | 🟠 สูง | ตัด `exchangePin` / `exchangePinHash` ออกสำหรับทุกคนที่ไม่ใช่เจ้าของออเดอร์ |
+| **ปล่อยโควตาสล็อตของคนอื่นได้** — `POST /api/capacity/release` | 🟠 สูง | ตรวจ `reservations/{id}.uid` ต้องตรงกับผู้เรียก หรือเป็นผู้ดูแลร้าน |
+| **`isSuperAdmin()` error แทนคืน false** — การอ่าน custom claim ที่ไม่มีอยู่ทำให้กฎทั้งข้อ error และ `||` ข้อถัดไปไม่ถูกประเมิน → **school admin ที่ไม่มี claim `admin` ถูกปฏิเสธ** | 🟠 สูง | เปลี่ยนไปใช้ `request.auth.token.get(key, default)` ทุกจุด | 
+
+### P1 — สูง (แก้ครบ 7/7)
+
+- **P1-1/2/3/4 (firestore.rules)** — เพิ่ม `isStoreOperator(storeId)` ผูกสิทธิ์กับ `ownerId` ของร้านจริง; `menu_items` แยก create/update/delete; `orders` และ `chats` ตัดเงื่อนไข "merchant คนไหนก็ได้" ออก; `school_members` อ่านได้เฉพาะเจ้าของเรคคอร์ดและ school admin ของสถาบันนั้น → ยืนยันด้วย 23 เทสต์บน Firestore Emulator
+- **P1-5 (timezone)** — `resolveCurrentSlot()` ตรึงเป็น `Asia/Bangkok` ผ่าน `Intl.DateTimeFormat` (ตั้งค่าได้ด้วย `QUEUEUP_TIMEZONE`) และ `src/services/engines/slotHelper.ts` ฝั่ง client ใช้หลักเดียวกัน → ทดสอบผ่านบน UTC, Asia/Bangkok, America/New_York, Pacific/Auckland
+- **P1-6 (silent fallback)** — `firebaseAdmin.js` throw ตอน boot บน production แทนการเขียนลง `.local_db.json`
+- **P1-7 (push ใช้ไม่ได้)** — `public/firebase-messaging-sw.js` ชี้ไปโปรเจกต์ `queueup-65e82` ตรงกับตัวแอปแล้ว
+
+### P2 — ปานกลาง (แก้ 9/15)
+
+| # | สถานะ |
+|---|---|
+| P2-1 `npm install` ล้มเหลว | ✅ ลบ `esbuild` ออกจาก devDependencies (vite มีในตัว) |
+| P2-2 full-collection scan | ✅ `merchant/orders`, `wallet/:id/ledger`, `release-held-funds` ใช้ `.where()` แล้ว |
+| P2-4 port ชนกัน | ✅ server default → 8080 ตรงกับ proxy; เพิ่ม `npm run dev:server` |
+| P2-5 Stripe fallback | ✅ ไม่มี dummy key แล้ว; endpoint ตอบ 503 อย่างชัดเจนถ้าไม่ได้ตั้งค่า |
+| P2-7 security shield ฝั่ง client เท่านั้น | ✅ เพิ่ม `server/services/inputShield.js` บังคับใช้ฝั่งเซิร์ฟเวอร์ (XSS, prompt injection, NoSQL, ความยาว 2000 ตัวอักษร) |
+| P2-10 dead code | ✅ ลบ `requireVerifiedUser` ที่ไม่ได้ใช้ (ยังเหลือ `ProtectedRoute`, `PageRouteLoader`, `Skeleton` ฝั่ง frontend) |
+| P2-13 เทสต์ไม่ครบ | ✅ `chatRoutes.test.js` เข้า `npm test` แล้ว และแก้ตัวนับ "6/5" เป็น 6/6 |
+| P2-14 README ไม่ตรงความจริง | ✅ แก้ Vitest/SQLite/port 5173 และเพิ่มตารางตัวแปรสภาพแวดล้อม |
+| P2-15 collection ไม่มีใน rules | ✅ เพิ่มเทสต์ยืนยันว่า `merchant_balances`, `payout_requests`, `ledger_entries` ถูก catch-all deny จริง |
+| เพิ่มเติม | ✅ เพิ่ม `firebase.json` ซึ่งเดิมไม่มี ทำให้ deploy `firestore.rules` / indexes ด้วย Firebase CLI ไม่ได้เลย |
+
+### ยังเหลือ (Sprint 3-4)
+
+- P2-3 Code splitting — bundle ยัง 2.58 MB ก้อนเดียว
+- P2-8 CORS middleware
+- P2-9 Rate limiting
+- P2-11 ลบไฟล์หน้าเก่าซ้ำซ้อนใน `src/pages/*.jsx`
+- P2-12 แตก `QueueContext.tsx` (3,291 บรรทัด)
+- P2-6 AI Layer 2 (`@google/genai` ยังไม่ถูกใช้)
+- Campus Wallet ฝั่งลูกค้า / Roster CSV Upload API / รวม `food_items` กับ `menu_items`
+
+### ไฟล์ที่เพิ่มใหม่
+
+| ไฟล์ | หน้าที่ |
+|---|---|
+| `server/config/secrets.js` | อ่าน secret แบบ fail-fast — production ไม่ยอมสตาร์ทถ้าขาดค่าที่จำเป็น |
+| `server/services/inputShield.js` | ตรวจ XSS / Prompt Injection / NoSQL / ความยาว ฝั่งเซิร์ฟเวอร์ |
+| `server/tests/authorization.test.js` | 24 เทสต์ขอบเขตสิทธิ์ของ API |
+| `server/tests/firestoreRules.test.js` | 23 เทสต์ Security Rules บน Firestore Emulator |
+| `firebase.json` | คอนฟิกสำหรับ deploy rules/indexes และรัน emulator |

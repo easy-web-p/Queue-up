@@ -2,6 +2,7 @@ import { Router } from 'express';
 import Stripe from 'stripe';
 import { adminDb } from '../firebaseAdmin.js';
 import { optionalAuthenticate } from '../middleware/authenticate.js';
+import { optionalSecret } from '../config/secrets.js';
 import { recordCustomerPayment } from '../services/ledgerService.js';
 import dotenv from 'dotenv';
 
@@ -9,8 +10,68 @@ dotenv.config();
 
 export const paymentRouter = Router();
 
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY || 'dummy_stripe_secret_key';
-const stripe = new Stripe(stripeSecretKey);
+const stripeSecretKey = optionalSecret('STRIPE_SECRET_KEY');
+const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
+
+/** Guard for endpoints that cannot work without a configured Stripe key. */
+function requireStripe(res) {
+  if (stripe) return true;
+  res.status(503).json({
+    success: false,
+    error: 'STRIPE_NOT_CONFIGURED',
+    message: 'Stripe is not configured on this server.'
+  });
+  return false;
+}
+
+/**
+ * Loads the order and authorises the caller to pay for it.
+ *
+ * The charged amount is ALWAYS taken from the stored order, never from the
+ * request body: a client-supplied amount lets the payer choose their own price.
+ *
+ * @returns {Promise<{ order: object } | { error: { status: number, body: object } }>}
+ */
+async function loadPayableOrder(req, orderId) {
+  const snap = await adminDb.collection('orders').doc(orderId).get();
+  if (!snap.exists) {
+    return { error: { status: 404, body: { success: false, error: 'ORDER_NOT_FOUND' } } };
+  }
+
+  const order = snap.data();
+  const isOrderCustomer = Boolean(req.user?.uid) && req.user.uid === order.customerId;
+  const isGuestOrder = order.customerId === 'guest-user';
+
+  if (!isOrderCustomer && !isGuestOrder) {
+    return {
+      error: {
+        status: 403,
+        body: { success: false, error: 'FORBIDDEN', message: 'This order belongs to another customer.' }
+      }
+    };
+  }
+
+  if (order.paymentStatus === 'PAID') {
+    return {
+      error: {
+        status: 409,
+        body: { success: false, error: 'ALREADY_PAID', message: 'ออเดอร์นี้ชำระเงินแล้ว' }
+      }
+    };
+  }
+
+  const totalSatang = Number(order.totalSatang) || Math.round(Number(order.total || 0) * 100);
+  if (!Number.isInteger(totalSatang) || totalSatang <= 0) {
+    return {
+      error: {
+        status: 409,
+        body: { success: false, error: 'ORDER_TOTAL_UNAVAILABLE', message: 'ยอดชำระของออเดอร์ไม่ถูกต้อง' }
+      }
+    };
+  }
+
+  return { order: { ...order, id: orderId, totalSatang } };
+}
 
 /**
  * POST /api/payment/create-checkout-session
@@ -20,21 +81,27 @@ paymentRouter.post('/create-checkout-session', optionalAuthenticate, async (req,
   try {
     const {
       orderId,
-      amount,
       storeName = 'QueueUp Restaurant',
-      items = [],
       customerEmail,
       paymentMethodType = 'promptpay',
       returnUrl
     } = req.body;
 
-    if (!orderId || !amount || amount <= 0) {
+    if (!orderId) {
       return res.status(400).json({
         success: false,
         error: 'INVALID_REQUEST',
-        message: 'orderId and valid amount are required.'
+        message: 'orderId is required.'
       });
     }
+
+    const loaded = await loadPayableOrder(req, orderId);
+    if (loaded.error) {
+      return res.status(loaded.error.status).json(loaded.error.body);
+    }
+    const order = loaded.order;
+
+    if (!requireStripe(res)) return;
 
     // Determine host origin
     const origin = req.headers.origin || req.headers.referer || returnUrl || 'http://localhost:3000';
@@ -45,32 +112,21 @@ paymentRouter.post('/create-checkout-session', optionalAuthenticate, async (req,
       ? ['promptpay', 'card']
       : ['card', 'promptpay'];
 
-    // Construct line items
-    const lineItems = items.length > 0
-      ? items.map((item) => ({
-          price_data: {
-            currency: 'thb',
-            product_data: {
-              name: item.name || 'รายการอาหาร',
-              description: `ร้าน: ${storeName}`
-            },
-            unit_amount: Math.round(Number(item.price || amount) * 100)
+    // A single line item for the stored order total. Per-item pricing is not
+    // itemised here so the charged sum can never drift from order.totalSatang.
+    const lineItems = [
+      {
+        price_data: {
+          currency: 'thb',
+          product_data: {
+            name: `ออเดอร์คิวอาหาร (${order.storeName || storeName})`,
+            description: `รหัสคำสั่งซื้อ: ${orderId}`
           },
-          quantity: Number(item.quantity || 1)
-        }))
-      : [
-          {
-            price_data: {
-              currency: 'thb',
-              product_data: {
-                name: `ออเดอร์คิวอาหาร (${storeName})`,
-                description: `รหัสคำสั่งซื้อ: ${orderId}`
-              },
-              unit_amount: Math.round(Number(amount) * 100)
-            },
-            quantity: 1
-          }
-        ];
+          unit_amount: order.totalSatang
+        },
+        quantity: 1
+      }
+    ];
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: allowedPaymentMethods,
@@ -107,14 +163,21 @@ paymentRouter.post('/create-checkout-session', optionalAuthenticate, async (req,
  */
 paymentRouter.post('/create-payment-intent', optionalAuthenticate, async (req, res) => {
   try {
-    const { amount, orderId, storeName } = req.body;
+    const { orderId, storeName } = req.body;
 
-    if (!amount || amount <= 0) {
-      return res.status(400).json({ success: false, error: 'INVALID_AMOUNT' });
+    if (!orderId) {
+      return res.status(400).json({ success: false, error: 'MISSING_ORDER_ID' });
     }
 
+    const loaded = await loadPayableOrder(req, orderId);
+    if (loaded.error) {
+      return res.status(loaded.error.status).json(loaded.error.body);
+    }
+
+    if (!requireStripe(res)) return;
+
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100),
+      amount: loaded.order.totalSatang,
       currency: 'thb',
       payment_method_types: ['card', 'promptpay'],
       metadata: {
@@ -142,6 +205,8 @@ paymentRouter.post('/create-payment-intent', optionalAuthenticate, async (req, r
  */
 paymentRouter.post('/verify-session', optionalAuthenticate, async (req, res) => {
   try {
+    if (!requireStripe(res)) return;
+
     const { sessionId, orderId } = req.body;
 
     if (!sessionId || !orderId) {

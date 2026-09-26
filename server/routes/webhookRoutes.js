@@ -2,15 +2,23 @@ import { Router } from 'express';
 import Stripe from 'stripe';
 import { adminDb } from '../firebaseAdmin.js';
 import { recordCustomerPayment, recordRefund } from '../services/ledgerService.js';
+import { optionalSecret, isProduction } from '../config/secrets.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 export const webhookRouter = Router();
 
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY || 'dummy_stripe_secret_key';
-const stripe = new Stripe(stripeSecretKey);
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+const stripeSecretKey = optionalSecret('STRIPE_SECRET_KEY');
+const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
+const webhookSecret = optionalSecret('STRIPE_WEBHOOK_SECRET');
+
+if (isProduction && !webhookSecret) {
+  throw new Error(
+    '[Config] STRIPE_WEBHOOK_SECRET is required in production. Without it the ' +
+    'webhook would accept unsigned payloads and any caller could mark orders paid.'
+  );
+}
 
 /**
  * POST /api/webhooks/stripe
@@ -22,10 +30,18 @@ webhookRouter.post('/stripe', async (req, res) => {
   let event;
 
   try {
-    if (webhookSecret && sig) {
+    if (webhookSecret) {
+      if (!stripe) {
+        return res.status(503).send('Webhook Error: Stripe is not configured.');
+      }
+      if (!sig) {
+        return res.status(400).send('Webhook Error: Missing stripe-signature header.');
+      }
       event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
     } else {
-      // In development or when webhook secret is pending, parse JSON safely
+      // Development only: signature verification is mandatory in production,
+      // enforced by the boot-time check above.
+      console.warn('[Stripe Webhook] STRIPE_WEBHOOK_SECRET unset — accepting unsigned payload (development only).');
       const rawText = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : JSON.stringify(req.body);
       event = JSON.parse(rawText);
     }
