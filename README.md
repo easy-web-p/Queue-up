@@ -153,8 +153,19 @@ npm run test:e2e  # ทดสอบ end-to-end ด้วย Playwright บน pr
 
 ### Background job
 `server.js` รัน pickup reminder ด้วย `setInterval` แต่ serverless ทำแบบนั้นไม่ได้
-จึงเปิดเป็น endpoint `/api/cron/pickup-reminders` และตั้ง Vercel Cron ทุก 5 นาทีใน `vercel.json`
-(แพ็กเกจ Hobby จำกัด cron วันละครั้ง — ถ้าอยู่บน Hobby ให้ใช้ตัวตั้งเวลาภายนอกยิงมาที่ endpoint นี้พร้อม header `Authorization: Bearer $CRON_SECRET`)
+จึงเปิดเป็น endpoint `/api/cron/pickup-reminders`
+
+> ⚠️ `vercel.json` ตั้ง cron เป็น `0 0 * * *` (วันละครั้ง) เพราะแพ็กเกจ Hobby ไม่รองรับถี่กว่านั้น
+> **วันละครั้งไม่พอสำหรับการเตือนรับอาหารที่ควรเตือนภายใน 5 นาที** ถ้ายังอยู่บน Hobby
+> ให้ใช้ตัวตั้งเวลาภายนอก (เช่น cron-job.org, GitHub Actions schedule, Cloud Scheduler)
+> ยิงมาที่ endpoint นี้ทุก 5 นาทีแทน:
+>
+> ```bash
+> curl -X POST https://<your-domain>/api/cron/pickup-reminders \
+>      -H "Authorization: Bearer $CRON_SECRET"
+> ```
+>
+> ถ้าอัปเกรดเป็น Pro แล้ว เปลี่ยน schedule กลับเป็น `*/5 * * * *` ได้เลย
 
 ### หลัง deploy ตรวจอะไรบ้าง
 
