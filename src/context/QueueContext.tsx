@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect, useMemo, useRef 
 import { orderRepository } from '../repositories/orderRepository';
 import { Store, FoodItem, CartItem, QueueOrder, QueueStatus, UserRole, AuthUser, ThemeMode, AppNotification, StoreChatMessage, StoreCustomerChatThread, CustomerChatMessage, StoreContactChannels, StoreExchangeTerms, PaymentMethodId } from '../types';
 import { STORES, FOOD_ITEMS, INITIAL_QUEUES } from '../data/mockData';
+import { buildDemoCustomerThreads } from '../data/demoChatThreads';
+import { buildDemoQueues } from '../data/demoQueues';
 import { INITIAL_NOTIFICATIONS } from '../data/mockNotifications';
 import { OrderAuthoritativeService } from '../services/orderAuthoritativeService';
 import { MerchantService } from '../services/merchantService';
@@ -25,39 +27,20 @@ import { cartStorage } from '../services/cartStorage';
 import { SchoolService } from '../services/schoolService';
 import { processAssistantReply } from '../services/engines/aiChatEngine';
 import { ChatService } from '../services/chatService';
+import {
+  AppView,
+  ToastMessage,
+  ADMIN_EMAIL,
+  isSuperAdmin,
+  SESSION_STORAGE_KEY,
+  DEFAULT_DEMO_USER,
+  getInitialSession
+} from './queueSession';
 
-export type AppView = 
-  | 'landing'
-  | 'about'
-  | 'register-school'
-  | 'home' 
-  | 'search' 
-  | 'store-detail' 
-  | 'food-detail'
-  | 'user-profile'
-  | 'queue-tracking' 
-  | 'order-history' 
-  | 'merchant-dashboard' 
-  | 'kds' 
-  | 'admin-dashboard'
-  | 'create-store'
-  | 'store-admin'
-  | 'chat'
-  | 'store-chat';
+// Re-exported so existing imports from './context/QueueContext' keep working.
+export type { AppView, ToastMessage };
+export { ADMIN_EMAIL, isSuperAdmin, DEFAULT_DEMO_USER };
 
-export interface ToastMessage {
-  id: string;
-  title: string;
-  message?: string;
-  type: 'success' | 'info' | 'warning' | 'error';
-}
-
-export const ADMIN_EMAIL = 'hi00000087@gmail.com';
-
-export const isSuperAdmin = (email?: string | null): boolean => {
-  if (!email) return false;
-  return email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase();
-};
 
 interface QueueContextType {
   role: UserRole;
@@ -245,60 +228,6 @@ interface QueueContextType {
 }
 
 const QueueContext = createContext<QueueContextType | undefined>(undefined);
-
-const SESSION_STORAGE_KEY = 'queueup_session_v1';
-
-export const DEFAULT_DEMO_USER: AuthUser = {
-  id: 'USR-89241',
-  fullName: 'ธนากร สุขเกษม',
-  email: 'hi00000087@gmail.com',
-  phone: '089-876-5432',
-  role: 'merchant',
-  storeId: 'store-1',
-  avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
-  authProvider: 'google',
-  studentOrStoreId: 'STD-6501094',
-  allergies: ['กุ้ง', 'ถั่วลิสง'],
-  registeredAt: '2024-01-15T08:30:00.000Z'
-};
-
-const getInitialSession = (): { user: AuthUser | null; view: AppView; role: UserRole } => {
-  const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
-  const isAbout = currentPath === '/about' || currentPath === '/queueup';
-
-  try {
-    const saved = localStorage.getItem(SESSION_STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved) as AuthUser;
-      if (parsed && (parsed.email || parsed.fullName)) {
-        const isUserAdmin = isSuperAdmin(parsed.email);
-        const resolvedRole: UserRole = isUserAdmin ? 'admin' : (parsed.role === 'admin' ? 'customer' : (parsed.role || 'customer'));
-        let targetView: AppView = isAbout ? 'about' : (resolvedRole === 'merchant' ? 'kds' : (resolvedRole === 'admin' ? 'admin-dashboard' : 'home'));
-        if (targetView === 'admin-dashboard' && !isUserAdmin) {
-          targetView = 'home';
-        }
-        // Link hi00000087@gmail.com directly to their store
-        const storeId = parsed.storeId || (parsed.email?.toLowerCase() === 'hi00000087@gmail.com' ? 'store-1' : undefined);
-        return {
-          user: {
-            ...parsed,
-            storeId,
-            role: resolvedRole
-          },
-          view: targetView,
-          role: resolvedRole
-        };
-      }
-    }
-  } catch (err) {
-    console.error('Session load error:', err);
-  }
-  return {
-    user: null, // Initial guest: not registered yet
-    view: isAbout ? 'about' : 'landing',
-    role: 'customer'
-  };
-};
 
 export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const initialSession = getInitialSession();
@@ -709,245 +638,7 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     // Generate initial customer threads for this store
     const store = stores.find(s => s.id === storeId) || userStore || stores[0];
-    const initialThreads: StoreCustomerChatThread[] = [
-      {
-        id: `th-${storeId}-1`,
-        storeId: storeId,
-        customerId: 'cust-101',
-        customerName: 'คุณธนพล ศรีวิชัย',
-        customerPhone: '081-234-5678',
-        customerAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80',
-        queueNumber: 'A01',
-        orderSummary: 'ข้าวกะเพราถาดเนื้อโคขุน 1 จาน + ไข่ดาวกรอบ',
-        orderTotal: 119,
-        orderStatus: 'กำลังปรุง',
-        lastMessage: 'ขอพริกน้ำปลาถ้วยเล็กเพิ่มด้วยนะครับ ขอบคุณครับ',
-        lastTimestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-        unreadCount: 1,
-        messages: [
-          {
-            id: `m-${storeId}-1`,
-            senderRole: 'customer',
-            senderName: 'คุณธนพล ศรีวิชัย',
-            message: 'สวัสดีครับ สั่งออเดอร์คิว #A01 ไปแล้วครับ',
-            timestamp: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
-            read: true
-          },
-          {
-            id: `m-${storeId}-2`,
-            senderRole: 'customer',
-            senderName: 'คุณธนพล ศรีวิชัย',
-            message: 'ขอพริกน้ำปลาถ้วยเล็กเพิ่มด้วยนะครับ ขอบคุณครับ',
-            timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-            read: false
-          }
-        ]
-      },
-      {
-        id: `th-${storeId}-2`,
-        storeId: storeId,
-        customerId: 'cust-102',
-        customerName: 'คุณสุดารัตน์ พรหมมา',
-        customerPhone: '089-876-5432',
-        customerAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80',
-        queueNumber: 'A03',
-        orderSummary: 'ข้าวหมูกรอบคั่วพริกเกลือ 2 กล่อง',
-        orderTotal: 178,
-        orderStatus: 'รอคิว',
-        lastMessage: 'ขอบคุณมากครับ เดี๋ยวรีบเดินไปรับครับ',
-        lastTimestamp: new Date(Date.now() - 35 * 60 * 1000).toISOString(),
-        unreadCount: 0,
-        messages: [
-          {
-            id: `m-${storeId}-3`,
-            senderRole: 'customer',
-            senderName: 'คุณสุดารัตน์ พรหมมา',
-            message: 'สอบถามครับ คิว #A03 ใช้เวลาปรุงประมาณกี่นาทีครับ พอดีกำลังเดินมาจากตึกเรียน',
-            timestamp: new Date(Date.now() - 40 * 60 * 1000).toISOString(),
-            read: true
-          },
-          {
-            id: `m-${storeId}-4`,
-            senderRole: 'merchant',
-            senderName: store?.name || 'ร้านค้า',
-            message: 'สวัสดีครับคุณสุดารัตน์ ประมาณ 8-10 นาทีพร้อมรับครับผม เดี๋ยวพอเสร็จแล้วระบบจะแจ้งเตือนให้ครับ',
-            timestamp: new Date(Date.now() - 37 * 60 * 1000).toISOString(),
-            read: true
-          },
-          {
-            id: `m-${storeId}-5`,
-            senderRole: 'customer',
-            senderName: 'คุณสุดารัตน์ พรหมมา',
-            message: 'ขอบคุณมากครับ เดี๋ยวรีบเดินไปรับครับ',
-            timestamp: new Date(Date.now() - 35 * 60 * 1000).toISOString(),
-            read: true
-          }
-        ]
-      },
-      {
-        id: `th-${storeId}-3`,
-        storeId: storeId,
-        customerId: 'cust-103',
-        customerName: 'คุณเอกภพ ดิลก (จองอาหารล่วงหน้า)',
-        customerPhone: '092-445-1234',
-        customerAvatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=120&auto=format&fit=crop&q=80',
-        orderSummary: 'แจ้งจองอาหาร 5 กล่อง นัดรับ 12:30 น.',
-        orderTotal: 450,
-        orderStatus: 'รอการยืนยัน',
-        lastMessage: 'สวัสดีครับคุณเจ้าของร้าน อยากสั่งจองอาหารล่วงหน้า 5 กล่อง ไปรับช่วง 12:30 น. วันนี้ครับ รบกวนยืนยันให้หน่อยครับ',
-        lastTimestamp: new Date(Date.now() - 55 * 60 * 1000).toISOString(),
-        unreadCount: 1,
-        messages: [
-          {
-            id: `m-${storeId}-6`,
-            senderRole: 'customer',
-            senderName: 'คุณเอกภพ ดิลก',
-            message: 'สวัสดีครับคุณเจ้าของร้าน อยากสั่งจองอาหารล่วงหน้า 5 กล่อง ไปรับช่วง 12:30 น. วันนี้ครับ รบกวนยืนยันให้หน่อยครับ',
-            timestamp: new Date(Date.now() - 55 * 60 * 1000).toISOString(),
-            read: false
-          }
-        ]
-      },
-      {
-        id: `th-${storeId}-4`,
-        storeId: storeId,
-        customerId: 'cust-104',
-        customerName: 'คุณเมทินี ชัยเรือง',
-        customerPhone: '086-112-8899',
-        customerAvatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120&auto=format&fit=crop&q=80',
-        queueNumber: 'A07',
-        orderSummary: 'ต้มยำกุ้งน้ำข้น 1 ชาม + ข้าวสวย',
-        orderTotal: 145,
-        orderStatus: 'พร้อมรับ',
-        lastMessage: 'ขอบคุณมากเลยค่ะ บริการดีมาก',
-        lastTimestamp: new Date(Date.now() - 75 * 60 * 1000).toISOString(),
-        unreadCount: 0,
-        messages: [
-          {
-            id: `m-${storeId}-7`,
-            senderRole: 'customer',
-            senderName: 'คุณเมทินี ชัยเรือง',
-            message: 'ขอไม่ใส่ผักชีและเห็ดฟางนะคะ พอดีแพ้เห็ดค่ะ รบกวนด้วยนะคะ',
-            timestamp: new Date(Date.now() - 85 * 60 * 1000).toISOString(),
-            read: true
-          },
-          {
-            id: `m-${storeId}-8`,
-            senderRole: 'merchant',
-            senderName: store?.name || 'ร้านค้า',
-            message: 'รับทราบครับ ทางร้านแยกภาชนะและไม่ใส่เห็ดให้เรียบร้อยครับผม ปรุงสดสะอาดปลอดภัยแน่นอนครับ',
-            timestamp: new Date(Date.now() - 80 * 60 * 1000).toISOString(),
-            read: true
-          },
-          {
-            id: `m-${storeId}-9`,
-            senderRole: 'customer',
-            senderName: 'คุณเมทินี ชัยเรือง',
-            message: 'ขอบคุณมากเลยค่ะ บริการดีมาก',
-            timestamp: new Date(Date.now() - 75 * 60 * 1000).toISOString(),
-            read: true
-          }
-        ]
-      },
-      {
-        id: `th-${storeId}-5`,
-        storeId: storeId,
-        customerId: 'cust-105',
-        customerName: 'คุณกิตติศักดิ์ เจริญกิจ',
-        customerPhone: '095-778-9900',
-        customerAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
-        orderSummary: 'สอบถามข้อมูลทั่วไป',
-        orderStatus: 'ลูกค้าทั่วไป',
-        lastMessage: 'วันนี้ที่ร้านมีเมนูพิเศษไหมครับ หรือร้านเปิดถึงกี่โมงครับ พอดีจะแวะไปช่วงเย็น',
-        lastTimestamp: new Date(Date.now() - 110 * 60 * 1000).toISOString(),
-        unreadCount: 1,
-        messages: [
-          {
-            id: `m-${storeId}-10`,
-            senderRole: 'customer',
-            senderName: 'คุณกิตติศักดิ์ เจริญกิจ',
-            message: 'วันนี้ที่ร้านมีเมนูพิเศษไหมครับ หรือร้านเปิดถึงกี่โมงครับ พอดีจะแวะไปช่วงเย็น',
-            timestamp: new Date(Date.now() - 110 * 60 * 1000).toISOString(),
-            read: false
-          }
-        ]
-      },
-      {
-        id: `th-${storeId}-6`,
-        storeId: storeId,
-        customerId: 'cust-106',
-        customerName: 'คุณกรกต สิทธิโชค',
-        customerPhone: '082-990-1122',
-        customerAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80',
-        queueNumber: 'A09',
-        orderSummary: 'ข้าวหมูกรอบคั่วพริกเกลือพิเศษ 1 กล่อง + น้ำเก๊กฮวย',
-        orderTotal: 125,
-        orderStatus: 'รอคิว',
-        lastMessage: 'แจ้งโอนเงินเรียบร้อยแล้วครับ ขอบคุณครับ',
-        lastTimestamp: new Date(Date.now() - 140 * 60 * 1000).toISOString(),
-        unreadCount: 1,
-        messages: [
-          {
-            id: `m-${storeId}-11`,
-            senderRole: 'customer',
-            senderName: 'คุณกรกต สิทธิโชค',
-            message: 'สวัสดีครับ ออเดอร์คิว #A09 ชำระผ่านพร้อมเพย์แล้วนะครับ',
-            timestamp: new Date(Date.now() - 150 * 60 * 1000).toISOString(),
-            read: true
-          },
-          {
-            id: `m-${storeId}-12`,
-            senderRole: 'customer',
-            senderName: 'คุณกรกต สิทธิโชค',
-            message: 'แจ้งโอนเงินเรียบร้อยแล้วครับ ขอบคุณครับ',
-            timestamp: new Date(Date.now() - 140 * 60 * 1000).toISOString(),
-            read: false
-          }
-        ]
-      },
-      {
-        id: `th-${storeId}-7`,
-        storeId: storeId,
-        customerId: 'cust-107',
-        customerName: 'คุณนภัสวรรณ รัตนวิจิตร',
-        customerPhone: '083-456-7890',
-        customerAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
-        queueNumber: 'A12',
-        orderSummary: 'ข้าวกะเพราเป็ดย่างพริกแห้ง 2 กล่อง (เผ็ดน้อย)',
-        orderTotal: 190,
-        orderStatus: 'กำลังปรุง',
-        lastMessage: 'เผ็ดน้อย ไม่ใส่น้ำตาลนะคะ ขอบคุณค่ะ',
-        lastTimestamp: new Date(Date.now() - 180 * 60 * 1000).toISOString(),
-        unreadCount: 0,
-        messages: [
-          {
-            id: `m-${storeId}-13`,
-            senderRole: 'customer',
-            senderName: 'คุณนภัสวรรณ รัตนวิจิตร',
-            message: 'สั่งคิว #A12 ไปเรียบร้อยค่ะ',
-            timestamp: new Date(Date.now() - 200 * 60 * 1000).toISOString(),
-            read: true
-          },
-          {
-            id: `m-${storeId}-14`,
-            senderRole: 'merchant',
-            senderName: store?.name || 'ร้านค้า',
-            message: 'ทางร้านได้รับรายการแล้วครับ กำลังเตรียมปรุงเป็ดย่างให้ครับผม',
-            timestamp: new Date(Date.now() - 190 * 60 * 1000).toISOString(),
-            read: true
-          },
-          {
-            id: `m-${storeId}-15`,
-            senderRole: 'customer',
-            senderName: 'คุณนภัสวรรณ รัตนวิจิตร',
-            message: 'เผ็ดน้อย ไม่ใส่น้ำตาลนะคะ ขอบคุณค่ะ',
-            timestamp: new Date(Date.now() - 180 * 60 * 1000).toISOString(),
-            read: true
-          }
-        ]
-      }
-    ];
-    return initialThreads;
+    return buildDemoCustomerThreads(storeId, store?.name);
   };
 
   const markStoreCustomerThreadAsRead = (storeId: string, threadId: string) => {
@@ -2154,105 +1845,7 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       });
     }
 
-    const demoQueues: QueueOrder[] = [
-      {
-        id: `demo-q-${Date.now()}-1`,
-        queueNumber: `Q-${String.fromCharCode(65 + Math.floor(Math.random() * 26))}${Math.floor(10 + Math.random() * 90)}`,
-        storeId: targetStore.id,
-        storeName: targetStore.name,
-        storeLogo: targetStore.logo,
-        customerName: 'สมชาย ใจดี (นักศึกษา)',
-        customerPhone: '081-234-5678',
-        pickupTime: '12:15 น.',
-        estimatedCompletionTime: '12:15',
-        paymentMethod: 'promptpay',
-        paymentStatus: 'PENDING',
-        status: 'PAYMENT_PENDING',
-        exchangePin: '4192',
-        specialNote: 'ขอเผ็ดน้อย ไม่ใส่ชูรสครับ',
-        createdAt: new Date(Date.now() - 3 * 60000).toISOString(),
-        items: [
-          {
-            cartItemId: `item-${Date.now()}-1`,
-            food: storeFoodList[0],
-            quantity: 1,
-            selectedOptions: [],
-            specialNote: 'ขอเผ็ดน้อย ไม่ใส่ชูรสครับ',
-            subtotal: storeFoodList[0].price
-          }
-        ],
-        subtotal: storeFoodList[0].price,
-        discount: 0,
-        total: storeFoodList[0].price
-      },
-      {
-        id: `demo-q-${Date.now()}-2`,
-        queueNumber: `Q-${String.fromCharCode(65 + Math.floor(Math.random() * 26))}${Math.floor(10 + Math.random() * 90)}`,
-        storeId: targetStore.id,
-        storeName: targetStore.name,
-        storeLogo: targetStore.logo,
-        customerName: 'นริศรา มีสุข (อาจารย์)',
-        customerPhone: '089-765-4321',
-        pickupTime: '12:20 น.',
-        estimatedCompletionTime: '12:20',
-        paymentMethod: 'promptpay',
-        paymentStatus: 'PAID',
-        status: 'PREPARING',
-        exchangePin: '8210',
-        specialNote: 'แยกน้ำซุปให้ด้วยนะคะ ขอบคุณค่ะ',
-        createdAt: new Date(Date.now() - 8 * 60000).toISOString(),
-        items: [
-          {
-            cartItemId: `item-${Date.now()}-2`,
-            food: storeFoodList[0],
-            quantity: 2,
-            selectedOptions: [],
-            specialNote: '',
-            subtotal: storeFoodList[0].price * 2
-          },
-          ...(storeFoodList[1] ? [{
-            cartItemId: `item-${Date.now()}-3`,
-            food: storeFoodList[1],
-            quantity: 1,
-            selectedOptions: [],
-            specialNote: '',
-            subtotal: storeFoodList[1].price
-          }] : [])
-        ],
-        subtotal: storeFoodList[0].price * 2 + (storeFoodList[1]?.price || 0),
-        discount: 0,
-        total: storeFoodList[0].price * 2 + (storeFoodList[1]?.price || 0)
-      },
-      {
-        id: `demo-q-${Date.now()}-3`,
-        queueNumber: `Q-${String.fromCharCode(65 + Math.floor(Math.random() * 26))}${Math.floor(10 + Math.random() * 90)}`,
-        storeId: targetStore.id,
-        storeName: targetStore.name,
-        storeLogo: targetStore.logo,
-        customerName: 'ธนวัฒน์ พัฒนกิจ',
-        customerPhone: '086-555-1234',
-        pickupTime: '12:05 น.',
-        estimatedCompletionTime: '12:05',
-        paymentMethod: 'credit_card',
-        paymentStatus: 'PAID',
-        status: 'READY',
-        exchangePin: '1904',
-        createdAt: new Date(Date.now() - 14 * 60000).toISOString(),
-        items: [
-          {
-            cartItemId: `item-${Date.now()}-4`,
-            food: storeFoodList[0],
-            quantity: 1,
-            selectedOptions: [],
-            specialNote: '',
-            subtotal: storeFoodList[0].price
-          }
-        ],
-        subtotal: storeFoodList[0].price,
-        discount: 0,
-        total: storeFoodList[0].price
-      }
-    ];
+    const demoQueues = buildDemoQueues(targetStore, storeFoodList, storeId);
 
     setQueues(prev => {
       const updated = [...demoQueues, ...prev];
