@@ -117,6 +117,65 @@ async function runTests() {
     else process.env.CRON_SECRET = priorSecret;
   }
 
+  // --- A misconfigured deployment must name what is missing ---
+  // Throwing at import would take the health probe down with everything else,
+  // leaving an operator with an opaque 500 and nothing to act on.
+  console.log('\n--- Misconfigured deployment reports what is missing ---');
+  const { execFile } = await import('child_process');
+  const probe = await new Promise((resolve) => {
+    execFile(process.execPath, ['-e', `
+      import('./server/app.js').then(async ({ createApp }) => {
+        const http = await import('http');
+        const s = http.createServer(createApp({ serveStatic: false }));
+        await new Promise(r => s.listen(0, '127.0.0.1', r));
+        const base = 'http://127.0.0.1:' + s.address().port;
+        const health = await fetch(base + '/api/health');
+        const body = await health.json();
+        const api = await fetch(base + '/api/orders/anything');
+        const apiBody = await api.json();
+        const hook = await fetch(base + '/api/webhooks/stripe', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
+        });
+        s.close();
+        console.log(JSON.stringify({
+          healthStatus: health.status,
+          missingRequired: body.missingRequired,
+          database: body.database,
+          leaksValues: JSON.stringify(body).includes('deadbeef'),
+          apiStatus: api.status,
+          apiError: apiBody.error,
+          webhookStatus: hook.status
+        }));
+      }).catch(err => console.log(JSON.stringify({ crashed: err.message })));
+    `], {
+      cwd: process.cwd(),
+      // A production environment with nothing configured: exactly the state a
+      // fresh deployment is in before its variables are filled in.
+      env: { ...process.env, NODE_ENV: 'production', HMAC_SECRET: '', FIREBASE_SERVICE_ACCOUNT: '', STRIPE_WEBHOOK_SECRET: '' }
+    }, (err, stdout) => {
+      const line = stdout.trim().split('\n').filter((l) => l.startsWith('{')).pop();
+      resolve(line ? JSON.parse(line) : { crashed: 'no output' });
+    });
+  });
+
+  check(!probe.crashed, 'The app still loads with nothing configured', probe.crashed || 'loaded');
+  check(probe.healthStatus === 503 && probe.database === 'unavailable',
+    'The health probe answers 503 instead of dying with the app',
+    `status ${probe.healthStatus}`);
+  check(Array.isArray(probe.missingRequired)
+    && probe.missingRequired.includes('FIREBASE_SERVICE_ACCOUNT')
+    && probe.missingRequired.includes('HMAC_SECRET')
+    && probe.missingRequired.includes('STRIPE_WEBHOOK_SECRET'),
+    'It names every missing variable', JSON.stringify(probe.missingRequired));
+  check(probe.leaksValues === false,
+    'It reports names and booleans only, never a secret value');
+  check(probe.apiStatus === 503 && probe.apiError === 'DATABASE_UNAVAILABLE',
+    'API routes refuse rather than falling back to the local store',
+    `status ${probe.apiStatus}`);
+  check(probe.webhookStatus === 503,
+    'The Stripe webhook refuses unsigned deliveries rather than accepting them',
+    `status ${probe.webhookStatus}`);
+
   console.log('\n===============================================================');
   console.log(`📊 DEPLOYMENT TEST RESULTS: ${passed}/${total} Passed (${passed === total ? 'ALL PASSED' : 'FAILURES DETECTED'})`);
   console.log('===============================================================\n');

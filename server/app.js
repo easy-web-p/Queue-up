@@ -26,6 +26,8 @@ import { schoolRouter } from './routes/schoolRoutes.js';
 import { catalogRouter } from './routes/catalogRoutes.js';
 import { customerWalletRouter } from './routes/customerWalletRoutes.js';
 import { cronRouter } from './routes/cronRoutes.js';
+import { firebaseAdminStatus } from './firebaseAdmin.js';
+import { optionalSecret, isProduction, missingRequiredSecrets } from './config/secrets.js';
 import {
   applyHardening,
   errorHandler,
@@ -58,9 +60,62 @@ export function createApp({ serveStatic = true } = {}) {
   // 2. Parse JSON body for all standard API requests
   app.use(express.json({ limit: '5mb' }));
 
-  // Health check, used by platform probes and by the E2E harness
+  // Health check, used by platform probes, by the E2E harness, and — most
+  // usefully — by whoever is trying to work out why a fresh deployment is
+  // refusing requests. It reports WHICH configuration is missing by name.
+  // Names and booleans only: a probe that echoed a secret's value would be a
+  // far worse problem than the one it diagnoses.
   app.get(['/healthz', '/_health', '/api/health'], (req, res) => {
-    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+    const firebase = firebaseAdminStatus();
+    const configured = {
+      FIREBASE_SERVICE_ACCOUNT: Boolean(optionalSecret('FIREBASE_SERVICE_ACCOUNT')),
+      GOOGLE_APPLICATION_CREDENTIALS: Boolean(optionalSecret('GOOGLE_APPLICATION_CREDENTIALS')),
+      HMAC_SECRET: Boolean(optionalSecret('HMAC_SECRET')),
+      STRIPE_SECRET_KEY: Boolean(optionalSecret('STRIPE_SECRET_KEY')),
+      STRIPE_WEBHOOK_SECRET: Boolean(optionalSecret('STRIPE_WEBHOOK_SECRET')),
+      CRON_SECRET: Boolean(optionalSecret('CRON_SECRET')),
+      GEMINI_API_KEY: Boolean(optionalSecret('GEMINI_API_KEY'))
+    };
+
+    const missingRequired = missingRequiredSecrets().slice();
+    if (!configured.FIREBASE_SERVICE_ACCOUNT && !configured.GOOGLE_APPLICATION_CREDENTIALS && !firebase.ready) {
+      missingRequired.push('FIREBASE_SERVICE_ACCOUNT');
+    }
+    if (isProduction && !configured.STRIPE_WEBHOOK_SECRET) {
+      missingRequired.push('STRIPE_WEBHOOK_SECRET');
+    }
+
+    const ready = firebase.ready && missingRequired.length === 0;
+
+    res.status(ready ? 200 : 503).json({
+      status: ready ? 'ok' : 'degraded',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      database: firebase.ready
+        ? (firebase.usingLocalStore ? 'local-file-store' : 'firestore')
+        : 'unavailable',
+      reason: firebase.reason || undefined,
+      missingRequired: missingRequired.length ? missingRequired : undefined,
+      configured
+    });
+  });
+
+  // Every API route below touches Firestore. Without it, answer with the
+  // reason rather than letting each handler fail on a null client.
+  app.use('/api', (req, res, next) => {
+    const firebase = firebaseAdminStatus();
+    const missingSecrets = missingRequiredSecrets();
+
+    if (firebase.ready && missingSecrets.length === 0) return next();
+
+    return res.status(503).json({
+      success: false,
+      error: firebase.ready ? 'CONFIGURATION_INCOMPLETE' : 'DATABASE_UNAVAILABLE',
+      message: firebase.reason
+        || `Missing required environment variables: ${missingSecrets.join(', ')}.`,
+      missingRequired: missingSecrets.length ? missingSecrets : undefined,
+      hint: 'GET /api/health lists which environment variables are missing.'
+    });
   });
 
   // 3. Rate limits, tightest first so the specific rules win.

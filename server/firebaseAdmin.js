@@ -65,6 +65,7 @@ let adminApp = null;
 let adminDb = null;
 let adminAuth = null;
 let adminMessaging = null;
+let adminInitError = null;
 
 if (useLiveAdmin) {
   try {
@@ -101,33 +102,39 @@ if (useLiveAdmin) {
     adminAuth = getAuth(adminApp);
     adminMessaging = getMessaging(adminApp);
   } catch (err) {
-    if (isProduction) {
-      throw new Error(
-        `[FirebaseAdmin] Failed to initialize Firebase Admin in production: ${err.message}. ` +
-        'Refusing to start on the local file-backed store — orders and payments would be lost.'
-      );
+    if (isProduction || isServerless) {
+      adminInitError = `Firebase Admin failed to initialize: ${err.message}`;
+      console.error(`[FirebaseAdmin] ${adminInitError}`);
+    } else {
+      console.warn('[FirebaseAdmin] Failed to initialize live Firebase Admin, falling back to local store:', err.message);
     }
-    console.warn('[FirebaseAdmin] Failed to initialize live Firebase Admin, falling back to local store:', err.message);
   }
 }
 
 // A production deployment that reaches this point has no credentials at all
 // (no GOOGLE_APPLICATION_CREDENTIALS and no Cloud Run ADC). Silently degrading
 // to .local_db.json would accept orders and payments onto ephemeral disk.
+// Outside development the local file-backed store is never an acceptable
+// substitute: orders and payments written to it vanish with the instance. But
+// throwing here would take the health probe down with everything else, leaving
+// an operator staring at an opaque 500. Instead adminDb stays null, the reason
+// is recorded, and requireFirebaseReady turns it into a 503 that names the
+// missing variable while /api/health keeps answering.
 if (!adminDb && (isProduction || isServerless)) {
-  throw new Error(
-    '[FirebaseAdmin] No Firebase Admin credentials available. Set ' +
-    'FIREBASE_SERVICE_ACCOUNT to the service account JSON (or base64 of it), ' +
-    'or GOOGLE_APPLICATION_CREDENTIALS to a key file, or run on a platform ' +
-    'that provides Application Default Credentials. Refusing to start on the ' +
-    'local file-backed store — orders and payments would be lost.'
+  adminInitError = adminInitError || (
+    'No Firebase Admin credentials available. Set FIREBASE_SERVICE_ACCOUNT to ' +
+    'the service account JSON (or base64 of it), or GOOGLE_APPLICATION_CREDENTIALS ' +
+    'to a key file, or run on a platform that provides Application Default ' +
+    'Credentials. On Vercel, check the variable is enabled for the Production ' +
+    'environment, not just Preview, and redeploy afterwards.'
   );
+  console.error(`[FirebaseAdmin] ${adminInitError}`);
 }
 
 // -------------------------------------------------------------
 // Local Development In-Memory / File-Persisted Fallback Store
 // -------------------------------------------------------------
-if (!adminDb) {
+if (!adminDb && !adminInitError) {
   console.log('[FirebaseAdmin] Local development mode active: using persistent file-backed Firestore store.');
 
   const localDbFile = path.resolve(__dirname, '../.local_db.json');
@@ -449,6 +456,18 @@ if (!adminDb) {
       }
     };
   }
+}
+
+/**
+ * Whether the Admin SDK is usable, and why not when it is not.
+ * Read by the health probe and by the API readiness guard.
+ */
+export function firebaseAdminStatus() {
+  return {
+    ready: Boolean(adminDb),
+    usingLocalStore: Boolean(adminDb) && !adminApp,
+    reason: adminInitError
+  };
 }
 
 export { adminDb, adminAuth, adminApp, adminMessaging };

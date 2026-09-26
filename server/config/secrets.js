@@ -9,6 +9,22 @@
 const isProduction = process.env.NODE_ENV === 'production';
 
 /**
+ * Required secrets that were absent at boot.
+ *
+ * Throwing on the first missing one takes the whole function down, including
+ * the health probe that would have named it — which is how a misconfigured
+ * deployment turns into an opaque 500. Recording it instead lets the API
+ * readiness guard refuse requests with the name in the response while the
+ * probe keeps answering.
+ */
+const missing = new Set();
+
+/** Names of required secrets this process is missing. */
+export function missingRequiredSecrets() {
+  return Array.from(missing);
+}
+
+/**
  * Reads a required secret from the environment.
  * In production a missing value throws at boot so the process never starts in a
  * state where it silently signs with a known-public key. Outside production a
@@ -20,13 +36,21 @@ const isProduction = process.env.NODE_ENV === 'production';
  */
 export function requireSecret(name, devFallback) {
   const value = process.env[name];
-  if (value && value.trim()) return value.trim();
+  if (value && value.trim()) {
+    missing.delete(name);
+    return value.trim();
+  }
 
   if (isProduction) {
-    throw new Error(
+    missing.add(name);
+    console.error(
       `[Config] Missing required environment variable ${name}. ` +
-      `Set it before starting the server in production.`
+      'API requests are refused until it is set.'
     );
+    // Returning null rather than the development value guarantees nothing can
+    // sign or verify with a placeholder: any caller that slipped past the
+    // readiness guard fails loudly instead.
+    return null;
   }
 
   console.warn(

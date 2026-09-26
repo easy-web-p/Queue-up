@@ -157,6 +157,23 @@ npm run test:e2e  # ทดสอบ end-to-end ด้วย Playwright บน pr
 (แพ็กเกจ Hobby จำกัด cron วันละครั้ง — ถ้าอยู่บน Hobby ให้ใช้ตัวตั้งเวลาภายนอกยิงมาที่ endpoint นี้พร้อม header `Authorization: Bearer $CRON_SECRET`)
 
 ### หลัง deploy ตรวจอะไรบ้าง
+
+`/api/health` จะบอกเองว่าขาดตัวแปรไหน — ไม่ต้องเดาจาก 500 เปล่า ๆ
+
+```bash
+curl -s https://<your-domain>/api/health | jq
+# ตั้งค่าครบ  -> 200 {"status":"ok","database":"firestore"}
+# ยังไม่ครบ   -> 503 {"status":"degraded","database":"unavailable",
+#                     "missingRequired":["HMAC_SECRET","FIREBASE_SERVICE_ACCOUNT"],
+#                     "configured":{...}}
+```
+
+> `configured` รายงานเป็น **ชื่อตัวแปรกับ true/false เท่านั้น ไม่เคยส่งค่าออกมา**
+>
+> บน Vercel ถ้าตั้งตัวแปรแล้วแต่ยังขึ้น `missingRequired` ให้ตรวจว่าติ๊ก **Production**
+> ไว้ด้วย (ไม่ใช่แค่ Preview) แล้ว **Redeploy** หนึ่งครั้ง เพราะ Vercel ไม่ inject
+> ตัวแปรใหม่ให้ deployment เดิม
+
 ```bash
 curl https://<your-domain>/api/health                 # ควรได้ {"status":"ok",...}
 curl https://<your-domain>/api/does-not-exist         # ควรได้ 404 JSON ไม่ใช่ HTML

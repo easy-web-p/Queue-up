@@ -13,10 +13,13 @@ const stripeSecretKey = optionalSecret('STRIPE_SECRET_KEY');
 const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
 const webhookSecret = optionalSecret('STRIPE_WEBHOOK_SECRET');
 
+// Required in production, but recorded rather than thrown: a throw here kills
+// the whole function, health probe included. The handler below refuses every
+// delivery while it is missing, so an unsigned payload is still never accepted.
 if (isProduction && !webhookSecret) {
-  throw new Error(
-    '[Config] STRIPE_WEBHOOK_SECRET is required in production. Without it the ' +
-    'webhook would accept unsigned payloads and any caller could mark orders paid.'
+  console.error(
+    '[Config] STRIPE_WEBHOOK_SECRET is required in production. Webhook deliveries ' +
+    'are refused until it is set, since without it any caller could mark orders paid.'
   );
 }
 
@@ -28,6 +31,13 @@ if (isProduction && !webhookSecret) {
 webhookRouter.post('/stripe', async (req, res) => {
   const sig = req.headers['stripe-signature'];
   let event;
+
+  if (isProduction && !webhookSecret) {
+    return res.status(503).send(
+      'Webhook Error: STRIPE_WEBHOOK_SECRET is not configured on this deployment. ' +
+      'Refusing to process an unsigned payload.'
+    );
+  }
 
   try {
     if (webhookSecret) {
