@@ -50,8 +50,9 @@ function pass(testName, detail = '') {
 
 async function runTests() {
   const baseUrl = await startServer();
-  const testStoreId = 'store-test-chat-1';
-  const testCustomerId = 'user-customer-99';
+  const uniqueSuffix = Date.now();
+  const testStoreId = `store-test-chat-${uniqueSuffix}`;
+  const testCustomerId = `user-customer-${uniqueSuffix}`;
   const testChatId = `chat_${testStoreId}_${testCustomerId}`;
 
   try {
