@@ -27,9 +27,12 @@ import {
   Plus,
   Sparkles,
   Settings,
-  School as SchoolIcon
+  School as SchoolIcon,
+  Banknote,
+  RefreshCw
 } from 'lucide-react';
 import { SchoolService } from '../../services/schoolService';
+import { apiClient, type PlatformPayout, type PaymentException } from '../../services/apiClient';
 import { School, SchoolApplication } from '../../types';
 
 export const AdminDashboard: React.FC = () => {
@@ -49,7 +52,15 @@ export const AdminDashboard: React.FC = () => {
     adminEmail
   } = useQueue();
 
-  const [adminTab, setAdminTab] = useState<'stores' | 'orders' | 'schools' | 'logs' | 'firebase'>('stores');
+  const [adminTab, setAdminTab] = useState<'stores' | 'orders' | 'money' | 'schools' | 'logs' | 'firebase'>('stores');
+
+  // Platform money operations. Loaded on demand rather than with the dashboard:
+  // both endpoints are admin-only and neither is needed to render anything else.
+  const [payouts, setPayouts] = useState<PlatformPayout[]>([]);
+  const [exceptions, setExceptions] = useState<PaymentException[]>([]);
+  const [moneyLoading, setMoneyLoading] = useState(false);
+  const [moneyError, setMoneyError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [applications, setApplications] = useState<SchoolApplication[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
   const [isLoadingSchools, setIsLoadingSchools] = useState(false);
@@ -71,6 +82,95 @@ export const AdminDashboard: React.FC = () => {
   useEffect(() => {
     loadSchoolData();
   }, []);
+
+  /** Both money queues, refreshed together so the tab shows one moment in time. */
+  const loadMoneyQueues = async () => {
+    setMoneyLoading(true);
+    setMoneyError(null);
+    try {
+      const [payoutResult, exceptionResult] = await Promise.all([
+        apiClient.listPlatformPayouts('REQUESTED'),
+        apiClient.listPaymentExceptions('OPEN')
+      ]);
+      setPayouts(payoutResult.payouts);
+      setExceptions(exceptionResult.exceptions);
+    } catch (err) {
+      setMoneyError(err instanceof Error ? err.message : 'ไม่สามารถโหลดข้อมูลการเงินได้');
+    } finally {
+      setMoneyLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (adminTab === 'money') loadMoneyQueues();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adminTab]);
+
+  const bahtOf = (satang: number | null | undefined) =>
+    `฿${((Number(satang) || 0) / 100).toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
+
+  /**
+   * Confirming a transfer is an assertion that money has already left the bank
+   * account, and it cannot be taken back by pressing something else. So it asks
+   * for the bank's own reference rather than accepting a single click.
+   */
+  const handleConfirmPayout = async (payout: PlatformPayout) => {
+    const reference = prompt(
+      `ยืนยันว่าโอนเงิน ${bahtOf(payout.amountSatang)} ให้ ${payout.storeName} แล้วจริง\n` +
+      'กรุณาใส่เลขอ้างอิงการโอนจากธนาคาร (ใส่ว่าง = ไม่ระบุ):',
+      ''
+    );
+    if (reference === null) return;
+
+    setBusyId(payout.id);
+    try {
+      await apiClient.completePayout(payout.id, reference.trim() || undefined);
+      addToast('บันทึกการโอนแล้ว', `${payout.storeName} ได้รับ ${bahtOf(payout.amountSatang)}`, 'success');
+      await loadMoneyQueues();
+    } catch (err) {
+      addToast('บันทึกไม่สำเร็จ', err instanceof Error ? err.message : 'ลองใหม่อีกครั้ง', 'error');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  /** A failed transfer must return the reserved funds rather than strand them. */
+  const handleFailPayout = async (payout: PlatformPayout) => {
+    const reason = prompt(
+      `โอนเงินให้ ${payout.storeName} ไม่สำเร็จเพราะอะไร\n` +
+      'ยอดที่กันไว้จะกลับเข้ายอดถอนได้ของร้าน:',
+      'เลขบัญชีไม่ถูกต้อง'
+    );
+    if (!reason) return;
+
+    setBusyId(payout.id);
+    try {
+      await apiClient.failPayout(payout.id, reason);
+      addToast('คืนยอดให้ร้านแล้ว', `${bahtOf(payout.amountSatang)} กลับเข้ายอดถอนได้ของ ${payout.storeName}`, 'info');
+      await loadMoneyQueues();
+    } catch (err) {
+      addToast('บันทึกไม่สำเร็จ', err instanceof Error ? err.message : 'ลองใหม่อีกครั้ง', 'error');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  /** Resolving records a decision; it does not move money by itself. */
+  const handleResolveException = async (exception: PaymentException, action: string) => {
+    const note = prompt('บันทึกสิ่งที่ดำเนินการไป (เพื่อให้ตรวจย้อนหลังได้):', '');
+    if (note === null) return;
+
+    setBusyId(exception.id);
+    try {
+      await apiClient.resolvePaymentException(exception.id, action, note);
+      addToast('ปิดรายการแล้ว', `ออเดอร์ ${exception.orderId} ถูกบันทึกว่าดำเนินการแล้ว`, 'success');
+      await loadMoneyQueues();
+    } catch (err) {
+      addToast('ปิดรายการไม่สำเร็จ', err instanceof Error ? err.message : 'ลองใหม่อีกครั้ง', 'error');
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const handleApproveSchool = async (appId: string, schoolName: string) => {
     try {
@@ -293,6 +393,23 @@ export const AdminDashboard: React.FC = () => {
           }`}
         >
           ออเดอร์ & ธุรกรรมคิว ({queues.length})
+        </button>
+
+        <button
+          onClick={() => setAdminTab('money')}
+          className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+            adminTab === 'money'
+              ? 'bg-orange-500 text-white shadow-sm shadow-orange-500/25'
+              : 'text-stone-600 hover:text-stone-900 dark:text-zinc-400 dark:hover:text-white bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800'
+          }`}
+        >
+          <Banknote className="w-3.5 h-3.5" />
+          <span>การเงินแพลตฟอร์ม</span>
+          {(payouts.length > 0 || exceptions.length > 0) && (
+            <span className="px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-black">
+              {payouts.length + exceptions.length}
+            </span>
+          )}
         </button>
 
         <button
@@ -536,6 +653,174 @@ export const AdminDashboard: React.FC = () => {
       )}
 
       {/* Tab: Schools & Applications (Phase 5 Approval Workflow) */}
+      {/* Tab: Platform money operations — the two things only an admin can do */}
+      {adminTab === 'money' && (
+        <div className="space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-bold text-stone-900 dark:text-white">
+                การเงินแพลตฟอร์ม
+              </h3>
+              <p className="text-xs text-stone-500 dark:text-zinc-400 mt-0.5">
+                สองอย่างที่มีแต่ผู้ดูแลระบบทำได้ — ยืนยันการโอนเงินให้ร้าน และเคลียร์เงินที่เข้ามาแต่ระบบรับไม่ได้
+              </p>
+            </div>
+            <button
+              onClick={loadMoneyQueues}
+              disabled={moneyLoading}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-stone-700 dark:text-zinc-200 text-xs font-bold transition-colors cursor-pointer border border-stone-200 dark:border-zinc-700 disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${moneyLoading ? 'animate-spin' : ''}`} />
+              <span>{moneyLoading ? 'กำลังโหลด...' : 'โหลดใหม่'}</span>
+            </button>
+          </div>
+
+          {moneyError && (
+            <div className="rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40 p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-bold text-red-700 dark:text-red-400">โหลดข้อมูลไม่สำเร็จ</p>
+                <p className="text-xs text-red-600 dark:text-red-300/80 mt-0.5">{moneyError}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Withdrawal requests awaiting a real bank transfer */}
+          <div className="rounded-3xl bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800 shadow-sm overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-stone-200 dark:border-zinc-800">
+              <h4 className="text-sm font-bold text-stone-900 dark:text-white flex items-center gap-2">
+                <Banknote className="w-4 h-4 text-emerald-500" />
+                คำขอถอนเงินที่รอโอน ({payouts.length})
+              </h4>
+              <p className="text-[11px] text-stone-500 dark:text-zinc-400 mt-1">
+                ยอดเงินถูกกันไว้แล้ว ร้านถอนซ้ำจากยอดเดิมไม่ได้ — โอนเงินจริงผ่านธนาคารก่อน แล้วจึงกดยืนยันที่นี่
+              </p>
+            </div>
+
+            {payouts.length === 0 ? (
+              <div className="p-8 text-center">
+                <CheckCircle className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
+                <p className="text-sm font-bold text-stone-700 dark:text-zinc-200">ไม่มีคำขอค้างอยู่</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-stone-100 dark:divide-zinc-800">
+                {payouts.map((payout) => (
+                  <div key={payout.id} className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-bold text-stone-900 dark:text-white">{payout.storeName}</span>
+                        <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30">
+                          รอโอน
+                        </span>
+                      </div>
+                      <p className="text-lg font-black text-emerald-600 dark:text-emerald-400 mt-1">
+                        {bahtOf(payout.amountSatang)}
+                      </p>
+                      <p className="text-[11px] text-stone-500 dark:text-zinc-400 mt-1 font-mono">
+                        {payout.bankAccountSnapshot?.bankName || '—'} ·{' '}
+                        {payout.bankAccountSnapshot?.accountName || '—'} ·{' '}
+                        {payout.bankAccountSnapshot?.accountNumberMasked
+                          || payout.bankAccountSnapshot?.accountNumber || '—'}
+                      </p>
+                      <p className="text-[11px] text-stone-400 dark:text-zinc-500 mt-0.5">
+                        ขอเมื่อ {new Date(payout.createdAt).toLocaleString('th-TH')} · {payout.id}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => handleConfirmPayout(payout)}
+                        disabled={busyId === payout.id}
+                        className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        โอนแล้ว ยืนยัน
+                      </button>
+                      <button
+                        onClick={() => handleFailPayout(payout)}
+                        disabled={busyId === payout.id}
+                        className="px-3.5 py-2 rounded-xl bg-white dark:bg-zinc-900 border border-red-200 dark:border-red-900/40 text-red-600 dark:text-red-400 text-xs font-bold hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        โอนไม่สำเร็จ
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Money that arrived and could not be applied */}
+          <div className="rounded-3xl bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800 shadow-sm overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-stone-200 dark:border-zinc-800">
+              <h4 className="text-sm font-bold text-stone-900 dark:text-white flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-red-500" />
+                เงินที่ระบบรับไม่ได้ ({exceptions.length})
+              </h4>
+              <p className="text-[11px] text-stone-500 dark:text-zinc-400 mt-1">
+                จ่ายน้อยกว่ายอด จ่ายหลังยกเลิก หรือคืนเงินหลังเงินออกจากยอดพักไปแล้ว — ระบบไม่เดาและไม่กลืนเงินเงียบๆ
+                แต่ต้องมีคนตัดสินใจ
+              </p>
+            </div>
+
+            {exceptions.length === 0 ? (
+              <div className="p-8 text-center">
+                <CheckCircle className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
+                <p className="text-sm font-bold text-stone-700 dark:text-zinc-200">ไม่มีเงินค้างที่ต้องตัดสินใจ</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-stone-100 dark:divide-zinc-800">
+                {exceptions.map((exception) => (
+                  <div key={exception.id} className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400 border border-red-200 dark:border-red-500/30 font-mono">
+                          {exception.reason}
+                        </span>
+                        <span className="text-xs font-mono text-stone-500 dark:text-zinc-400">
+                          {exception.orderId}
+                        </span>
+                      </div>
+                      <p className="text-sm font-bold text-stone-900 dark:text-white mt-1.5">
+                        เข้ามา {bahtOf(exception.amountSatang)}
+                        {exception.expectedSatang !== null && (
+                          <span className="text-stone-500 dark:text-zinc-400 font-medium">
+                            {' '}· ควรได้ {bahtOf(exception.expectedSatang)}
+                          </span>
+                        )}
+                      </p>
+                      {exception.detail && (
+                        <p className="text-[11px] text-stone-500 dark:text-zinc-400 mt-1">{exception.detail}</p>
+                      )}
+                      <p className="text-[11px] text-stone-400 dark:text-zinc-500 mt-0.5 font-mono">
+                        {exception.providerPaymentIntentId || exception.providerCheckoutSessionId || '—'} ·{' '}
+                        {new Date(exception.createdAt).toLocaleString('th-TH')}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => handleResolveException(exception, 'REFUNDED_AT_GATEWAY')}
+                        disabled={busyId === exception.id}
+                        className="px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        คืนเงินที่ Stripe แล้ว
+                      </button>
+                      <button
+                        onClick={() => handleResolveException(exception, 'RECONCILED')}
+                        disabled={busyId === exception.id}
+                        className="px-3.5 py-2 rounded-xl bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-700 text-stone-700 dark:text-zinc-200 text-xs font-bold hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        กระทบยอดแล้ว
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {adminTab === 'schools' && (
         <div className="space-y-6">
           {/* Applications Section */}

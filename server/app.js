@@ -26,6 +26,7 @@ import { schoolRouter } from './routes/schoolRoutes.js';
 import { catalogRouter } from './routes/catalogRoutes.js';
 import { customerWalletRouter } from './routes/customerWalletRoutes.js';
 import { cronRouter } from './routes/cronRoutes.js';
+import { platformRouter } from './routes/platformRoutes.js';
 import { firebaseAdminStatus } from './firebaseAdmin.js';
 import { optionalSecret, isProduction, missingRequiredSecrets } from './config/secrets.js';
 import {
@@ -124,6 +125,10 @@ export function createApp({ serveStatic = true } = {}) {
   app.post('/api/chat/messages', writeLimiter);
   app.post('/api/capacity/reserve', writeLimiter);
   app.post('/api/merchant/payouts', writeLimiter);
+  // Attesting or reversing a transfer is the highest-value write in the system.
+  app.post('/api/merchant/payouts/:payoutId/complete', writeLimiter);
+  app.post('/api/merchant/payouts/:payoutId/fail', writeLimiter);
+  app.post('/api/platform/payment-exceptions/:id/resolve', writeLimiter);
   app.post('/api/schools/membership/claim', writeLimiter);
   app.use('/api', apiLimiter);
 
@@ -138,6 +143,7 @@ export function createApp({ serveStatic = true } = {}) {
   app.use('/api/catalog', catalogRouter);
   app.use('/api/wallet', customerWalletRouter);
   app.use('/api/cron', cronRouter);
+  app.use('/api/platform', platformRouter);
   app.use('/api', notificationRouter);
 
   // Unmatched API paths must not fall through to the SPA fallback below, which

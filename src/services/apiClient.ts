@@ -2,6 +2,45 @@ import { auth } from '../config/firebase';
 import { QueueStatus, PaymentMethodId } from '../types';
 import { AuthoritativeOrder } from '../types/schema';
 
+export type PayoutStatus = 'REQUESTED' | 'PAID' | 'FAILED';
+
+/** A merchant withdrawal request as the platform operator sees it. */
+export interface PlatformPayout {
+  id: string;
+  storeId: string;
+  storeName: string;
+  amountSatang: number;
+  status: PayoutStatus;
+  bankAccountSnapshot?: {
+    bankName?: string;
+    accountName?: string;
+    accountNumber?: string;
+    accountNumberMasked?: string;
+  };
+  failureReason?: string | null;
+  createdAt: string;
+  updatedAt?: string;
+  paidAt?: string | null;
+}
+
+/** Money that arrived at the gateway but could not be applied to its order. */
+export interface PaymentException {
+  id: string;
+  orderId: string;
+  reason: string;
+  amountSatang: number | null;
+  expectedSatang: number | null;
+  detail?: string;
+  status: 'OPEN' | 'RESOLVED';
+  providerPaymentIntentId?: string | null;
+  providerCheckoutSessionId?: string | null;
+  resolvedAction?: string;
+  resolvedNote?: string;
+  resolvedByEmail?: string | null;
+  resolvedAt?: string | null;
+  createdAt: string;
+}
+
 export interface CreateOrderItemInput {
   menuItemId: string;
   quantity: number;
@@ -562,6 +601,91 @@ class ApiClient {
       (err as any).remainingWorkload = data.remainingWorkload;
       (err as any).code = data.code || data.error;
       throw err;
+    }
+    return data;
+  }
+
+  /**
+   * Platform operator: withdrawal requests across every store.
+   *
+   * Restricted to platform administrators server-side; a merchant gets a 403.
+   */
+  async listPlatformPayouts(status?: PayoutStatus): Promise<{
+    success: boolean;
+    payouts: PlatformPayout[];
+  }> {
+    const headers = await this.getAuthHeaders();
+    const query = status ? `?status=${encodeURIComponent(status)}` : '';
+    const response = await fetch(`${this.baseUrl}/platform/payouts${query}`, { headers });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || data.error || 'Failed to load payout requests');
+    }
+    return data;
+  }
+
+  /** Platform operator: attest that a transfer actually left the bank account. */
+  async completePayout(payoutId: string, reference?: string): Promise<{ success: boolean }> {
+    const headers = await this.getAuthHeaders();
+    const response = await fetch(`${this.baseUrl}/merchant/payouts/${payoutId}/complete`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ providerTransferId: reference || null })
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || data.error || 'Failed to confirm the transfer');
+    }
+    return data;
+  }
+
+  /** Platform operator: a transfer failed, so the reserved funds go back. */
+  async failPayout(payoutId: string, reason: string): Promise<{ success: boolean }> {
+    const headers = await this.getAuthHeaders();
+    const response = await fetch(`${this.baseUrl}/merchant/payouts/${payoutId}/fail`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ reason })
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || data.error || 'Failed to record the failure');
+    }
+    return data;
+  }
+
+  /** Platform operator: money that arrived but could not be applied to an order. */
+  async listPaymentExceptions(status: 'OPEN' | 'RESOLVED' | 'ALL' = 'OPEN'): Promise<{
+    success: boolean;
+    exceptions: PaymentException[];
+    openCount: number;
+  }> {
+    const headers = await this.getAuthHeaders();
+    const response = await fetch(
+      `${this.baseUrl}/platform/payment-exceptions?status=${status}`, { headers }
+    );
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || data.error || 'Failed to load payment exceptions');
+    }
+    return data;
+  }
+
+  /** Platform operator: record that a stuck payment has been dealt with. */
+  async resolvePaymentException(
+    id: string,
+    action: string,
+    note?: string
+  ): Promise<{ success: boolean; alreadyResolved?: boolean }> {
+    const headers = await this.getAuthHeaders();
+    const response = await fetch(`${this.baseUrl}/platform/payment-exceptions/${id}/resolve`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ action, note })
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || data.error || 'Failed to resolve the exception');
     }
     return data;
   }
