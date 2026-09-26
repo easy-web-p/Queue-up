@@ -126,6 +126,24 @@ async function run() {
     await expectDenied('Direct client order writes stay forbidden',
       updateDoc(doc(customer.firestore(), 'orders', 'ord-rules-1'), { total: 1 }));
 
+    console.log('\n--- Typing presence ---');
+    await expectAllowed('A participant can publish their own typing presence',
+      setDoc(doc(customer.firestore(), 'chats', 'chat-rules-1', 'typing', CUSTOMER),
+        { uid: CUSTOMER, displayName: 'สมชาย', role: 'customer', expiresAt: Date.now() + 6000 }));
+    await expectDenied('Nobody can publish presence under another person\'s uid',
+      setDoc(doc(customer.firestore(), 'chats', 'chat-rules-1', 'typing', OWNER),
+        { uid: OWNER, displayName: 'ร้านอัลฟ่า', role: 'merchant', expiresAt: Date.now() + 6000 }));
+    await expectAllowed('The store operator can publish presence in their thread',
+      setDoc(doc(owner.firestore(), 'chats', 'chat-rules-1', 'typing', OWNER),
+        { uid: OWNER, displayName: 'ร้านอัลฟ่า', role: 'merchant', expiresAt: Date.now() + 6000 }));
+    await expectAllowed('A participant can see who is typing',
+      getDoc(doc(customer.firestore(), 'chats', 'chat-rules-1', 'typing', OWNER)));
+    await expectDenied('A non-participant cannot see who is typing',
+      getDoc(doc(outsider.firestore(), 'chats', 'chat-rules-1', 'typing', OWNER)));
+    await expectDenied('A rival merchant cannot publish presence in another store thread',
+      setDoc(doc(rival.firestore(), 'chats', 'chat-rules-1', 'typing', RIVAL),
+        { uid: RIVAL, displayName: 'ร้านเบต้า', role: 'merchant', expiresAt: Date.now() + 6000 }));
+
     console.log('\n--- School admin claims resolve without an admin flag ---');
     await expectAllowed('A school admin can read an order from their own school',
       getDoc(doc(schoolAdmin.firestore(), 'orders', 'ord-rules-1')));

@@ -180,6 +180,22 @@ service cloud.firestore {
         );
       allow delete: if isAdmin();
 
+      // Typing presence: one document per person, id == their uid.
+      // Decorative, but still scoped — only a participant or the thread's store
+      // may see who is typing, and nobody may publish presence as someone else.
+      match /typing/{typingUid} {
+        allow read: if isAuthenticated() && (
+          request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds ||
+          isStoreOperator(get(/databases/$(database)/documents/chats/$(chatId)).data.storeId) ||
+          isSuperAdmin()
+        );
+        allow write: if isAuthenticated() &&
+          typingUid == request.auth.uid && (
+            request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds ||
+            isStoreOperator(get(/databases/$(database)/documents/chats/$(chatId)).data.storeId)
+          );
+      }
+
       match /messages/{messageId} {
         allow read: if isAuthenticated() && (
           request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds ||

@@ -1,5 +1,10 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useQueue } from '../../context/QueueContext';
+import {
+  TypingPublisher,
+  subscribeToTyping,
+  type TypingPresence
+} from '../../services/typingPresenceService';
 import type { Store, FoodItem, StoreChatMessage, StoreCustomerChatThread } from '../../types';
 import {
   MessageSquare,
@@ -165,18 +170,72 @@ export const ChatPage: React.FC = () => {
     return () => unsub();
   }, [chatScope, currentUser?.id]);
 
-  // Typing indicators state
-  const [isStoreTyping, setIsStoreTyping] = useState<boolean>(false);
-  const [isCustomerTyping, setIsCustomerTyping] = useState<boolean>(false);
-  const storeTypingTimeoutRef = useRef<any>(null);
-  const customerTypingTimeoutRef = useRef<any>(null);
+  // Typing presence.
+  //
+  // This used to be a local timer: sending a message flipped "the shop is
+  // typing" on for 2.4 seconds whether or not anyone was there, and the
+  // merchant's own indicator was declared but never set. Both sides now
+  // publish presence and watch for the other's.
+  const [typingInStoreThread, setTypingInStoreThread] = useState<TypingPresence[]>([]);
+  const [typingInCustomerThread, setTypingInCustomerThread] = useState<TypingPresence[]>([]);
+  const storeTypingPublisherRef = useRef<TypingPublisher | null>(null);
+  const customerTypingPublisherRef = useRef<TypingPublisher | null>(null);
 
+  // Thread the customer is viewing, and the one the merchant has open.
+  const customerFacingChatId = useMemo(
+    () => (selectedStore && currentUser?.id ? `chat_${selectedStore.id}_${currentUser.id}` : ''),
+    [selectedStore?.id, currentUser?.id]
+  );
+  const merchantFacingChatId = activeCustomerThread?.id || '';
+
+  // Customer side: publish while typing to the store, watch for the store/AI.
   useEffect(() => {
+    if (!customerFacingChatId || !currentUser?.id) {
+      storeTypingPublisherRef.current = null;
+      setTypingInStoreThread([]);
+      return;
+    }
+    const publisher = new TypingPublisher(
+      customerFacingChatId,
+      currentUser.id,
+      currentUser.fullName || 'ลูกค้า',
+      'customer'
+    );
+    storeTypingPublisherRef.current = publisher;
+    const unsubscribe = subscribeToTyping(customerFacingChatId, currentUser.id, setTypingInStoreThread);
+
     return () => {
-      if (storeTypingTimeoutRef.current) clearTimeout(storeTypingTimeoutRef.current);
-      if (customerTypingTimeoutRef.current) clearTimeout(customerTypingTimeoutRef.current);
+      publisher.stop();
+      storeTypingPublisherRef.current = null;
+      unsubscribe();
     };
-  }, []);
+  }, [customerFacingChatId, currentUser?.id, currentUser?.fullName]);
+
+  // Merchant side: publish while replying, watch for the customer.
+  useEffect(() => {
+    if (!merchantFacingChatId || !currentUser?.id) {
+      customerTypingPublisherRef.current = null;
+      setTypingInCustomerThread([]);
+      return;
+    }
+    const publisher = new TypingPublisher(
+      merchantFacingChatId,
+      currentUser.id,
+      merchantStore?.name || 'ร้านค้า',
+      'merchant'
+    );
+    customerTypingPublisherRef.current = publisher;
+    const unsubscribe = subscribeToTyping(merchantFacingChatId, currentUser.id, setTypingInCustomerThread);
+
+    return () => {
+      publisher.stop();
+      customerTypingPublisherRef.current = null;
+      unsubscribe();
+    };
+  }, [merchantFacingChatId, currentUser?.id, merchantStore?.name]);
+
+  const isStoreTyping = typingInStoreThread.length > 0;
+  const isCustomerTyping = typingInCustomerThread.length > 0;
 
   // Live messages for customer view
   const [liveStoreMessages, setLiveStoreMessages] = useState<StoreChatMessage[] | null>(null);
@@ -207,16 +266,6 @@ export const ChatPage: React.FC = () => {
     });
     return () => unsub();
   }, [chatScope, selectedStore?.id, currentUser?.id]);
-
-  // Turn off typing indicator when seller/AI response arrives
-  useEffect(() => {
-    if (liveStoreMessages && liveStoreMessages.length > 0) {
-      const latest = liveStoreMessages[liveStoreMessages.length - 1];
-      if (latest && latest.senderRole !== 'buyer') {
-        setIsStoreTyping(false);
-      }
-    }
-  }, [liveStoreMessages]);
 
   const currentStoreMessages = useMemo(() => {
     if (liveStoreMessages && liveStoreMessages.length > 0) {
@@ -346,6 +395,8 @@ export const ChatPage: React.FC = () => {
       // Merchant replies to the selected customer thread
       sendStoreCustomerReply(merchantStore.id, activeCustomerThread.id, text);
       setInputMessage('');
+      // The reply has been sent: stop advertising that we are still typing.
+      customerTypingPublisherRef.current?.stop();
       addToast('ส่งข้อความสำเร็จ', `ส่งถึง ${activeCustomerThread.customerName || 'ลูกค้า'} เรียบร้อย`, 'success');
       return;
     }
@@ -354,13 +405,8 @@ export const ChatPage: React.FC = () => {
       // Customer sends message to the store
       sendStoreChatMessage(selectedStore.id, text, relatedQueue?.id, 'buyer');
       setInputMessage('');
-
-      // Trigger realistic typing animation for store / AI auto-reply
-      setIsStoreTyping(true);
-      if (storeTypingTimeoutRef.current) clearTimeout(storeTypingTimeoutRef.current);
-      storeTypingTimeoutRef.current = setTimeout(() => {
-        setIsStoreTyping(false);
-      }, 2400);
+      // The message has been sent: stop advertising that we are still typing.
+      storeTypingPublisherRef.current?.stop();
     }
   };
 
@@ -1046,7 +1092,7 @@ export const ChatPage: React.FC = () => {
                       />
                       <div className="flex flex-col space-y-1">
                         <span className="text-[10px] font-bold text-stone-500 dark:text-zinc-400 ml-1">
-                          {activeCustomerThread.customerName || 'ลูกค้า'} กำลังพิมพ์...
+                          {typingInCustomerThread[0]?.displayName || activeCustomerThread.customerName || 'ลูกค้า'} กำลังพิมพ์...
                         </span>
                         <div className="bg-white dark:bg-zinc-800 border border-stone-200/80 dark:border-zinc-700/80 rounded-2xl rounded-tl-xs px-4 py-2.5 shadow-xs flex items-center gap-1.5 w-fit">
                           <span className="w-2 h-2 rounded-full bg-orange-500 animate-bounce [animation-delay:-0.3s]"></span>
@@ -1082,7 +1128,11 @@ export const ChatPage: React.FC = () => {
                   <input
                     type="text"
                     value={inputMessage}
-                    onChange={e => setInputMessage(e.target.value)}
+                    onChange={e => {
+                      setInputMessage(e.target.value);
+                      // Throttled inside the publisher; safe to call per keystroke.
+                      customerTypingPublisherRef.current?.keystroke();
+                    }}
                     onKeyDown={e => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
@@ -1398,7 +1448,7 @@ export const ChatPage: React.FC = () => {
                       />
                       <div className="flex flex-col space-y-1">
                         <span className="text-[10px] font-bold text-stone-500 dark:text-zinc-400 ml-1 flex items-center gap-1">
-                          <span>{selectedStore.name} กำลังพิมพ์ตอบกลับ...</span>
+                          <span>{typingInStoreThread[0]?.displayName || selectedStore.name} กำลังพิมพ์ตอบกลับ...</span>
                         </span>
                         <div className="bg-white dark:bg-zinc-800 border border-stone-200/80 dark:border-zinc-700/80 rounded-2xl rounded-tl-xs px-4 py-2.5 shadow-xs flex items-center gap-1.5 w-fit">
                           <span className="w-2 h-2 rounded-full bg-orange-500 animate-bounce [animation-delay:-0.3s]"></span>
@@ -1444,7 +1494,11 @@ export const ChatPage: React.FC = () => {
                   <input
                     type="text"
                     value={inputMessage}
-                    onChange={e => setInputMessage(e.target.value)}
+                    onChange={e => {
+                      setInputMessage(e.target.value);
+                      // Throttled inside the publisher; safe to call per keystroke.
+                      storeTypingPublisherRef.current?.keystroke();
+                    }}
                     onKeyDown={e => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
