@@ -12,7 +12,19 @@ function collectPageProblems(page: Page) {
   const failedAppRequests: string[] = [];
 
   const isExternalService = (text: string) =>
-    /googleapis\.com|firebaseio\.com|firebaseinstallations|gstatic\.com|fonts\.googleapis|jsdelivr|unsplash|firestore|ERR_NAME_NOT_RESOLVED|ERR_INTERNET_DISCONNECTED|ERR_PROXY/i.test(text);
+    /googleapis\.com|firebaseio\.com|firebaseinstallations|gstatic\.com|fonts\.googleapis|googletagmanager\.com|google-analytics\.com|analytics\.google\.com|jsdelivr|unsplash|firestore|ERR_NAME_NOT_RESOLVED|ERR_INTERNET_DISCONNECTED|ERR_PROXY/i.test(text);
+
+  // Compared by host, not by substring. The analytics beacon carries the page it
+  // is reporting on inside its query string (dl=http%3A%2F%2F127.0.0.1%2F...),
+  // so a substring check read Google's host as one of the app's own assets and
+  // failed the test for a third-party request this environment cannot reach.
+  const isAppAsset = (url: string) => {
+    try {
+      return new URL(url).hostname === '127.0.0.1';
+    } catch {
+      return false;
+    }
+  };
 
   page.on('console', (msg) => {
     if (msg.type() !== 'error') return;
@@ -29,7 +41,7 @@ function collectPageProblems(page: Page) {
     const url = request.url();
     if (isExternalService(url)) return;
     // Only the app's own assets matter here.
-    if (!url.includes('127.0.0.1')) return;
+    if (!isAppAsset(url)) return;
     failedAppRequests.push(`${url} — ${request.failure()?.errorText}`);
   });
 
