@@ -374,10 +374,33 @@ if (!adminDb && !adminInitError) {
       // Serialize transactions in local mock to emulate Firestore atomic isolation
       const execute = async () => {
         loadFromDisk();
+
+        // Real Firestore requires every read in a transaction to happen before
+        // any write, and throws otherwise. The mock used to allow it, so a
+        // transaction that read after writing passed every test here and failed
+        // only against the real database.
+        let hasWritten = false;
+        const guardRead = () => {
+          if (hasWritten) {
+            throw new Error(
+              'Firestore transactions require all reads to be executed before all writes.'
+            );
+          }
+        };
+
         const transaction = {
-          get: async (ref) => ref.get(),
-          set: async (ref, data, opts) => ref.set(data, opts),
-          update: async (ref, fields) => ref.update(fields)
+          get: async (ref) => {
+            guardRead();
+            return ref.get();
+          },
+          set: async (ref, data, opts) => {
+            hasWritten = true;
+            return ref.set(data, opts);
+          },
+          update: async (ref, fields) => {
+            hasWritten = true;
+            return ref.update(fields);
+          }
         };
         const result = await updateFunction(transaction);
         saveToDisk();

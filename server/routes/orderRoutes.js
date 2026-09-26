@@ -8,12 +8,13 @@ import {
   isStoreOperator
 } from '../middleware/authenticate.js';
 import { requireSecret } from '../config/secrets.js';
-import { recordOrderFulfilled } from '../services/ledgerService.js';
+import { recordCustomerPayment, recordOrderFulfilled } from '../services/ledgerService.js';
 import { NotificationEngine } from '../services/notificationEngine.js';
 import { SlotTransactionService } from '../services/slotTransactionService.js';
 import { findMenuItem } from '../services/menuCatalog.js';
 import { computeFeeBreakdown, resolveOrderBreakdown } from '../services/orderPricing.js';
 import { applyWalletDelta, isWalletPayment } from '../services/customerWalletService.js';
+import { reverseOrderPayment, customerMayCancel } from '../services/orderRefundService.js';
 
 export const orderRouter = Router();
 
@@ -204,6 +205,32 @@ orderRouter.post('/', optionalAuthenticate, async (req, res) => {
 
       const now = new Date().toISOString();
 
+      // Confirming the slot needs its current workload, and a Firestore
+      // transaction must finish reading before it writes anything — the wallet
+      // debit below is the first write, so the slot is read here.
+      let slotRef = null;
+      let slotUpdates = null;
+
+      if (req.body.slotId && reservationId) {
+        const candidateRef = SlotTransactionService.getSlotRef(storeId, req.body.slotId);
+        const slotSnap = await t.get(candidateRef);
+        if (slotSnap.exists) {
+          const slotData = slotSnap.data();
+          const pending = Array.isArray(slotData.pending) ? slotData.pending : [];
+          const foundIdx = pending.findIndex(r => r.reservationId === reservationId);
+          if (foundIdx !== -1) {
+            const targetRes = pending[foundIdx];
+            slotRef = candidateRef;
+            slotUpdates = {
+              confirmedWorkload: (slotData.confirmedWorkload || 0) + targetRes.workload,
+              confirmedOrders: (slotData.confirmedOrders || 0) + 1,
+              pending: pending.filter((_, idx) => idx !== foundIdx),
+              updatedAt: now
+            };
+          }
+        }
+      }
+
       // Campus Wallet settles immediately: the balance is debited inside this
       // same transaction, so an order can never exist without the money having
       // moved, and a debit can never happen without the order being written.
@@ -226,6 +253,20 @@ orderRouter.post('/', optionalAuthenticate, async (req, res) => {
         });
         walletTransactionId = debit.transactionId;
         walletBalanceAfterSatang = debit.balanceSatang;
+
+        // A wallet payment is a payment: it has to enter the books here, the way
+        // the Stripe webhook posts a card payment. Without it the merchant's
+        // pendingSatang was never credited, so fulfilling or refunding a wallet
+        // order debited a balance that had never been built up.
+        await recordCustomerPayment(t, adminDb, {
+          orderId,
+          storeId,
+          totalSatang,
+          merchantNetSatang,
+          platformFeeSatang,
+          gatewayFeeSatang: 0,
+          now
+        });
       }
 
       // Statuses decoupled
@@ -294,22 +335,8 @@ orderRouter.post('/', optionalAuthenticate, async (req, res) => {
 
       // Confirm slot reservation inside transaction if slotId was attached
       if (req.body.slotId && reservationId) {
-        const slotRef = SlotTransactionService.getSlotRef(storeId, req.body.slotId);
-        const slotSnap = await t.get(slotRef);
-        if (slotSnap.exists) {
-          const slotData = slotSnap.data();
-          const pending = Array.isArray(slotData.pending) ? slotData.pending : [];
-          const foundIdx = pending.findIndex(r => r.reservationId === reservationId);
-          if (foundIdx !== -1) {
-            const targetRes = pending[foundIdx];
-            const remainingPending = pending.filter((_, idx) => idx !== foundIdx);
-            t.update(slotRef, {
-              confirmedWorkload: (slotData.confirmedWorkload || 0) + targetRes.workload,
-              confirmedOrders: (slotData.confirmedOrders || 0) + 1,
-              pending: remainingPending,
-              updatedAt: now
-            });
-          }
+        if (slotRef && slotUpdates) {
+          t.update(slotRef, slotUpdates);
         }
         const resRef = adminDb.collection('reservations').doc(reservationId);
         t.set(resRef, {
@@ -428,6 +455,16 @@ orderRouter.patch('/:id/status', authenticate, async (req, res) => {
       });
     }
 
+    // Once the kitchen has started, the food exists. A store operator can still
+    // cancel and refund, but the customer cannot do it unilaterally.
+    if (!operatesStore && nextStatus === 'CANCELLED' && !customerMayCancel(preOrder.status)) {
+      return res.status(409).json({
+        success: false,
+        error: 'CANCELLATION_WINDOW_CLOSED',
+        message: 'ร้านค้าเริ่มเตรียมอาหารแล้ว จึงยกเลิกเองไม่ได้ กรุณาติดต่อร้านผ่านแชทค่ะ'
+      });
+    }
+
     const updatedResult = await adminDb.runTransaction(async (t) => {
       const orderSnap = await t.get(orderRef);
       if (!orderSnap.exists) {
@@ -453,14 +490,57 @@ orderRouter.patch('/:id/status', authenticate, async (req, res) => {
       const newVersion = (orderData.version || 1) + 1;
       const now = new Date().toISOString();
 
-      // 3. Update Order Document
       const isOnlinePaid = orderData.paymentMethod !== 'cash' && orderData.paymentStatus === 'PAID';
+      const isReversal = nextStatus === 'CANCELLED' || nextStatus === 'MERCHANT_REJECTED';
+
       const orderUpdates = {
         status: nextStatus,
         canonicalStatus: nextStatus,
         version: newVersion,
         updatedAt: now
       };
+
+      // ---- Read phase -------------------------------------------------------
+      // A Firestore transaction must perform every read before its first write,
+      // so the kitchen slot is fetched here and updated further down.
+      let slotRef = null;
+      let slotUpdates = null;
+
+      if (isReversal && orderData.storeId && orderData.slotId) {
+        const candidateRef = SlotTransactionService.getSlotRef(orderData.storeId, orderData.slotId);
+        const slotSnap = await t.get(candidateRef);
+        if (slotSnap.exists) {
+          const slotData = slotSnap.data();
+          const currentConfirmed = slotData.confirmedWorkload ?? 0;
+          const orderWorkload = Number(orderData.workload) || (Array.isArray(orderData.items) ? orderData.items.reduce((s, it) => s + (it.quantity || 1), 0) : 1);
+          slotRef = candidateRef;
+          slotUpdates = {
+            confirmedWorkload: Math.max(0, currentConfirmed - orderWorkload),
+            updatedAt: now
+          };
+        }
+      }
+
+      // 3. Reverse the payment on cancellation / rejection.
+      // Releasing the kitchen slot without reversing the payment left the
+      // customer out of pocket and the merchant still credited. This reads the
+      // customer's wallet, so it stays ahead of every write below.
+      if (isReversal) {
+        const reversal = await reverseOrderPayment(t, adminDb, {
+          orderId,
+          order: orderData,
+          reason: note || 'ยกเลิกคำสั่งซื้อ',
+          actorUid: changerUid,
+          now
+        });
+
+        if (reversal.reversed) {
+          orderUpdates.paymentStatus = reversal.method === 'wallet' ? 'REFUNDED' : 'REFUND_PENDING';
+          orderUpdates.settlementStatus = 'REVERSED';
+          orderUpdates.refundedSatang = reversal.amountSatang;
+          orderUpdates.refundedAt = reversal.method === 'wallet' ? now : null;
+        }
+      }
 
       if (nextStatus === 'COMPLETED') {
         orderUpdates.completedAt = now;
@@ -478,9 +558,10 @@ orderRouter.patch('/:id/status', authenticate, async (req, res) => {
         }
       }
 
+      // 4. Update the order document, refund fields included.
       t.update(orderRef, orderUpdates);
 
-      // 4. Record State Change in Events Subcollection
+      // 5. Record State Change in Events Subcollection
       const eventRef = orderRef.collection('events').doc();
       t.set(eventRef, {
         orderId,
@@ -492,8 +573,8 @@ orderRouter.patch('/:id/status', authenticate, async (req, res) => {
         timestamp: now
       });
 
-      // 5. Update user stats when reaching terminal states
-      if (nextStatus === 'COMPLETED' || nextStatus === 'CANCELLED' || nextStatus === 'MERCHANT_REJECTED') {
+      // 6. Update user stats when reaching terminal states
+      if (nextStatus === 'COMPLETED' || isReversal) {
         const userStatsRef = adminDb.collection('users').doc(orderData.customerId).collection('stats').doc('summary');
         const fieldToIncrement = nextStatus === 'COMPLETED' ? 'completedOrders' : 'cancelledOrders';
         t.set(userStatsRef, {
@@ -502,21 +583,10 @@ orderRouter.patch('/:id/status', authenticate, async (req, res) => {
         }, { merge: true });
       }
 
-      // 6. Atomic Capacity Release on Cancellation / Rejection (Requirement #7)
-      if (nextStatus === 'CANCELLED' || nextStatus === 'MERCHANT_REJECTED') {
-        if (orderData.storeId && orderData.slotId) {
-          const slotRef = SlotTransactionService.getSlotRef(orderData.storeId, orderData.slotId);
-          const slotSnap = await t.get(slotRef);
-          if (slotSnap.exists) {
-            const slotData = slotSnap.data();
-            const currentConfirmed = slotData.confirmedWorkload ?? 0;
-            const orderWorkload = Number(orderData.workload) || (Array.isArray(orderData.items) ? orderData.items.reduce((s, it) => s + (it.quantity || 1), 0) : 1);
-            const newConfirmed = Math.max(0, currentConfirmed - orderWorkload);
-            t.update(slotRef, {
-              confirmedWorkload: newConfirmed,
-              updatedAt: now
-            });
-          }
+      // 7. Atomic Capacity Release on Cancellation / Rejection (Requirement #7)
+      if (isReversal) {
+        if (slotRef && slotUpdates) {
+          t.update(slotRef, slotUpdates);
         }
         if (orderData.reservationId) {
           const resRef = adminDb.collection('reservations').doc(orderData.reservationId);

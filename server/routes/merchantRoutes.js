@@ -8,10 +8,10 @@ import {
   storeIdFromOrderParam
 } from '../middleware/authenticate.js';
 import { requireSecret, optionalSecret } from '../config/secrets.js';
-import { recordOrderFulfilled, recordRefund } from '../services/ledgerService.js';
+import { recordOrderFulfilled } from '../services/ledgerService.js';
 import { resolveOrderBreakdown } from '../services/orderPricing.js';
 import { NotificationEngine } from '../services/notificationEngine.js';
-import { applyWalletDelta } from '../services/customerWalletService.js';
+import { reverseOrderPayment } from '../services/orderRefundService.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -165,6 +165,7 @@ merchantRouter.post('/orders/:id/reject', authenticate, requireStoreOwnership(st
     const now = new Date().toISOString();
 
     let orderDataToRefund = null;
+    let refundMethod = 'none';
 
     await adminDb.runTransaction(async (t) => {
       const orderSnap = await t.get(orderRef);
@@ -179,60 +180,32 @@ merchantRouter.post('/orders/:id/reject', authenticate, requireStoreOwnership(st
         throw new Error(`Cannot reject order with status ${order.status}`);
       }
 
+      // The reversal reads the customer's wallet, so it has to run before any
+      // write in this transaction: Firestore requires every read to precede
+      // every write, and the order update below is a write.
+      const reversal = await reverseOrderPayment(t, adminDb, {
+        orderId,
+        order,
+        reason: `${reasonCode}: ${reasonMessage}`,
+        actorUid: req.user?.uid || null,
+        now
+      });
+      refundMethod = reversal.method;
+
       t.update(orderRef, {
         status: 'MERCHANT_REJECTED',
         canonicalStatus: 'CANCELLED',
-        settlementStatus: 'REVERSED',
-        paymentStatus: order.paidFromWallet ? 'REFUNDED' : 'REFUND_PENDING',
+        settlementStatus: reversal.reversed ? 'REVERSED' : 'NOT_SETTLED',
+        paymentStatus: reversal.method === 'wallet'
+          ? 'REFUNDED'
+          : (reversal.reversed ? 'REFUND_PENDING' : order.paymentStatus || 'UNPAID'),
+        refundedSatang: reversal.method === 'wallet' ? reversal.amountSatang : 0,
+        refundedAt: reversal.method === 'wallet' ? now : null,
         cancellationReason: reasonMessage,
         rejectionReasonCode: reasonCode,
         version: (order.version || 1) + 1,
         updatedAt: now
       });
-
-      // Campus Wallet settles at order time, so a rejection must put the money
-      // straight back rather than queueing a gateway refund that never comes.
-      if (order.paidFromWallet && order.paymentStatus === 'PAID') {
-        await applyWalletDelta(t, adminDb, {
-          uid: order.customerId,
-          deltaSatang: Number(order.totalSatang) || 0,
-          type: 'REFUND',
-          orderId,
-          note: `คืนเงินอัตโนมัติ: ร้านปฏิเสธออเดอร์ (${reasonMessage})`,
-          actorUid: req.user?.uid || null,
-          now
-        });
-      }
-
-      // Write Outbox record for refund
-      const refundId = `ref_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      const refundRef = adminDb.collection('refund_requests').doc(refundId);
-      t.set(refundRef, {
-        id: refundId,
-        orderId,
-        storeId: order.storeId,
-        amountSatang: order.totalSatang || Math.round((order.total || 0) * 100),
-        reason: `${reasonCode}: ${reasonMessage}`,
-        status: 'PENDING',
-        createdAt: now,
-        updatedAt: now
-      });
-
-      // Reverse pending ledger entry if previously credited
-      if (order.paymentStatus === 'PAID') {
-        const { totalSatang, platformFeeSatang, gatewayFeeSatang, merchantNetSatang } =
-          resolveOrderBreakdown(order);
-
-        await recordRefund(t, adminDb, {
-          orderId,
-          storeId: order.storeId,
-          totalSatang,
-          merchantNetSatang,
-          platformFeeSatang,
-          gatewayFeeSatang,
-          now
-        });
-      }
 
       // Record Audit Event
       const auditRef = orderRef.collection('events').doc();
@@ -248,7 +221,7 @@ merchantRouter.post('/orders/:id/reject', authenticate, requireStoreOwnership(st
     });
 
     // Execute Stripe Refund asynchronously (Outbox/Saga pattern)
-    if (stripe && orderDataToRefund?.stripePaymentIntentId) {
+    if (refundMethod === 'gateway' && stripe && orderDataToRefund?.stripePaymentIntentId) {
       try {
         const refund = await stripe.refunds.create({
           payment_intent: orderDataToRefund.stripePaymentIntentId,
