@@ -166,6 +166,7 @@ merchantRouter.post('/orders/:id/reject', authenticate, requireStoreOwnership(st
 
     let orderDataToRefund = null;
     let refundMethod = 'none';
+    let refundAmountSatang = 0;
 
     await adminDb.runTransaction(async (t) => {
       const orderSnap = await t.get(orderRef);
@@ -191,6 +192,7 @@ merchantRouter.post('/orders/:id/reject', authenticate, requireStoreOwnership(st
         now
       });
       refundMethod = reversal.method;
+      refundAmountSatang = reversal.amountSatang;
 
       t.update(orderRef, {
         status: 'MERCHANT_REJECTED',
@@ -228,10 +230,16 @@ merchantRouter.post('/orders/:id/reject', authenticate, requireStoreOwnership(st
           reason: 'requested_by_customer'
         });
         console.log(`[Merchant API] Stripe refund initiated: ${refund.id}`);
+        const refundedAt = new Date().toISOString();
+        // charge.refunded closes out the refund_requests row and would set these
+        // too, but recording them here keeps the order complete on a deployment
+        // whose webhook is not configured yet.
         await orderRef.update({
           paymentStatus: 'REFUNDED',
           stripeRefundId: refund.id,
-          updatedAt: new Date().toISOString()
+          refundedSatang: refundAmountSatang,
+          refundedAt,
+          updatedAt: refundedAt
         });
       } catch (stripeErr) {
         console.error('[Merchant API] Stripe refund error:', stripeErr.message);
