@@ -1,3 +1,5 @@
+import { doc, setDoc, serverTimestamp, collection, getDocs } from 'firebase/firestore';
+
 /**
  * ============================================================================
  * 📋 GE341511 KKU CANTEEN USABILITY & SATISFACTION SURVEY (QueueUp Pilot Study)
@@ -249,7 +251,6 @@ export async function seedSurveysToFirestore(db, surveys = PILOT_STUDENT_SURVEYS
   if (!db) return { success: false, error: "Database instance required", count: 0 };
   let count = 0;
   try {
-    const { doc, setDoc, serverTimestamp } = await import("firebase/firestore");
     for (const item of surveys) {
       await setDoc(
         doc(db, "canteen_surveys", item.id),
@@ -274,7 +275,6 @@ export async function seedSurveysToFirestore(db, surveys = PILOT_STUDENT_SURVEYS
 export async function fetchSurveysFromFirestore(db) {
   if (!db) return getStoredSatisfactionSurveys();
   try {
-    const { collection, getDocs } = await import("firebase/firestore");
     const snap = await getDocs(collection(db, "canteen_surveys"));
     const list = [];
     snap.forEach((docItem) => {
@@ -307,7 +307,6 @@ export async function submitSurveyToFirestore(db, surveyData) {
 
   if (db) {
     try {
-      const { doc, setDoc, serverTimestamp } = await import("firebase/firestore");
       await setDoc(doc(db, "canteen_surveys", surveyId), {
         ...fullSurvey,
         createdAt: serverTimestamp(),

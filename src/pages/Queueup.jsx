@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useSelector } from "react-redux";
+import { useQueue } from "../context/QueueContext";
 import {
   fetchEvaluationsFromFirestore,
   submitEvaluationToFirestore,
@@ -30,7 +30,8 @@ import "./Queueup.css";
 export default function Queueup() {
   const toast = useToast();
   const navigate = useNavigate();
-  const { user } = useSelector((state) => state.auth);
+  const { currentUser, setCurrentView, setIsRegisterModalOpen } = useQueue();
+  const user = currentUser;
   const [isScrolled, setIsScrolled] = useState(false);
 
   // Dynamic Real User Evaluations State
@@ -462,11 +463,24 @@ export default function Queueup() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+    const handleLoginClick = () => {
+    if (setIsRegisterModalOpen) {
+      setIsRegisterModalOpen(true);
+    } else {
+      navigate("/landing");
+    }
+  };
+
   const handleStartApp = () => {
     if (user || localStorage.getItem("queueup_user")) {
+      if (setCurrentView) setCurrentView("home");
       navigate("/home");
     } else {
-      navigate("/login");
+      if (setIsRegisterModalOpen) {
+        setIsRegisterModalOpen(true);
+      } else {
+        navigate("/landing");
+      }
     }
   };
 
@@ -527,7 +541,7 @@ export default function Queueup() {
             {!user && (
               <button
                 className="qup-btn-secondary"
-                onClick={() => navigate("/login")}
+                onClick={handleLoginClick}
               >
                 เข้าสู่ระบบ
               </button>

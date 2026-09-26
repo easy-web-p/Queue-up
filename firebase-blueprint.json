@@ -1,0 +1,126 @@
+{
+  "entities": {
+    "Canteen": {
+      "title": "Canteen",
+      "description": "มหาวิทยาลัยขอนแก่น - ข้อมูลโรงอาหารและศูนย์อาหาร",
+      "type": "object",
+      "properties": {
+        "canteenId": { "type": "number", "description": "รหัสลำดับโรงอาหาร" },
+        "nameTh": { "type": "string", "description": "ชื่อภาษาไทยของโรงอาหาร" },
+        "nameEn": { "type": "string", "description": "ชื่อภาษาอังกฤษของโรงอาหาร" },
+        "zone": { "type": "string", "description": "โซนที่ตั้งในมหาวิทยาลัย" },
+        "lat": { "type": "number", "description": "ละติจูดพิกัดแผนที่" },
+        "lng": { "type": "number", "description": "ลองจิจูดพิกัดแผนที่" },
+        "openingHours": { "type": "string", "description": "เวลาเปิด-ปิดทำการ" },
+        "storeCount": { "type": "number", "description": "จำนวนร้านค้าในโรงอาหาร" },
+        "smartTransit": { "type": "string", "description": "สายรถ Smart Transit มข. ที่ผ่าน" },
+        "popularMenus": { "type": "string", "description": "เมนูเด่นและช่วงราคา" },
+        "mapsUrl": { "type": "string", "description": "ลิงก์เปิด Google Maps นำทาง" }
+      },
+      "required": ["canteenId", "nameTh", "nameEn", "zone", "lat", "lng", "openingHours", "storeCount", "smartTransit", "popularMenus", "mapsUrl"]
+    },
+    "Store": {
+      "title": "Store",
+      "description": "ข้อมูลร้านค้าและศูนย์อาหารในระบบ",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "รหัสประจำร้านค้า" },
+        "name": { "type": "string", "description": "ชื่อร้านค้าหรือโรงอาหาร" },
+        "nameEn": { "type": "string", "description": "ชื่อภาษาอังกฤษ" },
+        "description": { "type": "string", "description": "รายละเอียดร้านค้า" },
+        "category": { "type": "string", "description": "หมวดหมู่ร้านค้า" },
+        "image": { "type": "string", "description": "รูปภาพหน้าร้าน" },
+        "rating": { "type": "number", "description": "คะแนนเฉลี่ย" },
+        "reviewCount": { "type": "number", "description": "จำนวนรีวิว" },
+        "isOpen": { "type": "boolean", "description": "สถานะเปิดให้บริการ" },
+        "address": { "type": "string", "description": "ที่ตั้งร้าน" },
+        "tags": { "type": "array", "description": "แท็กค้นหา" }
+      },
+      "required": ["id", "name", "category", "isOpen", "address"]
+    },
+    "FoodItem": {
+      "title": "FoodItem",
+      "description": "รายการอาหารในแต่ละร้านค้าหรือศูนย์อาหาร",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "รหัสเมนูอาหาร" },
+        "storeId": { "type": "string", "description": "รหัสร้านค้าเจ้าของเมนู" },
+        "name": { "type": "string", "description": "ชื่อเมนูอาหาร" },
+        "price": { "type": "number", "description": "ราคาอาหาร" },
+        "description": { "type": "string", "description": "รายละเอียดเมนู" },
+        "category": { "type": "string", "description": "หมวดหมู่เมนู" },
+        "image": { "type": "string", "description": "รูปภาพอาหาร" },
+        "isAvailable": { "type": "boolean", "description": "มีของพร้อมขาย" }
+      },
+      "required": ["id", "storeId", "name", "price", "isAvailable"]
+    },
+    "QueueOrder": {
+      "title": "QueueOrder",
+      "description": "คำสั่งซื้อและการจองคิวอาหาร",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "รหัสคิวออเดอร์" },
+        "queueNumber": { "type": "string", "description": "หมายเลขบัตรคิว" },
+        "storeId": { "type": "string", "description": "รหัสร้านค้า" },
+        "customerName": { "type": "string", "description": "ชื่อลูกค้า" },
+        "status": { "type": "string", "description": "สถานะคิว" },
+        "total": { "type": "number", "description": "ยอดเงินรวม" }
+      },
+      "required": ["id", "queueNumber", "storeId", "status", "total"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "ข้อมูลบัญชีผู้ใช้งาน สิทธิ์ และสถานะการยืนยันรหัสผ่านและ OTP ทาง SMS",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "รหัสประจำตัวผู้ใช้" },
+        "fullName": { "type": "string", "description": "ชื่อ-นามสกุล หรือชื่อร้านค้า" },
+        "email": { "type": "string", "description": "อีเมลผู้ใช้งาน" },
+        "phone": { "type": "string", "description": "เบอร์โทรศัพท์ที่ใช้ยืนยัน OTP" },
+        "role": { "type": "string", "description": "สิทธิ์การใช้งาน (customer, merchant, admin)" },
+        "phoneVerified": { "type": "boolean", "description": "สถานะการยืนยันรหัส OTP ทาง SMS สำเร็จ" },
+        "otpVerifiedAt": { "type": "string", "description": "วันเวลาที่ยืนยัน OTP สำเร็จ" },
+        "registeredAt": { "type": "string", "description": "วันเวลาที่ลงทะเบียน" }
+      },
+      "required": ["id", "fullName", "email", "phone", "role"]
+    },
+    "SearchLog": {
+      "title": "SearchLog",
+      "description": "บันทึกข้อมูลการค้นหาและสถิติคำค้นเพื่อใช้ในระบบแนะนำ",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "รหัสบันทึกการค้นหา" },
+        "query": { "type": "string", "description": "ข้อความคำค้นหา" },
+        "userId": { "type": "string", "description": "รหัสผู้ใช้" },
+        "timestamp": { "type": "string", "description": "วันเวลาที่ค้นหา" }
+      },
+      "required": ["id", "query", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/canteens/{canteenDocId}": {
+      "schema": { "$ref": "#/entities/Canteen" },
+      "description": "คอลเลกชันรายชื่อโรงอาหาร มข. ข้อมูลพิกัด เวลาเปิดปิด และสายรถขนส่ง"
+    },
+    "/stores/{storeDocId}": {
+      "schema": { "$ref": "#/entities/Store" },
+      "description": "คอลเลกชันร้านค้าและศูนย์อาหารทั้งหมด"
+    },
+    "/food_items/{foodDocId}": {
+      "schema": { "$ref": "#/entities/FoodItem" },
+      "description": "คอลเลกชันเมนูอาหารทั้งหมด"
+    },
+    "/orders/{orderDocId}": {
+      "schema": { "$ref": "#/entities/QueueOrder" },
+      "description": "คอลเลกชันคำสั่งซื้อและบัตรคิวเรียลไทม์"
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "คอลเลกชันข้อมูลบัญชีผู้ใช้งานและการยืนยันรหัสผ่านและ OTP"
+    },
+    "/search_logs/{searchLogId}": {
+      "schema": { "$ref": "#/entities/SearchLog" },
+      "description": "คอลเลกชันบันทึกข้อมูลการค้นหาเพื่อประมวลผลระบบแนะนำอัจฉริยะ"
+    }
+  }
+}

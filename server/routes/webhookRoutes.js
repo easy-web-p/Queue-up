@@ -1,0 +1,183 @@
+import { Router } from 'express';
+import Stripe from 'stripe';
+import { adminDb } from '../firebaseAdmin.js';
+import { recordCustomerPayment, recordRefund } from '../services/ledgerService.js';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+export const webhookRouter = Router();
+
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY || 'dummy_stripe_secret_key';
+const stripe = new Stripe(stripeSecretKey);
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+/**
+ * POST /api/webhooks/stripe
+ * Stripe Webhook Handler with Signature Verification and Event Deduplication
+ * Note: Must be mounted with express.raw({ type: 'application/json' }) before express.json()
+ */
+webhookRouter.post('/stripe', async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  let event;
+
+  try {
+    if (webhookSecret && sig) {
+      event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+    } else {
+      // In development or when webhook secret is pending, parse JSON safely
+      const rawText = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : JSON.stringify(req.body);
+      event = JSON.parse(rawText);
+    }
+  } catch (err) {
+    console.error('[Stripe Webhook] Signature verification failed:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  const eventId = event.id;
+  const eventType = event.type;
+  const eventRef = adminDb.collection('payment_webhook_events').doc(eventId);
+
+  // 1. Idempotency Check: Prevent duplicate webhook processing
+  try {
+    const existing = await eventRef.get();
+    if (existing.exists) {
+      console.log(`[Stripe Webhook] Event ${eventId} already processed, skipping.`);
+      return res.status(200).json({ received: true, deduplicated: true });
+    }
+  } catch (err) {
+    console.warn('[Stripe Webhook] Deduplication lookup error:', err.message);
+  }
+
+  const now = new Date().toISOString();
+
+  try {
+    switch (eventType) {
+      case 'checkout.session.completed': {
+        const session = event.data.object;
+        const orderId = session.metadata?.orderId || session.client_reference_id;
+
+        if (!orderId) {
+          console.warn('[Stripe Webhook] checkout.session.completed missing orderId metadata.');
+          break;
+        }
+
+        const orderRef = adminDb.collection('orders').doc(orderId);
+
+        await adminDb.runTransaction(async (t) => {
+          const orderSnap = await t.get(orderRef);
+          if (!orderSnap.exists) {
+            console.error(`[Stripe Webhook] Order ${orderId} not found.`);
+            return;
+          }
+
+          const order = orderSnap.data();
+
+          // Idempotency check on order status
+          if (order.paymentStatus === 'PAID') {
+            console.log(`[Stripe Webhook] Order ${orderId} already marked PAID.`);
+            return;
+          }
+
+          // 5-minute deadline for merchant to accept/reject
+          const merchantDeadline = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+          const totalSatang = order.totalSatang || Math.round((order.total || 0) * 100);
+          const platformFeeSatang = order.platformFeeSatang || Math.round(totalSatang * 0.10);
+          const gatewayFeeSatang = order.estimatedGatewayFeeSatang || Math.round(totalSatang * 0.0165 * 1.07);
+          const merchantNetSatang = order.merchantNetSatang || Math.max(0, totalSatang - platformFeeSatang - gatewayFeeSatang);
+
+          // Update Order State
+          t.update(orderRef, {
+            status: 'PAID_AWAITING_MERCHANT',
+            paymentStatus: 'PAID',
+            settlementStatus: 'PENDING_ORDER_ACCEPTANCE',
+            paidAt: now,
+            merchantResponseDeadlineAt: merchantDeadline,
+            stripeSessionId: session.id,
+            stripePaymentIntentId: session.payment_intent || null,
+            version: (order.version || 1) + 1,
+            updatedAt: now
+          });
+
+          // Write Customer Payment Record
+          const paymentId = `pay_${session.id}`;
+          const paymentRef = adminDb.collection('payments').doc(paymentId);
+          t.set(paymentRef, {
+            id: paymentId,
+            orderId,
+            storeId: order.storeId,
+            customerId: order.customerId,
+            amountSatang: totalSatang,
+            currency: 'thb',
+            provider: 'stripe',
+            providerPaymentIntentId: session.payment_intent || null,
+            providerCheckoutSessionId: session.id,
+            paymentMethodType: session.payment_method_types?.[0] || 'promptpay',
+            status: 'PAID',
+            paidAt: now,
+            createdAt: now,
+            updatedAt: now
+          });
+
+          // Record Double-Entry Ledger
+          await recordCustomerPayment(t, adminDb, {
+            orderId,
+            storeId: order.storeId,
+            totalSatang,
+            merchantNetSatang,
+            platformFeeSatang,
+            gatewayFeeSatang,
+            now
+          });
+
+          // Record Audit Event
+          const auditRef = orderRef.collection('events').doc();
+          t.set(auditRef, {
+            orderId,
+            fromStatus: order.status,
+            toStatus: 'PAID_AWAITING_MERCHANT',
+            changedBy: 'STRIPE_WEBHOOK',
+            changerRole: 'system',
+            note: `Payment verified via Stripe (${session.payment_method_types?.join(', ') || 'online'}). Awaiting merchant acceptance.`,
+            timestamp: now
+          });
+        });
+
+        console.log(`[Stripe Webhook] Order ${orderId} successfully transitioned to PAID_AWAITING_MERCHANT.`);
+        break;
+      }
+
+      case 'payment_intent.succeeded': {
+        const paymentIntent = event.data.object;
+        const orderId = paymentIntent.metadata?.orderId;
+        if (orderId) {
+          console.log(`[Stripe Webhook] payment_intent.succeeded for order ${orderId}`);
+        }
+        break;
+      }
+
+      case 'charge.refunded': {
+        const charge = event.data.object;
+        const paymentIntentId = charge.payment_intent;
+        console.log(`[Stripe Webhook] charge.refunded for payment intent ${paymentIntentId}`);
+        break;
+      }
+
+      default:
+        console.log(`[Stripe Webhook] Unhandled event type: ${eventType}`);
+    }
+
+    // Record webhook event as processed
+    await eventRef.set({
+      stripeEventId: eventId,
+      type: eventType,
+      processedAt: now,
+      livemode: !!event.livemode
+    });
+
+    return res.status(200).json({ received: true });
+  } catch (err) {
+    console.error('[Stripe Webhook] Processing error:', err);
+    return res.status(500).json({ error: 'WEBHOOK_PROCESSING_FAILED', message: err.message });
+  }
+});

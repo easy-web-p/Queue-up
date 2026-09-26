@@ -1,32 +1,34 @@
 /**
- * 🏫 Pilot programme lead submission.
- *
- * Goes through a Cloud Function rather than writing Firestore directly: the form
- * collects a contact's name, position, phone and email, and the landing page
- * promises to keep that confidential under the PDPA. A client-writable collection
- * could not honour that promise, so `pilot_leads` is closed to every browser and
- * the function is the only writer.
+ * Pilot Lead Submission Service
  */
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../config/firebase';
 
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '../firebase/config.js';
+export async function submitPilotLead(leadData) {
+  const item = {
+    ...leadData,
+    id: 'lead_' + Date.now(),
+    createdAt: new Date().toISOString()
+  };
 
-/**
- * @param {{schoolName: string, studentCount?: string, contactName: string,
- *          position?: string, phone: string, email: string, notes?: string}} form
- * @returns {Promise<{leadId: string}>} resolves only once the lead is stored
- * @throws {Error} with a message safe to show the school
- */
-export async function submitPilotLead(form) {
-  const callable = httpsCallable(functions, 'submitPilotLead');
-  const result = await callable({
-    schoolName: form.schoolName,
-    studentCount: form.studentCount,
-    contactName: form.contactName,
-    position: form.position,
-    phone: form.phone,
-    email: form.email,
-    notes: form.notes,
-  });
-  return { leadId: result?.data?.leadId };
+  try {
+    if (db) {
+      const docRef = await addDoc(collection(db, 'pilot_leads'), {
+        ...leadData,
+        createdAt: serverTimestamp()
+      });
+      item.id = docRef.id;
+    }
+  } catch (err) {
+    console.warn('[PilotLeadService] Firestore save error:', err);
+  }
+
+  try {
+    const local = JSON.parse(localStorage.getItem('queueup_pilot_leads') || '[]');
+    localStorage.setItem('queueup_pilot_leads', JSON.stringify([item, ...local]));
+  } catch {
+    // ignore
+  }
+
+  return item;
 }

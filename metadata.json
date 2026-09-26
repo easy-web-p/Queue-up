@@ -1,0 +1,8 @@
+{
+  "name": "QueueUp",
+  "description": "ระบบจัดการคิวและสั่งอาหารดิจิทัลล่วงหน้า พร้อมจอครัว KDS และระบบความปลอดภัยอัจฉริยะ",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

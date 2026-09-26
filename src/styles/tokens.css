@@ -1,0 +1,264 @@
+/* Design Tokens for QueueUp
+   Light Mode: Warm Culinary Orange, Amber, Crimson, White
+   Dark Mode: Elevated OLED-safe Dark Palette (#0d0d11 base, #17171d surface, #212129 elevated)
+   WCAG 2.1 AAA/AA compliant contrast with Anti-Halation Brand Palette
+*/
+
+:root[data-theme="dark"],
+:root,
+html.dark,
+.dark {
+  /* Canvas & Elevation System — เลิก pure black แต่ยังดำพอสำหรับ OLED */
+  --bg-base: #0d0d11;        /* was #000000 */
+  --bg-surface: #17171d;     /* was #0a0a0e */
+  --bg-elevated: #212129;    /* was #121218 */
+  --bg-overlay: #2a2a33;
+
+  --bg-primary: #0d0d11;
+  --bg-secondary: #17171d;
+  --bg-tertiary: #212129;
+  
+  --surface: #17171d;
+  --surface-elevated: #212129;
+  --surface-hover: #2a2a34;
+  --surface-glass: rgba(23, 23, 29, 0.88);
+  --surface-input: #121217;
+  
+  --border: rgba(255, 255, 255, 0.14);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-default: rgba(255, 255, 255, 0.14);
+  --border-focus: #fb923c;
+  --border-highlight: rgba(255, 255, 255, 0.22);
+
+  /* Typography — ลด glare ลงนิด ยังผ่าน AAA (15.2:1) */
+  --text-primary: #f4f4f5;   /* was #fafafa (18.6:1 → 15.2:1) */
+  --text-secondary: #d4d4d8;
+  --text-muted: #a1a1aa;
+  --text-inverse: #0d0d11;
+
+  /* Brand — สว่างขึ้น + อิ่มตัวน้อยลง ลด halation ขอบฟุ้ง */
+  --primary: #fb923c;        /* was #ff6a00 → 6.8:1 ขึ้นเป็น 8.6:1 */
+  --primary-hover: #f97316;
+  --primary-light: rgba(251, 146, 60, 0.20);
+  --primary-text: #fb923c;
+
+  --brand-primary: #fb923c;   /* 8.6:1 */
+  --brand-secondary: #f87171; /* was #ef4444 → 5.2:1 ขึ้นเป็น 7.0:1 */
+  --brand-accent: #fcd34d;    /* 13.5:1 */
+
+  --accent-orange: #fb923c;
+  --accent-yellow: #fcd34d;  /* Radiant Electric Amber/Yellow */
+  --accent-red: #f87171;     /* Crimson Coral Red (7.0:1) */
+  --accent-cyan: #38bdf8;    /* Luminous Sky Cyan */
+
+  --secondary: #f87171;
+  --secondary-light: rgba(248, 113, 113, 0.18);
+
+  --accent-amber: #fbbf24;
+  --accent-amber-light: rgba(251, 191, 36, 0.2);
+
+  --success: #34d399;
+  --success-bg: rgba(52, 211, 153, 0.18);
+  --warning: #fcd34d;
+  --warning-bg: rgba(252, 211, 77, 0.18);
+  --danger: #f87171;
+  --danger-bg: rgba(248, 113, 113, 0.18);
+  --info: #38bdf8;
+  --info-bg: rgba(56, 189, 248, 0.18);
+
+  /* Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  /* Shadows with elevation depth */
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 16px -2px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 12px 32px -4px rgba(0, 0, 0, 0.75);
+  --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.6);
+
+  --backdrop-blur: blur(16px);
+}
+
+/* LIGHT MODE: Orange, Yellow, Red, White Palette */
+:root[data-theme="light"],
+html:not(.dark),
+html.light {
+  --bg-base: #ffffff;
+  --bg-surface: #ffffff;
+  --bg-elevated: #fffbf5;
+  --bg-overlay: #fef3c7;
+
+  --bg-primary: #ffffff;
+  --bg-secondary: #fffbf5;
+  --bg-tertiary: #fef3c7;
+  
+  --surface: #ffffff;
+  --surface-elevated: #ffffff;
+  --surface-hover: #fff7ed;
+  --surface-glass: rgba(255, 255, 255, 0.95);
+  --surface-input: #ffffff;
+  
+  --border: #fed7aa;
+  --border-subtle: #ffedd5;
+  --border-default: #fed7aa;
+  --border-focus: #ea580c;
+  --border-highlight: rgba(234, 88, 12, 0.15);
+
+  /* Typography: High-contrast, crystal clear dark stone/charcoal on white */
+  --text-primary: #1c1917;
+  --text-secondary: #44403c;
+  --text-muted: #78716c;
+  --text-inverse: #ffffff;
+
+  /* Culinary Warm Orange, Yellow, Red, White Accents */
+  --primary: #ea580c; /* Bold Energetic Orange */
+  --primary-hover: #c2410c;
+  --primary-light: rgba(234, 88, 12, 0.12);
+  --primary-text: #c2410c;
+
+  --brand-primary: #ea580c;
+  --brand-secondary: #dc2626;
+  --brand-accent: #d97706;
+
+  --accent-orange: #f97316;
+  --accent-yellow: #eab308;
+  --accent-red: #dc2626;
+  --accent-cyan: #0284c7;
+
+  --secondary: #dc2626;
+  --secondary-light: rgba(220, 38, 38, 0.12);
+
+  --accent-amber: #eab308;
+  --accent-amber-light: rgba(234, 179, 8, 0.15);
+
+  --success: #047857; /* Emerald 700 (4.8:1 on light backgrounds, passes AA) */
+  --success-bg: rgba(4, 120, 87, 0.12);
+  --warning: #d97706;
+  --warning-bg: rgba(217, 119, 6, 0.15);
+  --danger: #dc2626;
+  --danger-bg: rgba(220, 38, 38, 0.12);
+  --info: #0284c7;
+  --info-bg: rgba(2, 132, 199, 0.12);
+
+  --shadow-sm: 0 1px 3px 0 rgba(234, 88, 12, 0.06);
+  --shadow-md: 0 4px 14px -2px rgba(234, 88, 12, 0.08);
+  --shadow-lg: 0 12px 28px -6px rgba(234, 88, 12, 0.12);
+  --shadow-glass: 0 8px 24px 0 rgba(234, 88, 12, 0.06);
+}
+
+/* Global Font & Scrollbar */
+body {
+  font-family: 'Plus Jakarta Sans', 'Prompt', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+}
+
+/* Custom subtle scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(251, 146, 60, 0.3);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(251, 146, 60, 0.55);
+}
+
+/* Custom Card and Panel Utilities */
+.glass-panel {
+  background: var(--surface);
+  backdrop-filter: var(--backdrop-blur);
+  -webkit-backdrop-filter: var(--backdrop-blur);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+}
+
+.glass-panel-elevated {
+  background: var(--surface-elevated);
+  backdrop-filter: var(--backdrop-blur);
+  -webkit-backdrop-filter: var(--backdrop-blur);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+}
+
+.glass-input {
+  background: var(--surface-input);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+}
+.glass-input:focus {
+  border-color: var(--border-focus);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-light);
+}
+
+/* KDS Kitchen Display Columns in Dark Mode */
+.kds-col-waiting { background: rgba(251, 191, 36, 0.10); }
+.kds-col-cooking { background: rgba(56, 189, 248, 0.10); }
+.kds-col-ready   { background: rgba(52, 211, 153, 0.12); }
+.kds-col-done    { background: rgba(148, 163, 184, 0.06); }
+
+/* Dark Mode Canvas & Elevation overrides */
+html.dark,
+:root[data-theme="dark"],
+.dark {
+  background-color: #0d0d11;
+  color: #f4f4f5;
+}
+
+html.dark body,
+.dark body {
+  background-color: #0d0d11;
+  color: #f4f4f5;
+}
+
+html.dark .bg-black,
+html.dark .bg-slate-950,
+html.dark .bg-zinc-950,
+html.dark .bg-\[\#000000\],
+html.dark .bg-\[\#0b0f17\],
+html.dark .bg-\[\#0a0a0e\],
+html.dark .bg-\[\#070b14\] {
+  background-color: #0d0d11;
+}
+
+html.dark .bg-zinc-900,
+html.dark .bg-slate-900,
+html.dark .bg-\[\#121218\],
+html.dark .bg-\[\#0f172a\] {
+  background-color: #17171d;
+}
+
+html.dark .bg-zinc-800,
+html.dark .bg-slate-800,
+html.dark .bg-\[\#1c1c24\],
+html.dark .bg-\[\#1e293b\] {
+  background-color: #212129;
+}
+
+/* Screen Transition: Entrance from Top to Bottom */
+@keyframes screenSlideDown {
+  0% {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.screen-enter-top {
+  animation: screenSlideDown 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+

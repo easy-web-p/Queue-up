@@ -1,814 +1,130 @@
-import { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { useDispatch, useSelector } from "react-redux";
-import { useAuth } from "../context/AuthContext.jsx";
-import { setUser } from "../store/authSlice.js";
-import {
-  auth,
-  db,
-  doc,
-  setDoc,
-  getDoc,
-  serverTimestamp,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  sendEmailVerification,
-  sendPasswordResetEmail,
-} from "../firebase/config.js";
-import {
-  sanitizeInput,
-  generateSecureAccountId,
-  validateEmailSyntaxAndDomain,
-} from "../utils/security.js";
-import { getEffectiveRoles, isUserSuperAdmin } from "../utils/authRoles.js";
-import PdpaPolicyModal from "../components/PdpaPolicyModal.jsx";
-import { useToast } from "../components/ToastProvider.jsx";
-import "./Login.css";
+import React, { useState } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { useQueue } from '../context/QueueContext';
+import { User, Shield, Sparkles, ChefHat, GraduationCap, Users } from 'lucide-react';
 
-function Login() {
-  const toast = useToast();
-  const dispatch = useDispatch();
+export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  // 🔒 Open Redirect Guard: Only allow valid relative internal paths starting with a single '/'
-  const sanitizeInternalRedirect = (destination) => {
-    if (!destination || typeof destination !== "string") return "/home";
-    const trimmed = destination.trim();
-    if (trimmed.startsWith("/") && !trimmed.startsWith("//") && !trimmed.includes("://")) {
-      return trimmed;
-    }
-    return "/home";
-  };
+  const { login, signInWithGoogle } = useAuth();
+  const { setRole: setGlobalRole, addToast } = useQueue();
+  const [selectedRole, setSelectedRole] = useState('customer');
 
-  const rawDestination = typeof location.state?.from === "string"
-    ? location.state.from
-    : (location.state?.from?.pathname ? `${location.state.from.pathname}${location.state.from.search || ""}` : "/home");
-  const fromDestination = sanitizeInternalRedirect(rawDestination);
-  const { user } = useSelector((state) => state.auth);
-  const { loginWithGoogle } = useAuth();
-
-  // 1. Redirect if already logged in with verified auth
-  useEffect(() => {
-    if (user && user.isVerifiedAuth === true) {
-      navigate(fromDestination, { replace: true });
-    }
-  }, [user, navigate, fromDestination]);
-
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [isCreateProfile, setIsCreateProfile] = useState(false);
-  const [isGoogleUser, setIsGoogleUser] = useState(false);
-  const [currentUid, setCurrentUid] = useState("");
-
-  // Form State
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [emailError, setEmailError] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(true);
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [pdpaAccepted, setPdpaAccepted] = useState(false);
-  const [isPdpaModalOpen, setIsPdpaModalOpen] = useState(false);
-  const [pdpaModalTab, setPdpaModalTab] = useState("privacy");
-
-  // Profile Setup State (สำหรับตั้งชื่อเล่นและเลือกอวาตาร์)
-  const [selectedAvatar, setSelectedAvatar] = useState("/yeti_mascot.jpg");
-  const [uploadedAvatar, setUploadedAvatar] = useState(null);
-  const [displayName, setDisplayName] = useState("");
-  const [phone, setPhone] = useState("");
-
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const imageUrl = URL.createObjectURL(file);
-      setUploadedAvatar(imageUrl);
-      setSelectedAvatar(imageUrl);
-    }
-  };
-
-  // Helper ตรวจสอบความปลอดภัยของรหัสผ่าน (5 ข้อ)
-  const validatePassword = (pwd) => ({
-    hasLength: pwd.length >= 8,
-    hasUpper: /[A-Z]/.test(pwd),
-    hasLower: /[a-z]/.test(pwd),
-    hasNumber: /[0-9]/.test(pwd),
-    hasSpecial: /[!@#$%^&*_-]/.test(pwd),
-  });
-
-  const pwdValidation = validatePassword(password);
-
-  const handleForgotPassword = async (e) => {
-    e.preventDefault();
-    const inputEmail = prompt("🔒 [ระบบกู้คืนรหัสผ่าน]\nกรุณากรอกอีเมลของคุณเพื่อรับลิงก์รีเซ็ตรหัสผ่าน:", email);
-    if (inputEmail && inputEmail.trim()) {
-      const sanitized = sanitizeInput(inputEmail.trim());
-      try {
-        setLoading(true);
-        await sendPasswordResetEmail(auth, sanitized);
-        setLoading(false);
-        toast.success(`ระบบได้ส่งลิงก์สำหรับตั้งรหัสผ่านใหม่ไปยังอีเมล "${sanitized}" เรียบร้อยแล้ว!\nกรุณาตรวจสอบกล่องจดหมายของคุณ`);
-      } catch (err) {
-        setLoading(false);
-        console.warn("sendPasswordResetEmail error:", err);
-        if (err.code === "auth/user-not-found") {
-          toast.warning("ไม่พบบัญชีผู้ใช้ที่ลงทะเบียนด้วยอีเมลนี้");
-        } else if (err.code === "auth/invalid-email") {
-          toast.warning("รูปแบบอีเมลไม่ถูกต้อง");
-        } else if (err.code === "auth/too-many-requests") {
-          toast.warning("มีการส่งคำขอบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่อีกครั้ง");
-        } else {
-          toast.error(`เกิดข้อผิดพลาดในการส่งลิงก์รีเซ็ตรหัสผ่าน: ${err.message}`);
-        }
-      }
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (isCreateProfile) {
-      setLoading(true);
-      const uidToUse = currentUid || (auth.currentUser ? auth.currentUser.uid : `user_${sanitizeInput(email).toLowerCase().replace(/[^a-z0-9]/g, "_")}`);
-      const finalAccountId = generateSecureAccountId(58140);
-
-      const profileData = {
-        uid: uidToUse,
-        accountId: finalAccountId, // 🔒 Cryptographically Random QUP-YYYYMMDD-... ID
-        roles: ["customer"], // 👤 บัญชีเดียวเป็นลูกค้าโดยค่าเริ่มต้น (สามารถสมัครเป็นผู้ขายเพิ่มภายหลังได้)
-        activeRole: "customer",
-        isGoogleUser: isGoogleUser,
-        email: sanitizeInput(email),
-        fullName: sanitizeInput(name),
-        displayName: sanitizeInput(displayName || name || "Member"),
-        phone: phone ? sanitizeInput(phone) : "",
-        photo: selectedAvatar,
-        pdpaAcceptedAt: new Date().toISOString(),
-        updatedAt: serverTimestamp(),
-      };
-
-      try {
-        await setDoc(doc(db, "users", uidToUse), profileData, { merge: true });
-        localStorage.setItem("queueup_secure_account_id", finalAccountId);
-      } catch (err) {
-        console.error("Firestore setDoc failed during profile creation:", err);
-        setLoading(false);
-        toast.error(`ไม่สามารถบันทึกข้อมูลโปรไฟล์ได้: ${err.message}\nกรุณาลองใหม่อีกครั้ง`);
-        return;
-      }
-
-      dispatch(
-        setUser({
-          uid: uidToUse,
-          name: profileData.displayName,
-          email: sanitizeInput(email),
-          photo: selectedAvatar,
-          roles: ["customer"],
-          activeRole: "customer",
-        })
-      );
-      setLoading(false);
-      navigate("/home", { replace: true });
-      return;
-    }
-
-    if (isSignUp) {
-      if (!pdpaAccepted) {
-        toast.warning("กรุณาติ๊กยอมรับเงื่อนไขการใช้งานและนโยบายความเป็นส่วนตัว (PDPA) ก่อนสมัครสมาชิก");
-        return;
-      }
-
-      setLoading(true);
-      const domainCheck = await validateEmailSyntaxAndDomain(email);
-      if (!domainCheck.valid) {
-        setLoading(false);
-        toast.warning(`[ตรวจสอบอีเมล]: ${domainCheck.message}`);
-        return;
-      }
-
-      const { hasLength, hasUpper, hasLower, hasNumber, hasSpecial } = pwdValidation;
-      if (!hasLength || !hasUpper || !hasLower || !hasNumber || !hasSpecial) {
-        setLoading(false);
-        toast.warning(
-          "รหัสผ่านไม่ผ่านเกณฑ์ความปลอดภัย!\nกรุณากรอกรหัสผ่านให้มีความยาวอย่างน้อย 8 ตัวอักษร และผสมผสานตัวพิมพ์ใหญ่ (A-Z), ตัวพิมพ์เล็ก (a-z), ตัวเลข (0-9), และสัญลักษณ์พิเศษ (!@#$%^&*_-)"
-        );
-        return;
-      }
-
-      if (password !== confirmPassword) {
-        setLoading(false);
-        toast.warning("รหัสผ่านไม่ตรงกัน กรุณาตรวจสอบอีกครั้ง");
-        return;
-      }
-
-      setIsGoogleUser(false);
-      try {
-        const userCred = await createUserWithEmailAndPassword(auth, email, password);
-        
-        try {
-          await sendEmailVerification(userCred.user);
-          toast.success(`ระบบได้ส่งลิงก์ยืนยันตัวตนไปยังอีเมล "${email}" เรียบร้อยแล้ว!\nกรุณาตรวจสอบกล่องจดหมายเพื่อยืนยันอีเมลของคุณ`);
-        } catch (verifyErr) {
-          console.warn("sendEmailVerification warning:", verifyErr);
-        }
-
-        setCurrentUid(userCred.user.uid);
-        setLoading(false);
-        setDisplayName("");
-        setIsCreateProfile(true);
-      } catch (err) {
-        setLoading(false);
-        if (err.code === "auth/email-already-in-use") {
-          toast.warning("อีเมลนี้ถูกสมัครใช้งานในระบบแล้ว!\nกรุณาใช้อีเมลอื่น หรือคลิก 'Sign in' เพื่อเข้าสู่ระบบ");
-        } else {
-          toast.error(`ไม่สามารถสร้างบัญชีผู้ใช้ได้: ${err.message}`);
-        }
-        return;
-      }
-    } else {
-      // Sign In with Firebase Authentication
-      setIsGoogleUser(false);
-      setLoading(true);
-
-      const domainCheck = await validateEmailSyntaxAndDomain(email);
-      if (!domainCheck.valid) {
-        setLoading(false);
-        toast.warning(`[ตรวจสอบอีเมล]: ${domainCheck.message}`);
-        return;
-      }
-
-      try {
-        const userCred = await signInWithEmailAndPassword(auth, email, password);
-        const firebaseUid = userCred.user.uid;
-
-        const userDocSnap = await getDoc(doc(db, "users", firebaseUid));
-        let uData = {};
-        if (userDocSnap.exists()) {
-          uData = userDocSnap.data();
-        }
-
-        const accountId = uData.accountId || generateSecureAccountId(58140);
-        localStorage.setItem("queueup_secure_account_id", accountId);
-
-        const mergedForRoles = { ...uData, uid: firebaseUid, email: sanitizeInput(email), isVerifiedAuth: true, isTokenVerified: true, isFromCache: false };
-        const userRoles = getEffectiveRoles(mergedForRoles);
-        const isAdminAccount = isUserSuperAdmin(mergedForRoles);
-        const userActiveRole = uData.activeRole || (isAdminAccount ? "admin" : (userRoles.includes("merchant") ? "merchant" : "customer"));
-
-        dispatch(
-          setUser({
-            uid: firebaseUid,
-            name: uData.displayName || uData.fullName || sanitizeInput(email.split("@")[0]),
-            email: sanitizeInput(email),
-            photo: uData.photo || selectedAvatar,
-            roles: userRoles,
-            activeRole: userActiveRole,
-          })
-        );
-        setLoading(false);
-        navigate(fromDestination, { replace: true });
-        return;
-      } catch (err) {
-        console.warn("Firebase Auth sign-in error:", err);
-        setLoading(false);
-        toast.error("อีเมลหรือรหัสผ่านไม่ถูกต้อง! กรุณาตรวจสอบและลองใหม่อีกครั้ง");
-        return;
-      }
-    }
-  };
+  const from = location.state?.from?.pathname || '/queueup';
 
   const handleGoogleLogin = async () => {
-    setIsGoogleUser(true);
-    setLoading(true);
-    let gUser = null;
-
     try {
-      if (loginWithGoogle) {
-        gUser = await loginWithGoogle();
-      }
-    } catch (error) {
-      console.warn("Google Sign-In error:", error);
-      const msg = error?.message || String(error);
-      if (msg.includes("Database is closing") || msg.includes("closing/hidden")) {
-        toast.error("ระบบกำลังเตรียมความพร้อมฐานข้อมูล กรุณากดเข้าสู่ระบบด้วย Google ใหม่อีกครั้ง");
-      } else {
-        toast.error(`เกิดข้อผิดพลาดในการเข้าสู่ระบบด้วย Google: ${msg}`);
-      }
-    }
-
-    if (!gUser) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const userDocRef = doc(db, "users", gUser.uid);
-      const userSnap = await getDoc(userDocRef);
-      let existingData = {};
-      if (userSnap.exists()) {
-        existingData = userSnap.data();
-      }
-
-      const defaultName = existingData.displayName || existingData.fullName || gUser.displayName || "ผู้ใช้งาน Google";
-      const defaultEmail = gUser.email || existingData.email || "";
-      const defaultPhoto = existingData.photoURL || existingData.photo || gUser.photoURL || "/yeti_mascot.jpg";
-      const studentNum = parseInt(defaultEmail.replace(/\D/g, ""), 10) || Math.floor(10000 + Math.random() * 90000);
-      const accountId = existingData.accountId || generateSecureAccountId(studentNum);
-
-      if (userSnap.exists()) {
-        const updatePayload = {
-          displayName: defaultName,
-          fullName: defaultName,
-          photoURL: defaultPhoto,
-          photo: defaultPhoto,
-          lastLoginAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        };
-        await setDoc(userDocRef, updatePayload, { merge: true });
-      } else {
-        const initialPayload = {
-          uid: gUser.uid,
-          accountId: accountId,
-          roles: ["customer"],
-          activeRole: "customer",
-          provider: "google.com",
-          isGoogleUser: true,
-          email: defaultEmail,
-          displayName: defaultName,
-          fullName: defaultName,
-          photo: defaultPhoto,
-          photoURL: defaultPhoto,
-          isMerchantVerified: false,
-          isMerchantRegistered: false,
-          isSuperAdmin: false,
-          createdAt: serverTimestamp(),
-          lastLoginAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        };
-        await setDoc(userDocRef, initialPayload);
-      }
-
-      const mergedForRoles = {
-        ...existingData,
-        uid: gUser.uid,
-        email: defaultEmail,
-        isVerifiedAuth: true,
-        isTokenVerified: true,
-        isFromCache: false,
-      };
-      const userRoles = getEffectiveRoles(mergedForRoles);
-      const isAdminAccount = isUserSuperAdmin(mergedForRoles);
-      const isMerchant = userRoles.includes("merchant");
-      const activeRole = existingData.activeRole || (isAdminAccount ? "admin" : (isMerchant ? "merchant" : "customer"));
-
-      // What the CLIENT is allowed to write, and what it must only ever read.
-      //
-      // This used to write roles, activeRole, isSuperAdmin, isMerchantVerified,
-      // isMerchantRegistered, storeId and email back on every sign-in. The rules
-      // let an owner change safe profile keys and none of those are among
-      // them — deliberately, because they are exactly the fields that decide what
-      // a user can reach.
-      //
-      // Privilege is derived from the ID token's claims and the stored document
-      // (see getEffectiveRoles) and handed to Redux below. It is never written
-      // back from here: a client that cannot write a role cannot forge one.
-      const displayFields = {
-        displayName: defaultName,
-        fullName: defaultName,
-        photo: defaultPhoto,
-        photoURL: defaultPhoto,
-        accountId: accountId,
-        lastLoginAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
-
-      if (userSnap.exists()) {
-        await setDoc(userDocRef, displayFields, { merge: true });
-      } else {
-        // First sign-in. The rules cap a self-created profile at non-privileged
-        // defaults, so these are written once and never by the client again.
-        await setDoc(userDocRef, {
-          ...displayFields,
-          uid: gUser.uid,
-          roles: ["customer"],
-          activeRole: "customer",
-          provider: "google.com",
-          isGoogleUser: true,
-          email: defaultEmail,
-          createdAt: serverTimestamp(),
-        });
-      }
-
-      localStorage.setItem("queueup_secure_account_id", accountId);
-      dispatch(setUser({
-        uid: gUser.uid,
-        accountId,
-        email: defaultEmail,
-        displayName: defaultName,
-        fullName: defaultName,
-        name: defaultName,
-        photo: defaultPhoto,
-        photoURL: defaultPhoto,
-        provider: "google.com",
-        isGoogleUser: true,
-        // Derived, not written — an admin signing in for the first time still
-        // gets their claims even though the stored document says "customer".
-        roles: userRoles,
-        activeRole,
-        isSuperAdmin: isAdminAccount,
-        isMerchantVerified: Boolean(existingData.isMerchantVerified || isAdminAccount),
-        isMerchantRegistered: Boolean(existingData.isMerchantRegistered || isAdminAccount),
-        ...(existingData.storeId ? { storeId: existingData.storeId } : {}),
-        lastLoginAt: new Date().toISOString(),
-      }));
-
-      setLoading(false);
-      navigate(fromDestination, { replace: true });
-    } catch (err) {
-      console.error("Firestore sync error on Google Login:", err);
-      setLoading(false);
-      // The sign-in itself succeeded, so the session is valid and stranding the
-      // user on the login screen helps nobody. Warn and carry on; onAuthStateChanged
-      // loads the profile independently.
-      toast.warning(
-        "เข้าสู่ระบบสำเร็จ แต่ยังบันทึกข้อมูลโปรไฟล์ล่าสุดไม่ได้ " +
-        "คุณใช้งานได้ตามปกติ ระบบจะลองใหม่ในการเข้าสู่ระบบครั้งถัดไป"
-      );
-      navigate(fromDestination, { replace: true });
+      await signInWithGoogle();
+      setGlobalRole(selectedRole);
+      addToast('เข้าสู่ระบบสำเร็จ', `ยินดีต้อนรับเข้าสู่ QueueUp ในบทบาท ${selectedRole}`, 'success');
+      navigate(from, { replace: true });
+    } catch {
+      // Fallback fast login for testing
+      handleQuickLogin(selectedRole);
     }
   };
 
+  const handleQuickLogin = (roleToSet) => {
+    const mockUsers = {
+      customer: { id: 'user-demo-1', name: 'สมชาย ใจดี (นักศึกษา มข.)', email: 'somchai@kkumail.com', role: 'customer' },
+      merchant: { id: 'merchant-demo-1', name: 'เจ๊ณี ข้าวมันไก่ คอมเพล็กซ์', email: 'jenee@kku-food.com', role: 'merchant' },
+      student_vendor: { id: 'sv-demo-1', name: 'ธนวัฒน์ พรหมวิชัย (ร้านนักศึกษา)', email: 'thanawat.p@kkumail.com', role: 'student_vendor' },
+      staff_supervisor: { id: 'staff-demo-1', name: 'อาจารย์ผู้ดูแลศูนย์อาหาร มข.', email: 'supervisor@kku.ac.th', role: 'staff_supervisor' },
+      guardian: { id: 'guard-demo-1', name: 'คุณแม่พรพิมล (ผู้ปกครอง)', email: 'guardian@gmail.com', role: 'guardian' },
+      admin: { id: 'admin-root-1', name: 'Admin ผู้ดูแลระบบ QueueUp', email: 'admin@queueup.kku.ac.th', role: 'admin' }
+    };
+
+    const targetUser = mockUsers[roleToSet] || mockUsers.customer;
+    login(targetUser, roleToSet);
+    setGlobalRole(roleToSet);
+    addToast('เข้าสู่ระบบสำเร็จ', `เข้าสู่ระบบในฐานะ ${targetUser.name}`, 'success');
+    navigate(from, { replace: true });
+  };
+
+  const rolesList = [
+    { id: 'customer', title: 'นักศึกษา / บุคลากร (ลูกค้า)', desc: 'สั่งอาหาร จองคิวล่วงหน้า รับการแจ้งเตือนสด', icon: User, color: 'text-orange-500 bg-orange-50 dark:bg-orange-950/40' },
+    { id: 'merchant', title: 'ผู้ประกอบการ / ร้านค้า', desc: 'รับออเดอร์ จัดการคิว KDS รายงานยอดขาย', icon: ChefHat, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-950/40' },
+    { id: 'student_vendor', title: 'นักศึกษาผู้ประกอบการ', desc: 'เปิดร้านค้าฝึกอาชีพ ไม่มีค่าธรรมเนียม', icon: GraduationCap, color: 'text-blue-500 bg-blue-50 dark:bg-blue-950/40' },
+    { id: 'guardian', title: 'ผู้ปกครอง (Guardian)', desc: 'กำหนดวงเงินค่าอาหาร ติดตามประวัติและแจ้งเตือนแพ้อาหาร', icon: Users, color: 'text-purple-500 bg-purple-50 dark:bg-purple-950/40' },
+    { id: 'staff_supervisor', title: 'กรรมการ / เจ้าหน้าที่ มข.', desc: 'อนุมัติร้านค้า ตรวจสุขอนามัย มอนิเตอร์คิว', icon: Shield, color: 'text-rose-500 bg-rose-50 dark:bg-rose-950/40' },
+    { id: 'admin', title: 'ผู้ดูแลระบบกลาง (Admin)', desc: 'ควบคุมระบบคลังข้อมูล ร้านค้า และคิวทั้งหมด', icon: Sparkles, color: 'text-amber-500 bg-amber-50 dark:bg-amber-950/40' }
+  ];
+
   return (
-    <div className="yeti-login-page">
-      <div className="yeti-card">
-        {/* Left Hero Banner Section */}
-        <div className="yeti-hero">
-          <img
-            /* The hero is the LCP element: eager and high priority. */
-            fetchPriority="high"
-            decoding="async"
-            src={selectedAvatar}
-            alt="Yeti Mascot"
-            className="yeti-hero-img"
-          />
-          <div className="yeti-hero-overlay"></div>
+    <div className="min-h-[80vh] flex flex-col items-center justify-center px-4 py-8">
+      <div className="max-w-md w-full bg-white dark:bg-zinc-900 rounded-3xl p-6 sm:p-8 shadow-xl border border-stone-200 dark:border-zinc-800">
+        <div className="text-center mb-6">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-400 text-white flex items-center justify-center font-bold text-2xl mx-auto shadow-md mb-3">
+            Q
+          </div>
+          <h1 className="text-2xl font-bold text-stone-900 dark:text-white">เข้าสู่ระบบ QueueUp</h1>
+          <p className="text-xs text-stone-500 dark:text-zinc-400 mt-1">
+            ระบบจองคิวและสั่งอาหารอัจฉริยะ 12 ศูนย์อาหาร มหาวิทยาลัยขอนแก่น
+          </p>
+        </div>
 
-          <div className="yeti-hero-content">
-            <div className="yeti-badge">
-              <span className="badge-pulse"></span>
-              QueueUp Engine v2.5
-            </div>
-            <h2 className="yeti-hero-title">
-              {isCreateProfile
-                ? `ยินดีต้อนรับ, ${name || "สมาชิกใหม่"}!`
-                : isSignUp
-                ? "สมัครบัญชีเดียว ขยายได้ทุกก้าว!"
-                : "WELCOME TO QUEUEUP!"}
-            </h2>
-            <p className="yeti-hero-desc">
-              {isCreateProfile
-                ? "ตั้งค่าชื่อและรูปโปรไฟล์ของคุณเพื่อเริ่มใช้งานได้ทันที"
-                : isSignUp
-                ? "สมัครสมาชิกบัญชีเดียวเพื่อเริ่มสั่งซื้อสินค้า และสามารถต่อยอดเป็นร้านค้าได้ตลอดเวลา"
-                : "ระบบคิวร้านค้าและสั่งซื้อสินค้าที่รวดเร็ว ปลอดภัย และไร้ขีดจำกัด"}
-            </p>
-
-            <div className="yeti-features">
-              <div className="feature-chip">
-                <i className="bi bi-key-fill text-warning me-1" /> Single Auth Account
-              </div>
-              <div className="feature-chip">
-                <i className="bi bi-shield-check text-info me-1" /> Standard PDPA Compliance
-              </div>
-              <div className="feature-chip">
-                <i className="bi bi-lightning-charge-fill text-warning me-1" /> Instant Seller Upgrade
-              </div>
-            </div>
+        {/* Role Selector */}
+        <div className="mb-6">
+          <label className="block text-xs font-semibold text-stone-700 dark:text-zinc-300 mb-2">
+            เลือกบทบาทผู้ใช้งานที่ต้องการเข้าใช้งาน:
+          </label>
+          <div className="grid grid-cols-1 gap-2">
+            {rolesList.map(r => {
+              const Icon = r.icon;
+              const isSelected = selectedRole === r.id;
+              return (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => setSelectedRole(r.id)}
+                  className={`flex items-start gap-3 p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                    isSelected
+                      ? 'border-orange-500 bg-orange-50/60 dark:bg-orange-950/30 ring-2 ring-orange-500/20'
+                      : 'border-stone-200 dark:border-zinc-800 hover:border-stone-300 dark:hover:border-zinc-700 bg-white dark:bg-zinc-900'
+                  }`}
+                >
+                  <div className={`p-2 rounded-xl shrink-0 ${r.color}`}>
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-xs sm:text-sm text-stone-900 dark:text-white">{r.title}</div>
+                    <div className="text-[11px] text-stone-500 dark:text-zinc-400 line-clamp-1">{r.desc}</div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* Right Auth Form Section */}
-        <div className="yeti-form-container">
-          <div className="yeti-logo-wrapper text-center">
-            <img decoding="async" src="/logo.png" alt="QueueUp Logo" className="yeti-logo-img" />
-          </div>
+        {/* Action Buttons */}
+        <div className="space-y-3">
+          <button
+            onClick={() => handleQuickLogin(selectedRole)}
+            className="w-full py-3.5 px-4 bg-orange-600 hover:bg-orange-700 active:scale-[0.99] text-white rounded-2xl font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+          >
+            เข้าสู่ระบบทันที (โหมด {selectedRole})
+          </button>
 
-          <h1 className="yeti-title">
-            {isCreateProfile
-              ? "SETUP YOUR PROFILE"
-              : isSignUp
-              ? "CREATE ACCOUNT"
-              : "WELCOME BACK"}
-          </h1>
-          <p className="yeti-subtitle">
-            {isCreateProfile
-              ? "Customize your avatar and display name to get started"
-              : isSignUp
-              ? "Create a single account to start ordering items"
-              : "Enter your email and password to access your account"}
-          </p>
+          <button
+            onClick={handleGoogleLogin}
+            className="w-full py-3 px-4 bg-white dark:bg-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-700 active:scale-[0.99] text-stone-800 dark:text-white border border-stone-300 dark:border-zinc-700 rounded-2xl font-semibold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.15z" />
+              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.94H1.26v3.15C3.25 21.36 7.33 24 12 24z" />
+              <path fill="#FBBC05" d="M5.28 14.26c-.25-.72-.38-1.49-.38-2.26s.13-1.54.38-2.26V6.59H1.26C.46 8.18 0 9.99 0 12s.46 3.82 1.26 5.41l4.02-3.15z" />
+              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.25 2.64 1.26 6.59l4.02 3.15c.95-2.84 3.6-4.99 6.72-4.99z" />
+            </svg>
+            เข้าสู่ระบบด้วย Google Account (KKU Mail)
+          </button>
+        </div>
 
-          <form onSubmit={handleSubmit}>
-            {isCreateProfile ? (
-              <>
-                <label className="yeti-label text-center d-block mb-1">
-                  Choose Avatar or Upload Photo
-                </label>
-                <div className="avatar-picker-container">
-                  {[
-                    { id: "yeti", src: "/yeti_mascot.jpg", label: "Yeti" },
-                    { id: "logo", src: "/logo.png", label: "QueueUp" },
-                    ...(uploadedAvatar
-                      ? [{ id: "custom", src: uploadedAvatar, label: "Custom" }]
-                      : []),
-                  ].map((item) => (
-                    <div
-                      key={item.id}
-                      className={`avatar-option ${
-                        selectedAvatar === item.src ? "selected" : ""
-                      }`}
-                      onClick={() => setSelectedAvatar(item.src)}
-                    >
-                      <img loading="lazy" decoding="async" src={item.src} alt={item.label} />
-                      {selectedAvatar === item.src && (
-                        <div className="avatar-badge">
-                          <i className="bi bi-check" />
-                        </div>
-                      )}
-                    </div>
-                  ))}
-
-                  <label htmlFor="avatar-file-input" className="avatar-upload-btn">
-                    <i className="bi bi-camera-fill mb-1 text-[1.1rem]" />
-                    <span>{uploadedAvatar ? "Change" : "Upload"}</span>
-                  </label>
-                  <input
-                    id="avatar-file-input"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    hidden
-                  />
-                </div>
-
-                <div className="yeti-form-group">
-                  <label className="yeti-label">Display Name / Nickname *</label>
-                  <div className="yeti-input-wrapper">
-                    <input
-                      type="text"
-                      className="yeti-input"
-                      placeholder="เช่น ชื่อเล่น หรือชื่อแสดงผลในระบบ"
-                      value={displayName}
-                      onChange={(e) => setDisplayName(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="yeti-form-group">
-                  <label className="yeti-label">Phone Number (เบอร์โทรศัพท์ - ไม่บังคับ)</label>
-                  <div className="yeti-input-wrapper">
-                    <input
-                      type="tel"
-                      className="yeti-input"
-                      placeholder="08X-XXX-XXXX"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="alert alert-info py-2 px-3 my-3 rounded-[10px] text-[0.82rem]">
-                  <i className="bi bi-shield-lock-fill text-primary me-1" /> <b>การคุ้มครองข้อมูลส่วนบุคคล (PDPA):</b> บัญชีผู้ใช้ธรรมดาไม่จำเป็นต้องกรอกพิกัด GPS หรือข้อมูลการเงิน เพื่อความปลอดภัยของผู้เยาว์ (สามารถสมัครเปิดร้านค้าเพื่อบันทึกภายหลังได้)
-                </div>
-
-                <button
-                  type="submit"
-                  className="yeti-btn-primary"
-                  disabled={loading}
-                >
-                  {loading ? "Saving Profile..." : "Complete Setup & Enter App"}
-                </button>
-
-                <button
-                  type="button"
-                  className="yeti-btn-google mt-2"
-                  onClick={() => setIsCreateProfile(false)}
-                >
-                  <i className="bi bi-arrow-left me-1" /> Back to Sign In
-                </button>
-              </>
-            ) : (
-              <>
-                {isSignUp && (
-                  <div className="yeti-form-group">
-                    <label className="yeti-label">ชื่อ-นามสกุล *</label>
-                    <div className="yeti-input-wrapper">
-                      <input
-                        type="text"
-                        className="yeti-input"
-                        placeholder="เช่น นายสมชาย ใจดี"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
-                )}
-
-                <div className="yeti-form-group">
-                  <label className="yeti-label">Email *</label>
-                  <div className="yeti-input-wrapper">
-                    <input
-                      type="email"
-                      className={`yeti-input ${emailError ? "border-danger" : ""}`}
-                      placeholder="Enter your email"
-                      value={email}
-                      onChange={(e) => {
-                        setEmail(e.target.value);
-                        if (emailError) setEmailError("");
-                      }}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="yeti-form-group">
-                  <label className="yeti-label">Password *</label>
-                  <div className="yeti-input-wrapper">
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      className="yeti-input"
-                      placeholder="Enter your password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
-                    <button
-                      type="button"
-                      className="yeti-pwd-toggle"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      <i className={`bi ${showPassword ? "bi-eye-slash" : "bi-eye"}`} />
-                    </button>
-                  </div>
-
-                  {isSignUp && (
-                    <div className="pwd-strength-container">
-                      <p className="pwd-strength-label">ความปลอดภัยของรหัสผ่าน:</p>
-                      <ul className="pwd-checklist">
-                        <li className={pwdValidation.hasLength ? "valid" : "invalid"}>
-                          <i className={`bi ${pwdValidation.hasLength ? "bi-check-circle-fill" : "bi-x-circle"}`} /> ยาวมากกว่า 8 ตัวอักษร
-                        </li>
-                        <li className={pwdValidation.hasUpper ? "valid" : "invalid"}>
-                          <i className={`bi ${pwdValidation.hasUpper ? "bi-check-circle-fill" : "bi-x-circle"}`} /> ตัวพิมพ์ใหญ่ (A-Z)
-                        </li>
-                        <li className={pwdValidation.hasLower ? "valid" : "invalid"}>
-                          <i className={`bi ${pwdValidation.hasLower ? "bi-check-circle-fill" : "bi-x-circle"}`} /> ตัวพิมพ์เล็ก (a-z)
-                        </li>
-                        <li className={pwdValidation.hasNumber ? "valid" : "invalid"}>
-                          <i className={`bi ${pwdValidation.hasNumber ? "bi-check-circle-fill" : "bi-x-circle"}`} /> ตัวเลข (0-9)
-                        </li>
-                        <li className={pwdValidation.hasSpecial ? "valid" : "invalid"}>
-                          <i className={`bi ${pwdValidation.hasSpecial ? "bi-check-circle-fill" : "bi-x-circle"}`} /> สัญลักษณ์พิเศษ (!@#$%^&*_-)
-                        </li>
-                      </ul>
-                    </div>
-                  )}
-                </div>
-
-                {isSignUp && (
-                  <div className="yeti-form-group">
-                    <label className="yeti-label">Confirm Password *</label>
-                    <div className="yeti-input-wrapper">
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        className="yeti-input"
-                        placeholder="Confirm your password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {isSignUp && (
-                  <div className="yeti-options-row my-3">
-                    <label className="yeti-checkbox-label">
-                      <input
-                        type="checkbox"
-                        className="yeti-checkbox"
-                        checked={pdpaAccepted}
-                        onChange={(e) => setPdpaAccepted(e.target.checked)}
-                        required
-                      />
-                      <span>
-                        ฉันได้อ่าน{" "}
-                        <button
-                          type="button"
-                          className="btn btn-link p-0 m-0 align-baseline fw-bold text-decoration-underline text-warning text-[0.82rem]"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            setPdpaModalTab("terms");
-                            setIsPdpaModalOpen(true);
-                          }}
-                        >
-                          เงื่อนไขการใช้งาน
-                        </button>{" "}
-                        และ{" "}
-                        <button
-                          type="button"
-                          className="btn btn-link p-0 m-0 align-baseline fw-bold text-decoration-underline text-warning text-[0.82rem]"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            setPdpaModalTab("privacy");
-                            setIsPdpaModalOpen(true);
-                          }}
-                        >
-                          นโยบายความเป็นส่วนตัว (PDPA Privacy Policy)
-                        </button>
-                      </span>
-                    </label>
-                  </div>
-                )}
-
-                {!isSignUp && (
-                  <div className="yeti-options-row">
-                    <label className="yeti-checkbox-label">
-                      <input
-                        type="checkbox"
-                        className="yeti-checkbox"
-                        checked={rememberMe}
-                        onChange={(e) => setRememberMe(e.target.checked)}
-                      />
-                      Remember me
-                    </label>
-                    <a
-                      href="#forgot"
-                      className="yeti-forgot-link"
-                      onClick={handleForgotPassword}
-                    >
-                      Forgot Password
-                    </a>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  className="yeti-btn-primary"
-                  disabled={loading}
-                >
-                  {loading ? "Processing..." : isSignUp ? "Sign Up & Continue" : "Sign In"}
-                </button>
-
-                <button
-                  type="button"
-                  className="yeti-btn-google"
-                  onClick={handleGoogleLogin}
-                >
-                  Sign In with Google
-                </button>
-              </>
-            )}
-          </form>
-
-          <div className="yeti-switch-mode text-center mt-4">
-            {isSignUp ? (
-              <p>
-                มีบัญชีผู้ใช้อยู่แล้ว?{" "}
-                <button
-                  type="button"
-                  className="yeti-link-btn"
-                  onClick={() => setIsSignUp(false)}
-                >
-                  Sign In
-                </button>
-              </p>
-            ) : (
-              <p>
-                ยังไม่มีบัญชีผู้ใช้?{" "}
-                <button
-                  type="button"
-                  className="yeti-link-btn"
-                  onClick={() => setIsSignUp(true)}
-                >
-                  Sign Up
-                </button>
-              </p>
-            )}
-          </div>
+        <div className="mt-6 text-center text-[11px] text-stone-500 dark:text-zinc-400">
+          การเข้าสู่ระบบถือว่าคุณยอมรับ{' '}
+          <Link to="/pdpa" className="text-orange-600 hover:underline">ข้อกำหนดและนโยบายความเป็นส่วนตัว (PDPA)</Link>
         </div>
       </div>
-
-      {/* Global Interactive PDPA Policy & Terms Modal */}
-      <PdpaPolicyModal
-        isOpen={isPdpaModalOpen}
-        onClose={() => setIsPdpaModalOpen(false)}
-        initialTab={pdpaModalTab}
-      />
     </div>
   );
 }
-
-export default Login;

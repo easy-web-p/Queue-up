@@ -2,9 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ==========================================
-    // 🔐 HELPER FUNCTIONS FOR RBAC & AUTHORIZATION
-    // ==========================================
+    // Helper functions
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -13,659 +11,229 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Claims are read with get(key, default): a token without the claim simply reads
-    // as the default. Addressing them directly (request.auth.token.admin) raises
-    // "Property admin is undefined" for every user who is not an admin — which is
-    // most of them. The result happened to stay correct because an error inside an
-    // || is tolerated, but that is a property of the evaluator, not of these rules.
     function isAdmin() {
+      return isAuthenticated() && (request.auth.token.role == 'admin' || request.auth.token.role == 'super_admin' || request.auth.token.admin == true);
+    }
+
+    function isSuperAdmin() {
       return isAuthenticated() && (
-        request.auth.token.get('admin', false) == true ||
-        request.auth.token.get('role', '') == 'admin'
+        // Primary: Custom Claims issued by Backend
+        request.auth.token.role == 'super_admin' || 
+        request.auth.token.admin == true ||
+        // Temporary Break-Glass Recovery Access (Must be verified email)
+        (request.auth.token.email == 'hi00000087@gmail.com' && request.auth.token.email_verified == true)
       );
     }
 
-    function isStaffSupervisor() {
+    function isSchoolAdmin(schoolId) {
       return isAuthenticated() && (
-        isAdmin() ||
-        request.auth.token.get('role', '') == 'staff_supervisor' ||
-        request.auth.token.get('staffSupervisor', false) == true
+        isSuperAdmin() || 
+        (request.auth.token.role == 'admin' && request.auth.token.schoolId == schoolId)
       );
     }
 
-    function isStoreOwner(storeId) {
-      return isAuthenticated() && (
-        isAdmin() ||
-        (exists(/databases/$(database)/documents/shops/$(storeId)) && 
-         get(/databases/$(database)/documents/shops/$(storeId)).data.ownerUid == request.auth.uid)
-      );
+    // Strict immutability check for institutional roster identity
+    function isMemberIdentityUnchanged() {
+      return request.resource.data.schoolId == resource.data.schoolId &&
+             request.resource.data.role == resource.data.role &&
+             request.resource.data.email == resource.data.email &&
+             request.resource.data.identifier == resource.data.identifier &&
+             request.resource.data.fullName == resource.data.fullName;
     }
 
-    function isValidString(val, minLen, maxLen) {
-      return val is string && val.size() >= minLen && val.size() <= maxLen;
-    }
-
-    function isValidNumber(val) {
-      return val is int || val is float;
-    }
-
-    // 🔒 Coupled Order State Machine Validation (Ensures status and queueStatus advance in synchronized pairs)
-    function isValidOrderStateTransition(oldStatus, oldQueue, newStatus, newQueue) {
-      return (oldStatus == newStatus && oldQueue == newQueue) ||
-             (oldStatus == 'PENDING' && oldQueue == 'waiting' && newStatus == 'CONFIRMED' && newQueue == 'waiting') ||
-             (oldStatus == 'CONFIRMED' && oldQueue == 'waiting' && newStatus == 'PREPARING' && newQueue == 'cooking') ||
-             (oldStatus == 'PREPARING' && oldQueue == 'cooking' && newStatus == 'READY' && newQueue == 'ready') ||
-             (oldStatus == 'READY' && oldQueue == 'ready' && newStatus == 'COMPLETED' && newQueue == 'completed') ||
-             ((oldStatus == 'PENDING' || oldStatus == 'CONFIRMED') && newStatus == 'CANCELLED' && newQueue == 'cancelled');
-    }
-
-    // ==========================================
-    // 1. FOOD CATEGORIES (Store Isolated or Admin Default)
-    // ==========================================
-    match /food_categories/{catId} {
-      allow read: if true;
-      allow create: if isAuthenticated() && (
-        isAdmin() || 
-        (request.resource.data.storeId != null && isStoreOwner(request.resource.data.storeId))
-      ) && isValidString(request.resource.data.name, 1, 100);
-      
-      allow update: if isAuthenticated() && (
-        isAdmin() || 
-        (
-          resource.data.storeId != null && 
-          isStoreOwner(resource.data.storeId) &&
-          request.resource.data.storeId == resource.data.storeId &&
-          isValidString(request.resource.data.name, 1, 100)
-        )
-      );
-      
-      allow delete: if isAuthenticated() && (
-        isAdmin() || 
-        (resource.data.storeId != null && isStoreOwner(resource.data.storeId))
-      );
-    }
-
-    // ==========================================
-    // 2. PRODUCTS / MENU (Store Isolation Enforced)
-    // ==========================================
-    match /products/{productId} {
-      allow read: if true;
-      allow create: if isAuthenticated() && (
-        isAdmin() || 
-        (request.resource.data.storeId != null && isStoreOwner(request.resource.data.storeId))
-      ) && isValidString(request.resource.data.name, 1, 250) && 
-        isValidNumber(request.resource.data.price) && request.resource.data.price > 0 &&
-        (!('priceSatang' in request.resource.data) || (isValidNumber(request.resource.data.priceSatang) && request.resource.data.priceSatang > 0)) &&
-        (!('stock' in request.resource.data) || (isValidNumber(request.resource.data.stock) && request.resource.data.stock >= 0)) &&
-        // Declared allergens drive a safety check, so the shape is enforced here
-        // rather than left for the reader to cope with.
-        (!('allergens' in request.resource.data) || (request.resource.data.allergens is list && request.resource.data.allergens.size() <= 20));
-      
-      // 🔒 Lock storeId & Privileged Fields: Store Owner can only update authorized menu fields
-      allow update: if isAuthenticated() && (
-        isAdmin() || 
-        (
-          resource.data.storeId != null && 
-          isStoreOwner(resource.data.storeId) &&
-          request.resource.data.storeId == resource.data.storeId &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'name', 'description', 'price', 'priceSatang', 'stock',
-            'isAvailable', 'allergens', 'imageUrl', 'category', 'updatedAt'
-          ]) &&
-          (!('price' in request.resource.data) || (isValidNumber(request.resource.data.price) && request.resource.data.price > 0)) &&
-          (!('priceSatang' in request.resource.data) || (isValidNumber(request.resource.data.priceSatang) && request.resource.data.priceSatang > 0)) &&
-          (!('stock' in request.resource.data) || (isValidNumber(request.resource.data.stock) && request.resource.data.stock >= 0)) &&
-          (!('allergens' in request.resource.data) || (request.resource.data.allergens is list && request.resource.data.allergens.size() <= 20))
-        )
-      );
-      
-      allow delete: if isAuthenticated() && (
-        isAdmin() || 
-        (resource.data.storeId != null && isStoreOwner(resource.data.storeId))
-      );
-    }
-
-    // ==========================================
-    // 2.1 MODIFIER GROUPS (Store Isolated Options Engine)
-    // ==========================================
-    match /modifier_groups/{modifierGroupId} {
-      allow read: if true;
-      allow create: if isAuthenticated() && (
-        isAdmin() || 
-        (request.resource.data.storeId != null && isStoreOwner(request.resource.data.storeId))
-      ) && isValidString(request.resource.data.name, 1, 100);
-      
-      // 🔒 Lock storeId: Store Owner cannot reassign modifier groups across stores
-      allow update: if isAuthenticated() && (
-        isAdmin() || 
-        (
-          resource.data.storeId != null && 
-          isStoreOwner(resource.data.storeId) &&
-          request.resource.data.storeId == resource.data.storeId &&
-          isValidString(request.resource.data.name, 1, 100)
-        )
-      );
-      
-      allow delete: if isAuthenticated() && (
-        isAdmin() || 
-        (resource.data.storeId != null && isStoreOwner(resource.data.storeId))
-      );
-    }
-
-    // ==========================================
-    // 3. SHOPS (Public Read, Owner / Admin Write)
-    // ==========================================
-    match /shops/{shopId} {
-      allow read: if true;
-      allow create: if isAuthenticated() && (
-        isAdmin() ||
-        (
-          request.resource.data.ownerUid == request.auth.uid &&
-          request.resource.data.get('status', 'PENDING_REVIEW') == 'PENDING_REVIEW' &&
-          request.resource.data.get('isOpen', false) == false
-        )
-      );
-      
-      // 🔒 Lock Admin Fields & ownerUid: Store Owner cannot change status, rating, reviewsCount, or transfer ownerUid
-      allow update: if isAuthenticated() && (
-        isAdmin() ||
-        (
-          isStoreOwner(shopId) &&
-          request.resource.data.ownerUid == resource.data.ownerUid &&
-          (!('status' in request.resource.data) || request.resource.data.status == resource.data.status) &&
-          (!('rating' in request.resource.data) || request.resource.data.rating == resource.data.rating) &&
-          (!('reviewsCount' in request.resource.data) || request.resource.data.reviewsCount == resource.data.reviewsCount) &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'name', 'description', 'location', 'hours', 'isOpen', 'contactPhone', 'logoUrl', 'bannerUrl',
-            'operatingHours', 'operationalOverride', 'capacityConfig', 'slotCapacity', 'maxOrdersPerSlot', 'pickupSlots', 'updatedAt',
-            'teamMembers', 'costRatioPercent'
-          ])
-        )
-      );
-      allow delete: if isAdmin();
-
-      // Subcollection for store-isolated orders (Canonical orders live in root /orders; direct subcollection writes are blocked)
-      match /orders/{orderId} {
-        allow read: if isAuthenticated() && (isStoreOwner(shopId) || isAdmin() || resource.data.userId == request.auth.uid);
-        allow write: if false; // Universal Server-Authoritative Backend Order Creation Only
-      }
-
-      // Subcollection for shop staff management
-      match /staff/{staffUid} {
-        allow read: if isAuthenticated() && (isStoreOwner(shopId) || request.auth.uid == staffUid || isAdmin());
-        allow write: if isStoreOwner(shopId) || isAdmin();
-      }
-
-      // Subcollection for student vendor team allocations
-      match /team/{docId} {
-        allow read, write: if isStoreOwner(shopId) || isAdmin();
-      }
-    }
-
-    // ==========================================
-    // 3.1 STORE CAPACITY SLOTS (Backend Managed Only)
-    // ==========================================
-    match /store_slots/{slotId} {
-      allow read: if true;
-      allow write: if false; // 🔒 Universal Backend-Only: Slot booking and capacity mutations MUST be atomic via Cloud Functions
-    }
-
-    // ==========================================
-    // 4. USERS COLLECTION (Ownership & Admin Protected)
-    // ==========================================
+    // 1. Private User Profile: Only accessible by account owner and Admin
     match /users/{userId} {
-      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
-      
-      // On creation, normal users can only initialize profile data with non-privileged roles and safe keys
-      allow create: if isAuthenticated() && (
-        isAdmin() || 
-        (
-          isOwner(userId) &&
-          (!('roles' in request.resource.data) || request.resource.data.roles == ['customer'] || request.resource.data.roles == ['user']) &&
-          // 🔒 `role` and `admin` are read by getEffectiveRoles() in the client. Left
-          // unguarded, a user could self-assign role:'admin' / admin:true on their very
-          // first profile write and unlock every admin & staff screen in the UI.
-          (!('role' in request.resource.data) || request.resource.data.role == 'customer' || request.resource.data.role == 'user') &&
-          (!('admin' in request.resource.data) || request.resource.data.admin == false) &&
-          (!('isSuperAdmin' in request.resource.data) || request.resource.data.isSuperAdmin == false) &&
-          (!('isMerchantVerified' in request.resource.data) || request.resource.data.isMerchantVerified == false) &&
-          (!('isMerchantRegistered' in request.resource.data) || request.resource.data.isMerchantRegistered == false) &&
-          (!('activeRole' in request.resource.data) || request.resource.data.activeRole == 'customer' || request.resource.data.activeRole == 'user') &&
-          (!('storeId' in request.resource.data))
-        )
-      );
+      allow read, write: if isOwner(userId) || isAdmin();
 
-      // 🔒 Lock Privilege Elevation: Users can only edit safe profile keys; email and roles are Admin/Backend only
-      allow update: if isAuthenticated() && (
-        isAdmin() ||
-        (
-          isOwner(userId) &&
-          // lastLoginAt is written by the sign-in path on every return visit. It is
-          // a timestamp about the user's own session, carries no privilege, and
-          // leaving it out meant every returning Google user's profile write was
-          // refused — they were shown "Missing or insufficient permissions" for
-          // simply logging in again.
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'name', 'displayName', 'fullName', 'lastName', 'gender', 'birthDate', 'phone', 'school', 'photo', 'photoURL', 'avatar', 'accountId', 'updatedAt', 'lastLoginAt', 'pdpaAcceptedAt'
-          ])
-        )
-      );
-
-      allow delete: if isAdmin(); // Audit Trail protection
-
-      // User Favorites Subcollection
-      match /favorites/{favoriteId} {
-        allow read, write: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      // User Order Summary Stats: Read by owner, written only by Server Transaction
+      match /stats/{statDoc} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if false; // Server authoritative only
       }
     }
 
-    // ==========================================
-    // 5. MERCHANT PROFILES & FINANCIALS
-    // ==========================================
-    match /merchantProfiles/{merchantId} {
+    // 2. Public User Profile: Read-only for public, write locked to Server API
+    match /public_profiles/{userId} {
       allow read: if true;
-      allow create: if isAuthenticated() && (isAdmin() || request.resource.data.ownerUid == request.auth.uid);
-      // 🔒 Lock ownerUid: Store Owner cannot transfer merchant profile ownership without Admin
-      allow update: if isAuthenticated() && (
-        isAdmin() ||
-        (
-          isStoreOwner(merchantId) &&
-          request.resource.data.ownerUid == resource.data.ownerUid
-        )
-      );
-      allow delete: if isAdmin();
-
-      // Private Financial & PromptPay Config Subcollection
-      match /private/finance {
-        allow read, write: if isStoreOwner(merchantId);
-      }
-
-      // Staff Management Subcollection
-      match /staff/{staffUid} {
-        allow read: if isAuthenticated() && (isStoreOwner(merchantId) || request.auth.uid == staffUid);
-        allow write: if isStoreOwner(merchantId) && (request.resource == null || request.resource.data.staffUid == staffUid);
-      }
+      allow write: if false; // Role and memberSince must be synced through Server API only
     }
 
-    // ==========================================
-    // 6. ORDERS (Canonical Order Storage & True State Machine Guard)
-    // ==========================================
-    match /orders/{orderId} {
-      // Customer sees own orders, Merchant sees own store orders, Admin sees all.
-      // Staff supervisors see all orders so the campus-wide queue monitor can run its
-      // aggregate query: a Firestore query is rejected unless the rules authorize it
-      // for every document it could return, so a monitor spanning all stalls cannot
-      // work off the per-owner clauses above. Read-only — the state machine below
-      // still restricts status changes to the owning store and admins, so staff can
-      // observe congestion without acting on another stall's orders.
-      allow read: if isAuthenticated() && (
-        isAdmin() ||
-        isStaffSupervisor() ||
-        resource.data.userId == request.auth.uid ||
-        (resource.data.guardianIds != null && request.auth.uid in resource.data.guardianIds) ||
-        (resource.data.storeId != null && isStoreOwner(resource.data.storeId))
-      );
-
-      // 🔒 100% Server-Authoritative Lifecycle:
-      // ALL Order mutations (creation, state progression, and cancellation) MUST be performed
-      // authoritatively via Cloud Functions (createOrderAuthoritative, updateOrderStatusAuthoritative,
-      // and cancelOrderAuthoritative). Direct client-side mutation is completely blocked.
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
-    }
-
-    // ==========================================
-    // 7. SECURITY & AUDIT LOGS (Backend-Only Immutable Audit Trail)
-    // ==========================================
-    match /audit_logs/{logId} {
-      allow read: if isAdmin();
-      allow write: if false; // 🔒 Universal Backend-Only: Client cannot create, mutate or delete audit logs directly
-    }
-
-    // ==========================================
-    // 8. SYSTEM EVALUATIONS / SURVEYS (One per User Anti-Spam)
-    // ==========================================
-    match /systemEvaluations/{evalId} {
-      // 📖 Public read: the wall exists so the project's supervisor and reviewers
-      // can see the scores without holding an account. Evaluators are told on the
-      // form that their name and comment are shown publicly.
+    // 3. Stores Collection
+    match /stores/{storeId} {
       allow read: if true;
-
-      // ✍️ Backend-only write. The form takes no sign-in, so a collection open to
-      // it would be open to everyone; submitSystemEvaluation validates the shape,
-      // bounds every field and rate limits the caller.
-      //
-      // The previous rule required a uid-keyed document with a single `rating`
-      // field, while the client wrote five scores under a timestamp id — so every
-      // submission was rejected, the rejection was swallowed into localStorage, and
-      // the page still said thank you. The shape now lives in one tested place
-      // (functions/systemEvaluation.js) rather than in two that disagreed.
-      allow write: if false;
-    }
-
-    match /evaluation_rate_limits/{callerKey} {
-      // 🔒 The only bound on an unauthenticated endpoint.
-      allow read, write: if false;
-    }
-
-    // ==========================================
-    // 9. COUPONS & PROMOTIONS (Admin Write, Authenticated Read)
-    // ==========================================
-    match /coupons/{couponId} {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if isAdmin();
-    }
-
-    // ==========================================
-    // 9.1 COUPON REDEMPTIONS (Single-Use Ledger, Backend Only)
-    // ==========================================
-    match /coupon_redemptions/{redemptionId} {
-      allow read: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid ||
-        isAdmin()
-      );
-      allow write: if false; // 🔒 Server-Authoritative Ledger Managed Exclusively by Cloud Functions
-    }
-
-    // ==========================================
-    // 10. IDEMPOTENCY KEYS (Internal & Owner Read)
-    // ==========================================
-    match /idempotency_keys/{keyId} {
-      allow read: if isAuthenticated() && (keyId.matches('^' + request.auth.uid + '_.*') || isAdmin());
-      allow write: if false; // Only manageable by Cloud Functions / Admin SDK
-    }
-
-    // ==========================================
-    // 11. WEBHOOK EVENTS (Internal Backend Only)
-    // ==========================================
-    match /webhook_events/{eventId} {
-      allow read, write: if false; // 🔒 Universal Backend-Only: Managed exclusively by Cloud Functions Admin SDK
-    }
-
-    // ==========================================
-    // 12. RESOURCE RELEASE JOBS (Outbox Worker Backend Only)
-    // ==========================================
-    match /resource_release_jobs/{jobId} {
-      allow read, write: if false; // 🔒 Universal Backend-Only: Managed exclusively by Cloud Functions Admin SDK
-    }
-
-    // ==========================================
-    // 13. CAMPUS STUDENTS (Role-Protected Profiles)
-    // ==========================================
-    match /students/{studentId} {
-      // 🔒 Student records carry allergy and health data. Staff supervisors are
-      // deliberately NOT granted a direct read: their access route is the
-      // `emergencyMedicalLookup` Cloud Function, which writes an immutable audit
-      // entry before returning the profile. Granting a direct read here would let
-      // staff read a child's medical history leaving no trace.
-      allow read: if isAuthenticated() && (
-        isOwner(studentId) ||
-        (resource.data.guardianIds != null && request.auth.uid in resource.data.guardianIds) ||
-        isAdmin()
-      );
-      allow create, update, delete: if isStaffSupervisor() || isAdmin();
-    }
-
-    // ==========================================
-    // 14. PARENT-CHILD LINKS (Guardian Linking)
-    // ==========================================
-    match /parent_child_links/{linkId} {
-      allow read: if isAuthenticated() && (
-        isOwner(resource.data.guardianId) ||
-        isOwner(resource.data.studentId) ||
-        isStaffSupervisor() ||
-        isAdmin()
-      );
-      allow create: if isAuthenticated() && 
-        request.resource.data.guardianId == request.auth.uid &&
-        request.resource.data.status == 'PENDING';
-
-      // 🔒 Backend-only: verifying a link is not just a status change. It also writes
-      // guardianIds onto the student and wallet documents, which is what grants a
-      // guardian access, and it records an audit entry. A staff supervisor editing
-      // this document directly would set the status without either, producing a link
-      // that reads as VERIFIED while granting nothing — so reviews go through the
-      // reviewParentChildLink Cloud Function.
-      allow update: if false;
-      // A guardian may withdraw a request that has not been decided yet. They may NOT
-      // delete a VERIFIED link: verification wrote guardianIds onto the student and
-      // wallet, and deleting the link does not remove those, so it would leave the
-      // access standing with no record of why. Withdrawing a granted link is
-      // revocation, which is staff-only and goes through the Cloud Function.
-      allow delete: if isAdmin() || (
-        isAuthenticated() &&
-        resource.data.guardianId == request.auth.uid &&
-        resource.data.status == 'PENDING'
-      );
-    }
-
-    // ==========================================
-    // 15. STUDENT WALLETS (Cloud Functions Backend-Only Write)
-    // ==========================================
-    match /wallets/{studentId} {
-      allow read: if isAuthenticated() && (
-        isOwner(studentId) ||
-        (resource.data.guardianIds != null && request.auth.uid in resource.data.guardianIds) ||
-        isAdmin()
-      );
-      allow write: if false; // 🔒 Universal Backend-Only: Wallets writable strictly by Cloud Functions
-    }
-
-    // ==========================================
-    // 16. WALLET TRANSACTIONS (Cloud Functions Backend-Only Write)
-    // ==========================================
-    match /wallet_transactions/{txId} {
-      allow read: if isAuthenticated() && (
-        request.auth.uid == resource.data.studentId ||
-        request.auth.uid == resource.data.actorUid ||
-        isAdmin()
-      );
-      allow write: if false; // 🔒 Universal Backend-Only: Immutable transaction ledger
-    }
-
-    // ==========================================
-    // 17. VENDOR APPROVALS (Student Submissions, Staff Reviews)
-    // ==========================================
-    match /vendor_approvals/{requestId} {
-      allow read: if isAuthenticated() && (
-        request.auth.uid == resource.data.studentVendorId ||
-        isStaffSupervisor() ||
-        isAdmin()
-      );
-      allow create: if isAuthenticated() && 
-        request.resource.data.studentVendorId == request.auth.uid &&
-        request.resource.data.status == 'PENDING';
-      allow update: if isStaffSupervisor() || isAdmin();
-      allow delete: if isAdmin();
-    }
-
-    // ==========================================
-    // 18. STAFF SUPERVISORS (Role-Restricted Directory)
-    // ==========================================
-    match /staff_supervisors/{staffId} {
-      // 🔒 A directory of who supervises what, including their permission flags, is
-      // reconnaissance material and was readable by every signed-in user. No client
-      // code reads it — the Cloud Functions that consult it use the Admin SDK and
-      // bypass these rules — so it is closed to staff reading their own record and
-      // to admins.
-      allow read: if isAuthenticated() && (isOwner(staffId) || isAdmin());
-      allow write: if isAdmin();
-    }
-
-    // ==========================================
-    // 18.1 ASSISTANT RATE LIMITS (Backend-Only Quota Counters)
-    // ==========================================
-    match /assistant_rate_limits/{uid} {
-      // 🔒 A quota the client could read or reset would not be a quota.
-      allow read, write: if false;
-    }
-
-    // ==========================================
-    // 18.2 PILOT PROGRAMME LEADS (Backend-Only Write, Admin Read)
-    // ==========================================
-    match /pilot_leads/{leadId} {
-      // Schools submit a name, position, phone and email through the public
-      // landing page. The page promises to keep that confidential under the PDPA,
-      // which rules out a client-writable collection: what a browser can write it
-      // can be tricked into writing, and what a browser can read is not
-      // confidential. The submitPilotLead Cloud Function is the only writer.
-      allow read: if isAdmin();
-      allow write: if false;
-    }
-
-    match /pilot_lead_rate_limits/{callerKey} {
-      // 🔒 The only thing standing between an unauthenticated form and a filled
-      // collection. Readable or resettable from a client, it would stop one.
-      allow read, write: if false;
-    }
-
-    // ==========================================
-    // 19. EMERGENCY AUDIT LOGS (Strict Backend-Only Immutable Log)
-    // ==========================================
-    match /emergency_audit_logs/{auditId} {
-      allow read: if isStaffSupervisor() || isAdmin();
-      allow create: if isStaffSupervisor() || isAdmin();
-      allow update, delete: if false; // 🔒 Strict Append-Only: Audit records can never be modified or erased
-    }
-
-    // ==========================================
-    // 20. PILOT PROPOSAL LEADS (Admin Read, Backend Only Writes)
-    // ==========================================
-    match /pilot_leads/{leadId} {
-      allow read: if isAdmin();
-      allow write: if false;
-    }
-
-    match /pilot_lead_rate_limits/{key} {
-      allow read, write: if false;
-    }
-
-    // ==========================================
-    // 21. PRODUCT & STORE REVIEWS
-    // ==========================================
-    match /reviews/{reviewId} {
-      allow read: if true;
-      allow create: if isAuthenticated() &&
-                       request.resource.data.userId == request.auth.uid &&
-                       isValidNumber(request.resource.data.rating) &&
-                       request.resource.data.rating >= 1 &&
-                       request.resource.data.rating <= 5 &&
-                       isValidString(request.resource.data.comment, 1, 1000);
-      allow update: if isAdmin() || (
+      allow create: if isSuperAdmin() || isAdmin();
+      allow update: if isSuperAdmin() || (
         isAuthenticated() && 
-        resource.data.userId == request.auth.uid &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating', 'comment', 'updatedAt']) &&
-        isValidNumber(request.resource.data.rating) &&
-        request.resource.data.rating >= 1 &&
-        request.resource.data.rating <= 5 &&
-        isValidString(request.resource.data.comment, 1, 1000)
+        resource.data.ownerId == request.auth.uid &&
+        // Immutable schoolId: Merchant cannot change their store's schoolId!
+        (!('schoolId' in request.resource.data) || request.resource.data.schoolId == resource.data.schoolId)
       );
-      allow delete: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
-    }
+      allow delete: if isSuperAdmin();
 
-    // ==========================================
-    // 22. REAL-TIME CUSTOMER-MERCHANT CHAT
-    // ==========================================
-    match /chats/{chatId} {
-      allow read: if isAuthenticated() && (
-        resource == null ||
-        resource.data.customerUid == request.auth.uid ||
-        (resource.data.storeId != null && isStoreOwner(resource.data.storeId)) ||
-        isAdmin()
-      );
-      allow create: if isAuthenticated() && (
-        request.resource.data.customerUid == request.auth.uid ||
-        isAdmin()
-      );
-      allow update: if isAuthenticated() && (
-        resource.data.customerUid == request.auth.uid ||
-        (resource.data.storeId != null && isStoreOwner(resource.data.storeId)) ||
-        isAdmin()
-      );
-      allow delete: if isAdmin();
-
-      match /messages/{msgId} {
+      // Store staff and members
+      match /members/{memberId} {
         allow read: if isAuthenticated() && (
-          get(/databases/$(database)/documents/chats/$(chatId)).data.customerUid == request.auth.uid ||
-          isStoreOwner(get(/databases/$(database)/documents/chats/$(chatId)).data.storeId) ||
+          request.auth.uid == memberId || 
+          resource.data.userId == request.auth.uid ||
           isAdmin()
         );
-        allow create: if isAuthenticated() &&
-          request.resource.data.senderUid == request.auth.uid &&
-          (
-            get(/databases/$(database)/documents/chats/$(chatId)).data.customerUid == request.auth.uid ||
-            isStoreOwner(get(/databases/$(database)/documents/chats/$(chatId)).data.storeId) ||
-            isAdmin()
-          );
-        allow update, delete: if isAdmin();
+        allow write: if isSuperAdmin() || (isAuthenticated() && get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid);
+      }
+
+      // Store daily statistics
+      match /daily_stats/{date} {
+        allow read: if isAuthenticated() && (
+          get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid || 
+          isAdmin()
+        );
+        allow write: if false;
       }
     }
 
-    // ==========================================
-    // 23. QUEUE COUNTERS (Cloud Functions Backend Only)
-    // ==========================================
-    match /queue_counters/{counterId} {
-      allow read, write: if false;
-    }
-
-    // ==========================================
-    // 24. REELS & SHORT VIDEOS (คลิปสั้นโปรโมตและรีวิวอาหาร)
-    // ==========================================
-    match /reels/{reelId} {
+    // 4. Menu Items: Top-level collection for cross-store query
+    match /menu_items/{menuItemId} {
       allow read: if true;
-      allow create: if isAuthenticated() && (
-        isAdmin() ||
-        request.resource.data.authorUid == request.auth.uid
-      );
-      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.authorUid == request.auth.uid);
+      allow write: if isSuperAdmin() || (isAuthenticated() && request.auth.token.role == 'merchant');
     }
 
-    // ==========================================
-    // 25. COMMUNITY ANNOUNCEMENTS & POSTS (การโพสต์กระดานอาหารและข่าวสาร)
-    // ==========================================
-    match /announcements/{announcementId} {
+    // 5. Orders: Server authoritative (Command Model via Express API)
+    match /orders/{orderId} {
+      // Readable by customer who placed it, store merchant, super admin, or school admin of that school
+      allow read: if isAuthenticated() && (
+        resource.data.customerId == request.auth.uid ||
+        request.auth.token.storeId == resource.data.storeId ||
+        request.auth.token.role == 'merchant' ||
+        isSuperAdmin() ||
+        isSchoolAdmin(resource.data.schoolId)
+      );
+      // Direct client writing is FORBIDDEN. All orders must go through /api/orders
+      allow write: if false;
+
+      // Order Audit Events Subcollection
+      match /events/{eventId} {
+        allow read: if isAuthenticated() && (
+          get(/databases/$(database)/documents/orders/$(orderId)).data.customerId == request.auth.uid ||
+          request.auth.token.role == 'merchant' ||
+          isAdmin()
+        );
+        allow write: if false;
+      }
+    }
+
+    // 6. Chats and Messages
+    match /chats/{chatId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid in resource.data.participantIds ||
+        request.auth.token.role in ['merchant', 'admin'] ||
+        request.auth.token.admin == true ||
+        isAdmin()
+      );
+      // Create: user must be in the participantIds array and match customerId
+      allow create: if isAuthenticated() && (
+        (request.auth.uid in request.resource.data.participantIds &&
+         request.resource.data.customerId == request.auth.uid) ||
+        request.auth.token.role in ['merchant', 'admin'] ||
+        isAdmin()
+      );
+      // Update: MUST be an existing participant, participantIds, storeId, customerId CANNOT be modified
+      allow update: if isAuthenticated() && (
+        (
+          request.auth.uid in resource.data.participantIds &&
+          request.resource.data.participantIds == resource.data.participantIds &&
+          request.resource.data.storeId == resource.data.storeId &&
+          request.resource.data.customerId == resource.data.customerId
+        ) ||
+        request.auth.token.role in ['merchant', 'admin'] ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+
+      match /messages/{messageId} {
+        allow read: if isAuthenticated() && (
+          request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds ||
+          request.auth.token.role in ['merchant', 'admin'] ||
+          request.auth.token.admin == true ||
+          isAdmin()
+        );
+        // Message creation: MUST be an authentic participant of the chat room
+        // senderRole restricted to customer/merchant only (ai_assistant/system can ONLY be written by Admin SDK)
+        // Message size bounded to 2000 chars to prevent DoS/overflow
+        allow create: if isAuthenticated() &&
+          request.resource.data.senderId == request.auth.uid &&
+          request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds &&
+          request.resource.data.senderRole in ['customer', 'merchant'] &&
+          request.resource.data.message.size() <= 2000;
+        allow update, delete: if false;
+      }
+    }
+
+    // 7. Canteens
+    match /canteens/{canteenId} {
       allow read: if true;
-      allow create: if isAuthenticated() && (
-        isAdmin() ||
-        request.resource.data.authorUid == request.auth.uid
-      );
-      allow update, delete: if isAdmin() || (isAuthenticated() && (resource.data.authorUid == request.auth.uid || isStoreOwner(resource.data.storeId)));
-    }
-
-    // ==========================================
-    // 26. USER BEHAVIORS & USAGE ANALYTICS (ข้อมูลพฤติกรรมการใช้งาน)
-    // ==========================================
-    match /user_behaviors/{userId} {
-      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
-      allow write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
-    }
-
-    // ==========================================
-    // 27. STORE STATS & DAILY ANALYTICS (สถิติร้านค้าและยอดขาย)
-    // ==========================================
-    match /store_stats/{storeId} {
-      allow read: if isAuthenticated() && (isAdmin() || isStoreOwner(storeId));
-      allow write: if false; // 🔒 Server-Authoritative: Aggregated stats managed by Cloud Functions only
-    }
-
-    // ==========================================
-    // 28. COUPONS & PROMOTIONS (คูปองส่วนลดและโปรโมชัน)
-    // ==========================================
-    match /coupons/{couponId} {
-      allow read: if isAuthenticated();
       allow write: if isAdmin();
     }
 
-    // ==========================================
-    // 29. CANTEEN USABILITY & SATISFACTION SURVEYS (GE341511 15-Item Likert Scale)
-    // ==========================================
-    match /canteen_surveys/{surveyId} {
-      allow read: if true;
-      allow create, update: if true;
-      allow delete: if isAdmin();
+    // 8. School Applications: Public submission, Super Admin management ONLY
+    match /school_applications/{applicationId} {
+      allow create: if true;
+      allow read, update, delete: if isSuperAdmin();
     }
 
+    // 9. Schools: Public read of registered schools, Super Admin write ONLY
+    match /schools/{schoolId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    // 10. School Members: Institutional Authorized Roster with Field-Level Immutability
+    match /school_members/{memberId} {
+      allow read: if isAuthenticated();
+      allow create: if isSuperAdmin() || isSchoolAdmin(request.resource.data.schoolId);
+      allow update: if isSuperAdmin() || 
+        // Case 1: School Admin update (Restricted to non-security fields; CANNOT alter role, schoolId, email, identifier, or claiming state)
+        (
+          isSchoolAdmin(resource.data.schoolId) &&
+          isMemberIdentityUnchanged() &&
+          request.resource.data.claimedByUid == resource.data.claimedByUid &&
+          request.resource.data.isRegistered == resource.data.isRegistered
+        ) ||
+        // Case 2: Self-Claim by verified user (Only claiming previously unclaimed roster record)
+        (
+          isAuthenticated() &&
+          request.auth.token.email_verified == true &&
+          resource.data.email == request.auth.token.email &&
+          resource.data.status == 'active' &&
+          isMemberIdentityUnchanged() &&
+          (resource.data.claimedByUid == null || resource.data.claimedByUid == request.auth.uid) &&
+          request.resource.data.claimedByUid == request.auth.uid &&
+          request.resource.data.isRegistered == true
+        );
+      allow delete: if isSuperAdmin() || isSchoolAdmin(resource.data.schoolId);
+    }
+
+    // 11. User Devices (FCM Push Tokens)
+    match /user_devices/{deviceId} {
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.uid == request.auth.uid && request.resource.data.uid == request.auth.uid;
+      allow delete: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+    }
+
+    // 12. Notifications (Central Notification Inbox)
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && (
+        resource.data.recipientId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create, delete: if false; // Server authoritative via Firebase Admin SDK only
+      allow update: if isAuthenticated() &&
+        resource.data.recipientId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
+    }
+
+    // 13. Catch-all: Deny all by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
   }
 }
-
