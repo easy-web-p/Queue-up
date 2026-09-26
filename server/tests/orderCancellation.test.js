@@ -312,20 +312,44 @@ async function runTests() {
 
     res = await createWalletOrder(baseUrl, 1, { slotId, reservationId });
     const slotOrderId = res.data?.orderId;
+
+    // A second diner in the same slot, so a double release would be visible.
+    const neighbourId = `res-cancel-neighbour-${suffix}`;
+    await SlotTransactionService.reserveSlot({
+      storeId: STORE, slotId, reservationId: neighbourId, workload: 1,
+      uid: STUDENT, schoolId: SCHOOL
+    });
+    await createWalletOrder(baseUrl, 1, { slotId, reservationId: neighbourId });
+
     let slot = (await SlotTransactionService.getSlotRef(STORE, slotId).get()).data();
-    check(slot.confirmedWorkload === 1,
-      'Creating the order confirms the slot workload', `confirmed ${slot.confirmedWorkload}`);
+    check(slot.confirmedWorkload === 2,
+      'Creating the orders confirms both slot workloads', `confirmed ${slot.confirmedWorkload}`);
 
     res = await request(baseUrl, `/api/orders/${slotOrderId}/status`, 'PATCH',
       { status: 'CANCELLED' }, as(STUDENT));
     check(res.status === 200, 'The slot-bound order cancels', `status ${res.status}`);
     slot = (await SlotTransactionService.getSlotRef(STORE, slotId).get()).data();
-    check(slot.confirmedWorkload === 0,
-      'The workload is returned to the slot for someone else to book',
+    check(slot.confirmedWorkload === 1,
+      'Its workload is returned to the slot for someone else to book',
       `confirmed ${slot.confirmedWorkload}`);
     const reservation = (await adminDb.collection('reservations').doc(reservationId).get()).data();
     check(reservation?.status === 'CANCELLED',
       'The reservation is cancelled with the order', `status ${reservation?.status}`);
+
+    // Cancelling again used to run the whole branch a second time, releasing
+    // the same workload twice and letting the slot be overbooked.
+    const balanceBeforeRepeat = await walletBalance(baseUrl);
+    res = await request(baseUrl, `/api/orders/${slotOrderId}/status`, 'PATCH',
+      { status: 'CANCELLED' }, as(STUDENT));
+    check(res.status === 200 && res.data?.unchanged === true,
+      'Cancelling an already-cancelled order is a no-op, not a replay',
+      `status ${res.status}, unchanged ${res.data?.unchanged}`);
+    slot = (await SlotTransactionService.getSlotRef(STORE, slotId).get()).data();
+    check(slot.confirmedWorkload === 1,
+      'The other diner keeps their place in the slot',
+      `confirmed ${slot.confirmedWorkload}`);
+    check(await walletBalance(baseUrl) === balanceBeforeRepeat,
+      'And nobody is refunded twice', `balance ${await walletBalance(baseUrl)}`);
 
     // --- The rule that caught both bugs above ---
     console.log('\n--- Reads before writes ---');

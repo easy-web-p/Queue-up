@@ -4,8 +4,7 @@ import { adminDb } from '../firebaseAdmin.js';
 import { optionalAuthenticate } from '../middleware/authenticate.js';
 import { optionalSecret } from '../config/secrets.js';
 import { verifySessionAgainstOrder } from '../services/paymentVerification.js';
-import { recordCustomerPayment } from '../services/ledgerService.js';
-import { resolveOrderBreakdown } from '../services/orderPricing.js';
+import { settleOrderPayment, recordPaymentException } from '../services/paymentSettlement.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -226,11 +225,12 @@ paymentRouter.post('/verify-session', optionalAuthenticate, async (req, res) => 
       const orderRef = adminDb.collection('orders').doc(orderId);
       const now = new Date().toISOString();
 
-      // Update Firestore Order atomically
-      await adminDb.runTransaction(async (t) => {
+      // Settled through the same path as the webhook, so a session confirmed
+      // here and an event arriving later cannot disagree about what happened.
+      const outcome = await adminDb.runTransaction(async (t) => {
         const orderSnap = await t.get(orderRef);
         if (!orderSnap.exists) {
-          throw new Error(`Order ${orderId} not found`);
+          throw new Error(`ORDER_NOT_FOUND: Order ${orderId} not found`);
         }
 
         const data = orderSnap.data();
@@ -245,73 +245,41 @@ paymentRouter.post('/verify-session', optionalAuthenticate, async (req, res) => 
           throw new Error(`${verdict.error}: ${verdict.message}`);
         }
 
-        // If already paid, do not repeat ledger write
-        if (data.paymentStatus === 'PAID') {
-          return;
-        }
-
-        // Set status to PAID_AWAITING_MERCHANT (5-minute deadline for merchant to respond)
-        const merchantDeadline = new Date(Date.now() + 5 * 60 * 1000).toISOString();
-        const { totalSatang, platformFeeSatang, gatewayFeeSatang, merchantNetSatang } =
-          resolveOrderBreakdown(data);
-
-        const newVersion = (data.version || 1) + 1;
-
-        t.update(orderRef, {
-          paymentStatus: 'PAID',
-          status: 'PAID_AWAITING_MERCHANT',
-          canonicalStatus: 'AWAITING_CONFIRMATION',
-          settlementStatus: 'PENDING_ORDER_ACCEPTANCE',
-          paidAt: now,
-          merchantResponseDeadlineAt: merchantDeadline,
-          version: newVersion,
-          stripeSessionId: sessionId,
-          stripePaymentIntentId: session.payment_intent || null,
-          updatedAt: now
-        });
-
-        // Write Customer Payment Record
-        const paymentId = `pay_${sessionId}`;
-        t.set(adminDb.collection('payments').doc(paymentId), {
-          id: paymentId,
+        return settleOrderPayment(t, adminDb, {
+          orderRef,
           orderId,
-          storeId: data.storeId,
-          customerId: data.customerId,
-          amountSatang: totalSatang,
-          currency: 'thb',
-          provider: 'stripe',
-          providerPaymentIntentId: session.payment_intent || null,
+          order: data,
+          amountPaidSatang: Number(session.amount_total),
           providerCheckoutSessionId: sessionId,
+          providerPaymentIntentId: session.payment_intent || null,
           paymentMethodType: session.payment_method_types?.[0] || 'promptpay',
-          status: 'PAID',
-          paidAt: now,
-          createdAt: now,
-          updatedAt: now
-        });
-
-        // Double-Entry Ledger Record
-        await recordCustomerPayment(t, adminDb, {
-          orderId,
-          storeId: data.storeId,
-          totalSatang,
-          merchantNetSatang,
-          platformFeeSatang,
-          gatewayFeeSatang,
+          changedBy: 'STRIPE_GATEWAY',
+          note: `Payment verified via Stripe (${session.payment_method_types?.join(', ') || 'online'}). Awaiting merchant acceptance.`,
           now
         });
-
-        // Add event to audit trail
-        const eventRef = orderRef.collection('events').doc();
-        t.set(eventRef, {
-          orderId,
-          fromStatus: data.status,
-          toStatus: 'PAID_AWAITING_MERCHANT',
-          changedBy: 'STRIPE_GATEWAY',
-          changerRole: 'system',
-          note: `Payment verified via Stripe (${session.payment_method_types?.join(', ') || 'online'}). Awaiting merchant acceptance.`,
-          timestamp: now
-        });
       });
+
+      // Money arrived that this order cannot take — it was cancelled, or less
+      // was captured than it costs. Refusing quietly would lose it.
+      if (!outcome.settled && outcome.reason !== 'ALREADY_PAID') {
+        await recordPaymentException(adminDb, {
+          orderId,
+          reason: outcome.reason,
+          providerCheckoutSessionId: sessionId,
+          providerPaymentIntentId: session.payment_intent || null,
+          amountSatang: Number(session.amount_total),
+          detail: `verify-session could not settle the order (${outcome.reason}).`,
+          now
+        });
+        return res.status(409).json({
+          success: false,
+          paid: true,
+          error: outcome.reason,
+          message: outcome.reason === 'ORDER_NOT_PAYABLE'
+            ? 'คำสั่งซื้อนี้ถูกยกเลิกไปแล้ว ทีมงานจะติดต่อเพื่อคืนเงินให้ค่ะ'
+            : 'ยอดที่ชำระไม่ตรงกับคำสั่งซื้อ ทีมงานกำลังตรวจสอบค่ะ'
+        });
+      }
 
       console.log(`[Payment API] Order ${orderId} successfully marked PAID_AWAITING_MERCHANT via Stripe.`);
       return res.status(200).json({

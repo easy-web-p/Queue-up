@@ -455,6 +455,20 @@ orderRouter.patch('/:id/status', authenticate, async (req, res) => {
       });
     }
 
+    // Asking for the status it already has is a repeat, not a request to run
+    // the transition again — and saying the cancellation window has closed on an
+    // order that is already cancelled would only confuse the caller.
+    if (preOrder.status === nextStatus) {
+      return res.status(200).json({
+        success: true,
+        orderId,
+        previousStatus: preOrder.status,
+        status: preOrder.status,
+        version: preOrder.version || 1,
+        unchanged: true
+      });
+    }
+
     // Once the kitchen has started, the food exists. A store operator can still
     // cancel and refund, but the customer cannot do it unilaterally.
     if (!operatesStore && nextStatus === 'CANCELLED' && !customerMayCancel(preOrder.status)) {
@@ -478,6 +492,21 @@ orderRouter.patch('/:id/status', authenticate, async (req, res) => {
       const allowedNext = VALID_TRANSITIONS[currentStatus] || [];
       if (!allowedNext.includes(nextStatus) && nextStatus !== currentStatus) {
         throw new Error(`INVALID_TRANSITION: Cannot transition order from "${currentStatus}" to "${nextStatus}". Allowed: [${allowedNext.join(', ')}]`);
+      }
+
+      // 1b. A repeat of the status the order is already in is a no-op, not a
+      // replay. Re-running it cancelled twice: the kitchen slot gave back the
+      // same workload a second time, so the slot looked emptier than it was and
+      // could be overbooked, and the terminal-state counters double-counted.
+      if (nextStatus === currentStatus) {
+        return {
+          success: true,
+          orderId,
+          previousStatus: currentStatus,
+          status: currentStatus,
+          version: orderData.version || 1,
+          unchanged: true
+        };
       }
 
       // 2. Verify Optimistic Locking Version

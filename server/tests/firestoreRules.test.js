@@ -197,6 +197,14 @@ async function run() {
       getDoc(doc(owner.firestore(), 'payout_requests', 'payout-1')));
     await expectDenied('Clients cannot read the ledger',
       getDoc(doc(owner.firestore(), 'ledger_entries', 'ledger-1')));
+    await expectDenied('Clients cannot read refund requests',
+      getDoc(doc(owner.firestore(), 'refund_requests', 'ref-1')));
+    await expectDenied('Clients cannot read the payment exception queue',
+      getDoc(doc(owner.firestore(), 'payment_exceptions', 'pex-1')));
+    await expectDenied('Clients cannot queue a refund for themselves',
+      setDoc(doc(customer.firestore(), 'refund_requests', 'ref-forged'), {
+        orderId: 'ord-1', amountSatang: 100000, status: 'PENDING'
+      }));
 
     console.log('\n===============================================================');
     console.log(`📊 FIRESTORE RULES TEST RESULTS: ${passed}/${total} Passed (${passed === total ? 'ALL PASSED' : 'FAILURES DETECTED'})`);
