@@ -4,7 +4,7 @@
 > ทุกตัวเลขและทุกข้อความในเอกสารนี้ผ่านการรันคำสั่งจริงหรืออ่านไฟล์จริงแล้ว
 > วันที่ตรวจสอบ: 26 กันยายน 2026
 >
-> **สถานะการแก้ไข:** Sprint 1 และ Sprint 2 ดำเนินการเสร็จแล้ว — ดู
+> **สถานะการแก้ไข:** Sprint 1-4 ดำเนินการครบแล้ว — ดู
 > [ส่วนที่ 6 — สถานะการแก้ไข](#ส่วนที่-6--สถานะการแก้ไข-remediation-status)
 > ข้อค้นพบทั้งหมดในส่วนที่ 3 ยังคงไว้ตามเดิมเพื่อเป็นบันทึกว่าพบอะไรและแก้อย่างไร
 
@@ -470,15 +470,57 @@ grep -n "projectId" firebase-applet-config.json public/firebase-messaging-sw.js 
 | P2-15 collection ไม่มีใน rules | ✅ เพิ่มเทสต์ยืนยันว่า `merchant_balances`, `payout_requests`, `ledger_entries` ถูก catch-all deny จริง |
 | เพิ่มเติม | ✅ เพิ่ม `firebase.json` ซึ่งเดิมไม่มี ทำให้ deploy `firestore.rules` / indexes ด้วย Firebase CLI ไม่ได้เลย |
 
-### ยังเหลือ (Sprint 3-4)
+### Sprint 3 — Performance & Infrastructure (เสร็จแล้ว)
 
-- P2-3 Code splitting — bundle ยัง 2.58 MB ก้อนเดียว
-- P2-8 CORS middleware
-- P2-9 Rate limiting
-- P2-11 ลบไฟล์หน้าเก่าซ้ำซ้อนใน `src/pages/*.jsx`
-- P2-12 แตก `QueueContext.tsx` (3,291 บรรทัด)
-- P2-6 AI Layer 2 (`@google/genai` ยังไม่ถูกใช้)
-- Campus Wallet ฝั่งลูกค้า / Roster CSV Upload API / รวม `food_items` กับ `menu_items`
+| # | สถานะ | รายละเอียด |
+|---|---|---|
+| P2-3 Code splitting | ✅ | `React.lazy()` ทุก route ยกเว้นหน้าแรก + `firebase/analytics` เป็น dynamic import → **2.58 MB → 1.48 MB (gzip 661 KB → 392 KB) ลดลง 43%** |
+| P2-8 CORS | ✅ | ควบคุมด้วย `ALLOWED_ORIGINS` — production ที่ไม่ตั้งค่าจะเป็น same-origin เท่านั้น |
+| P2-9 Rate limiting | ✅ | 600/15นาที ทั้ง API · 30/นาที สำหรับสร้างออเดอร์/แชท/จองสล็อต/ถอนเงิน · 20/10นาที สำหรับตรวจ PIN |
+| Security headers | ✅ | `helmet` + CSP (report-only โดยค่าเริ่มต้น, เปิด enforce ด้วย `CSP_ENFORCE`) — ชุด E2E รันแบบ enforce อยู่แล้ว |
+| Error handler | ✅ | Express error middleware กลาง — JSON ผิดรูปได้ 400 JSON แทนหน้า HTML |
+| API 404 | ✅ | `/api/*` ที่ไม่ตรง route ตอบ 404 JSON แทนการตกไปที่ SPA fallback (เดิมตอบ index.html พร้อม 200) |
+| P2-10/P2-11 Dead code | ✅ | ลบ 8 ไฟล์ที่ไม่มีใคร import (`ProtectedRoute`, `Skeleton`, หน้าเก่า `.jsx` 4 ไฟล์, `LandingPage` ซ้ำ, `StoreChatPage`) |
+| P2-12 `QueueContext.tsx` | ⚠️ บางส่วน | 3,291 → **2,870 บรรทัด** แยก demo data และ session bootstrap ออก แต่**ยังไม่ได้แตกเป็นหลาย context** เพราะเป็น behavioural refactor ที่กระทบทุก consumer และยังไม่มี UI test รองรับเพียงพอ |
+| CI | ✅ | GitHub Actions: lint → build → `TZ=UTC npm test` → rules suite → E2E |
+| E2E | ✅ | Playwright 6 เทสต์บน production build จริง (บูตได้, lazy chunk โหลดได้, CSP ไม่บล็อก, route guard, API 404, payout ถูกปฏิเสธ) |
+
+### Sprint 4 — Features (เสร็จแล้ว)
+
+| ฟีเจอร์ | สถานะ | รายละเอียด |
+|---|---|---|
+| **Custom Claims** | ✅ | **พบว่าไม่เคยถูกออกเลย** — `firestore.rules` และ `AuthContext` อ่าน `request.auth.token.role/.schoolId/.storeId` แต่ไม่มีโค้ดไหนเรียก `setCustomUserClaims` ทำให้กฎที่อิง claim ทั้งหมดใช้งานไม่ได้จริง ตอนนี้มี `POST /api/schools/membership/claim` และ `POST /api/schools/users/:uid/claims` |
+| **Roster CSV Upload API** | ✅ | อนุมัติสถานศึกษาและนำเข้า Roster ฝั่งเซิร์ฟเวอร์แบบ batch ละ 500 รายการ, ข้ามแถวเสียแทนการล้มทั้งชุด, ไม่ทับสิทธิ์ที่ถูก claim ไปแล้ว |
+| **รวม `food_items` / `menu_items`** | ✅ | **พบช่องโหว่ร้ายแรงระหว่างแก้**: `menu_items` ไม่เคยถูกเขียนเลย ทำให้การหาเมนูตอนคิดราคา miss เสมอ แล้วตกไปใช้ `item.unitPrice` **จาก request body** — ลูกค้าเลือกราคาเองได้ ตอนนี้ปฏิเสธเมนูที่ไม่รู้จักแทน และคิดราคา option จาก option group ของเมนูจริง |
+| **AI Layer 2** | ✅ | Scope-Bound Tool Calling ด้วย `@google/genai` เปิดใช้เมื่อตั้ง `GEMINI_API_KEY` · tool เป็น read-only ล้วน · ไม่มีพารามิเตอร์ใดระบุร้าน/ลูกค้า/สถาบันได้ · จำกัด 3 รอบ 8 วินาที 600 ตัวอักษร · ล้มเหลวแล้วส่งต่อให้คน |
+| **Campus Wallet** | ✅ | กระเป๋าเงินนักศึกษา: เติมที่เคาน์เตอร์แบบ idempotent (จำกัด ฿5,000/ครั้ง), ยอดติดลบไม่ได้, ตัดยอดใน transaction เดียวกับการสร้างออเดอร์, คืนเงินอัตโนมัติเมื่อร้านปฏิเสธ |
+
+### ช่องโหว่เพิ่มเติมที่พบใน Sprint 3-4
+
+| ปัญหา | ความรุนแรง | การแก้ไข |
+|---|---|---|
+| **ราคาออเดอร์มาจาก client** — `menu_items` ไม่เคยถูกเขียน ทำให้ lookup miss แล้ว fallback ไปใช้ `item.unitPrice` จาก body | 🔴 วิกฤต | ปฏิเสธเมนูที่หาไม่เจอ, ตรวจว่าเมนูเป็นของร้านนั้นจริง, คิด option จาก option group ของเมนู |
+| **Custom claims ไม่เคยถูกออก** ทำให้ `isSchoolAdmin()` และ `request.auth.token.storeId` ใช้งานไม่ได้จริงทั้งระบบ | 🟠 สูง | เพิ่ม endpoint ออก claim จาก roster และจาก platform admin |
+| **เบราว์เซอร์เขียนเมนูของทุกร้าน** ลง Firestore ได้โดยตรง | 🟠 สูง | ย้ายไปที่ `PUT /api/catalog/stores/:storeId/menu` ที่ตรวจความเป็นเจ้าของและ stamp `storeId` จาก route |
+| **`SUPER_ADMIN_EMAILS` อ่านตอน module load** — process ที่ตั้งค่าหลัง import จะได้ค่า default เงียบ ๆ | 🟡 ปานกลาง | ย้ายไปอ่านตอนเรียกใช้ |
+
+### สรุปสถานะสุดท้าย
+
+| ระบบตรวจสอบ | ก่อนเริ่ม | หลังแก้ครบ |
+|---|---|---|
+| `npm install` | ❌ ERESOLVE | ✅ สำเร็จ |
+| `npm run lint` | ✅ 0 error | ✅ 0 error |
+| `npm run build` | ✅ 2.58 MB ก้อนเดียว | ✅ **1.49 MB โหลดตอนแรก, แตกเป็น 27 chunks** |
+| `TZ=UTC npm test` | ❌ 75/77 | ✅ **175/175** |
+| `npm run test:rules` | ไม่มี | ✅ **29/29** |
+| `npm run test:e2e` | ไม่มี | ✅ **6/6** |
+| **รวมเทสต์** | 77 | **210** |
+
+### ยังไม่ได้ทำ (นอกขอบเขตรอบนี้)
+
+- แตก `QueueContext.tsx` เป็นหลาย context แยกกัน (ดูเหตุผลในตาราง Sprint 3)
+- E2E ครอบ flow เต็ม (สั่ง → จ่าย → KDS → รับด้วย PIN) ซึ่งต้องมี Firebase Auth จริงหรือ emulator suite เพิ่ม
+- เติมเงิน Campus Wallet ด้วยตัวเองผ่าน Stripe (ตอนนี้รองรับเฉพาะเติมที่เคาน์เตอร์โดยผู้ดูแลสถาบัน)
 
 ### ไฟล์ที่เพิ่มใหม่
 
