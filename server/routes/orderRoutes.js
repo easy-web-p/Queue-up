@@ -11,6 +11,7 @@ import { requireSecret } from '../config/secrets.js';
 import { recordOrderFulfilled } from '../services/ledgerService.js';
 import { NotificationEngine } from '../services/notificationEngine.js';
 import { SlotTransactionService } from '../services/slotTransactionService.js';
+import { findMenuItem } from '../services/menuCatalog.js';
 
 export const orderRouter = Router();
 
@@ -117,30 +118,55 @@ orderRouter.post('/', optionalAuthenticate, async (req, res) => {
       let calculatedSubtotalSatang = 0;
 
       for (const item of items) {
-        const itemRef = adminDb.collection('menu_items').doc(item.menuItemId);
-        const itemSnap = await t.get(itemRef);
+        const found = await findMenuItem(adminDb, item.menuItemId, t);
 
-        let itemName = 'อาหาร';
-        let basePriceBaht = 0;
-        let isAvailable = true;
+        // Falling back to a request-supplied price would make the whole
+        // "authoritative pricing" tier decorative: the payer would choose what
+        // they pay. An unknown item is refused instead.
+        if (!found) {
+          throw new Error(
+            `MENU_ITEM_NOT_FOUND: ไม่พบรายการอาหารรหัส "${item.menuItemId}" ในระบบ กรุณารีเฟรชเมนูแล้วลองใหม่`
+          );
+        }
 
-        if (itemSnap.exists) {
-          const itemData = itemSnap.data();
-          itemName = itemData.name;
-          basePriceBaht = Number(itemData.price || 0);
-          isAvailable = itemData.isAvailable !== false;
-        } else {
-          basePriceBaht = Number(item.unitPrice || 45);
-          itemName = item.name || 'เมนูแนะนำ';
+        const itemData = found.data;
+
+        // A menu item belongs to exactly one store; ordering it from another
+        // store's cart would price one kitchen's food against another's.
+        if (itemData.storeId && itemData.storeId !== storeId) {
+          throw new Error(
+            `MENU_ITEM_STORE_MISMATCH: รายการ "${itemData.name || item.menuItemId}" ไม่ได้อยู่ในเมนูของร้านนี้`
+          );
+        }
+
+        const itemName = itemData.name || 'อาหาร';
+        const basePriceBaht = Number(itemData.price || 0);
+        const isAvailable = itemData.isAvailable !== false;
+
+        if (!Number.isFinite(basePriceBaht) || basePriceBaht <= 0) {
+          throw new Error(`MENU_ITEM_PRICE_INVALID: รายการ "${itemName}" ยังไม่ได้ตั้งราคา`);
         }
 
         if (!isAvailable) {
           throw new Error(`ITEM_UNAVAILABLE: รายการ "${itemName}" หมดชั่วคราว`);
         }
 
+        // Option surcharges are priced from the menu item's own option groups,
+        // not from the priceDelta the client sent alongside its choice.
         let optionsDeltaBaht = 0;
         if (Array.isArray(item.selectedOptions)) {
-          optionsDeltaBaht = item.selectedOptions.reduce((acc, o) => acc + (Number(o.priceDelta) || 0), 0);
+          const groups = Array.isArray(itemData.optionGroups) ? itemData.optionGroups : [];
+          for (const selected of item.selectedOptions) {
+            const group = groups.find((g) => g.name === selected.groupName);
+            const choice = group?.choices?.find((c) => c.name === selected.choiceName);
+            if (choice) {
+              optionsDeltaBaht += Number(choice.priceDelta) || 0;
+            } else if (groups.length === 0) {
+              // Menu item carries no option definitions (legacy record): accept
+              // the client value but never let it reduce the price.
+              optionsDeltaBaht += Math.max(0, Number(selected.priceDelta) || 0);
+            }
+          }
         }
 
         const unitTotalSatang = Math.round((basePriceBaht + optionsDeltaBaht) * 100);

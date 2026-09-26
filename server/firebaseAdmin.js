@@ -341,7 +341,31 @@ if (!adminDb) {
     }
   };
 
+  // Local stand-in for the Auth service. Custom claims are persisted in the
+  // same file-backed store so a development session (and the test suites) can
+  // read back what the claims endpoints wrote.
+  const localClaims = () => {
+    memoryStore.__auth_claims = memoryStore.__auth_claims || {};
+    return memoryStore.__auth_claims;
+  };
+
   adminAuth = {
+    setCustomUserClaims: async (uid, claims) => {
+      localClaims()[uid] = { ...(claims || {}) };
+      saveToDisk();
+    },
+    getUser: async (uid) => ({
+      uid,
+      email: `${uid}@queueup.local`,
+      emailVerified: true,
+      customClaims: localClaims()[uid] || {}
+    }),
+    getUserByEmail: async (email) => {
+      const uid = Object.keys(localClaims()).find(
+        (key) => localClaims()[key]?.email === email
+      ) || `local-${Buffer.from(email).toString('hex').slice(0, 12)}`;
+      return { uid, email, emailVerified: true, customClaims: localClaims()[uid] || {} };
+    },
     verifyIdToken: async (token) => {
       // Decode JWT payload for local simulation
       try {

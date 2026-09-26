@@ -10,7 +10,8 @@ import {
   orderBy,
   serverTimestamp
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, auth } from './firebase';
+import { apiClient } from './apiClient';
 import { School, SchoolApplication, SchoolMember, Store } from '../types';
 
 const SCHOOL_APPLICATIONS_COLLECTION = 'school_applications';
@@ -60,6 +61,40 @@ export const SchoolService = {
   },
 
   /**
+   * นำเข้ารายชื่อสมาชิก (Roster) ของสถานศึกษาที่อนุมัติแล้ว
+   * ส่งทั้งชุดให้เซิร์ฟเวอร์เขียนแบบ batch แทนการวนเขียนทีละรายการจากเบราว์เซอร์
+   */
+  async importRoster(
+    schoolId: string,
+    members: Array<{
+      type?: 'admin' | 'student' | 'staff' | 'teacher';
+      id: string;
+      fullName: string;
+      email: string;
+      phone?: string;
+      classRoom?: string;
+    }>
+  ): Promise<{ success: boolean; importedMemberCount: number; skippedMemberCount: number }> {
+    const res = await apiClient.post<{
+      success: boolean;
+      importedMemberCount?: number;
+      skippedMemberCount?: number;
+      message?: string;
+      error?: string;
+    }>(`/schools/${encodeURIComponent(schoolId)}/roster`, { members });
+
+    if (!res?.success) {
+      throw new Error(res?.message || res?.error || 'Roster import failed');
+    }
+
+    return {
+      success: true,
+      importedMemberCount: res.importedMemberCount || 0,
+      skippedMemberCount: res.skippedMemberCount || 0
+    };
+  },
+
+  /**
    * ดึงรายการคำขอทั้งหมด (สำหรับ Admin ตรวจสอบ)
    */
   async fetchApplications(): Promise<SchoolApplication[]> {
@@ -103,6 +138,25 @@ export const SchoolService = {
    * 3. สร้างข้อมูลสมาชิกใน collection school_members
    */
   async approveApplication(applicationId: string, reviewedBy: string = 'SuperAdmin'): Promise<{ success: boolean; schoolId: string }> {
+    // Approval creates the school and imports the whole roster. That belongs on
+    // the server: firestore.rules only lets a platform admin write these
+    // collections, and a browser loop over a thousand members leaves the school
+    // half-imported if the tab closes.
+    try {
+      const res = await apiClient.post<{
+        success: boolean;
+        schoolId: string;
+        importedMemberCount?: number;
+        skippedMemberCount?: number;
+      }>(`/schools/applications/${encodeURIComponent(applicationId)}/approve`, {});
+
+      if (res?.success && res.schoolId) {
+        return { success: true, schoolId: res.schoolId };
+      }
+    } catch (err) {
+      console.warn('[SchoolService] Approval API unavailable, falling back to local store:', err);
+    }
+
     const applications = await this.fetchApplications();
     const app = applications.find(a => a.id === applicationId);
 
@@ -199,6 +253,16 @@ export const SchoolService = {
    * ปฏิเสธคำขอสมัครสถานศึกษา (Reject School Application)
    */
   async rejectApplication(applicationId: string, rejectionReason: string, reviewedBy: string = 'SuperAdmin'): Promise<{ success: boolean }> {
+    try {
+      const res = await apiClient.post<{ success: boolean }>(
+        `/schools/applications/${encodeURIComponent(applicationId)}/reject`,
+        { rejectionReason }
+      );
+      if (res?.success) return { success: true };
+    } catch (err) {
+      console.warn('[SchoolService] Rejection API unavailable, falling back to local store:', err);
+    }
+
     const applications = await this.fetchApplications();
     const reviewedAt = new Date().toISOString();
 
@@ -315,7 +379,40 @@ export const SchoolService = {
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    
+
+    // The server owns this: only it can call setCustomUserClaims, and
+    // role/schoolId must come from the roster rather than from the browser.
+    try {
+      const res = await apiClient.post<{
+        success: boolean;
+        claimed?: boolean;
+        schoolId?: string;
+        role?: string;
+        error?: string;
+      }>('/schools/membership/claim', {});
+
+      if (res?.success && res.claimed) {
+        // Custom claims only reach the client on the next ID token, so force a
+        // refresh before anything reads the new role.
+        try {
+          await auth.currentUser?.getIdToken(true);
+        } catch (refreshErr) {
+          console.warn('[SchoolService] Token refresh after claim failed:', refreshErr);
+        }
+        const member = await this.verifyMember(res.schoolId || '', cleanEmail);
+        return { claimed: true, member: member || undefined };
+      }
+
+      if (res?.error === 'ROSTER_ALREADY_CLAIMED') {
+        return { claimed: false, error: 'ROSTER_ALREADY_CLAIMED' };
+      }
+      if (res?.error === 'NOT_ON_ANY_ROSTER') {
+        return { claimed: false };
+      }
+    } catch (err) {
+      console.warn('[SchoolService] Claim API unavailable, falling back to client path:', err);
+    }
+
     // 1. ตรวจสอบใน Firestore collection 'school_members'
     try {
       const q = query(

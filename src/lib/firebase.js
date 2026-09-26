@@ -28,15 +28,20 @@ export async function fetchShopsFromFirestore() {
 }
 
 export async function fetchProductsFromFirestore() {
-  try {
-    const snap = await getDocs(collection(db, 'food_items'));
-    if (!snap.empty) {
-      return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  // `menu_items` is canonical; `food_items` is still read so records written
+  // under the old collection name keep appearing during the migration.
+  const byId = new Map();
+
+  for (const collectionName of ['food_items', 'menu_items']) {
+    try {
+      const snap = await getDocs(collection(db, collectionName));
+      snap.docs.forEach((d) => byId.set(d.id, { id: d.id, ...d.data() }));
+    } catch (err) {
+      console.warn(`[Firebase] fetchProducts ${collectionName} note:`, err);
     }
-  } catch (err) {
-    console.warn('[Firebase] fetchProducts fallback to mock:', err);
   }
-  return FOOD_ITEMS;
+
+  return byId.size > 0 ? Array.from(byId.values()) : FOOD_ITEMS;
 }
 
 export async function fetchEvaluationsFromFirestore() {

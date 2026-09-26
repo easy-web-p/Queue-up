@@ -121,6 +121,67 @@ export async function optionalAuthenticate(req, res, next) {
 }
 
 /**
+ * Platform super admins.
+ *
+ * Mirrors the break-glass clause in firestore.rules so the two tiers agree on
+ * who may approve a school or issue custom claims. Configure the real list via
+ * SUPER_ADMIN_EMAILS; the default keeps the address the rules already trust.
+ */
+function superAdminEmails() {
+  return (process.env.SUPER_ADMIN_EMAILS || 'hi00000087@gmail.com')
+    .split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+/** True for accounts carrying an admin claim, or on the configured allowlist. */
+export function isSuperAdmin(user) {
+  if (!user || user.verified !== true) return false;
+  if (user.admin === true || user.role === 'super_admin') return true;
+  return Boolean(user.email) && superAdminEmails().includes(user.email.toLowerCase());
+}
+
+/** Guards endpoints that administer the platform itself. */
+export function requireSuperAdmin(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ success: false, error: 'UNAUTHORIZED' });
+  }
+  if (!isSuperAdmin(req.user)) {
+    return res.status(403).json({
+      success: false,
+      error: 'FORBIDDEN',
+      message: 'This action is restricted to platform administrators.'
+    });
+  }
+  return next();
+}
+
+/**
+ * Guards endpoints scoped to one institution: the school's own admin, or a
+ * platform admin.
+ */
+export function requireSchoolAdmin(resolveSchoolId = (req) => req.params?.schoolId) {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'UNAUTHORIZED' });
+    }
+    if (isSuperAdmin(req.user)) return next();
+
+    const schoolId = resolveSchoolId(req);
+    if (!schoolId) {
+      return res.status(400).json({ success: false, error: 'MISSING_SCHOOL_ID' });
+    }
+    if (req.user.role === 'admin' && req.user.schoolId === schoolId) return next();
+
+    return res.status(403).json({
+      success: false,
+      error: 'FORBIDDEN',
+      message: 'You do not administer this institution.'
+    });
+  };
+}
+
+/**
  * Role-Based Access Control Middleware.
  */
 export function requireRole(allowedRoles = []) {

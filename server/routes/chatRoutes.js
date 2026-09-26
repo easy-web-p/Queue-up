@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { adminDb } from '../firebaseAdmin.js';
+import { listStoreMenu } from '../services/menuCatalog.js';
 import { authenticate, isStoreOperator } from '../middleware/authenticate.js';
 import { inspectMessage } from '../services/inputShield.js';
 import { NotificationEngine } from '../services/notificationEngine.js';
@@ -314,8 +315,7 @@ chatRouter.post('/messages', authenticate, async (req, res) => {
     if (!isMerchant) {
       let menuItems = [];
       try {
-        const menuSnap = await adminDb.collection('food_items').where('storeId', '==', storeId).get();
-        menuItems = menuSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        menuItems = await listStoreMenu(adminDb, storeId);
       } catch (e) {
         console.warn('[ChatRoutes] Menu fetch fallback:', e.message);
       }

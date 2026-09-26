@@ -11,6 +11,8 @@ import { walletRouter } from './server/routes/walletRoutes.js';
 import { notificationRouter } from './server/routes/notificationRoutes.js';
 import { capacityRouter } from './server/routes/capacityRoutes.js';
 import { chatRouter } from './server/routes/chatRoutes.js';
+import { schoolRouter } from './server/routes/schoolRoutes.js';
+import { catalogRouter } from './server/routes/catalogRoutes.js';
 import { startPickupReminderWorker } from './server/services/pickupReminderWorker.js';
 import {
   applyHardening,
@@ -66,6 +68,7 @@ app.post('/api/orders', writeLimiter);
 app.post('/api/chat/messages', writeLimiter);
 app.post('/api/capacity/reserve', writeLimiter);
 app.post('/api/merchant/payouts', writeLimiter);
+app.post('/api/schools/membership/claim', writeLimiter);
 app.use('/api', apiLimiter);
 
 // 4. Mount Command & Financial API routes
@@ -75,6 +78,8 @@ app.use('/api/merchant', merchantRouter);
 app.use('/api/merchant', walletRouter);
 app.use('/api/capacity', capacityRouter);
 app.use('/api/chat', chatRouter);
+app.use('/api/schools', schoolRouter);
+app.use('/api/catalog', catalogRouter);
 app.use('/api', notificationRouter);
 
 // Unmatched API paths must not fall through to the SPA fallback below, which

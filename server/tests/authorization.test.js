@@ -17,6 +17,7 @@ import { chatRouter } from '../routes/chatRoutes.js';
 import { paymentRouter } from '../routes/paymentRoutes.js';
 import { capacityRouter } from '../routes/capacityRoutes.js';
 import { orderRouter } from '../routes/orderRoutes.js';
+import { catalogRouter } from '../routes/catalogRoutes.js';
 import { adminDb } from '../firebaseAdmin.js';
 
 console.log('===============================================================');
@@ -31,6 +32,7 @@ app.use('/api/merchant', merchantRouter);
 app.use('/api/merchant', walletRouter);
 app.use('/api/capacity', capacityRouter);
 app.use('/api/chat', chatRouter);
+app.use('/api/catalog', catalogRouter);
 
 const server = http.createServer(app);
 
@@ -94,6 +96,9 @@ async function seed() {
     exchangePin: '4821', exchangePinHash: 'deadbeef', version: 1,
     createdAt: new Date().toISOString(),
     merchantResponseDeadlineAt: new Date(Date.now() + 5 * 60 * 1000).toISOString()
+  });
+  await adminDb.collection('menu_items').doc('menu-alpha-1').set({
+    id: 'menu-alpha-1', storeId: STORE, name: 'กะเพราหมูกรอบ', price: 60, isAvailable: true
   });
   await adminDb.collection('reservations').doc('res-auth-1').set({
     id: 'res-auth-1', storeId: STORE, slotId: '2026-09-26_12-00', uid: CUSTOMER, workload: 3
@@ -224,6 +229,44 @@ async function runTests() {
       storeId: STORE, slotId: '2026-09-26_12-00', reservationId: 'res-auth-1'
     }, as(OUTSIDER));
     check(res.status === 403, 'A stranger cannot release another customer reservation', `status ${res.status}`);
+
+    // --- Menu catalogue ownership and authoritative pricing ---
+    console.log('\n--- Menu catalogue ---');
+    res = await request(baseUrl, `/api/catalog/stores/${STORE}/menu`, 'PUT',
+      { items: [{ id: 'menu-alpha-1', name: 'กะเพราหมูกรอบ', price: 1 }] }, as(RIVAL, 'merchant'));
+    check(res.status === 403, 'A rival merchant cannot rewrite another store menu', `status ${res.status}`);
+
+    res = await request(baseUrl, `/api/catalog/stores/${STORE}/menu`, 'PUT',
+      { items: [{ id: 'menu-alpha-2', name: 'ผัดซีอิ๊ว', price: 55, storeId: RIVAL_STORE }] },
+      as(OWNER, 'merchant'));
+    check(res.status === 200 && res.data?.upsertedCount === 1,
+      'The store owner upserts their own menu', `upserted ${res.data?.upsertedCount}`);
+
+    const stamped = await adminDb.collection('menu_items').doc('menu-alpha-2').get();
+    check(stamped.exists && stamped.data().storeId === STORE,
+      'storeId is stamped from the authorised route, not the payload',
+      `storeId ${stamped.data()?.storeId}`);
+
+    console.log('\n--- Authoritative order pricing ---');
+    res = await request(baseUrl, '/api/orders', 'POST', {
+      storeId: STORE,
+      items: [{ menuItemId: 'menu-alpha-1', quantity: 1, unitPrice: 1, name: 'ของถูก' }],
+      paymentMethod: 'cash',
+      idempotencyKey: `price-test-${Date.now()}`
+    }, as(CUSTOMER));
+    check(res.status === 201 && res.data?.order?.totalSatang === 6000,
+      'The order is priced from the menu, not from the client unitPrice',
+      `status ${res.status}, totalSatang ${res.data?.order?.totalSatang}`);
+
+    res = await request(baseUrl, '/api/orders', 'POST', {
+      storeId: STORE,
+      items: [{ menuItemId: 'does-not-exist', quantity: 1, unitPrice: 1, name: 'ของปลอม' }],
+      paymentMethod: 'cash',
+      idempotencyKey: `unknown-item-${Date.now()}`
+    }, as(CUSTOMER));
+    check(res.status === 400 && /MENU_ITEM_NOT_FOUND/.test(res.data?.message || ''),
+      'An unknown menu item is refused instead of priced from the request',
+      `message ${res.data?.message}`);
 
     console.log('\n===============================================================');
     console.log(`📊 AUTHORIZATION TEST RESULTS: ${passed}/${total} Passed (${passed === total ? 'ALL PASSED' : 'FAILURES DETECTED'})`);

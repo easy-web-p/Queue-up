@@ -1,6 +1,7 @@
 import express from 'express';
 import crypto from 'crypto';
 import { adminDb } from '../firebaseAdmin.js';
+import { listStoreMenu } from '../services/menuCatalog.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { NotificationEngine } from '../services/notificationEngine.js';
 import { processAssistantReply } from '../services/aiChatEngine.js';
@@ -339,8 +340,7 @@ notificationRouter.post('/chat/assistant-reply', authenticate, async (req, res) 
     // 4. Fetch menu items for this store
     let menuItems = [];
     try {
-      const menuSnap = await adminDb.collection('food_items').where('storeId', '==', storeId).get();
-      menuItems = menuSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      menuItems = await listStoreMenu(adminDb, storeId);
     } catch {
       // Fallback
     }

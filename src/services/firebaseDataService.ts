@@ -12,13 +12,18 @@ import {
   onSnapshot
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { apiClient } from './apiClient';
 import { QueueOrder, AuthUser, QueueStatus, Store, FoodItem } from '../types';
 import { INITIAL_QUEUES, STORES, FOOD_ITEMS } from '../data/mockData';
 
 const ORDERS_COLLECTION = 'orders';
 const USERS_COLLECTION = 'users';
 const STORES_COLLECTION = 'stores';
-const FOOD_ITEMS_COLLECTION = 'food_items';
+// `menu_items` is the canonical collection: it is the one firestore.rules and
+// the composite indexes cover, and the one authoritative order pricing reads.
+// `food_items` is still read so data written under the old name keeps showing.
+const MENU_ITEMS_COLLECTION = 'menu_items';
+const LEGACY_FOOD_ITEMS_COLLECTION = 'food_items';
 const DIAGNOSTICS_COLLECTION = 'system_diagnostics';
 
 const LOCAL_STORAGE_ORDERS_KEY = 'queueup_orders_v1';
@@ -311,20 +316,35 @@ export const FirebaseDataService = {
   },
 
   /**
-   * ซิงค์รายการอาหารทั้งหมดขึ้น Cloud Firestore
+   * ซิงค์เมนูของร้านขึ้น Cloud Firestore ผ่าน Catalog API
+   *
+   * Sends each store's items to the endpoint that authorises the caller as that
+   * store's operator. The browser used to write every store's menu directly,
+   * which both bypassed ownership and wrote to the wrong collection; a visitor
+   * seeding the shared catalogue is now correctly refused.
    */
   async syncFoodItemsToFirestore(itemsToSync: FoodItem[] = FOOD_ITEMS): Promise<void> {
-    try {
-      for (const item of itemsToSync) {
-        const foodRef = doc(db, FOOD_ITEMS_COLLECTION, item.id);
-        await setDoc(foodRef, {
-          ...item,
-          syncedAt: serverTimestamp(),
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
+    const byStore = new Map<string, FoodItem[]>();
+    for (const item of itemsToSync) {
+      if (!item.storeId) continue;
+      const bucket = byStore.get(item.storeId) || [];
+      bucket.push(item);
+      byStore.set(item.storeId, bucket);
+    }
+
+    for (const [storeId, items] of byStore) {
+      try {
+        const res = await apiClient.put<{ success?: boolean; error?: string }>(
+          `/catalog/stores/${encodeURIComponent(storeId)}/menu`,
+          { items }
+        );
+        if (!res?.success) {
+          // Expected for stores this account does not operate.
+          console.info(`[FirebaseDataService] Menu sync skipped for ${storeId}:`, res?.error || 'not authorised');
+        }
+      } catch (error) {
+        console.info(`[FirebaseDataService] Menu sync failed for ${storeId}:`, error);
       }
-    } catch (error) {
-      console.warn('Sync food items to Firestore note:', error);
     }
   },
 
@@ -333,10 +353,18 @@ export const FirebaseDataService = {
    */
   async fetchFoodItemsFromFirestore(): Promise<FoodItem[]> {
     try {
-      const q = query(collection(db, FOOD_ITEMS_COLLECTION));
-      const snap = await getDocs(q);
-      if (!snap.empty) {
+      const [canonicalSnap, legacySnap] = await Promise.all([
+        getDocs(query(collection(db, MENU_ITEMS_COLLECTION))),
+        getDocs(query(collection(db, LEGACY_FOOD_ITEMS_COLLECTION))).catch(() => null)
+      ]);
+
+      const snap = canonicalSnap;
+      if (!snap.empty || (legacySnap && !legacySnap.empty)) {
         const cloudFoods: FoodItem[] = [];
+        // Legacy first so a canonical record of the same id wins.
+        legacySnap?.forEach(docSnap => {
+          cloudFoods.push(docSnap.data() as FoodItem);
+        });
         snap.forEach(docSnap => {
           cloudFoods.push(docSnap.data() as FoodItem);
         });
@@ -360,7 +388,7 @@ export const FirebaseDataService = {
    */
   subscribeFoodItems(callback: (items: FoodItem[]) => void): () => void {
     try {
-      const q = query(collection(db, FOOD_ITEMS_COLLECTION));
+      const q = query(collection(db, MENU_ITEMS_COLLECTION));
       return onSnapshot(q, (snapshot) => {
         if (snapshot.empty) {
           this.syncFoodItemsToFirestore().then(() => callback(FOOD_ITEMS));
