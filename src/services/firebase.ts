@@ -5,7 +5,6 @@ import {
   onAuthStateChanged
 } from 'firebase/auth';
 import { doc, getDocFromServer } from 'firebase/firestore';
-import { logEvent } from 'firebase/analytics';
 import { app, auth, db, googleProvider, firebaseConfig, analytics } from '../config/firebase';
 
 export { app, auth, db, googleProvider, firebaseConfig, analytics };
@@ -33,11 +32,11 @@ export async function signOutUser() {
 
 export function logAnalyticsEvent(eventName: string, params?: Record<string, unknown>) {
   if (analytics) {
-    try {
-      logEvent(analytics, eventName, params);
-    } catch (e) {
-      console.warn('[Analytics] Log event failed:', e);
-    }
+    // Matches the dynamic import in config/firebase.ts; by the time `analytics`
+    // is non-null the module is already in the browser's module cache.
+    import('firebase/analytics')
+      .then(({ logEvent }) => logEvent(analytics!, eventName, params))
+      .catch((e) => console.warn('[Analytics] Log event failed:', e));
   }
   console.log(`[Analytics] ${eventName}:`, params);
 }

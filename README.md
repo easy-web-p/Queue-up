@@ -61,6 +61,8 @@ QueueUp เป็นแพลตฟอร์ม Web Application ทันสม�
    | `STRIPE_SECRET_KEY` | ตามการใช้งาน | ปิดใช้งานการชำระเงินถ้าไม่ตั้ง (API จะตอบ 503) |
    | `STRIPE_WEBHOOK_SECRET` | ✅ production | production จะไม่สตาร์ทถ้าไม่ตั้ง เพราะ webhook จะรับ payload ที่ไม่ได้เซ็น |
    | `ALLOW_MOCK_AUTH` | ❌ | development เท่านั้น: รับ header `x-mock-*` แทน Firebase ID Token |
+   | `CSP_ENFORCE` | ❌ | `true` = บังคับใช้ Content Security Policy (ค่าเริ่มต้นเป็น report-only) ชุดทดสอบ E2E รันแบบ enforce อยู่แล้ว |
+   | `ALLOWED_ORIGINS` | ❌ | รายชื่อ origin ที่อนุญาต CORS คั่นด้วยจุลภาค (เว้นว่าง = same-origin เท่านั้นบน production) |
    | `QUEUEUP_TIMEZONE` | ❌ | โซนเวลาของรอบรับอาหาร (ค่าเริ่มต้น `Asia/Bangkok`) |
 
    > ⚠️ `npm start` ตั้ง `NODE_ENV=production` ให้อัตโนมัติ ซึ่งจะปิด mock auth และปิดการ fallback ไปใช้ฐานข้อมูลไฟล์
@@ -95,6 +97,7 @@ QueueUp เป็นแพลตฟอร์ม Web Application ทันสม�
 npm test          # ชุดทดสอบหลัก: Capacity, Concurrency, AI Chat, Chat API, Authorization
 npm run test:utc  # ชุดเดียวกันภายใต้ TZ=UTC (จำลองคอนเทนเนอร์จริง)
 npm run test:rules # ทดสอบ firestore.rules ด้วย Firestore Emulator (ต้องมี Java)
+npm run test:e2e  # ทดสอบ end-to-end ด้วย Playwright บน production build จริง
 ```
 
 | ชุดทดสอบ | ครอบคลุม |
@@ -105,6 +108,7 @@ npm run test:rules # ทดสอบ firestore.rules ด้วย Firestore Emul
 | `chatRoutes.test.js` | ห้องแชทและการซิงก์ข้อความแบบ end-to-end |
 | `authorization.test.js` | ขอบเขตสิทธิ์ของ API: การถอนเงิน, วงจรชีวิตออเดอร์, การปลอมบทบาทในแชท, ยอดชำระเงิน |
 | `firestoreRules.test.js` | การแยกข้อมูลระหว่างสถาบันและร้านค้าในระดับ Security Rules |
+| `e2e/smoke.spec.ts` | แอปบูตได้จริงบน production build, lazy chunk โหลดได้, CSP ไม่บล็อกแอป, route guard ทำงาน |
 
 > `npm run test:rules` จะดาวน์โหลด Firestore Emulator ในครั้งแรก จึงแยกออกจาก `npm test`
 

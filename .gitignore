@@ -10,3 +10,7 @@ coverage/
 scratch/
 .vscode/
 .idea/
+test-results/
+playwright-report/
+blob-report/
+.playwright/

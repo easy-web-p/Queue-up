@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { QueueProvider, useQueue, AppView } from './context/QueueContext';
 import { Navbar } from './components/layout/Navbar';
@@ -6,20 +6,24 @@ import { MobileNavigation } from './components/layout/MobileNavigation';
 import { Footer } from './components/layout/Footer';
 import { HomePage } from './pages/customer/HomePage';
 import { LandingPage } from './pages/customer/LandingPage';
-import Queueup from './pages/Queueup';
-import { SearchPage } from './pages/customer/SearchPage';
-import { StoreDetailPage } from './pages/customer/StoreDetailPage';
-import { FoodDetailPage } from './pages/customer/FoodDetailPage';
-import { UserProfilePage } from './pages/customer/UserProfilePage';
-import { QueueTrackingPage } from './pages/customer/QueueTrackingPage';
-import { KitchenDisplaySystem } from './pages/merchant/KitchenDisplaySystem';
-import { MerchantDashboard } from './pages/merchant/MerchantDashboard';
-import { CreateStorePage } from './pages/merchant/CreateStorePage';
-import { StoreAdminPage } from './pages/merchant/StoreAdminPage';
-import { AdminDashboard } from './pages/admin/AdminDashboard';
-import { ChatPage } from './pages/customer/ChatPage';
-import { StoreChatPage } from './pages/merchant/StoreChatPage';
-import { RegisterSchoolPage } from './pages/school/RegisterSchoolPage';
+
+// Route-level code splitting. Every screen below is reachable only after a
+// deliberate navigation, so shipping it in the first chunk makes the initial
+// load slower for the canteen's mobile users without ever being used by most
+// of them. Each lazy() call becomes its own chunk.
+const Queueup = lazy(() => import('./pages/Queueup'));
+const SearchPage = lazy(() => import('./pages/customer/SearchPage').then(m => ({ default: m.SearchPage })));
+const StoreDetailPage = lazy(() => import('./pages/customer/StoreDetailPage').then(m => ({ default: m.StoreDetailPage })));
+const FoodDetailPage = lazy(() => import('./pages/customer/FoodDetailPage').then(m => ({ default: m.FoodDetailPage })));
+const UserProfilePage = lazy(() => import('./pages/customer/UserProfilePage').then(m => ({ default: m.UserProfilePage })));
+const QueueTrackingPage = lazy(() => import('./pages/customer/QueueTrackingPage').then(m => ({ default: m.QueueTrackingPage })));
+const KitchenDisplaySystem = lazy(() => import('./pages/merchant/KitchenDisplaySystem').then(m => ({ default: m.KitchenDisplaySystem })));
+const MerchantDashboard = lazy(() => import('./pages/merchant/MerchantDashboard').then(m => ({ default: m.MerchantDashboard })));
+const CreateStorePage = lazy(() => import('./pages/merchant/CreateStorePage').then(m => ({ default: m.CreateStorePage })));
+const StoreAdminPage = lazy(() => import('./pages/merchant/StoreAdminPage').then(m => ({ default: m.StoreAdminPage })));
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
+const ChatPage = lazy(() => import('./pages/customer/ChatPage').then(m => ({ default: m.ChatPage })));
+const RegisterSchoolPage = lazy(() => import('./pages/school/RegisterSchoolPage').then(m => ({ default: m.RegisterSchoolPage })));
 import { FoodDetailModal } from './components/food/FoodDetailModal';
 import { CartDrawer } from './components/cart/CartDrawer';
 import { ToastContainer } from './components/ui/ToastContainer';
@@ -35,6 +39,7 @@ import { PushChatPanel } from './components/chat/PushChatPanel';
 import { AppSidebar } from './components/layout/AppSidebar';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { ScrollToTop } from './components/common/ScrollToTop';
+import { PageRouteLoaderView } from './components/common/PageRouteLoader';
 
 // Maps AppView in state to URL pathname
 const VIEW_TO_PATH_MAP: Record<AppView, string> = {
@@ -176,10 +181,12 @@ const MainAppContent: React.FC = () => {
       <div className="min-h-screen bg-[#070b14] text-white">
         <ScrollToTop />
         <div key={location.pathname} className="screen-enter-top w-full">
-          <Routes>
-            <Route path="/about" element={<Queueup />} />
-            <Route path="/queueup" element={<Queueup />} />
-          </Routes>
+          <Suspense fallback={<PageRouteLoaderView />}>
+            <Routes>
+              <Route path="/about" element={<Queueup />} />
+              <Route path="/queueup" element={<Queueup />} />
+            </Routes>
+          </Suspense>
         </div>
         <ToastContainer />
         <RegisterModal
@@ -205,43 +212,45 @@ const MainAppContent: React.FC = () => {
             {/* Animated Screen Container - Displays gracefully from Top down to Bottom */}
             <div key={location.pathname + '-' + currentView} className="screen-enter-top w-full">
               {/* Complete Route Declarations with Strict Auth Guard */}
-              <Routes>
-                {/* Landing Page & Public Pages - Open to all */}
-                <Route path="/" element={<LandingPage />} />
-                <Route path="/landing" element={<LandingPage />} />
-                <Route path="/about" element={<Queueup />} />
-                <Route path="/queueup" element={<Queueup />} />
-                <Route path="/register-school" element={<RegisterSchoolPage />} />
+              <Suspense fallback={<PageRouteLoaderView />}>
+                <Routes>
+                  {/* Landing Page & Public Pages - Open to all */}
+                  <Route path="/" element={<LandingPage />} />
+                  <Route path="/landing" element={<LandingPage />} />
+                  <Route path="/about" element={<Queueup />} />
+                  <Route path="/queueup" element={<Queueup />} />
+                  <Route path="/register-school" element={<RegisterSchoolPage />} />
 
-                {/* Customer Flow - Requires Login */}
-                <Route path="/home" element={currentUser ? <HomePage /> : <Navigate to="/landing" replace />} />
-                <Route path="/search" element={currentUser ? <SearchPage /> : <Navigate to="/landing" replace />} />
-                <Route path="/store/:storeId" element={currentUser ? <StoreDetailPage /> : <Navigate to="/landing" replace />} />
-                <Route path="/store" element={currentUser ? <StoreDetailPage /> : <Navigate to="/landing" replace />} />
-                <Route path="/food/:foodId" element={currentUser ? <FoodDetailPage /> : <Navigate to="/landing" replace />} />
-                <Route path="/food" element={currentUser ? <FoodDetailPage /> : <Navigate to="/landing" replace />} />
-                <Route path="/user-profile" element={currentUser ? <UserProfilePage /> : <Navigate to="/landing" replace />} />
-                <Route path="/profile" element={currentUser ? <UserProfilePage /> : <Navigate to="/landing" replace />} />
-                <Route path="/queue-tracking" element={currentUser ? <QueueTrackingPage /> : <Navigate to="/landing" replace />} />
-                <Route path="/tracking" element={currentUser ? <QueueTrackingPage /> : <Navigate to="/landing" replace />} />
-                <Route path="/order-history" element={currentUser ? <UserProfilePage /> : <Navigate to="/landing" replace />} />
-                <Route path="/chat" element={currentUser ? <ChatPage /> : <Navigate to="/landing" replace />} />
+                  {/* Customer Flow - Requires Login */}
+                  <Route path="/home" element={currentUser ? <HomePage /> : <Navigate to="/landing" replace />} />
+                  <Route path="/search" element={currentUser ? <SearchPage /> : <Navigate to="/landing" replace />} />
+                  <Route path="/store/:storeId" element={currentUser ? <StoreDetailPage /> : <Navigate to="/landing" replace />} />
+                  <Route path="/store" element={currentUser ? <StoreDetailPage /> : <Navigate to="/landing" replace />} />
+                  <Route path="/food/:foodId" element={currentUser ? <FoodDetailPage /> : <Navigate to="/landing" replace />} />
+                  <Route path="/food" element={currentUser ? <FoodDetailPage /> : <Navigate to="/landing" replace />} />
+                  <Route path="/user-profile" element={currentUser ? <UserProfilePage /> : <Navigate to="/landing" replace />} />
+                  <Route path="/profile" element={currentUser ? <UserProfilePage /> : <Navigate to="/landing" replace />} />
+                  <Route path="/queue-tracking" element={currentUser ? <QueueTrackingPage /> : <Navigate to="/landing" replace />} />
+                  <Route path="/tracking" element={currentUser ? <QueueTrackingPage /> : <Navigate to="/landing" replace />} />
+                  <Route path="/order-history" element={currentUser ? <UserProfilePage /> : <Navigate to="/landing" replace />} />
+                  <Route path="/chat" element={currentUser ? <ChatPage /> : <Navigate to="/landing" replace />} />
 
-                {/* Merchant & Kitchen Display Flow - Requires Login */}
-                <Route path="/kds" element={currentUser ? <KitchenDisplaySystem /> : <Navigate to="/landing" replace />} />
-                <Route path="/merchant-dashboard" element={currentUser ? <MerchantDashboard /> : <Navigate to="/landing" replace />} />
-                <Route path="/merchant" element={currentUser ? <MerchantDashboard /> : <Navigate to="/landing" replace />} />
-                <Route path="/create-store" element={currentUser ? <CreateStorePage /> : <Navigate to="/landing" replace />} />
-                <Route path="/store-admin" element={currentUser ? <StoreAdminPage /> : <Navigate to="/landing" replace />} />
-                <Route path="/store-chat" element={currentUser ? <ChatPage /> : <Navigate to="/landing" replace />} />
+                  {/* Merchant & Kitchen Display Flow - Requires Login */}
+                  <Route path="/kds" element={currentUser ? <KitchenDisplaySystem /> : <Navigate to="/landing" replace />} />
+                  <Route path="/merchant-dashboard" element={currentUser ? <MerchantDashboard /> : <Navigate to="/landing" replace />} />
+                  <Route path="/merchant" element={currentUser ? <MerchantDashboard /> : <Navigate to="/landing" replace />} />
+                  <Route path="/create-store" element={currentUser ? <CreateStorePage /> : <Navigate to="/landing" replace />} />
+                  <Route path="/store-admin" element={currentUser ? <StoreAdminPage /> : <Navigate to="/landing" replace />} />
+                  <Route path="/store-chat" element={currentUser ? <ChatPage /> : <Navigate to="/landing" replace />} />
 
-                {/* System Admin - Requires Super Admin */}
-                <Route path="/admin-dashboard" element={currentUser && isAdmin ? <AdminDashboard /> : <Navigate to="/landing" replace />} />
-                <Route path="/admin" element={currentUser && isAdmin ? <AdminDashboard /> : <Navigate to="/landing" replace />} />
+                  {/* System Admin - Requires Super Admin */}
+                  <Route path="/admin-dashboard" element={currentUser && isAdmin ? <AdminDashboard /> : <Navigate to="/landing" replace />} />
+                  <Route path="/admin" element={currentUser && isAdmin ? <AdminDashboard /> : <Navigate to="/landing" replace />} />
 
-                {/* Fallback */}
-                <Route path="*" element={<Navigate to={currentUser ? "/home" : "/landing"} replace />} />
-              </Routes>
+                  {/* Fallback */}
+                  <Route path="*" element={<Navigate to={currentUser ? "/home" : "/landing"} replace />} />
+                </Routes>
+              </Suspense>
             </div>
           </main>
           {/* Global Footer */}

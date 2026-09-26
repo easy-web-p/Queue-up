@@ -7,7 +7,7 @@ import {
   getFirestore
 } from 'firebase/firestore';
 import { getAuth, GoogleAuthProvider, browserLocalPersistence, setPersistence } from 'firebase/auth';
-import { getAnalytics, isSupported, Analytics } from 'firebase/analytics';
+import type { Analytics } from 'firebase/analytics';
 import rawConfig from '../../firebase-applet-config.json';
 
 export const firebaseConfig = rawConfig;
@@ -17,16 +17,21 @@ export const app: FirebaseApp = !getApps().length
   ? initializeApp(firebaseConfig)
   : getApp();
 
-// Optional Analytics instance
+// Optional Analytics instance.
+// firebase/analytics is imported dynamically so its SDK never lands in the
+// initial bundle: it is optional, frequently blocked, and nothing on the first
+// screen waits for it.
 export let analytics: Analytics | null = null;
 if (typeof window !== 'undefined') {
-  isSupported().then((supported) => {
-    if (supported && firebaseConfig.measurementId) {
-      analytics = getAnalytics(app);
-    }
-  }).catch(() => {
-    // Analytics is blocked or not supported in this environment
-  });
+  import('firebase/analytics')
+    .then(async ({ getAnalytics, isSupported }) => {
+      if ((await isSupported()) && firebaseConfig.measurementId) {
+        analytics = getAnalytics(app);
+      }
+    })
+    .catch(() => {
+      // Analytics is blocked or not supported in this environment
+    });
 }
 
 // 2. Initialize Firestore with Offline IndexedDB Persistence

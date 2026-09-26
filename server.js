@@ -12,6 +12,14 @@ import { notificationRouter } from './server/routes/notificationRoutes.js';
 import { capacityRouter } from './server/routes/capacityRoutes.js';
 import { chatRouter } from './server/routes/chatRoutes.js';
 import { startPickupReminderWorker } from './server/services/pickupReminderWorker.js';
+import {
+  applyHardening,
+  errorHandler,
+  apiLimiter,
+  writeLimiter,
+  pinLimiter
+} from './server/middleware/hardening.js';
+import { isProduction } from './server/config/secrets.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,16 +28,25 @@ const app = express();
 const distDir = path.join(__dirname, 'dist');
 const indexPath = path.join(distDir, 'index.html');
 
-// Ensure dist exists before serving
+// Ensure dist exists before serving. A production image is expected to have
+// been built already; rebuilding at boot there would mask a broken deployment
+// and needs dev dependencies that a runtime image may not carry.
 if (!fs.existsSync(indexPath)) {
-  console.log('[Server] Dist not found, building applet...');
-  try {
-    execSync('npm run build', { stdio: 'inherit' });
-    console.log('[Server] Build completed successfully.');
-  } catch (err) {
-    console.error('[Server] Build failed:', err);
+  if (isProduction) {
+    console.error('[Server] dist/index.html is missing. Run `npm run build` before deploying.');
+  } else {
+    console.log('[Server] Dist not found, building applet...');
+    try {
+      execSync('npm run build', { stdio: 'inherit' });
+      console.log('[Server] Build completed successfully.');
+    } catch (err) {
+      console.error('[Server] Build failed:', err);
+    }
   }
 }
+
+// 0. Security headers and cross-origin policy, before anything else.
+applyHardening(app);
 
 // 1. Mount Webhook routes with RAW body parser BEFORE express.json()
 // This is strictly required by Stripe to verify webhook cryptographic signatures.
@@ -43,7 +60,15 @@ app.get(['/healthz', '/_health', '/api/health'], (req, res) => {
   res.status(200).send('OK');
 });
 
-// 3. Mount Command & Financial API routes
+// 3. Rate limits, tightest first so the specific rules win.
+app.post('/api/merchant/orders/:id/complete', pinLimiter);
+app.post('/api/orders', writeLimiter);
+app.post('/api/chat/messages', writeLimiter);
+app.post('/api/capacity/reserve', writeLimiter);
+app.post('/api/merchant/payouts', writeLimiter);
+app.use('/api', apiLimiter);
+
+// 4. Mount Command & Financial API routes
 app.use('/api/orders', orderRouter);
 app.use('/api/payment', paymentRouter);
 app.use('/api/merchant', merchantRouter);
@@ -51,6 +76,16 @@ app.use('/api/merchant', walletRouter);
 app.use('/api/capacity', capacityRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api', notificationRouter);
+
+// Unmatched API paths must not fall through to the SPA fallback below, which
+// would answer an API client with index.html and a 200.
+app.use('/api', (req, res) => {
+  res.status(404).json({
+    success: false,
+    error: 'NOT_FOUND',
+    message: `No API route matches ${req.method} ${req.originalUrl}`
+  });
+});
 
 // Explicit route for Firebase Messaging Service Worker (prevents SPA rewrite hijacking)
 app.get('/firebase-messaging-sw.js', (req, res) => {
@@ -86,6 +121,9 @@ app.get('*', (req, res) => {
 // The vite dev server owns port 3000 and proxies /api here, so the API must
 // not default to the same port.
 const DEFAULT_PORT = 8080;
+
+// Terminal error handler: must be registered after every route.
+app.use(errorHandler);
 
 function startServer(preferredPort) {
   const server = app.listen(preferredPort, '0.0.0.0', () => {
