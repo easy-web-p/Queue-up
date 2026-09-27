@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { adminDb } from '../firebaseAdmin.js';
 import { listStoreMenu } from '../services/menuCatalog.js';
 import { authenticate, isStoreOperator } from '../middleware/authenticate.js';
+import { resolveThreadAccess, canReadThread } from '../services/chatAccess.js';
 import { inspectMessage } from '../services/inputShield.js';
 import { NotificationEngine } from '../services/notificationEngine.js';
 import { processAssistantReply } from '../services/aiChatEngine.js';
@@ -47,19 +48,6 @@ async function resolveActiveOrder(customerId, storeId, orderId) {
  * Helper: authorise a caller against a chat thread.
  * A thread is readable by its participants and by operators of its store.
  */
-async function canAccessThread(user, chatId) {
-  const snap = await adminDb.collection('chats').doc(chatId).get();
-  if (!snap.exists) return { allowed: false, notFound: true };
-
-  const thread = snap.data() || {};
-  const isParticipant = Array.isArray(thread.participantIds) && thread.participantIds.includes(user.uid);
-  const isCustomer = thread.customerId === user.uid;
-  if (isParticipant || isCustomer) return { allowed: true, thread };
-
-  const operatesStore = await isStoreOperator(user, thread.storeId);
-  return { allowed: operatesStore, thread };
-}
-
 /**
  * 1. GET /api/chat/threads/:storeId
  * Returns all real customer chat threads for a specific store.
@@ -148,7 +136,7 @@ chatRouter.get('/messages/:chatId', authenticate, async (req, res) => {
       return res.status(400).json({ success: false, error: 'MISSING_CHAT_ID' });
     }
 
-    const access = await canAccessThread(req.user, chatId);
+    const access = await canReadThread(req.user, chatId);
     if (access.notFound) {
       return res.status(404).json({ success: false, error: 'CHAT_NOT_FOUND' });
     }
@@ -209,12 +197,22 @@ chatRouter.post('/messages', authenticate, async (req, res) => {
     // The sender's role is derived from the verified identity, never from the
     // request body: the Admin SDK bypasses firestore.rules, so a body-supplied
     // senderRole would let any customer post as the store.
-    const isMerchant = await isStoreOperator(req.user, storeId);
-    const customerId = isMerchant
-      ? (rawCustomerId || 'guest-customer')
-      : req.user.uid;
+    // The room is resolved from the verified identity, not taken on trust: a
+    // body-supplied chatId used to write wherever it pointed.
+    const access = await resolveThreadAccess(req.user, {
+      storeId,
+      chatId: customChatId,
+      customerId: rawCustomerId
+    });
+    if (!access.allowed) {
+      return res.status(access.status).json({
+        success: false,
+        error: access.error,
+        message: access.message
+      });
+    }
 
-    const chatId = customChatId || `chat_${storeId}_${customerId}`;
+    const { chatId, customerId, isMerchant } = access;
 
     // 1. Fetch Store Data
     const storeSnap = await adminDb.collection('stores').doc(storeId).get();
@@ -283,7 +281,9 @@ chatRouter.post('/messages', authenticate, async (req, res) => {
       customerPhone: finalCustomerPhone || existingThread?.customerPhone || '',
       lastMessage: userMessageDoc.message,
       lastTimestamp: nowIso,
-      participantIds: Array.from(new Set([customerId, storeData.ownerId, req.user.uid].filter(Boolean))),
+      // The customer and the shop, not whoever happened to post: read access no
+      // longer trusts this list, and it should not drift either.
+      participantIds: Array.from(new Set([customerId, storeData.ownerId].filter(Boolean))),
       updatedAt: nowIso
     };
 
@@ -412,7 +412,7 @@ chatRouter.post('/mark-read', authenticate, async (req, res) => {
       return res.status(400).json({ success: false, error: 'MISSING_CHAT_ID' });
     }
 
-    const access = await canAccessThread(req.user, chatId);
+    const access = await canReadThread(req.user, chatId);
     if (access.notFound) {
       return res.status(404).json({ success: false, error: 'CHAT_NOT_FOUND' });
     }

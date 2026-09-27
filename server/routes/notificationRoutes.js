@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { adminDb } from '../firebaseAdmin.js';
 import { listStoreMenu } from '../services/menuCatalog.js';
 import { authenticate } from '../middleware/authenticate.js';
+import { resolveThreadAccess } from '../services/chatAccess.js';
 import { NotificationEngine } from '../services/notificationEngine.js';
 import { processAssistantReply } from '../services/aiChatEngine.js';
 import { LineNotifyService } from '../services/lineNotifyService.js';
@@ -339,7 +340,20 @@ notificationRouter.post('/chat/assistant-reply', authenticate, async (req, res) 
       });
     }
 
-    const cleanChatId = chatId || `chat_store_${storeId}`;
+    // Same resolver the message endpoint uses. Without it the assistant wrote
+    // into whatever thread the body named, so a stranger could have it speak
+    // inside somebody else's conversation with a shop.
+    const access = await resolveThreadAccess(req.user, { storeId, chatId });
+    if (!access.allowed) {
+      return res.status(access.status).json({
+        success: false,
+        error: access.error,
+        message: access.message
+      });
+    }
+    const cleanChatId = access.chatId;
+    const threadCustomerId = access.customerId;
+
     if (isThreadRateLimited(cleanChatId)) {
       return res.status(429).json({
         success: false,
@@ -353,20 +367,31 @@ notificationRouter.post('/chat/assistant-reply', authenticate, async (req, res) 
     const store = storeSnap.exists ? { id: storeSnap.id, ...storeSnap.data() } : null;
 
     // 2. Fetch Chat Thread for silence / setting flags
-    let chatThread = { id: cleanChatId, storeId, customerId: req.user.uid, aiAutoReply: true };
-    const threadSnap = await adminDb.collection('chats').doc(cleanChatId).get();
-    if (threadSnap.exists) {
-      chatThread = { id: threadSnap.id, ...threadSnap.data() };
+    let chatThread = { id: cleanChatId, storeId, customerId: threadCustomerId, aiAutoReply: true };
+    if (access.thread) {
+      chatThread = { id: cleanChatId, ...access.thread };
     }
 
     // 3. Fetch Active Order for this customer & store if any
     let activeOrder = null;
     if (orderId) {
       const orderSnap = await adminDb.collection('orders').doc(orderId).get();
-      if (orderSnap.exists) activeOrder = { id: orderSnap.id, ...orderSnap.data() };
+      // An order id in the body is a request to talk about that order, so it has
+      // to belong to this conversation. Otherwise handing the assistant somebody
+      // else's order id had it read that order out loud.
+      if (orderSnap.exists) {
+        const candidate = { id: orderSnap.id, ...orderSnap.data() };
+        if (candidate.customerId === threadCustomerId && candidate.storeId === storeId) {
+          activeOrder = candidate;
+        } else {
+          console.warn(
+            `[Notifications] Ignoring order ${orderId} in thread ${cleanChatId}: it belongs elsewhere.`
+          );
+        }
+      }
     } else {
       const ordersSnap = await adminDb.collection('orders')
-        .where('customerId', '==', req.user.uid)
+        .where('customerId', '==', threadCustomerId)
         .where('storeId', '==', storeId)
         .limit(5)
         .get();
@@ -408,12 +433,15 @@ notificationRouter.post('/chat/assistant-reply', authenticate, async (req, res) 
 
       try {
         await adminDb.collection('chats').doc(cleanChatId).collection('messages').add(messageDoc);
+        // The thread's own customer, not whoever triggered the assistant: writing
+        // req.user.uid here meant a shop replying in a customer's thread rewrote
+        // that thread as the shop's own, and the customer lost access to it.
         await adminDb.collection('chats').doc(cleanChatId).set({
           lastMessage: assistantResult.replyText,
           lastTimestamp: messageDoc.timestamp,
           storeId,
-          customerId: req.user.uid,
-          participantIds: [req.user.uid, store?.ownerId || 'store-owner'].filter(Boolean)
+          customerId: threadCustomerId,
+          participantIds: [threadCustomerId, store?.ownerId || 'store-owner'].filter(Boolean)
         }, { merge: true });
       } catch (dbErr) {
         console.warn('[NotificationRoutes] Assistant write to chats warning:', dbErr.message);
