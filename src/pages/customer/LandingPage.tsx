@@ -546,7 +546,7 @@ export const LandingPage: React.FC = () => {
             </div>
 
             <div className="pt-2 border-t border-orange-200/80 text-[11px] text-stone-600 flex items-center justify-between dark:border-zinc-800 dark:text-zinc-400">
-              <span>เวอร์ชันระบบ: v2.4.0 (Enterprise)</span>
+              <span>เวอร์ชันระบบ: v2.5.0 (Production Verified)</span>
               <span className="text-orange-600 font-bold flex items-center gap-1 dark:text-orange-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-orange-600 animate-pulse dark:bg-orange-400" /> Cloud Online
               </span>

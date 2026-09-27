@@ -495,7 +495,7 @@ export const AppSidebar: React.FC = () => {
         {/* Footer Logout / Version */}
         <div className="p-3 border-t border-stone-100 dark:border-zinc-800 bg-stone-50/50 dark:bg-zinc-950/30 flex items-center justify-between">
           <div className="text-[10px] text-stone-400 dark:text-zinc-500 font-mono">
-            QueueUp v2.2 Production
+            QueueUp v2.5.0 Production
           </div>
           {currentUser && (
             <button
