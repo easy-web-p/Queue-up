@@ -72,7 +72,8 @@ orderRouter.post('/', optionalAuthenticate, async (req, res) => {
     const key = idempotencyKey || req.headers['x-idempotency-key'] || `idemp_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     const idempotencyRef = adminDb.collection('idempotency_records').doc(key);
 
-    // 1. Check idempotency record before running transaction
+    // 1. Fast path: a retry whose record already exists never needs the
+    // transaction at all. The authoritative check is inside it — see below.
     const existingIdemp = await idempotencyRef.get();
     if (existingIdemp.exists) {
       console.log(`[Order API] Idempotency cache hit for key: ${key}`);
@@ -87,7 +88,19 @@ orderRouter.post('/', optionalAuthenticate, async (req, res) => {
 
     // Execute atomic transaction
     const result = await adminDb.runTransaction(async (t) => {
-      // 0. Strict Idempotency: if order with this reservationId already exists, return existing order
+      // 0. The idempotency guard, read inside the transaction so it joins the
+      // read set. Checking it only before the transaction left a window where
+      // two requests carrying the same key both saw "no record" and both ran —
+      // a double-tapped pay button debiting a wallet twice. Reading it here
+      // gives Firestore a document to detect the conflict on: the loser retries
+      // and finds the record.
+      const idempSnap = await t.get(idempotencyRef);
+      if (idempSnap.exists) {
+        console.log(`[Order API] Idempotency record already committed for key: ${key}`);
+        return idempSnap.data().response;
+      }
+
+      // 0b. Strict Idempotency: if order with this reservationId already exists, return existing order
       const existingOrderSnap = await t.get(orderRef);
       if (existingOrderSnap.exists) {
         console.log(`[Order API] Idempotency: Existing order found for ID: ${orderId}`);

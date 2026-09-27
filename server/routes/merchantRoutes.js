@@ -22,6 +22,37 @@ const stripeSecretKey = optionalSecret('STRIPE_SECRET_KEY');
 const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
 const HMAC_SECRET = requireSecret('HMAC_SECRET', 'dev-only-insecure-hmac-secret');
 
+/** Statuses from which food actually exists to hand over. */
+const HANDOVER_STATUSES = new Set([
+  'MERCHANT_ACCEPTED',
+  'PREPARING',
+  'READY',
+  'READY_FOR_PICKUP'
+]);
+
+const PIN_ATTEMPT_LIMIT = 5;
+
+/**
+ * Checks a pickup PIN against the stored HMAC.
+ *
+ * Compared with timingSafeEqual: the digests are the same length every time, so
+ * there is no reason to leak how much of one matched.
+ */
+function verifyPin(order, submittedPin) {
+  const submitted = String(submittedPin ?? '').trim();
+  if (!submitted) return false;
+
+  if (order.exchangePinHash) {
+    const computed = crypto.createHmac('sha256', HMAC_SECRET).update(submitted).digest('hex');
+    const a = Buffer.from(computed, 'utf8');
+    const b = Buffer.from(String(order.exchangePinHash), 'utf8');
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+  }
+
+  // Fallback for an order written before PINs were hashed.
+  return Boolean(order.exchangePin) && order.exchangePin === submitted;
+}
+
 /**
  * GET /api/merchant/orders
  * Retrieve list of orders for a store with merchant financial breakdown
@@ -345,26 +376,43 @@ merchantRouter.post('/orders/:id/complete', authenticate, requireStoreOwnership(
 
     const result = await adminDb.runTransaction(async (t) => {
       const orderSnap = await t.get(orderRef);
-      if (!orderSnap.exists) throw new Error(`Order ${orderId} not found`);
+      if (!orderSnap.exists) {
+        return { ok: false, status: 404, error: 'ORDER_NOT_FOUND', message: `Order ${orderId} not found` };
+      }
 
       const order = orderSnap.data();
 
-      // Check lockout
-      if (order.exchangePinLockedUntil && new Date() < new Date(order.exchangePinLockedUntil)) {
-        throw new Error('PIN verification temporarily locked due to too many failed attempts.');
+      // The food has to exist before it can be handed over. Without this an
+      // order the shop never accepted could be completed straight from
+      // PAID_AWAITING_MERCHANT — which told the order its money was on hold
+      // while the ledger still had it pending, so the two disagreed and the
+      // hold release then drove the balance negative. A cancelled and refunded
+      // order could likewise be turned into a completed sale.
+      if (!HANDOVER_STATUSES.has(String(order.status))) {
+        return {
+          ok: false,
+          status: 409,
+          error: 'ORDER_NOT_READY_FOR_HANDOVER',
+          message: `ออเดอร์สถานะ ${order.status} ยังส่งมอบไม่ได้ กรุณารับออเดอร์และเตรียมอาหารก่อน`
+        };
       }
 
-      // Compute HMAC of incoming PIN
-      const computedHash = crypto.createHmac('sha256', HMAC_SECRET).update(String(exchangePin).trim()).digest('hex');
+      // Check lockout
+      if (order.exchangePinLockedUntil && new Date() < new Date(order.exchangePinLockedUntil)) {
+        return {
+          ok: false,
+          status: 423,
+          error: 'PIN_LOCKED',
+          message: 'ใส่รหัส PIN ผิดหลายครั้งเกินไป กรุณารอ 10 นาทีแล้วลองใหม่',
+          lockedUntil: order.exchangePinLockedUntil
+        };
+      }
 
-      // Verify PIN
-      const isPinValid = order.exchangePinHash
-        ? order.exchangePinHash === computedHash
-        : order.exchangePin === String(exchangePin).trim(); // fallback if unhashed in dev
+      const isPinValid = verifyPin(order, exchangePin);
 
       if (!isPinValid) {
         const failedAttempts = (order.exchangePinFailedAttempts || 0) + 1;
-        const lockUntil = failedAttempts >= 5
+        const lockUntil = failedAttempts >= PIN_ATTEMPT_LIMIT
           ? new Date(Date.now() + 10 * 60 * 1000).toISOString()
           : null;
 
@@ -374,7 +422,30 @@ merchantRouter.post('/orders/:id/complete', authenticate, requireStoreOwnership(
           updatedAt: now
         });
 
-        throw new Error(`INVALID_PIN: รหัส PIN รับอาหารไม่ถูกต้อง (ผิด ${failedAttempts}/5 ครั้ง)`);
+        if (lockUntil) {
+          t.set(orderRef.collection('events').doc(), {
+            orderId,
+            fromStatus: order.status,
+            toStatus: order.status,
+            changedBy: req.user?.uid || 'merchant-staff',
+            changerRole: 'merchant',
+            note: `Pickup PIN locked after ${failedAttempts} failed attempts.`,
+            timestamp: now
+          });
+        }
+
+        // Returned rather than thrown: a throw rolls the whole transaction back,
+        // so the attempt counter was discarded every time and the lockout this
+        // relies on could never trigger. A four-digit PIN with no lockout is
+        // 10,000 guesses away from someone else's lunch.
+        return {
+          ok: false,
+          status: 403,
+          error: 'INVALID_PIN',
+          message: `รหัส PIN รับอาหารไม่ถูกต้อง (ผิด ${failedAttempts}/${PIN_ATTEMPT_LIMIT} ครั้ง)`,
+          failedAttempts,
+          lockedUntil: lockUntil
+        };
       }
 
       // Hold period for dispute & safety: 60 minutes
@@ -420,6 +491,7 @@ merchantRouter.post('/orders/:id/complete', authenticate, requireStoreOwnership(
       });
 
       return {
+        ok: true,
         success: true,
         orderId,
         status: 'COMPLETED',
@@ -427,6 +499,13 @@ merchantRouter.post('/orders/:id/complete', authenticate, requireStoreOwnership(
         fundReleaseAt: isOnlinePaid ? fundReleaseAt : null
       };
     });
+
+    // A refused handover still commits what it recorded — the attempt counter —
+    // so the answer is sent here rather than raised as an error.
+    if (!result.ok) {
+      const { ok, status, ...body } = result;
+      return res.status(status).json({ success: false, ...body });
+    }
 
     orderRef.get().then(snap => {
       if (snap.exists) {

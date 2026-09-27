@@ -388,6 +388,13 @@ if (!adminDb && !adminInitError) {
           }
         };
 
+        // Real Firestore buffers a transaction's writes and applies them only
+        // when the function returns. If it throws, every write is discarded.
+        // The mock used to write straight through, so a handler that wrote and
+        // then threw — recording a failed PIN attempt, say — appeared to work
+        // here and silently kept nothing in production.
+        const pendingWrites = [];
+
         const transaction = {
           get: async (ref) => {
             guardRead();
@@ -395,14 +402,27 @@ if (!adminDb && !adminInitError) {
           },
           set: async (ref, data, opts) => {
             hasWritten = true;
-            return ref.set(data, opts);
+            pendingWrites.push(() => ref.set(data, opts));
           },
           update: async (ref, fields) => {
             hasWritten = true;
-            return ref.update(fields);
+            pendingWrites.push(() => ref.update(fields));
+          },
+          delete: async (ref) => {
+            hasWritten = true;
+            pendingWrites.push(async () => {
+              loadFromDisk();
+              delete memoryStore[ref.fullKey];
+            });
           }
         };
+
+        // A throw here propagates with nothing written, as it would for real.
         const result = await updateFunction(transaction);
+
+        for (const write of pendingWrites) {
+          await write();
+        }
         saveToDisk();
         return result;
       };
