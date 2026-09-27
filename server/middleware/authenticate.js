@@ -37,6 +37,9 @@ function buildMockUser(req) {
     admin: role === 'admin',
     // Mock auth is an explicit, opt-in development mode, so the identity it
     // produces is accepted as authentic; isMock records where it came from.
+    // x-mock-email-verified: false lets a test express an account whose address
+    // has never been confirmed.
+    emailVerified: req.headers['x-mock-email-verified'] !== 'false',
     verified: true,
     isMock: true
   };
@@ -46,6 +49,10 @@ function buildVerifiedUser(decodedToken) {
   return {
     uid: decodedToken.uid,
     email: decodedToken.email || '',
+    // Whether the address was ever confirmed. Anyone can create a Firebase
+    // account claiming any address; only the provider's verification says it is
+    // theirs, so every decision made on the strength of an email checks this.
+    emailVerified: decodedToken.email_verified === true,
     name: decodedToken.name || '',
     role: decodedToken.role || 'customer',
     storeId: decodedToken.storeId || null,
@@ -137,7 +144,16 @@ function superAdminEmails() {
 /** True for accounts carrying an admin claim, or on the configured allowlist. */
 export function isSuperAdmin(user) {
   if (!user || user.verified !== true) return false;
+
+  // Granted by an existing admin through custom claims, so it stands on its own.
   if (user.admin === true || user.role === 'super_admin') return true;
+
+  // The configured-address fallback is the break-glass path, and it is only
+  // worth anything if the provider confirmed the address. firestore.rules has
+  // always required email_verified here; the API did not, so an account created
+  // with an admin's address and never verified could confirm payouts and issue
+  // custom claims — the two tiers now agree.
+  if (user.emailVerified !== true) return false;
   return Boolean(user.email) && superAdminEmails().includes(user.email.toLowerCase());
 }
 

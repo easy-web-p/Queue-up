@@ -282,6 +282,17 @@ schoolRouter.post('/membership/claim', authenticate, async (req, res) => {
       return res.status(400).json({ success: false, error: 'NO_EMAIL_ON_ACCOUNT' });
     }
 
+    // A roster row carries a school and a role — merchant and school admin among
+    // them. Binding one on the strength of an address nobody confirmed would let
+    // anyone sign up as somebody@university.ac.th and take their place on it.
+    if (req.user.emailVerified !== true) {
+      return res.status(403).json({
+        success: false,
+        error: 'EMAIL_NOT_VERIFIED',
+        message: 'กรุณายืนยันอีเมลของคุณก่อนรับสิทธิ์สมาชิกสถานศึกษา'
+      });
+    }
+
     const snap = await adminDb.collection('school_members')
       .where('email', '==', email)
       .where('status', '==', 'active')
