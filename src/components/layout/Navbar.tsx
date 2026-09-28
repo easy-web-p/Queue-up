@@ -14,8 +14,7 @@ import {
   Store,
   Menu,
   MessageSquare,
-  LogIn,
-  Sparkles
+  LogIn
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -47,12 +46,6 @@ export const Navbar: React.FC = () => {
     } else {
       setCurrentView('landing');
     }
-  };
-
-  const handleGoToAbout = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setCurrentView('about');
-    navigate('/about');
   };
 
   const activeQueue = userActiveQueue;
@@ -114,18 +107,7 @@ export const Navbar: React.FC = () => {
                 <span>เข้าสู่ระบบ / สมัครสมาชิก</span>
               </button>
 
-              {/* 2. ปุ่มเกี่ยวกับเรา (Outline Pill) */}
-              <a
-                href="/about"
-                onClick={handleGoToAbout}
-                className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-bold border border-stone-200/90 hover:border-orange-300 bg-white hover:bg-orange-50/60 text-stone-700 hover:text-stone-900 dark:bg-zinc-900/90 dark:border-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-800 transition-all cursor-pointer no-underline shadow-2xs"
-                title="เกี่ยวกับเรา และรายงานโครงการ"
-              >
-                <Sparkles className="w-4 h-4 text-orange-500 shrink-0" />
-                <span>เกี่ยวกับเรา</span>
-              </a>
-
-              {/* 3. ปุ่มช่วยเหลือ (Outline Pill) */}
+              {/* 2. ปุ่มช่วยเหลือ (Outline Pill) */}
               <button
                 onClick={() => setIsHelpModalOpen(true)}
                 className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-bold border border-stone-200/90 hover:border-orange-300 bg-white hover:bg-orange-50/60 text-stone-700 hover:text-stone-900 dark:bg-zinc-900/90 dark:border-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-800 transition-all cursor-pointer shadow-2xs"
