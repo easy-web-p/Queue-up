@@ -1916,7 +1916,7 @@ export default function Queueup() {
       />
 
       {/* Global Reusable Premium Footer */}
-      <Footer />
+      <Footer forceDark={true} />
     </div>
   );
 }
