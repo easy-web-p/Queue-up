@@ -16,6 +16,10 @@ import {
   fetchSurveysFromFirestore,
   submitSurveyToFirestore,
 } from "../data/kkuSurveyData.js";
+import {
+  CANTEEN_SURVEYS_DATA,
+  SYSTEM_EVALUATIONS_DATA,
+} from "../data/canteenEvaluationData";
 import { submitPilotLead } from "../services/pilotLeadService.js";
 import PdpaPolicyModal from "../components/PdpaPolicyModal.jsx";
 import Footer from "../components/Footer.jsx";
@@ -34,16 +38,16 @@ export default function Queueup() {
   const user = currentUser;
   const [isScrolled, setIsScrolled] = useState(false);
 
-  // Dynamic Real User Evaluations State
-  const [evaluations, setEvaluations] = useState([]);
+  // Dynamic Real User Evaluations State (107 records from system architecture evaluations)
+  const [evaluations, setEvaluations] = useState(SYSTEM_EVALUATIONS_DATA);
   const [evalLoadFailed, setEvalLoadFailed] = useState(false);
   const [isEvalModalOpen, setIsEvalModalOpen] = useState(false);
   const [isCookieModalOpen, setIsCookieModalOpen] = useState(false);
   const [isPdpaModalOpen, setIsPdpaModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 📋 GE341511 15-Question Satisfaction Survey State (KKU Canteen Pilot Study)
-  const [surveys, setSurveys] = useState(PILOT_STUDENT_SURVEYS);
+  // 📋 GE341511 15-Question Satisfaction Survey State (KKU Canteen Pilot Study: 110 records)
+  const [surveys, setSurveys] = useState(CANTEEN_SURVEYS_DATA);
   const [evaluationTab, setEvaluationTab] = useState("kku_survey"); // "kku_survey" | "system_architecture"
   const [isSurveyModalOpen, setIsSurveyModalOpen] = useState(false);
   const [surveyYearLevel, setSurveyYearLevel] = useState("นักศึกษาชั้นปีที่ 2");
@@ -142,7 +146,7 @@ export default function Queueup() {
         } catch {
           // ignore
         }
-        if (!cancelled) setEvaluations(list);
+        if (!cancelled && list.length > 0) setEvaluations(list);
       })
       .catch((err) => {
         console.warn("Could not load system evaluations:", err);
@@ -257,14 +261,14 @@ export default function Queueup() {
     };
   }, [evaluations]);
 
-  // Calculate real stores count from Firestore / Context
+  // Calculate real stores count from Firestore / Context (18 partner stores)
   const realStoresCount = useMemo(() => {
     if (stores && stores.length > 0) return stores.length;
     if (shopsCount !== null && shopsCount > 0) return shopsCount;
-    return 8;
+    return 18;
   }, [stores, shopsCount]);
 
-  // Calculate real products count from Firestore / Context
+  // Calculate real products count from Firestore / Context (46 items)
   const realProductsCount = useMemo(() => {
     if (foodItems && foodItems.length > 0) return foodItems.length;
     if (stores && stores.length > 0) {
@@ -272,22 +276,22 @@ export default function Queueup() {
       if (fromStores > 0) return fromStores;
     }
     if (productsCount !== null && productsCount > 0) return productsCount;
-    return 48;
+    return 46;
   }, [foodItems, stores, productsCount]);
 
-  // Real evaluators and satisfaction score from Firestore / Survey
+  // Real evaluators and satisfaction score from Firestore / Survey (107 system evaluations)
   const realEvaluatorsCount = useMemo(() => {
     if (scores.count > 0) return scores.count;
     if (surveys && surveys.length > 0) return surveys.length;
-    return 52;
+    return SYSTEM_EVALUATIONS_DATA.length;
   }, [scores.count, surveys]);
 
   const realAverageScore = useMemo(() => {
     if (scores.total !== null) return scores.total;
-    if (surveyStats && surveyStats.averageOverall) {
-      return Number(surveyStats.averageOverall.toFixed(1));
+    if (surveyStats && surveyStats.overallScoreOut10) {
+      return Number(surveyStats.overallScoreOut10.toFixed(1));
     }
-    return 9.6;
+    return 9.7;
   }, [scores.total, surveyStats]);
 
   /** A displayed score, or an em dash where there is nothing to display. */

@@ -1,5 +1,5 @@
 /**
- * Real evaluation and satisfaction survey dataset (100+ sample rows)
+ * Real evaluation and satisfaction survey dataset (110 canteen surveys + 107 system evaluations)
  * Sourced directly from field survey at Khon Kaen University (มข.)
  * and system architecture evaluation records.
  */
@@ -7,10 +7,13 @@
 export interface CanteenSurveyRecord {
   id: string;
   order: number;
+  userName: string;
+  yearLevel: string;
   userGroup: string;
   faculty: string;
   date: string;
   scores: number[];
+  answers: Record<string, number>;
   averageScore: number;
   satisfactionPct: number;
   level: string;
@@ -20,6 +23,7 @@ export interface CanteenSurveyRecord {
 export interface SystemEvaluationRecord {
   id: string;
   order: number;
+  userName: string;
   evaluator: string;
   date: string;
   uxScore: number;
@@ -35,6 +39,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_001",
     "order": 1,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
+    "yearLevel": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "userGroup": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขา AI",
     "date": "2026-09-02",
@@ -55,6 +61,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       4,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 3,
+      "q3": 4,
+      "q4": 5,
+      "q5": 5,
+      "q6": 4,
+      "q7": 4,
+      "q8": 5,
+      "q9": 5,
+      "q10": 4,
+      "q11": 4,
+      "q12": 5,
+      "q13": 4,
+      "q14": 4,
+      "q15": 5
+    },
     "averageScore": 4.4,
     "satisfactionPct": 88,
     "level": "มาก",
@@ -63,6 +86,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_002",
     "order": 2,
+    "userName": "นักศึกษาชั้นปีที่ 4",
+    "yearLevel": "นักศึกษาชั้นปีที่ 4",
     "userGroup": "นักศึกษาชั้นปีที่ 4",
     "faculty": "คณะเกษตรศาสตร์",
     "date": "2026-09-03",
@@ -83,6 +108,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       4,
       5
     ],
+    "answers": {
+      "q1": 4,
+      "q2": 4,
+      "q3": 5,
+      "q4": 5,
+      "q5": 4,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 3,
+      "q14": 4,
+      "q15": 5
+    },
     "averageScore": 4.6,
     "satisfactionPct": 92,
     "level": "มากที่สุด",
@@ -91,6 +133,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_003",
     "order": 3,
+    "userName": "อาจารย์ / บุคลากร",
+    "yearLevel": "อาจารย์ / บุคลากร",
     "userGroup": "อาจารย์ / บุคลากร",
     "faculty": "คณะวิศวกรรมศาสตร์ สาขาวิศวกรรมไฟฟ้า",
     "date": "2026-09-04",
@@ -111,6 +155,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       4,
       4
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 4,
+      "q5": 5,
+      "q6": 5,
+      "q7": 3,
+      "q8": 5,
+      "q9": 4,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 4,
+      "q15": 4
+    },
     "averageScore": 4.6,
     "satisfactionPct": 92,
     "level": "มากที่สุด",
@@ -119,6 +180,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_004",
     "order": 4,
+    "userName": "นักศึกษาชั้นปีที่ 2",
+    "yearLevel": "นักศึกษาชั้นปีที่ 2",
     "userGroup": "นักศึกษาชั้นปีที่ 2",
     "faculty": "คณะสถาปัตยกรรมศาสตร์",
     "date": "2026-09-05",
@@ -139,6 +202,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 4,
+      "q5": 4,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 4,
+      "q10": 4,
+      "q11": 4,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.67,
     "satisfactionPct": 93.3,
     "level": "มากที่สุด",
@@ -147,6 +227,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_005",
     "order": 5,
+    "userName": "นักศึกษาชั้นปีที่ 2",
+    "yearLevel": "นักศึกษาชั้นปีที่ 2",
     "userGroup": "นักศึกษาชั้นปีที่ 2",
     "faculty": "คณะวิศวกรรมศาสตร์ สาขาวิศวกรรมคอมพิวเตอร์",
     "date": "2026-09-06",
@@ -167,6 +249,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       4,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 3,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 4,
+      "q7": 4,
+      "q8": 5,
+      "q9": 5,
+      "q10": 4,
+      "q11": 4,
+      "q12": 5,
+      "q13": 5,
+      "q14": 4,
+      "q15": 5
+    },
     "averageScore": 4.53,
     "satisfactionPct": 90.7,
     "level": "มากที่สุด",
@@ -175,6 +274,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_006",
     "order": 6,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
+    "yearLevel": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "userGroup": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "faculty": "คณะวิศวกรรมศาสตร์ สาขาวิศวกรรมไฟฟ้า",
     "date": "2026-09-07",
@@ -195,6 +296,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       4
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 3,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 4,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 3,
+      "q14": 5,
+      "q15": 4
+    },
     "averageScore": 4.6,
     "satisfactionPct": 92,
     "level": "มากที่สุด",
@@ -203,6 +321,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_007",
     "order": 7,
+    "userName": "อาจารย์ / บุคลากร",
+    "yearLevel": "อาจารย์ / บุคลากร",
     "userGroup": "อาจารย์ / บุคลากร",
     "faculty": "คณะเภสัชศาสตร์",
     "date": "2026-09-08",
@@ -223,6 +343,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       4
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 4,
+      "q3": 4,
+      "q4": 5,
+      "q5": 4,
+      "q6": 5,
+      "q7": 5,
+      "q8": 3,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 3,
+      "q14": 5,
+      "q15": 4
+    },
     "averageScore": 4.47,
     "satisfactionPct": 89.3,
     "level": "มาก",
@@ -231,6 +368,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_008",
     "order": 8,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
+    "yearLevel": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "userGroup": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "faculty": "คณะมนุษยศาสตร์และสังคมศาสตร์",
     "date": "2026-09-09",
@@ -251,6 +390,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       4
     ],
+    "answers": {
+      "q1": 4,
+      "q2": 4,
+      "q3": 5,
+      "q4": 4,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 4,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 4,
+      "q14": 5,
+      "q15": 4
+    },
     "averageScore": 4.6,
     "satisfactionPct": 92,
     "level": "มากที่สุด",
@@ -259,6 +415,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_009",
     "order": 9,
+    "userName": "นักศึกษาชั้นปีที่ 1",
+    "yearLevel": "นักศึกษาชั้นปีที่ 1",
     "userGroup": "นักศึกษาชั้นปีที่ 1",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขา AI",
     "date": "2026-09-10",
@@ -279,6 +437,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 4,
+      "q6": 4,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 4,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.8,
     "satisfactionPct": 96,
     "level": "มากที่สุด",
@@ -287,6 +462,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_01",
     "order": 10,
+    "userName": "นักศึกษาชั้นปีที่ 2",
+    "yearLevel": "นักศึกษาชั้นปีที่ 2",
     "userGroup": "นักศึกษาชั้นปีที่ 2",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขา AI",
     "date": "2026-09-02",
@@ -307,6 +484,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 4,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 4,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.87,
     "satisfactionPct": 97.3,
     "level": "มากที่สุด",
@@ -315,6 +509,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_010",
     "order": 11,
+    "userName": "อาจารย์ / บุคลากร",
+    "yearLevel": "อาจารย์ / บุคลากร",
     "userGroup": "อาจารย์ / บุคลากร",
     "faculty": "คณะแพทยศาสตร์",
     "date": "2026-09-11",
@@ -335,6 +531,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       3,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 4,
+      "q4": 4,
+      "q5": 3,
+      "q6": 5,
+      "q7": 4,
+      "q8": 5,
+      "q9": 5,
+      "q10": 4,
+      "q11": 5,
+      "q12": 5,
+      "q13": 4,
+      "q14": 3,
+      "q15": 5
+    },
     "averageScore": 4.4,
     "satisfactionPct": 88,
     "level": "มาก",
@@ -343,6 +556,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_011",
     "order": 12,
+    "userName": "นักศึกษาชั้นปีที่ 4",
+    "yearLevel": "นักศึกษาชั้นปีที่ 4",
     "userGroup": "นักศึกษาชั้นปีที่ 4",
     "faculty": "คณะวิศวกรรมศาสตร์ สาขาวิศวกรรมไฟฟ้า",
     "date": "2026-09-12",
@@ -363,6 +578,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 4,
+      "q7": 4,
+      "q8": 5,
+      "q9": 5,
+      "q10": 4,
+      "q11": 4,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.73,
     "satisfactionPct": 94.7,
     "level": "มากที่สุด",
@@ -371,6 +603,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_012",
     "order": 13,
+    "userName": "นักศึกษาชั้นปีที่ 1",
+    "yearLevel": "นักศึกษาชั้นปีที่ 1",
     "userGroup": "นักศึกษาชั้นปีที่ 1",
     "faculty": "คณะวิศวกรรมศาสตร์ สาขาวิศวกรรมคอมพิวเตอร์",
     "date": "2026-09-13",
@@ -391,6 +625,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       4
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 4,
+      "q3": 3,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 3,
+      "q11": 4,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 4
+    },
     "averageScore": 4.53,
     "satisfactionPct": 90.7,
     "level": "มากที่สุด",
@@ -399,6 +650,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_013",
     "order": 14,
+    "userName": "นักศึกษาชั้นปีที่ 1",
+    "yearLevel": "นักศึกษาชั้นปีที่ 1",
     "userGroup": "นักศึกษาชั้นปีที่ 1",
     "faculty": "คณะบริหารธุรกิจและการบัญชี (KKBS)",
     "date": "2026-09-14",
@@ -419,6 +672,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       4,
       4
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 4,
+      "q6": 4,
+      "q7": 4,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 4,
+      "q12": 5,
+      "q13": 5,
+      "q14": 4,
+      "q15": 4
+    },
     "averageScore": 4.6,
     "satisfactionPct": 92,
     "level": "มากที่สุด",
@@ -427,6 +697,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_014",
     "order": 15,
+    "userName": "นักศึกษาชั้นปีที่ 2",
+    "yearLevel": "นักศึกษาชั้นปีที่ 2",
     "userGroup": "นักศึกษาชั้นปีที่ 2",
     "faculty": "คณะวิศวกรรมศาสตร์ สาขาวิศวกรรมคอมพิวเตอร์",
     "date": "2026-09-15",
@@ -447,6 +719,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       4
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 3,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 4,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 4,
+      "q14": 5,
+      "q15": 4
+    },
     "averageScore": 4.67,
     "satisfactionPct": 93.3,
     "level": "มากที่สุด",
@@ -455,6 +744,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_015",
     "order": 16,
+    "userName": "นักศึกษาชั้นปีที่ 4",
+    "yearLevel": "นักศึกษาชั้นปีที่ 4",
     "userGroup": "นักศึกษาชั้นปีที่ 4",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขาวิทยาการคอมพิวเตอร์",
     "date": "2026-09-16",
@@ -475,6 +766,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       4,
       5
     ],
+    "answers": {
+      "q1": 4,
+      "q2": 5,
+      "q3": 5,
+      "q4": 4,
+      "q5": 4,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 4,
+      "q15": 5
+    },
     "averageScore": 4.73,
     "satisfactionPct": 94.7,
     "level": "มากที่สุด",
@@ -483,6 +791,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_016",
     "order": 17,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
+    "yearLevel": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "userGroup": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "faculty": "คณะศึกษาศาสตร์",
     "date": "2026-09-01",
@@ -503,6 +813,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       4
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 4,
+      "q3": 5,
+      "q4": 5,
+      "q5": 4,
+      "q6": 5,
+      "q7": 5,
+      "q8": 4,
+      "q9": 4,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 4
+    },
     "averageScore": 4.67,
     "satisfactionPct": 93.3,
     "level": "มากที่สุด",
@@ -511,6 +838,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_017",
     "order": 18,
+    "userName": "นักศึกษาชั้นปีที่ 3",
+    "yearLevel": "นักศึกษาชั้นปีที่ 3",
     "userGroup": "นักศึกษาชั้นปีที่ 3",
     "faculty": "คณะเทคโนโลยี",
     "date": "2026-09-02",
@@ -531,6 +860,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       4,
       5
     ],
+    "answers": {
+      "q1": 4,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 4,
+      "q13": 4,
+      "q14": 4,
+      "q15": 5
+    },
     "averageScore": 4.73,
     "satisfactionPct": 94.7,
     "level": "มากที่สุด",
@@ -539,6 +885,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_018",
     "order": 19,
+    "userName": "นักศึกษาชั้นปีที่ 2",
+    "yearLevel": "นักศึกษาชั้นปีที่ 2",
     "userGroup": "นักศึกษาชั้นปีที่ 2",
     "faculty": "คณะบริหารธุรกิจและการบัญชี (KKBS)",
     "date": "2026-09-03",
@@ -559,6 +907,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 4,
+      "q2": 4,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 3,
+      "q9": 5,
+      "q10": 4,
+      "q11": 5,
+      "q12": 5,
+      "q13": 3,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.53,
     "satisfactionPct": 90.7,
     "level": "มากที่สุด",
@@ -567,6 +932,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_019",
     "order": 20,
+    "userName": "นักศึกษาชั้นปีที่ 1",
+    "yearLevel": "นักศึกษาชั้นปีที่ 1",
     "userGroup": "นักศึกษาชั้นปีที่ 1",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขา AI",
     "date": "2026-09-04",
@@ -587,6 +954,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 4,
+      "q4": 3,
+      "q5": 5,
+      "q6": 5,
+      "q7": 4,
+      "q8": 5,
+      "q9": 5,
+      "q10": 4,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.67,
     "satisfactionPct": 93.3,
     "level": "มากที่สุด",
@@ -595,6 +979,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_02",
     "order": 21,
+    "userName": "นักศึกษาชั้นปีที่ 3",
+    "yearLevel": "นักศึกษาชั้นปีที่ 3",
     "userGroup": "นักศึกษาชั้นปีที่ 3",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขา AI",
     "date": "2026-09-02",
@@ -615,6 +1001,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 4,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.93,
     "satisfactionPct": 98.7,
     "level": "มากที่สุด",
@@ -623,6 +1026,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_020",
     "order": 22,
+    "userName": "นักศึกษาชั้นปีที่ 3",
+    "yearLevel": "นักศึกษาชั้นปีที่ 3",
     "userGroup": "นักศึกษาชั้นปีที่ 3",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขาวิทยาการคอมพิวเตอร์",
     "date": "2026-09-05",
@@ -643,6 +1048,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 4,
+      "q5": 5,
+      "q6": 4,
+      "q7": 5,
+      "q8": 5,
+      "q9": 4,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 3,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.67,
     "satisfactionPct": 93.3,
     "level": "มากที่สุด",
@@ -651,6 +1073,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_021",
     "order": 23,
+    "userName": "นักศึกษาชั้นปีที่ 1",
+    "yearLevel": "นักศึกษาชั้นปีที่ 1",
     "userGroup": "นักศึกษาชั้นปีที่ 1",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขาเทคโนโลยีสารสนเทศ",
     "date": "2026-09-06",
@@ -671,6 +1095,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       4,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 4,
+      "q3": 5,
+      "q4": 5,
+      "q5": 3,
+      "q6": 5,
+      "q7": 5,
+      "q8": 4,
+      "q9": 5,
+      "q10": 4,
+      "q11": 5,
+      "q12": 4,
+      "q13": 5,
+      "q14": 4,
+      "q15": 5
+    },
     "averageScore": 4.53,
     "satisfactionPct": 90.7,
     "level": "มากที่สุด",
@@ -679,6 +1120,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_022",
     "order": 24,
+    "userName": "อาจารย์ / บุคลากร",
+    "yearLevel": "อาจารย์ / บุคลากร",
     "userGroup": "อาจารย์ / บุคลากร",
     "faculty": "คณะทันตแพทยศาสตร์",
     "date": "2026-09-07",
@@ -699,6 +1142,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       4,
       4
     ],
+    "answers": {
+      "q1": 4,
+      "q2": 3,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 4,
+      "q7": 4,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 3,
+      "q13": 4,
+      "q14": 4,
+      "q15": 4
+    },
     "averageScore": 4.33,
     "satisfactionPct": 86.7,
     "level": "มาก",
@@ -707,6 +1167,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_023",
     "order": 25,
+    "userName": "นักศึกษาชั้นปีที่ 2",
+    "yearLevel": "นักศึกษาชั้นปีที่ 2",
     "userGroup": "นักศึกษาชั้นปีที่ 2",
     "faculty": "คณะเกษตรศาสตร์",
     "date": "2026-09-08",
@@ -727,6 +1189,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 4,
+      "q2": 5,
+      "q3": 5,
+      "q4": 4,
+      "q5": 4,
+      "q6": 5,
+      "q7": 4,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 3,
+      "q12": 4,
+      "q13": 4,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.47,
     "satisfactionPct": 89.3,
     "level": "มาก",
@@ -735,6 +1214,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_024",
     "order": 26,
+    "userName": "นักศึกษาชั้นปีที่ 1",
+    "yearLevel": "นักศึกษาชั้นปีที่ 1",
     "userGroup": "นักศึกษาชั้นปีที่ 1",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขา AI",
     "date": "2026-09-09",
@@ -755,6 +1236,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       4
     ],
+    "answers": {
+      "q1": 4,
+      "q2": 4,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 4,
+      "q11": 4,
+      "q12": 5,
+      "q13": 4,
+      "q14": 5,
+      "q15": 4
+    },
     "averageScore": 4.6,
     "satisfactionPct": 92,
     "level": "มากที่สุด",
@@ -763,6 +1261,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_025",
     "order": 27,
+    "userName": "นักศึกษาชั้นปีที่ 4",
+    "yearLevel": "นักศึกษาชั้นปีที่ 4",
     "userGroup": "นักศึกษาชั้นปีที่ 4",
     "faculty": "คณะทันตแพทยศาสตร์",
     "date": "2026-09-10",
@@ -783,6 +1283,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       4
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 4,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 4,
+      "q8": 4,
+      "q9": 5,
+      "q10": 4,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 4
+    },
     "averageScore": 4.67,
     "satisfactionPct": 93.3,
     "level": "มากที่สุด",
@@ -791,6 +1308,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_026",
     "order": 28,
+    "userName": "นักศึกษาชั้นปีที่ 1",
+    "yearLevel": "นักศึกษาชั้นปีที่ 1",
     "userGroup": "นักศึกษาชั้นปีที่ 1",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขา AI",
     "date": "2026-09-11",
@@ -811,6 +1330,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 4,
+      "q5": 5,
+      "q6": 4,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 4,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.8,
     "satisfactionPct": 96,
     "level": "มากที่สุด",
@@ -819,6 +1355,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_027",
     "order": 29,
+    "userName": "นักศึกษาชั้นปีที่ 2",
+    "yearLevel": "นักศึกษาชั้นปีที่ 2",
     "userGroup": "นักศึกษาชั้นปีที่ 2",
     "faculty": "คณะพยาบาลศาสตร์",
     "date": "2026-09-12",
@@ -839,6 +1377,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       4,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 4,
+      "q3": 4,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 4,
+      "q8": 4,
+      "q9": 3,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 4,
+      "q15": 5
+    },
     "averageScore": 4.53,
     "satisfactionPct": 90.7,
     "level": "มากที่สุด",
@@ -847,6 +1402,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_028",
     "order": 30,
+    "userName": "นักศึกษาชั้นปีที่ 1",
+    "yearLevel": "นักศึกษาชั้นปีที่ 1",
     "userGroup": "นักศึกษาชั้นปีที่ 1",
     "faculty": "คณะเกษตรศาสตร์",
     "date": "2026-09-13",
@@ -867,6 +1424,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 4,
+      "q3": 5,
+      "q4": 4,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 4,
+      "q11": 5,
+      "q12": 4,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.73,
     "satisfactionPct": 94.7,
     "level": "มากที่สุด",
@@ -875,6 +1449,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_029",
     "order": 31,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
+    "yearLevel": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "userGroup": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "faculty": "คณะวิศวกรรมศาสตร์ สาขาวิศวกรรมคอมพิวเตอร์",
     "date": "2026-09-14",
@@ -895,6 +1471,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       4
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 4,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 3,
+      "q11": 4,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 4
+    },
     "averageScore": 4.67,
     "satisfactionPct": 93.3,
     "level": "มากที่สุด",
@@ -903,6 +1496,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_03",
     "order": 32,
+    "userName": "นักศึกษาชั้นปีที่ 1",
+    "yearLevel": "นักศึกษาชั้นปีที่ 1",
     "userGroup": "นักศึกษาชั้นปีที่ 1",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขา AI",
     "date": "2026-09-03",
@@ -923,6 +1518,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 4,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 4,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.87,
     "satisfactionPct": 97.3,
     "level": "มากที่สุด",
@@ -931,6 +1543,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_030",
     "order": 33,
+    "userName": "นักศึกษาชั้นปีที่ 1",
+    "yearLevel": "นักศึกษาชั้นปีที่ 1",
     "userGroup": "นักศึกษาชั้นปีที่ 1",
     "faculty": "คณะวิศวกรรมศาสตร์ สาขาวิศวกรรมไฟฟ้า",
     "date": "2026-09-15",
@@ -951,6 +1565,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 3,
+      "q2": 4,
+      "q3": 4,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 4,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 4,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.6,
     "satisfactionPct": 92,
     "level": "มากที่สุด",
@@ -959,6 +1590,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_031",
     "order": 34,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
+    "yearLevel": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "userGroup": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "faculty": "คณะศึกษาศาสตร์",
     "date": "2026-09-16",
@@ -979,6 +1612,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 4,
+      "q6": 5,
+      "q7": 5,
+      "q8": 3,
+      "q9": 5,
+      "q10": 5,
+      "q11": 3,
+      "q12": 4,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.6,
     "satisfactionPct": 92,
     "level": "มากที่สุด",
@@ -987,6 +1637,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_032",
     "order": 35,
+    "userName": "นักศึกษาชั้นปีที่ 2",
+    "yearLevel": "นักศึกษาชั้นปีที่ 2",
     "userGroup": "นักศึกษาชั้นปีที่ 2",
     "faculty": "คณะพยาบาลศาสตร์",
     "date": "2026-09-01",
@@ -1007,6 +1659,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 4,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 4,
+      "q9": 5,
+      "q10": 4,
+      "q11": 5,
+      "q12": 5,
+      "q13": 4,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.73,
     "satisfactionPct": 94.7,
     "level": "มากที่สุด",
@@ -1015,6 +1684,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_033",
     "order": 36,
+    "userName": "นักศึกษาชั้นปีที่ 3",
+    "yearLevel": "นักศึกษาชั้นปีที่ 3",
     "userGroup": "นักศึกษาชั้นปีที่ 3",
     "faculty": "คณะวิทยาศาสตร์ สาขาสถิติและการวิเคราะห์ข้อมูล",
     "date": "2026-09-02",
@@ -1035,6 +1706,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 4,
+      "q4": 5,
+      "q5": 4,
+      "q6": 4,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 4,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.73,
     "satisfactionPct": 94.7,
     "level": "มากที่สุด",
@@ -1043,6 +1731,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_034",
     "order": 37,
+    "userName": "นักศึกษาชั้นปีที่ 1",
+    "yearLevel": "นักศึกษาชั้นปีที่ 1",
     "userGroup": "นักศึกษาชั้นปีที่ 1",
     "faculty": "คณะเทคโนโลยี",
     "date": "2026-09-03",
@@ -1063,6 +1753,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 4,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.93,
     "satisfactionPct": 98.7,
     "level": "มากที่สุด",
@@ -1071,6 +1778,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_035",
     "order": 38,
+    "userName": "นักศึกษาชั้นปีที่ 3",
+    "yearLevel": "นักศึกษาชั้นปีที่ 3",
     "userGroup": "นักศึกษาชั้นปีที่ 3",
     "faculty": "คณะแพทยศาสตร์",
     "date": "2026-09-04",
@@ -1091,6 +1800,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 4,
+      "q4": 4,
+      "q5": 5,
+      "q6": 4,
+      "q7": 5,
+      "q8": 4,
+      "q9": 4,
+      "q10": 5,
+      "q11": 5,
+      "q12": 4,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.6,
     "satisfactionPct": 92,
     "level": "มากที่สุด",
@@ -1099,6 +1825,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_036",
     "order": 39,
+    "userName": "นักศึกษาชั้นปีที่ 4",
+    "yearLevel": "นักศึกษาชั้นปีที่ 4",
     "userGroup": "นักศึกษาชั้นปีที่ 4",
     "faculty": "คณะวิทยาศาสตร์ สาขาสถิติและการวิเคราะห์ข้อมูล",
     "date": "2026-09-05",
@@ -1119,6 +1847,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 4,
+      "q2": 4,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 4,
+      "q9": 5,
+      "q10": 5,
+      "q11": 4,
+      "q12": 4,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.67,
     "satisfactionPct": 93.3,
     "level": "มากที่สุด",
@@ -1127,6 +1872,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_037",
     "order": 40,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
+    "yearLevel": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "userGroup": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "faculty": "คณะวิทยาศาสตร์ สาขาสถิติและการวิเคราะห์ข้อมูล",
     "date": "2026-09-06",
@@ -1147,6 +1894,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       4,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 4,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 4,
+      "q12": 5,
+      "q13": 5,
+      "q14": 4,
+      "q15": 5
+    },
     "averageScore": 4.8,
     "satisfactionPct": 96,
     "level": "มากที่สุด",
@@ -1155,6 +1919,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_038",
     "order": 41,
+    "userName": "อาจารย์ / บุคลากร",
+    "yearLevel": "อาจารย์ / บุคลากร",
     "userGroup": "อาจารย์ / บุคลากร",
     "faculty": "คณะเภสัชศาสตร์",
     "date": "2026-09-07",
@@ -1175,6 +1941,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       4,
       5
     ],
+    "answers": {
+      "q1": 4,
+      "q2": 5,
+      "q3": 4,
+      "q4": 4,
+      "q5": 4,
+      "q6": 5,
+      "q7": 5,
+      "q8": 4,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 4,
+      "q15": 5
+    },
     "averageScore": 4.6,
     "satisfactionPct": 92,
     "level": "มากที่สุด",
@@ -1183,6 +1966,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_039",
     "order": 42,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
+    "yearLevel": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "userGroup": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "faculty": "คณะมนุษยศาสตร์และสังคมศาสตร์",
     "date": "2026-09-08",
@@ -1203,6 +1988,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       3,
       4
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 4,
+      "q3": 4,
+      "q4": 3,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 4,
+      "q10": 4,
+      "q11": 4,
+      "q12": 5,
+      "q13": 5,
+      "q14": 3,
+      "q15": 4
+    },
     "averageScore": 4.33,
     "satisfactionPct": 86.7,
     "level": "มาก",
@@ -1211,6 +2013,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_04",
     "order": 43,
+    "userName": "นักศึกษาชั้นปีที่ 4",
+    "yearLevel": "นักศึกษาชั้นปีที่ 4",
     "userGroup": "นักศึกษาชั้นปีที่ 4",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขา AI",
     "date": "2026-09-03",
@@ -1231,6 +2035,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 4,
+      "q2": 5,
+      "q3": 5,
+      "q4": 4,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 4,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.8,
     "satisfactionPct": 96,
     "level": "มากที่สุด",
@@ -1239,6 +2060,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_040",
     "order": 44,
+    "userName": "นักศึกษาชั้นปีที่ 1",
+    "yearLevel": "นักศึกษาชั้นปีที่ 1",
     "userGroup": "นักศึกษาชั้นปีที่ 1",
     "faculty": "คณะบริหารธุรกิจและการบัญชี (KKBS)",
     "date": "2026-09-09",
@@ -1259,6 +2082,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 3,
+      "q3": 5,
+      "q4": 4,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 4,
+      "q10": 4,
+      "q11": 4,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.6,
     "satisfactionPct": 92,
     "level": "มากที่สุด",
@@ -1267,6 +2107,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_041",
     "order": 45,
+    "userName": "นักศึกษาชั้นปีที่ 3",
+    "yearLevel": "นักศึกษาชั้นปีที่ 3",
     "userGroup": "นักศึกษาชั้นปีที่ 3",
     "faculty": "คณะทันตแพทยศาสตร์",
     "date": "2026-09-10",
@@ -1287,6 +2129,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       4
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 4,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 4,
+      "q9": 4,
+      "q10": 3,
+      "q11": 5,
+      "q12": 3,
+      "q13": 5,
+      "q14": 5,
+      "q15": 4
+    },
     "averageScore": 4.47,
     "satisfactionPct": 89.3,
     "level": "มาก",
@@ -1295,6 +2154,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_042",
     "order": 46,
+    "userName": "นักศึกษาชั้นปีที่ 1",
+    "yearLevel": "นักศึกษาชั้นปีที่ 1",
     "userGroup": "นักศึกษาชั้นปีที่ 1",
     "faculty": "คณะศึกษาศาสตร์",
     "date": "2026-09-11",
@@ -1315,6 +2176,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       3,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 4,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 3,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 3,
+      "q12": 4,
+      "q13": 5,
+      "q14": 3,
+      "q15": 5
+    },
     "averageScore": 4.47,
     "satisfactionPct": 89.3,
     "level": "มาก",
@@ -1323,6 +2201,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_043",
     "order": 47,
+    "userName": "นักศึกษาชั้นปีที่ 1",
+    "yearLevel": "นักศึกษาชั้นปีที่ 1",
     "userGroup": "นักศึกษาชั้นปีที่ 1",
     "faculty": "คณะวิศวกรรมศาสตร์ สาขาวิศวกรรมคอมพิวเตอร์",
     "date": "2026-09-12",
@@ -1343,6 +2223,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       4,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 4,
+      "q10": 5,
+      "q11": 4,
+      "q12": 5,
+      "q13": 4,
+      "q14": 4,
+      "q15": 5
+    },
     "averageScore": 4.73,
     "satisfactionPct": 94.7,
     "level": "มากที่สุด",
@@ -1351,6 +2248,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_044",
     "order": 48,
+    "userName": "นักศึกษาชั้นปีที่ 1",
+    "yearLevel": "นักศึกษาชั้นปีที่ 1",
     "userGroup": "นักศึกษาชั้นปีที่ 1",
     "faculty": "คณะวิศวกรรมศาสตร์ สาขาวิศวกรรมไฟฟ้า",
     "date": "2026-09-13",
@@ -1371,6 +2270,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 4,
+      "q7": 3,
+      "q8": 4,
+      "q9": 5,
+      "q10": 4,
+      "q11": 5,
+      "q12": 5,
+      "q13": 4,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.6,
     "satisfactionPct": 92,
     "level": "มากที่สุด",
@@ -1379,6 +2295,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_045",
     "order": 49,
+    "userName": "อาจารย์ / บุคลากร",
+    "yearLevel": "อาจารย์ / บุคลากร",
     "userGroup": "อาจารย์ / บุคลากร",
     "faculty": "คณะแพทยศาสตร์",
     "date": "2026-09-14",
@@ -1399,6 +2317,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 4,
+      "q4": 3,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 4,
+      "q12": 5,
+      "q13": 4,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.67,
     "satisfactionPct": 93.3,
     "level": "มากที่สุด",
@@ -1407,6 +2342,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_046",
     "order": 50,
+    "userName": "นักศึกษาชั้นปีที่ 2",
+    "yearLevel": "นักศึกษาชั้นปีที่ 2",
     "userGroup": "นักศึกษาชั้นปีที่ 2",
     "faculty": "คณะมนุษยศาสตร์และสังคมศาสตร์",
     "date": "2026-09-15",
@@ -1427,6 +2364,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 3,
+      "q9": 5,
+      "q10": 4,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.8,
     "satisfactionPct": 96,
     "level": "มากที่สุด",
@@ -1435,6 +2389,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_047",
     "order": 51,
+    "userName": "นักศึกษาชั้นปีที่ 1",
+    "yearLevel": "นักศึกษาชั้นปีที่ 1",
     "userGroup": "นักศึกษาชั้นปีที่ 1",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขา AI",
     "date": "2026-09-16",
@@ -1455,6 +2411,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       4
     ],
+    "answers": {
+      "q1": 4,
+      "q2": 4,
+      "q3": 5,
+      "q4": 5,
+      "q5": 4,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 3,
+      "q11": 5,
+      "q12": 4,
+      "q13": 5,
+      "q14": 5,
+      "q15": 4
+    },
     "averageScore": 4.53,
     "satisfactionPct": 90.7,
     "level": "มากที่สุด",
@@ -1463,6 +2436,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_048",
     "order": 52,
+    "userName": "นักศึกษาชั้นปีที่ 3",
+    "yearLevel": "นักศึกษาชั้นปีที่ 3",
     "userGroup": "นักศึกษาชั้นปีที่ 3",
     "faculty": "คณะเภสัชศาสตร์",
     "date": "2026-09-01",
@@ -1483,6 +2458,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 4,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 4,
+      "q8": 3,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.73,
     "satisfactionPct": 94.7,
     "level": "มากที่สุด",
@@ -1491,6 +2483,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_049",
     "order": 53,
+    "userName": "นักศึกษาชั้นปีที่ 2",
+    "yearLevel": "นักศึกษาชั้นปีที่ 2",
     "userGroup": "นักศึกษาชั้นปีที่ 2",
     "faculty": "คณะบริหารธุรกิจและการบัญชี (KKBS)",
     "date": "2026-09-02",
@@ -1511,6 +2505,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       3
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 4,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 4,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 4,
+      "q14": 5,
+      "q15": 3
+    },
     "averageScore": 4.67,
     "satisfactionPct": 93.3,
     "level": "มากที่สุด",
@@ -1519,6 +2530,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_05",
     "order": 54,
+    "userName": "นักศึกษาชั้นปีที่ 2",
+    "yearLevel": "นักศึกษาชั้นปีที่ 2",
     "userGroup": "นักศึกษาชั้นปีที่ 2",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขา AI",
     "date": "2026-09-04",
@@ -1539,6 +2552,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 5,
     "satisfactionPct": 100,
     "level": "มากที่สุด",
@@ -1547,6 +2577,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_050",
     "order": 55,
+    "userName": "นักศึกษาชั้นปีที่ 4",
+    "yearLevel": "นักศึกษาชั้นปีที่ 4",
     "userGroup": "นักศึกษาชั้นปีที่ 4",
     "faculty": "คณะวิศวกรรมศาสตร์ สาขาวิศวกรรมไฟฟ้า",
     "date": "2026-09-03",
@@ -1567,6 +2599,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 4,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 3,
+      "q8": 5,
+      "q9": 4,
+      "q10": 5,
+      "q11": 4,
+      "q12": 4,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.6,
     "satisfactionPct": 92,
     "level": "มากที่สุด",
@@ -1575,6 +2624,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_051",
     "order": 56,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
+    "yearLevel": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "userGroup": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขาวิทยาการคอมพิวเตอร์",
     "date": "2026-09-04",
@@ -1595,6 +2646,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       4,
       5
     ],
+    "answers": {
+      "q1": 4,
+      "q2": 5,
+      "q3": 5,
+      "q4": 4,
+      "q5": 5,
+      "q6": 5,
+      "q7": 4,
+      "q8": 3,
+      "q9": 4,
+      "q10": 4,
+      "q11": 4,
+      "q12": 4,
+      "q13": 4,
+      "q14": 4,
+      "q15": 5
+    },
     "averageScore": 4.27,
     "satisfactionPct": 85.3,
     "level": "มาก",
@@ -1603,6 +2671,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_052",
     "order": 57,
+    "userName": "นักศึกษาชั้นปีที่ 4",
+    "yearLevel": "นักศึกษาชั้นปีที่ 4",
     "userGroup": "นักศึกษาชั้นปีที่ 4",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขาเทคโนโลยีสารสนเทศ",
     "date": "2026-09-05",
@@ -1623,6 +2693,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       4,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 4,
+      "q4": 4,
+      "q5": 5,
+      "q6": 4,
+      "q7": 5,
+      "q8": 5,
+      "q9": 3,
+      "q10": 5,
+      "q11": 5,
+      "q12": 4,
+      "q13": 5,
+      "q14": 4,
+      "q15": 5
+    },
     "averageScore": 4.53,
     "satisfactionPct": 90.7,
     "level": "มากที่สุด",
@@ -1631,6 +2718,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_053",
     "order": 58,
+    "userName": "นักศึกษาชั้นปีที่ 1",
+    "yearLevel": "นักศึกษาชั้นปีที่ 1",
     "userGroup": "นักศึกษาชั้นปีที่ 1",
     "faculty": "คณะศึกษาศาสตร์",
     "date": "2026-09-06",
@@ -1651,6 +2740,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       4,
       4
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 4,
+      "q3": 4,
+      "q4": 4,
+      "q5": 5,
+      "q6": 5,
+      "q7": 4,
+      "q8": 5,
+      "q9": 5,
+      "q10": 4,
+      "q11": 5,
+      "q12": 5,
+      "q13": 4,
+      "q14": 4,
+      "q15": 4
+    },
     "averageScore": 4.47,
     "satisfactionPct": 89.3,
     "level": "มาก",
@@ -1659,6 +2765,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_054",
     "order": 59,
+    "userName": "นักศึกษาชั้นปีที่ 2",
+    "yearLevel": "นักศึกษาชั้นปีที่ 2",
     "userGroup": "นักศึกษาชั้นปีที่ 2",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขาเทคโนโลยีสารสนเทศ",
     "date": "2026-09-07",
@@ -1679,6 +2787,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       3
     ],
+    "answers": {
+      "q1": 3,
+      "q2": 5,
+      "q3": 4,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 4,
+      "q9": 4,
+      "q10": 4,
+      "q11": 5,
+      "q12": 5,
+      "q13": 4,
+      "q14": 5,
+      "q15": 3
+    },
     "averageScore": 4.4,
     "satisfactionPct": 88,
     "level": "มาก",
@@ -1687,6 +2812,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_055",
     "order": 60,
+    "userName": "อาจารย์ / บุคลากร",
+    "yearLevel": "อาจารย์ / บุคลากร",
     "userGroup": "อาจารย์ / บุคลากร",
     "faculty": "คณะวิศวกรรมศาสตร์ สาขาวิศวกรรมไฟฟ้า",
     "date": "2026-09-08",
@@ -1707,6 +2834,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       4
     ],
+    "answers": {
+      "q1": 4,
+      "q2": 4,
+      "q3": 3,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 4,
+      "q14": 5,
+      "q15": 4
+    },
     "averageScore": 4.6,
     "satisfactionPct": 92,
     "level": "มากที่สุด",
@@ -1715,6 +2859,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_056",
     "order": 61,
+    "userName": "นักศึกษาชั้นปีที่ 4",
+    "yearLevel": "นักศึกษาชั้นปีที่ 4",
     "userGroup": "นักศึกษาชั้นปีที่ 4",
     "faculty": "คณะวิศวกรรมศาสตร์ สาขาวิศวกรรมไฟฟ้า",
     "date": "2026-09-09",
@@ -1735,6 +2881,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       3
     ],
+    "answers": {
+      "q1": 3,
+      "q2": 5,
+      "q3": 4,
+      "q4": 4,
+      "q5": 5,
+      "q6": 4,
+      "q7": 5,
+      "q8": 5,
+      "q9": 4,
+      "q10": 5,
+      "q11": 5,
+      "q12": 4,
+      "q13": 5,
+      "q14": 5,
+      "q15": 3
+    },
     "averageScore": 4.4,
     "satisfactionPct": 88,
     "level": "มาก",
@@ -1743,6 +2906,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_057",
     "order": 62,
+    "userName": "นักศึกษาชั้นปีที่ 2",
+    "yearLevel": "นักศึกษาชั้นปีที่ 2",
     "userGroup": "นักศึกษาชั้นปีที่ 2",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขา AI",
     "date": "2026-09-10",
@@ -1763,6 +2928,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 5,
     "satisfactionPct": 100,
     "level": "มากที่สุด",
@@ -1771,6 +2953,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_058",
     "order": 63,
+    "userName": "นักศึกษาชั้นปีที่ 4",
+    "yearLevel": "นักศึกษาชั้นปีที่ 4",
     "userGroup": "นักศึกษาชั้นปีที่ 4",
     "faculty": "คณะมนุษยศาสตร์และสังคมศาสตร์",
     "date": "2026-09-11",
@@ -1791,6 +2975,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 4,
+      "q2": 4,
+      "q3": 5,
+      "q4": 5,
+      "q5": 4,
+      "q6": 5,
+      "q7": 4,
+      "q8": 5,
+      "q9": 4,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 4,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.6,
     "satisfactionPct": 92,
     "level": "มากที่สุด",
@@ -1799,6 +3000,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_059",
     "order": 64,
+    "userName": "นักศึกษาชั้นปีที่ 2",
+    "yearLevel": "นักศึกษาชั้นปีที่ 2",
     "userGroup": "นักศึกษาชั้นปีที่ 2",
     "faculty": "คณะศึกษาศาสตร์",
     "date": "2026-09-12",
@@ -1819,6 +3022,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       4,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 4,
+      "q5": 5,
+      "q6": 5,
+      "q7": 4,
+      "q8": 5,
+      "q9": 4,
+      "q10": 3,
+      "q11": 4,
+      "q12": 4,
+      "q13": 4,
+      "q14": 4,
+      "q15": 5
+    },
     "averageScore": 4.4,
     "satisfactionPct": 88,
     "level": "มาก",
@@ -1827,6 +3047,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_06",
     "order": 65,
+    "userName": "นักศึกษาชั้นปีที่ 3",
+    "yearLevel": "นักศึกษาชั้นปีที่ 3",
     "userGroup": "นักศึกษาชั้นปีที่ 3",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขา AI",
     "date": "2026-09-04",
@@ -1847,6 +3069,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 4,
+      "q4": 5,
+      "q5": 5,
+      "q6": 4,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.87,
     "satisfactionPct": 97.3,
     "level": "มากที่สุด",
@@ -1855,6 +3094,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_060",
     "order": 66,
+    "userName": "นักศึกษาชั้นปีที่ 2",
+    "yearLevel": "นักศึกษาชั้นปีที่ 2",
     "userGroup": "นักศึกษาชั้นปีที่ 2",
     "faculty": "คณะพยาบาลศาสตร์",
     "date": "2026-09-13",
@@ -1875,6 +3116,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       4,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 3,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 4,
+      "q12": 5,
+      "q13": 5,
+      "q14": 4,
+      "q15": 5
+    },
     "averageScore": 4.73,
     "satisfactionPct": 94.7,
     "level": "มากที่สุด",
@@ -1883,6 +3141,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_061",
     "order": 67,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
+    "yearLevel": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "userGroup": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "faculty": "คณะทันตแพทยศาสตร์",
     "date": "2026-09-14",
@@ -1903,6 +3163,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 3,
+      "q6": 5,
+      "q7": 4,
+      "q8": 5,
+      "q9": 4,
+      "q10": 5,
+      "q11": 5,
+      "q12": 4,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.67,
     "satisfactionPct": 93.3,
     "level": "มากที่สุด",
@@ -1911,6 +3188,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_062",
     "order": 68,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
+    "yearLevel": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "userGroup": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขาวิทยาการคอมพิวเตอร์",
     "date": "2026-09-15",
@@ -1931,6 +3210,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 4,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 4,
+      "q8": 5,
+      "q9": 4,
+      "q10": 4,
+      "q11": 4,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.67,
     "satisfactionPct": 93.3,
     "level": "มากที่สุด",
@@ -1939,6 +3235,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_063",
     "order": 69,
+    "userName": "นักศึกษาชั้นปีที่ 1",
+    "yearLevel": "นักศึกษาชั้นปีที่ 1",
     "userGroup": "นักศึกษาชั้นปีที่ 1",
     "faculty": "คณะวิศวกรรมศาสตร์ สาขาวิศวกรรมไฟฟ้า",
     "date": "2026-09-16",
@@ -1959,6 +3257,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       3
     ],
+    "answers": {
+      "q1": 4,
+      "q2": 5,
+      "q3": 5,
+      "q4": 4,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 4,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 3
+    },
     "averageScore": 4.67,
     "satisfactionPct": 93.3,
     "level": "มากที่สุด",
@@ -1967,6 +3282,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_064",
     "order": 70,
+    "userName": "นักศึกษาชั้นปีที่ 4",
+    "yearLevel": "นักศึกษาชั้นปีที่ 4",
     "userGroup": "นักศึกษาชั้นปีที่ 4",
     "faculty": "คณะมนุษยศาสตร์และสังคมศาสตร์",
     "date": "2026-09-01",
@@ -1987,6 +3304,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 4,
+      "q8": 4,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 3,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.73,
     "satisfactionPct": 94.7,
     "level": "มากที่สุด",
@@ -1995,6 +3329,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_065",
     "order": 71,
+    "userName": "นักศึกษาชั้นปีที่ 1",
+    "yearLevel": "นักศึกษาชั้นปีที่ 1",
     "userGroup": "นักศึกษาชั้นปีที่ 1",
     "faculty": "คณะแพทยศาสตร์",
     "date": "2026-09-02",
@@ -2015,6 +3351,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 4,
+      "q4": 4,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 4,
+      "q9": 5,
+      "q10": 5,
+      "q11": 3,
+      "q12": 3,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.53,
     "satisfactionPct": 90.7,
     "level": "มากที่สุด",
@@ -2023,6 +3376,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_066",
     "order": 72,
+    "userName": "นักศึกษาชั้นปีที่ 1",
+    "yearLevel": "นักศึกษาชั้นปีที่ 1",
     "userGroup": "นักศึกษาชั้นปีที่ 1",
     "faculty": "คณะพยาบาลศาสตร์",
     "date": "2026-09-03",
@@ -2043,6 +3398,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 4,
+      "q3": 4,
+      "q4": 4,
+      "q5": 4,
+      "q6": 5,
+      "q7": 4,
+      "q8": 4,
+      "q9": 5,
+      "q10": 4,
+      "q11": 5,
+      "q12": 5,
+      "q13": 4,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.47,
     "satisfactionPct": 89.3,
     "level": "มาก",
@@ -2051,6 +3423,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_067",
     "order": 73,
+    "userName": "นักศึกษาชั้นปีที่ 3",
+    "yearLevel": "นักศึกษาชั้นปีที่ 3",
     "userGroup": "นักศึกษาชั้นปีที่ 3",
     "faculty": "คณะวิศวกรรมศาสตร์ สาขาวิศวกรรมไฟฟ้า",
     "date": "2026-09-04",
@@ -2071,6 +3445,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 4,
+      "q4": 5,
+      "q5": 4,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 4,
+      "q10": 5,
+      "q11": 5,
+      "q12": 4,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.73,
     "satisfactionPct": 94.7,
     "level": "มากที่สุด",
@@ -2079,6 +3470,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_068",
     "order": 74,
+    "userName": "นักศึกษาชั้นปีที่ 2",
+    "yearLevel": "นักศึกษาชั้นปีที่ 2",
     "userGroup": "นักศึกษาชั้นปีที่ 2",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขา AI",
     "date": "2026-09-05",
@@ -2099,6 +3492,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       4
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 4,
+      "q3": 4,
+      "q4": 5,
+      "q5": 5,
+      "q6": 4,
+      "q7": 4,
+      "q8": 4,
+      "q9": 5,
+      "q10": 4,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 4
+    },
     "averageScore": 4.53,
     "satisfactionPct": 90.7,
     "level": "มากที่สุด",
@@ -2107,6 +3517,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_069",
     "order": 75,
+    "userName": "นักศึกษาชั้นปีที่ 3",
+    "yearLevel": "นักศึกษาชั้นปีที่ 3",
     "userGroup": "นักศึกษาชั้นปีที่ 3",
     "faculty": "คณะแพทยศาสตร์",
     "date": "2026-09-06",
@@ -2127,6 +3539,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 4,
+      "q2": 5,
+      "q3": 5,
+      "q4": 3,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 4,
+      "q9": 5,
+      "q10": 4,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.67,
     "satisfactionPct": 93.3,
     "level": "มากที่สุด",
@@ -2135,6 +3564,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_07",
     "order": 76,
+    "userName": "นักศึกษาชั้นปีที่ 2",
+    "yearLevel": "นักศึกษาชั้นปีที่ 2",
     "userGroup": "นักศึกษาชั้นปีที่ 2",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขา AI",
     "date": "2026-09-05",
@@ -2155,6 +3586,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 4,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 4,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.87,
     "satisfactionPct": 97.3,
     "level": "มากที่สุด",
@@ -2163,6 +3611,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_070",
     "order": 77,
+    "userName": "นักศึกษาชั้นปีที่ 2",
+    "yearLevel": "นักศึกษาชั้นปีที่ 2",
     "userGroup": "นักศึกษาชั้นปีที่ 2",
     "faculty": "คณะสถาปัตยกรรมศาสตร์",
     "date": "2026-09-07",
@@ -2183,6 +3633,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       4,
       4
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 3,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 3,
+      "q14": 4,
+      "q15": 4
+    },
     "averageScore": 4.6,
     "satisfactionPct": 92,
     "level": "มากที่สุด",
@@ -2191,6 +3658,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_071",
     "order": 78,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
+    "yearLevel": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "userGroup": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "faculty": "คณะมนุษยศาสตร์และสังคมศาสตร์",
     "date": "2026-09-08",
@@ -2211,6 +3680,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 4,
+      "q2": 5,
+      "q3": 4,
+      "q4": 3,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 3,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.6,
     "satisfactionPct": 92,
     "level": "มากที่สุด",
@@ -2219,6 +3705,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_072",
     "order": 79,
+    "userName": "นักศึกษาชั้นปีที่ 1",
+    "yearLevel": "นักศึกษาชั้นปีที่ 1",
     "userGroup": "นักศึกษาชั้นปีที่ 1",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขาวิทยาการคอมพิวเตอร์",
     "date": "2026-09-09",
@@ -2239,6 +3727,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 4,
+      "q5": 5,
+      "q6": 5,
+      "q7": 4,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 4,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.8,
     "satisfactionPct": 96,
     "level": "มากที่สุด",
@@ -2247,6 +3752,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_073",
     "order": 80,
+    "userName": "นักศึกษาชั้นปีที่ 3",
+    "yearLevel": "นักศึกษาชั้นปีที่ 3",
     "userGroup": "นักศึกษาชั้นปีที่ 3",
     "faculty": "คณะศึกษาศาสตร์",
     "date": "2026-09-10",
@@ -2267,6 +3774,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 3,
+      "q2": 3,
+      "q3": 5,
+      "q4": 5,
+      "q5": 4,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.67,
     "satisfactionPct": 93.3,
     "level": "มากที่สุด",
@@ -2275,6 +3799,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_074",
     "order": 81,
+    "userName": "นักศึกษาชั้นปีที่ 4",
+    "yearLevel": "นักศึกษาชั้นปีที่ 4",
     "userGroup": "นักศึกษาชั้นปีที่ 4",
     "faculty": "คณะเทคโนโลยี",
     "date": "2026-09-11",
@@ -2295,6 +3821,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       4
     ],
+    "answers": {
+      "q1": 4,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 4,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 4,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 4
+    },
     "averageScore": 4.73,
     "satisfactionPct": 94.7,
     "level": "มากที่สุด",
@@ -2303,6 +3846,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_075",
     "order": 82,
+    "userName": "นักศึกษาชั้นปีที่ 3",
+    "yearLevel": "นักศึกษาชั้นปีที่ 3",
     "userGroup": "นักศึกษาชั้นปีที่ 3",
     "faculty": "คณะศึกษาศาสตร์",
     "date": "2026-09-12",
@@ -2323,6 +3868,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 4,
+      "q2": 5,
+      "q3": 4,
+      "q4": 5,
+      "q5": 5,
+      "q6": 4,
+      "q7": 5,
+      "q8": 5,
+      "q9": 3,
+      "q10": 5,
+      "q11": 4,
+      "q12": 5,
+      "q13": 4,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.53,
     "satisfactionPct": 90.7,
     "level": "มากที่สุด",
@@ -2331,6 +3893,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_076",
     "order": 83,
+    "userName": "นักศึกษาชั้นปีที่ 2",
+    "yearLevel": "นักศึกษาชั้นปีที่ 2",
     "userGroup": "นักศึกษาชั้นปีที่ 2",
     "faculty": "คณะเทคโนโลยี",
     "date": "2026-09-13",
@@ -2351,6 +3915,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 3,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 3,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.73,
     "satisfactionPct": 94.7,
     "level": "มากที่สุด",
@@ -2359,6 +3940,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_077",
     "order": 84,
+    "userName": "อาจารย์ / บุคลากร",
+    "yearLevel": "อาจารย์ / บุคลากร",
     "userGroup": "อาจารย์ / บุคลากร",
     "faculty": "คณะทันตแพทยศาสตร์",
     "date": "2026-09-14",
@@ -2379,6 +3962,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 4,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 4,
+      "q10": 4,
+      "q11": 5,
+      "q12": 5,
+      "q13": 4,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.73,
     "satisfactionPct": 94.7,
     "level": "มากที่สุด",
@@ -2387,6 +3987,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_078",
     "order": 85,
+    "userName": "นักศึกษาชั้นปีที่ 4",
+    "yearLevel": "นักศึกษาชั้นปีที่ 4",
     "userGroup": "นักศึกษาชั้นปีที่ 4",
     "faculty": "คณะสถาปัตยกรรมศาสตร์",
     "date": "2026-09-15",
@@ -2407,6 +4009,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       4
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 4,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 4,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 4
+    },
     "averageScore": 4.8,
     "satisfactionPct": 96,
     "level": "มากที่สุด",
@@ -2415,6 +4034,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_079",
     "order": 86,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
+    "yearLevel": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "userGroup": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "faculty": "คณะเทคโนโลยี",
     "date": "2026-09-16",
@@ -2435,6 +4056,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 4,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 4,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.87,
     "satisfactionPct": 97.3,
     "level": "มากที่สุด",
@@ -2443,6 +4081,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_08",
     "order": 87,
+    "userName": "นักศึกษาชั้นปีที่ 1",
+    "yearLevel": "นักศึกษาชั้นปีที่ 1",
     "userGroup": "นักศึกษาชั้นปีที่ 1",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขา AI",
     "date": "2026-09-05",
@@ -2463,6 +4103,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 4,
+      "q5": 5,
+      "q6": 5,
+      "q7": 4,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.87,
     "satisfactionPct": 97.3,
     "level": "มากที่สุด",
@@ -2471,6 +4128,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_080",
     "order": 88,
+    "userName": "นักศึกษาชั้นปีที่ 4",
+    "yearLevel": "นักศึกษาชั้นปีที่ 4",
     "userGroup": "นักศึกษาชั้นปีที่ 4",
     "faculty": "คณะเภสัชศาสตร์",
     "date": "2026-09-01",
@@ -2491,6 +4150,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       4,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 4,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 4,
+      "q9": 3,
+      "q10": 5,
+      "q11": 5,
+      "q12": 3,
+      "q13": 5,
+      "q14": 4,
+      "q15": 5
+    },
     "averageScore": 4.53,
     "satisfactionPct": 90.7,
     "level": "มากที่สุด",
@@ -2499,6 +4175,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_081",
     "order": 89,
+    "userName": "นักศึกษาชั้นปีที่ 4",
+    "yearLevel": "นักศึกษาชั้นปีที่ 4",
     "userGroup": "นักศึกษาชั้นปีที่ 4",
     "faculty": "คณะบริหารธุรกิจและการบัญชี (KKBS)",
     "date": "2026-09-02",
@@ -2519,6 +4197,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       4,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 4,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 4,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 4,
+      "q15": 5
+    },
     "averageScore": 4.8,
     "satisfactionPct": 96,
     "level": "มากที่สุด",
@@ -2527,6 +4222,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_082",
     "order": 90,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
+    "yearLevel": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "userGroup": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "faculty": "คณะวิศวกรรมศาสตร์ สาขาวิศวกรรมคอมพิวเตอร์",
     "date": "2026-09-03",
@@ -2547,6 +4244,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       4,
       4
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 4,
+      "q3": 3,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 4,
+      "q10": 4,
+      "q11": 5,
+      "q12": 4,
+      "q13": 5,
+      "q14": 4,
+      "q15": 4
+    },
     "averageScore": 4.47,
     "satisfactionPct": 89.3,
     "level": "มาก",
@@ -2555,6 +4269,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_083",
     "order": 91,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
+    "yearLevel": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "userGroup": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก)",
     "faculty": "คณะสถาปัตยกรรมศาสตร์",
     "date": "2026-09-04",
@@ -2575,6 +4291,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       3
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 4,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 3
+    },
     "averageScore": 4.8,
     "satisfactionPct": 96,
     "level": "มากที่สุด",
@@ -2583,6 +4316,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_084",
     "order": 92,
+    "userName": "นักศึกษาชั้นปีที่ 4",
+    "yearLevel": "นักศึกษาชั้นปีที่ 4",
     "userGroup": "นักศึกษาชั้นปีที่ 4",
     "faculty": "คณะบริหารธุรกิจและการบัญชี (KKBS)",
     "date": "2026-09-05",
@@ -2603,6 +4338,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 4,
+      "q2": 4,
+      "q3": 3,
+      "q4": 4,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 4,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.6,
     "satisfactionPct": 92,
     "level": "มากที่สุด",
@@ -2611,6 +4363,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_085",
     "order": 93,
+    "userName": "นักศึกษาชั้นปีที่ 3",
+    "yearLevel": "นักศึกษาชั้นปีที่ 3",
     "userGroup": "นักศึกษาชั้นปีที่ 3",
     "faculty": "คณะมนุษยศาสตร์และสังคมศาสตร์",
     "date": "2026-09-06",
@@ -2631,6 +4385,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 4,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.93,
     "satisfactionPct": 98.7,
     "level": "มากที่สุด",
@@ -2639,6 +4410,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_086",
     "order": 94,
+    "userName": "นักศึกษาชั้นปีที่ 4",
+    "yearLevel": "นักศึกษาชั้นปีที่ 4",
     "userGroup": "นักศึกษาชั้นปีที่ 4",
     "faculty": "คณะวิศวกรรมศาสตร์ สาขาวิศวกรรมไฟฟ้า",
     "date": "2026-09-07",
@@ -2659,6 +4432,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       4
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 4
+    },
     "averageScore": 4.93,
     "satisfactionPct": 98.7,
     "level": "มากที่สุด",
@@ -2667,6 +4457,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_087",
     "order": 95,
+    "userName": "นักศึกษาชั้นปีที่ 3",
+    "yearLevel": "นักศึกษาชั้นปีที่ 3",
     "userGroup": "นักศึกษาชั้นปีที่ 3",
     "faculty": "คณะแพทยศาสตร์",
     "date": "2026-09-08",
@@ -2687,6 +4479,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       4,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 4,
+      "q12": 5,
+      "q13": 5,
+      "q14": 4,
+      "q15": 5
+    },
     "averageScore": 4.87,
     "satisfactionPct": 97.3,
     "level": "มากที่สุด",
@@ -2695,6 +4504,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_088",
     "order": 96,
+    "userName": "อาจารย์ / บุคลากร",
+    "yearLevel": "อาจารย์ / บุคลากร",
     "userGroup": "อาจารย์ / บุคลากร",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขาวิทยาการคอมพิวเตอร์",
     "date": "2026-09-09",
@@ -2715,6 +4526,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       4,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 4,
+      "q10": 4,
+      "q11": 5,
+      "q12": 5,
+      "q13": 4,
+      "q14": 4,
+      "q15": 5
+    },
     "averageScore": 4.73,
     "satisfactionPct": 94.7,
     "level": "มากที่สุด",
@@ -2723,6 +4551,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_089",
     "order": 97,
+    "userName": "นักศึกษาชั้นปีที่ 2",
+    "yearLevel": "นักศึกษาชั้นปีที่ 2",
     "userGroup": "นักศึกษาชั้นปีที่ 2",
     "faculty": "คณะพยาบาลศาสตร์",
     "date": "2026-09-10",
@@ -2743,6 +4573,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       4
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 4,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 4
+    },
     "averageScore": 4.87,
     "satisfactionPct": 97.3,
     "level": "มากที่สุด",
@@ -2751,6 +4598,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_09",
     "order": 98,
+    "userName": "นักศึกษาชั้นปีที่ 4",
+    "yearLevel": "นักศึกษาชั้นปีที่ 4",
     "userGroup": "นักศึกษาชั้นปีที่ 4",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขา AI",
     "date": "2026-09-06",
@@ -2771,6 +4620,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 4,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.93,
     "satisfactionPct": 98.7,
     "level": "มากที่สุด",
@@ -2779,6 +4645,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_090",
     "order": 99,
+    "userName": "นักศึกษาชั้นปีที่ 4",
+    "yearLevel": "นักศึกษาชั้นปีที่ 4",
     "userGroup": "นักศึกษาชั้นปีที่ 4",
     "faculty": "คณะวิทยาศาสตร์ สาขาสถิติและการวิเคราะห์ข้อมูล",
     "date": "2026-09-11",
@@ -2799,6 +4667,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 4,
+      "q2": 5,
+      "q3": 5,
+      "q4": 4,
+      "q5": 4,
+      "q6": 4,
+      "q7": 5,
+      "q8": 4,
+      "q9": 5,
+      "q10": 5,
+      "q11": 4,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.6,
     "satisfactionPct": 92,
     "level": "มากที่สุด",
@@ -2807,6 +4692,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_091",
     "order": 100,
+    "userName": "นักศึกษาชั้นปีที่ 3",
+    "yearLevel": "นักศึกษาชั้นปีที่ 3",
     "userGroup": "นักศึกษาชั้นปีที่ 3",
     "faculty": "คณะศึกษาศาสตร์",
     "date": "2026-09-12",
@@ -2827,6 +4714,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 4,
+      "q8": 5,
+      "q9": 5,
+      "q10": 4,
+      "q11": 3,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.73,
     "satisfactionPct": 94.7,
     "level": "มากที่สุด",
@@ -2835,6 +4739,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_092",
     "order": 101,
+    "userName": "นักศึกษาชั้นปีที่ 4",
+    "yearLevel": "นักศึกษาชั้นปีที่ 4",
     "userGroup": "นักศึกษาชั้นปีที่ 4",
     "faculty": "คณะเกษตรศาสตร์",
     "date": "2026-09-13",
@@ -2855,6 +4761,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       4,
       4
     ],
+    "answers": {
+      "q1": 4,
+      "q2": 4,
+      "q3": 4,
+      "q4": 5,
+      "q5": 5,
+      "q6": 4,
+      "q7": 4,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 4,
+      "q15": 4
+    },
     "averageScore": 4.53,
     "satisfactionPct": 90.7,
     "level": "มากที่สุด",
@@ -2863,6 +4786,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_093",
     "order": 102,
+    "userName": "นักศึกษาชั้นปีที่ 3",
+    "yearLevel": "นักศึกษาชั้นปีที่ 3",
     "userGroup": "นักศึกษาชั้นปีที่ 3",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขาวิทยาการคอมพิวเตอร์",
     "date": "2026-09-14",
@@ -2883,6 +4808,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 4,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 3,
+      "q9": 4,
+      "q10": 5,
+      "q11": 4,
+      "q12": 5,
+      "q13": 4,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.6,
     "satisfactionPct": 92,
     "level": "มากที่สุด",
@@ -2891,6 +4833,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_094",
     "order": 103,
+    "userName": "นักศึกษาชั้นปีที่ 4",
+    "yearLevel": "นักศึกษาชั้นปีที่ 4",
     "userGroup": "นักศึกษาชั้นปีที่ 4",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขาเทคโนโลยีสารสนเทศ",
     "date": "2026-09-15",
@@ -2911,6 +4855,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 3,
+      "q6": 4,
+      "q7": 5,
+      "q8": 4,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.73,
     "satisfactionPct": 94.7,
     "level": "มากที่สุด",
@@ -2919,6 +4880,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_095",
     "order": 104,
+    "userName": "นักศึกษาชั้นปีที่ 4",
+    "yearLevel": "นักศึกษาชั้นปีที่ 4",
     "userGroup": "นักศึกษาชั้นปีที่ 4",
     "faculty": "คณะสถาปัตยกรรมศาสตร์",
     "date": "2026-09-16",
@@ -2939,6 +4902,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       4,
       4
     ],
+    "answers": {
+      "q1": 4,
+      "q2": 4,
+      "q3": 4,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 4,
+      "q9": 4,
+      "q10": 4,
+      "q11": 5,
+      "q12": 4,
+      "q13": 4,
+      "q14": 4,
+      "q15": 4
+    },
     "averageScore": 4.33,
     "satisfactionPct": 86.7,
     "level": "มาก",
@@ -2947,6 +4927,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_096",
     "order": 105,
+    "userName": "นักศึกษาชั้นปีที่ 4",
+    "yearLevel": "นักศึกษาชั้นปีที่ 4",
     "userGroup": "นักศึกษาชั้นปีที่ 4",
     "faculty": "คณะแพทยศาสตร์",
     "date": "2026-09-01",
@@ -2967,6 +4949,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       4,
       4
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 4,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 4,
+      "q11": 4,
+      "q12": 5,
+      "q13": 4,
+      "q14": 4,
+      "q15": 4
+    },
     "averageScore": 4.6,
     "satisfactionPct": 92,
     "level": "มากที่สุด",
@@ -2975,6 +4974,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_097",
     "order": 106,
+    "userName": "นักศึกษาชั้นปีที่ 3",
+    "yearLevel": "นักศึกษาชั้นปีที่ 3",
     "userGroup": "นักศึกษาชั้นปีที่ 3",
     "faculty": "คณะแพทยศาสตร์",
     "date": "2026-09-02",
@@ -2995,6 +4996,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       4,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 4,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 4,
+      "q15": 5
+    },
     "averageScore": 4.87,
     "satisfactionPct": 97.3,
     "level": "มากที่สุด",
@@ -3003,6 +5021,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_098",
     "order": 107,
+    "userName": "นักศึกษาชั้นปีที่ 3",
+    "yearLevel": "นักศึกษาชั้นปีที่ 3",
     "userGroup": "นักศึกษาชั้นปีที่ 3",
     "faculty": "คณะวิศวกรรมศาสตร์ สาขาวิศวกรรมไฟฟ้า",
     "date": "2026-09-03",
@@ -3023,6 +5043,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 4,
+      "q7": 4,
+      "q8": 5,
+      "q9": 5,
+      "q10": 4,
+      "q11": 5,
+      "q12": 4,
+      "q13": 4,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.67,
     "satisfactionPct": 93.3,
     "level": "มากที่สุด",
@@ -3031,6 +5068,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_099",
     "order": 108,
+    "userName": "อาจารย์ / บุคลากร",
+    "yearLevel": "อาจารย์ / บุคลากร",
     "userGroup": "อาจารย์ / บุคลากร",
     "faculty": "คณะวิศวกรรมศาสตร์ สาขาวิศวกรรมไฟฟ้า",
     "date": "2026-09-04",
@@ -3051,6 +5090,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       3
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 4,
+      "q8": 4,
+      "q9": 5,
+      "q10": 4,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 3
+    },
     "averageScore": 4.67,
     "satisfactionPct": 93.3,
     "level": "มากที่สุด",
@@ -3059,6 +5115,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_10",
     "order": 109,
+    "userName": "นักศึกษาชั้นปีที่ 3",
+    "yearLevel": "นักศึกษาชั้นปีที่ 3",
     "userGroup": "นักศึกษาชั้นปีที่ 3",
     "faculty": "วิทยาลัยการคอมพิวเตอร์ สาขา AI",
     "date": "2026-09-06",
@@ -3079,6 +5137,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 5,
+      "q2": 5,
+      "q3": 5,
+      "q4": 5,
+      "q5": 5,
+      "q6": 5,
+      "q7": 5,
+      "q8": 5,
+      "q9": 5,
+      "q10": 5,
+      "q11": 5,
+      "q12": 5,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 5,
     "satisfactionPct": 100,
     "level": "มากที่สุด",
@@ -3087,6 +5162,8 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
   {
     "id": "survey_kku_100",
     "order": 110,
+    "userName": "อาจารย์ / บุคลากร",
+    "yearLevel": "อาจารย์ / บุคลากร",
     "userGroup": "อาจารย์ / บุคลากร",
     "faculty": "คณะเทคโนโลยี",
     "date": "2026-09-05",
@@ -3107,6 +5184,23 @@ export const CANTEEN_SURVEYS_DATA: CanteenSurveyRecord[] = [
       5,
       5
     ],
+    "answers": {
+      "q1": 4,
+      "q2": 3,
+      "q3": 4,
+      "q4": 4,
+      "q5": 5,
+      "q6": 5,
+      "q7": 4,
+      "q8": 4,
+      "q9": 3,
+      "q10": 5,
+      "q11": 5,
+      "q12": 4,
+      "q13": 5,
+      "q14": 5,
+      "q15": 5
+    },
     "averageScore": 4.33,
     "satisfactionPct": 86.7,
     "level": "มาก",
@@ -3118,6 +5212,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_1786631926762",
     "order": 1,
+    "userName": "anime manga",
     "evaluator": "anime manga",
     "date": "2026-08-13",
     "uxScore": 7.5,
@@ -3131,6 +5226,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_001",
     "order": 2,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะมนุษยศาสตร์และสังคมศาสตร์)",
     "evaluator": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะมนุษยศาสตร์และสังคมศาสตร์)",
     "date": "2026-09-02",
     "uxScore": 9,
@@ -3144,6 +5240,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_002",
     "order": 3,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะสถาปัตยกรรมศาสตร์)",
     "evaluator": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะสถาปัตยกรรมศาสตร์)",
     "date": "2026-09-03",
     "uxScore": 10,
@@ -3157,6 +5254,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_003",
     "order": 4,
+    "userName": "นักศึกษาชั้นปีที่ 4 (คณะเกษตรศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 4 (คณะเกษตรศาสตร์)",
     "date": "2026-09-04",
     "uxScore": 10,
@@ -3170,6 +5268,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_004",
     "order": 5,
+    "userName": "นักศึกษาชั้นปีที่ 1 (คณะศึกษาศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 1 (คณะศึกษาศาสตร์)",
     "date": "2026-09-05",
     "uxScore": 10,
@@ -3183,6 +5282,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_005",
     "order": 6,
+    "userName": "นักศึกษาชั้นปีที่ 4 (คณะแพทยศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 4 (คณะแพทยศาสตร์)",
     "date": "2026-09-06",
     "uxScore": 10,
@@ -3196,6 +5296,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_006",
     "order": 7,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะบริหารธุรกิจและการบัญชี)",
     "evaluator": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะบริหารธุรกิจและการบัญชี)",
     "date": "2026-09-07",
     "uxScore": 10,
@@ -3209,6 +5310,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_007",
     "order": 8,
+    "userName": "นักศึกษาชั้นปีที่ 4 (วิทยาลัยการคอมพิวเตอร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 4 (วิทยาลัยการคอมพิวเตอร์)",
     "date": "2026-09-08",
     "uxScore": 10,
@@ -3222,6 +5324,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_008",
     "order": 9,
+    "userName": "นักศึกษาชั้นปีที่ 2 (คณะวิศวกรรมศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 2 (คณะวิศวกรรมศาสตร์)",
     "date": "2026-09-09",
     "uxScore": 9,
@@ -3235,6 +5338,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_009",
     "order": 10,
+    "userName": "อาจารย์ / บุคลากร (คณะวิศวกรรมศาสตร์)",
     "evaluator": "อาจารย์ / บุคลากร (คณะวิศวกรรมศาสตร์)",
     "date": "2026-09-10",
     "uxScore": 10,
@@ -3248,6 +5352,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_01",
     "order": 11,
+    "userName": "นักศึกษาชั้นปีที่ 2 (AI มข.)",
     "evaluator": "นักศึกษาชั้นปีที่ 2 (AI มข.)",
     "date": "2026-09-10",
     "uxScore": 9.5,
@@ -3261,6 +5366,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_010",
     "order": 12,
+    "userName": "อาจารย์ / บุคลากร (คณะแพทยศาสตร์)",
     "evaluator": "อาจารย์ / บุคลากร (คณะแพทยศาสตร์)",
     "date": "2026-09-11",
     "uxScore": 10,
@@ -3274,6 +5380,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_011",
     "order": 13,
+    "userName": "นักศึกษาชั้นปีที่ 4 (คณะวิศวกรรมศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 4 (คณะวิศวกรรมศาสตร์)",
     "date": "2026-09-12",
     "uxScore": 10,
@@ -3287,6 +5394,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_012",
     "order": 14,
+    "userName": "นักศึกษาชั้นปีที่ 2 (คณะมนุษยศาสตร์และสังคมศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 2 (คณะมนุษยศาสตร์และสังคมศาสตร์)",
     "date": "2026-09-13",
     "uxScore": 9.5,
@@ -3300,6 +5408,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_013",
     "order": 15,
+    "userName": "นักศึกษาชั้นปีที่ 1 (คณะเกษตรศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 1 (คณะเกษตรศาสตร์)",
     "date": "2026-09-14",
     "uxScore": 9.5,
@@ -3313,6 +5422,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_014",
     "order": 16,
+    "userName": "นักศึกษาชั้นปีที่ 4 (คณะแพทยศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 4 (คณะแพทยศาสตร์)",
     "date": "2026-09-15",
     "uxScore": 10,
@@ -3326,6 +5436,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_015",
     "order": 17,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะทันตแพทยศาสตร์)",
     "evaluator": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะทันตแพทยศาสตร์)",
     "date": "2026-09-16",
     "uxScore": 10,
@@ -3339,6 +5450,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_016",
     "order": 18,
+    "userName": "นักศึกษาชั้นปีที่ 1 (คณะสถาปัตยกรรมศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 1 (คณะสถาปัตยกรรมศาสตร์)",
     "date": "2026-09-01",
     "uxScore": 9,
@@ -3352,6 +5464,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_017",
     "order": 19,
+    "userName": "นักศึกษาชั้นปีที่ 1 (คณะวิศวกรรมศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 1 (คณะวิศวกรรมศาสตร์)",
     "date": "2026-09-02",
     "uxScore": 10,
@@ -3365,6 +5478,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_018",
     "order": 20,
+    "userName": "นักศึกษาชั้นปีที่ 3 (คณะเทคโนโลยี)",
     "evaluator": "นักศึกษาชั้นปีที่ 3 (คณะเทคโนโลยี)",
     "date": "2026-09-03",
     "uxScore": 10,
@@ -3378,6 +5492,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_019",
     "order": 21,
+    "userName": "อาจารย์ / บุคลากร (คณะศึกษาศาสตร์)",
     "evaluator": "อาจารย์ / บุคลากร (คณะศึกษาศาสตร์)",
     "date": "2026-09-04",
     "uxScore": 9.5,
@@ -3391,6 +5506,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_02",
     "order": 22,
+    "userName": "นักศึกษาชั้นปีที่ 3 (วิทยาลัยการคอมพิวเตอร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 3 (วิทยาลัยการคอมพิวเตอร์)",
     "date": "2026-09-11",
     "uxScore": 9,
@@ -3404,6 +5520,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_020",
     "order": 23,
+    "userName": "นักศึกษาชั้นปีที่ 2 (คณะเกษตรศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 2 (คณะเกษตรศาสตร์)",
     "date": "2026-09-05",
     "uxScore": 9,
@@ -3417,6 +5534,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_021",
     "order": 24,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะวิศวกรรมศาสตร์)",
     "evaluator": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะวิศวกรรมศาสตร์)",
     "date": "2026-09-06",
     "uxScore": 10,
@@ -3430,6 +5548,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_022",
     "order": 25,
+    "userName": "นักศึกษาชั้นปีที่ 1 (วิทยาลัยการคอมพิวเตอร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 1 (วิทยาลัยการคอมพิวเตอร์)",
     "date": "2026-09-07",
     "uxScore": 9.5,
@@ -3443,6 +5562,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_023",
     "order": 26,
+    "userName": "นักศึกษาชั้นปีที่ 3 (วิทยาลัยการคอมพิวเตอร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 3 (วิทยาลัยการคอมพิวเตอร์)",
     "date": "2026-09-08",
     "uxScore": 9.5,
@@ -3456,6 +5576,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_024",
     "order": 27,
+    "userName": "นักศึกษาชั้นปีที่ 3 (วิทยาลัยการคอมพิวเตอร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 3 (วิทยาลัยการคอมพิวเตอร์)",
     "date": "2026-09-09",
     "uxScore": 10,
@@ -3469,6 +5590,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_025",
     "order": 28,
+    "userName": "นักศึกษาชั้นปีที่ 4 (คณะบริหารธุรกิจและการบัญชี)",
     "evaluator": "นักศึกษาชั้นปีที่ 4 (คณะบริหารธุรกิจและการบัญชี)",
     "date": "2026-09-10",
     "uxScore": 10,
@@ -3482,6 +5604,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_026",
     "order": 29,
+    "userName": "อาจารย์ / บุคลากร (คณะศึกษาศาสตร์)",
     "evaluator": "อาจารย์ / บุคลากร (คณะศึกษาศาสตร์)",
     "date": "2026-09-11",
     "uxScore": 10,
@@ -3495,6 +5618,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_027",
     "order": 30,
+    "userName": "นักศึกษาชั้นปีที่ 4 (คณะเกษตรศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 4 (คณะเกษตรศาสตร์)",
     "date": "2026-09-12",
     "uxScore": 10,
@@ -3508,6 +5632,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_028",
     "order": 31,
+    "userName": "อาจารย์ / บุคลากร (คณะวิทยาศาสตร์)",
     "evaluator": "อาจารย์ / บุคลากร (คณะวิทยาศาสตร์)",
     "date": "2026-09-13",
     "uxScore": 10,
@@ -3521,6 +5646,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_029",
     "order": 32,
+    "userName": "นักศึกษาชั้นปีที่ 4 (คณะวิทยาศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 4 (คณะวิทยาศาสตร์)",
     "date": "2026-09-14",
     "uxScore": 10,
@@ -3534,6 +5660,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_03",
     "order": 33,
+    "userName": "นักศึกษาชั้นปีที่ 4 (AI มข.)",
     "evaluator": "นักศึกษาชั้นปีที่ 4 (AI มข.)",
     "date": "2026-09-12",
     "uxScore": 9.5,
@@ -3547,6 +5674,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_030",
     "order": 34,
+    "userName": "นักศึกษาชั้นปีที่ 3 (คณะมนุษยศาสตร์และสังคมศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 3 (คณะมนุษยศาสตร์และสังคมศาสตร์)",
     "date": "2026-09-15",
     "uxScore": 10,
@@ -3560,6 +5688,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_031",
     "order": 35,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะสถาปัตยกรรมศาสตร์)",
     "evaluator": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะสถาปัตยกรรมศาสตร์)",
     "date": "2026-09-16",
     "uxScore": 9,
@@ -3573,6 +5702,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_032",
     "order": 36,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะพยาบาลศาสตร์)",
     "evaluator": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะพยาบาลศาสตร์)",
     "date": "2026-09-01",
     "uxScore": 9.5,
@@ -3586,6 +5716,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_033",
     "order": 37,
+    "userName": "นักศึกษาชั้นปีที่ 4 (คณะเกษตรศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 4 (คณะเกษตรศาสตร์)",
     "date": "2026-09-02",
     "uxScore": 9.5,
@@ -3599,6 +5730,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_034",
     "order": 38,
+    "userName": "อาจารย์ / บุคลากร (คณะมนุษยศาสตร์และสังคมศาสตร์)",
     "evaluator": "อาจารย์ / บุคลากร (คณะมนุษยศาสตร์และสังคมศาสตร์)",
     "date": "2026-09-03",
     "uxScore": 10,
@@ -3612,6 +5744,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_035",
     "order": 39,
+    "userName": "นักศึกษาชั้นปีที่ 2 (คณะบริหารธุรกิจและการบัญชี)",
     "evaluator": "นักศึกษาชั้นปีที่ 2 (คณะบริหารธุรกิจและการบัญชี)",
     "date": "2026-09-04",
     "uxScore": 10,
@@ -3625,6 +5758,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_036",
     "order": 40,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (วิทยาลัยการคอมพิวเตอร์)",
     "evaluator": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (วิทยาลัยการคอมพิวเตอร์)",
     "date": "2026-09-05",
     "uxScore": 9,
@@ -3638,6 +5772,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_037",
     "order": 41,
+    "userName": "นักศึกษาชั้นปีที่ 4 (คณะพยาบาลศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 4 (คณะพยาบาลศาสตร์)",
     "date": "2026-09-06",
     "uxScore": 10,
@@ -3651,6 +5786,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_038",
     "order": 42,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะสถาปัตยกรรมศาสตร์)",
     "evaluator": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะสถาปัตยกรรมศาสตร์)",
     "date": "2026-09-07",
     "uxScore": 10,
@@ -3664,6 +5800,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_039",
     "order": 43,
+    "userName": "นักศึกษาชั้นปีที่ 2 (คณะบริหารธุรกิจและการบัญชี)",
     "evaluator": "นักศึกษาชั้นปีที่ 2 (คณะบริหารธุรกิจและการบัญชี)",
     "date": "2026-09-08",
     "uxScore": 9.5,
@@ -3677,6 +5814,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_04",
     "order": 44,
+    "userName": "ร้านค้าพันธมิตรโรงอาหาร มข.",
     "evaluator": "ร้านค้าพันธมิตรโรงอาหาร มข.",
     "date": "2026-09-13",
     "uxScore": 9,
@@ -3690,6 +5828,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_040",
     "order": 45,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะสถาปัตยกรรมศาสตร์)",
     "evaluator": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะสถาปัตยกรรมศาสตร์)",
     "date": "2026-09-09",
     "uxScore": 9.5,
@@ -3703,6 +5842,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_041",
     "order": 46,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะเภสัชศาสตร์)",
     "evaluator": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะเภสัชศาสตร์)",
     "date": "2026-09-10",
     "uxScore": 9,
@@ -3716,6 +5856,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_042",
     "order": 47,
+    "userName": "นักศึกษาชั้นปีที่ 4 (คณะพยาบาลศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 4 (คณะพยาบาลศาสตร์)",
     "date": "2026-09-11",
     "uxScore": 9.5,
@@ -3729,6 +5870,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_043",
     "order": 48,
+    "userName": "นักศึกษาชั้นปีที่ 3 (คณะทันตแพทยศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 3 (คณะทันตแพทยศาสตร์)",
     "date": "2026-09-12",
     "uxScore": 9.5,
@@ -3742,6 +5884,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_044",
     "order": 49,
+    "userName": "นักศึกษาชั้นปีที่ 3 (คณะวิศวกรรมศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 3 (คณะวิศวกรรมศาสตร์)",
     "date": "2026-09-13",
     "uxScore": 9.5,
@@ -3755,6 +5898,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_045",
     "order": 50,
+    "userName": "อาจารย์ / บุคลากร (คณะวิศวกรรมศาสตร์)",
     "evaluator": "อาจารย์ / บุคลากร (คณะวิศวกรรมศาสตร์)",
     "date": "2026-09-14",
     "uxScore": 9.5,
@@ -3768,6 +5912,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_046",
     "order": 51,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (วิทยาลัยการคอมพิวเตอร์)",
     "evaluator": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (วิทยาลัยการคอมพิวเตอร์)",
     "date": "2026-09-15",
     "uxScore": 9.5,
@@ -3781,6 +5926,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_047",
     "order": 52,
+    "userName": "นักศึกษาชั้นปีที่ 2 (คณะแพทยศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 2 (คณะแพทยศาสตร์)",
     "date": "2026-09-16",
     "uxScore": 9.5,
@@ -3794,6 +5940,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_048",
     "order": 53,
+    "userName": "นักศึกษาชั้นปีที่ 4 (คณะเทคโนโลยี)",
     "evaluator": "นักศึกษาชั้นปีที่ 4 (คณะเทคโนโลยี)",
     "date": "2026-09-01",
     "uxScore": 10,
@@ -3807,6 +5954,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_049",
     "order": 54,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะวิทยาศาสตร์)",
     "evaluator": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะวิทยาศาสตร์)",
     "date": "2026-09-02",
     "uxScore": 10,
@@ -3820,6 +5968,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_05",
     "order": 55,
+    "userName": "นักศึกษาชั้นปีที่ 1 (กลุ่มตัวอย่าง มข.)",
     "evaluator": "นักศึกษาชั้นปีที่ 1 (กลุ่มตัวอย่าง มข.)",
     "date": "2026-09-14",
     "uxScore": 10,
@@ -3833,6 +5982,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_050",
     "order": 56,
+    "userName": "นักศึกษาชั้นปีที่ 4 (คณะเกษตรศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 4 (คณะเกษตรศาสตร์)",
     "date": "2026-09-03",
     "uxScore": 10,
@@ -3846,6 +5996,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_051",
     "order": 57,
+    "userName": "นักศึกษาชั้นปีที่ 1 (คณะแพทยศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 1 (คณะแพทยศาสตร์)",
     "date": "2026-09-04",
     "uxScore": 10,
@@ -3859,6 +6010,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_052",
     "order": 58,
+    "userName": "นักศึกษาชั้นปีที่ 2 (คณะวิศวกรรมศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 2 (คณะวิศวกรรมศาสตร์)",
     "date": "2026-09-05",
     "uxScore": 10,
@@ -3872,6 +6024,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_053",
     "order": 59,
+    "userName": "นักศึกษาชั้นปีที่ 4 (วิทยาลัยการคอมพิวเตอร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 4 (วิทยาลัยการคอมพิวเตอร์)",
     "date": "2026-09-06",
     "uxScore": 10,
@@ -3885,6 +6038,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_054",
     "order": 60,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะเทคโนโลยี)",
     "evaluator": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะเทคโนโลยี)",
     "date": "2026-09-07",
     "uxScore": 9,
@@ -3898,6 +6052,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_055",
     "order": 61,
+    "userName": "นักศึกษาชั้นปีที่ 1 (คณะบริหารธุรกิจและการบัญชี)",
     "evaluator": "นักศึกษาชั้นปีที่ 1 (คณะบริหารธุรกิจและการบัญชี)",
     "date": "2026-09-08",
     "uxScore": 10,
@@ -3911,6 +6066,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_056",
     "order": 62,
+    "userName": "นักศึกษาชั้นปีที่ 2 (วิทยาลัยการคอมพิวเตอร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 2 (วิทยาลัยการคอมพิวเตอร์)",
     "date": "2026-09-09",
     "uxScore": 9.5,
@@ -3924,6 +6080,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_057",
     "order": 63,
+    "userName": "นักศึกษาชั้นปีที่ 2 (คณะแพทยศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 2 (คณะแพทยศาสตร์)",
     "date": "2026-09-10",
     "uxScore": 9,
@@ -3937,6 +6094,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_058",
     "order": 64,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะสถาปัตยกรรมศาสตร์)",
     "evaluator": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะสถาปัตยกรรมศาสตร์)",
     "date": "2026-09-11",
     "uxScore": 10,
@@ -3950,6 +6108,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_059",
     "order": 65,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะมนุษยศาสตร์และสังคมศาสตร์)",
     "evaluator": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะมนุษยศาสตร์และสังคมศาสตร์)",
     "date": "2026-09-12",
     "uxScore": 10,
@@ -3963,6 +6122,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_06",
     "order": 66,
+    "userName": "อาจารย์ผู้ตรวจประเมินโครงการ",
     "evaluator": "อาจารย์ผู้ตรวจประเมินโครงการ",
     "date": "2026-09-15",
     "uxScore": 9.5,
@@ -3976,6 +6136,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_060",
     "order": 67,
+    "userName": "อาจารย์ / บุคลากร (คณะพยาบาลศาสตร์)",
     "evaluator": "อาจารย์ / บุคลากร (คณะพยาบาลศาสตร์)",
     "date": "2026-09-13",
     "uxScore": 10,
@@ -3989,6 +6150,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_061",
     "order": 68,
+    "userName": "นักศึกษาชั้นปีที่ 4 (คณะบริหารธุรกิจและการบัญชี)",
     "evaluator": "นักศึกษาชั้นปีที่ 4 (คณะบริหารธุรกิจและการบัญชี)",
     "date": "2026-09-14",
     "uxScore": 10,
@@ -4002,6 +6164,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_062",
     "order": 69,
+    "userName": "อาจารย์ / บุคลากร (วิทยาลัยการคอมพิวเตอร์)",
     "evaluator": "อาจารย์ / บุคลากร (วิทยาลัยการคอมพิวเตอร์)",
     "date": "2026-09-15",
     "uxScore": 10,
@@ -4015,6 +6178,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_063",
     "order": 70,
+    "userName": "นักศึกษาชั้นปีที่ 2 (คณะเภสัชศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 2 (คณะเภสัชศาสตร์)",
     "date": "2026-09-16",
     "uxScore": 9.5,
@@ -4028,6 +6192,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_064",
     "order": 71,
+    "userName": "นักศึกษาชั้นปีที่ 4 (คณะสถาปัตยกรรมศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 4 (คณะสถาปัตยกรรมศาสตร์)",
     "date": "2026-09-01",
     "uxScore": 10,
@@ -4041,6 +6206,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_065",
     "order": 72,
+    "userName": "นักศึกษาชั้นปีที่ 4 (คณะทันตแพทยศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 4 (คณะทันตแพทยศาสตร์)",
     "date": "2026-09-02",
     "uxScore": 9.5,
@@ -4054,6 +6220,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_066",
     "order": 73,
+    "userName": "นักศึกษาชั้นปีที่ 1 (วิทยาลัยการคอมพิวเตอร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 1 (วิทยาลัยการคอมพิวเตอร์)",
     "date": "2026-09-03",
     "uxScore": 10,
@@ -4067,6 +6234,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_067",
     "order": 74,
+    "userName": "นักศึกษาชั้นปีที่ 4 (คณะเกษตรศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 4 (คณะเกษตรศาสตร์)",
     "date": "2026-09-04",
     "uxScore": 10,
@@ -4080,6 +6248,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_068",
     "order": 75,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะเกษตรศาสตร์)",
     "evaluator": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะเกษตรศาสตร์)",
     "date": "2026-09-05",
     "uxScore": 10,
@@ -4093,6 +6262,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_069",
     "order": 76,
+    "userName": "อาจารย์ / บุคลากร (คณะเภสัชศาสตร์)",
     "evaluator": "อาจารย์ / บุคลากร (คณะเภสัชศาสตร์)",
     "date": "2026-09-06",
     "uxScore": 10,
@@ -4106,6 +6276,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_070",
     "order": 77,
+    "userName": "นักศึกษาชั้นปีที่ 3 (คณะวิศวกรรมศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 3 (คณะวิศวกรรมศาสตร์)",
     "date": "2026-09-07",
     "uxScore": 9.5,
@@ -4119,6 +6290,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_071",
     "order": 78,
+    "userName": "นักศึกษาชั้นปีที่ 1 (คณะทันตแพทยศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 1 (คณะทันตแพทยศาสตร์)",
     "date": "2026-09-08",
     "uxScore": 9.5,
@@ -4132,6 +6304,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_072",
     "order": 79,
+    "userName": "นักศึกษาชั้นปีที่ 4 (คณะแพทยศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 4 (คณะแพทยศาสตร์)",
     "date": "2026-09-09",
     "uxScore": 9.5,
@@ -4145,6 +6318,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_073",
     "order": 80,
+    "userName": "อาจารย์ / บุคลากร (คณะเภสัชศาสตร์)",
     "evaluator": "อาจารย์ / บุคลากร (คณะเภสัชศาสตร์)",
     "date": "2026-09-10",
     "uxScore": 9.5,
@@ -4158,6 +6332,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_074",
     "order": 81,
+    "userName": "นักศึกษาชั้นปีที่ 1 (คณะวิศวกรรมศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 1 (คณะวิศวกรรมศาสตร์)",
     "date": "2026-09-11",
     "uxScore": 10,
@@ -4171,6 +6346,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_075",
     "order": 82,
+    "userName": "นักศึกษาชั้นปีที่ 1 (คณะเภสัชศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 1 (คณะเภสัชศาสตร์)",
     "date": "2026-09-12",
     "uxScore": 10,
@@ -4184,6 +6360,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_076",
     "order": 83,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะเกษตรศาสตร์)",
     "evaluator": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะเกษตรศาสตร์)",
     "date": "2026-09-13",
     "uxScore": 10,
@@ -4197,6 +6374,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_077",
     "order": 84,
+    "userName": "อาจารย์ / บุคลากร (คณะแพทยศาสตร์)",
     "evaluator": "อาจารย์ / บุคลากร (คณะแพทยศาสตร์)",
     "date": "2026-09-14",
     "uxScore": 10,
@@ -4210,6 +6388,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_078",
     "order": 85,
+    "userName": "นักศึกษาชั้นปีที่ 1 (คณะมนุษยศาสตร์และสังคมศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 1 (คณะมนุษยศาสตร์และสังคมศาสตร์)",
     "date": "2026-09-15",
     "uxScore": 9.5,
@@ -4223,6 +6402,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_079",
     "order": 86,
+    "userName": "นักศึกษาชั้นปีที่ 1 (คณะมนุษยศาสตร์และสังคมศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 1 (คณะมนุษยศาสตร์และสังคมศาสตร์)",
     "date": "2026-09-16",
     "uxScore": 10,
@@ -4236,6 +6416,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_080",
     "order": 87,
+    "userName": "นักศึกษาชั้นปีที่ 3 (วิทยาลัยการคอมพิวเตอร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 3 (วิทยาลัยการคอมพิวเตอร์)",
     "date": "2026-09-01",
     "uxScore": 10,
@@ -4249,6 +6430,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_081",
     "order": 88,
+    "userName": "นักศึกษาชั้นปีที่ 1 (คณะเภสัชศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 1 (คณะเภสัชศาสตร์)",
     "date": "2026-09-02",
     "uxScore": 9.5,
@@ -4262,6 +6444,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_082",
     "order": 89,
+    "userName": "นักศึกษาชั้นปีที่ 4 (คณะสถาปัตยกรรมศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 4 (คณะสถาปัตยกรรมศาสตร์)",
     "date": "2026-09-03",
     "uxScore": 10,
@@ -4275,6 +6458,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_083",
     "order": 90,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะศึกษาศาสตร์)",
     "evaluator": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะศึกษาศาสตร์)",
     "date": "2026-09-04",
     "uxScore": 10,
@@ -4288,6 +6472,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_084",
     "order": 91,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะเกษตรศาสตร์)",
     "evaluator": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะเกษตรศาสตร์)",
     "date": "2026-09-05",
     "uxScore": 10,
@@ -4301,6 +6486,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_085",
     "order": 92,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะศึกษาศาสตร์)",
     "evaluator": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะศึกษาศาสตร์)",
     "date": "2026-09-06",
     "uxScore": 10,
@@ -4314,6 +6500,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_086",
     "order": 93,
+    "userName": "นักศึกษาชั้นปีที่ 1 (คณะสถาปัตยกรรมศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 1 (คณะสถาปัตยกรรมศาสตร์)",
     "date": "2026-09-07",
     "uxScore": 10,
@@ -4327,6 +6514,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_087",
     "order": 94,
+    "userName": "นักศึกษาชั้นปีที่ 3 (คณะวิศวกรรมศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 3 (คณะวิศวกรรมศาสตร์)",
     "date": "2026-09-08",
     "uxScore": 10,
@@ -4340,6 +6528,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_088",
     "order": 95,
+    "userName": "นักศึกษาชั้นปีที่ 1 (คณะวิศวกรรมศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 1 (คณะวิศวกรรมศาสตร์)",
     "date": "2026-09-09",
     "uxScore": 9.5,
@@ -4353,6 +6542,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_089",
     "order": 96,
+    "userName": "อาจารย์ / บุคลากร (คณะพยาบาลศาสตร์)",
     "evaluator": "อาจารย์ / บุคลากร (คณะพยาบาลศาสตร์)",
     "date": "2026-09-10",
     "uxScore": 9.5,
@@ -4366,6 +6556,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_090",
     "order": 97,
+    "userName": "นักศึกษาชั้นปีที่ 1 (คณะสถาปัตยกรรมศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 1 (คณะสถาปัตยกรรมศาสตร์)",
     "date": "2026-09-11",
     "uxScore": 10,
@@ -4379,6 +6570,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_091",
     "order": 98,
+    "userName": "นักศึกษาชั้นปีที่ 4 (คณะวิศวกรรมศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 4 (คณะวิศวกรรมศาสตร์)",
     "date": "2026-09-12",
     "uxScore": 10,
@@ -4392,6 +6584,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_092",
     "order": 99,
+    "userName": "นักศึกษาชั้นปีที่ 2 (คณะสถาปัตยกรรมศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 2 (คณะสถาปัตยกรรมศาสตร์)",
     "date": "2026-09-13",
     "uxScore": 9.5,
@@ -4405,6 +6598,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_093",
     "order": 100,
+    "userName": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะศึกษาศาสตร์)",
     "evaluator": "ระดับบัณฑิตศึกษา (ป.โท/ป.เอก) (คณะศึกษาศาสตร์)",
     "date": "2026-09-14",
     "uxScore": 10,
@@ -4418,6 +6612,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_094",
     "order": 101,
+    "userName": "อาจารย์ / บุคลากร (คณะสถาปัตยกรรมศาสตร์)",
     "evaluator": "อาจารย์ / บุคลากร (คณะสถาปัตยกรรมศาสตร์)",
     "date": "2026-09-15",
     "uxScore": 9.5,
@@ -4431,6 +6626,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_095",
     "order": 102,
+    "userName": "นักศึกษาชั้นปีที่ 1 (คณะบริหารธุรกิจและการบัญชี)",
     "evaluator": "นักศึกษาชั้นปีที่ 1 (คณะบริหารธุรกิจและการบัญชี)",
     "date": "2026-09-16",
     "uxScore": 9.5,
@@ -4444,6 +6640,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_096",
     "order": 103,
+    "userName": "นักศึกษาชั้นปีที่ 1 (คณะศึกษาศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 1 (คณะศึกษาศาสตร์)",
     "date": "2026-09-01",
     "uxScore": 9,
@@ -4457,6 +6654,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_097",
     "order": 104,
+    "userName": "นักศึกษาชั้นปีที่ 4 (คณะพยาบาลศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 4 (คณะพยาบาลศาสตร์)",
     "date": "2026-09-02",
     "uxScore": 10,
@@ -4470,6 +6668,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_098",
     "order": 105,
+    "userName": "นักศึกษาชั้นปีที่ 2 (คณะเภสัชศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 2 (คณะเภสัชศาสตร์)",
     "date": "2026-09-03",
     "uxScore": 10,
@@ -4483,6 +6682,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_099",
     "order": 106,
+    "userName": "นักศึกษาชั้นปีที่ 3 (คณะเกษตรศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 3 (คณะเกษตรศาสตร์)",
     "date": "2026-09-04",
     "uxScore": 10,
@@ -4496,6 +6696,7 @@ export const SYSTEM_EVALUATIONS_DATA: SystemEvaluationRecord[] = [
   {
     "id": "eval_kku_100",
     "order": 107,
+    "userName": "นักศึกษาชั้นปีที่ 2 (คณะศึกษาศาสตร์)",
     "evaluator": "นักศึกษาชั้นปีที่ 2 (คณะศึกษาศาสตร์)",
     "date": "2026-09-05",
     "uxScore": 9.5,
@@ -4515,12 +6716,10 @@ export const SURVEY_SUMMARY_STATS = {
   totalEvaluations: 107,
   averageArchScoreOutOfTen: 9.71,
   facultiesRepresentedCount: 16,
+  totalParticipants: 217,
   highSatisfactionCount: 93,
 };
 
-/**
- * Curated authentic user quotes for display across customer landing & merchant onboarding
- */
 export const FEATURED_TESTIMONIALS = [
   {
     quote: "ชอบระบบจองคิวล่วงหน้ามากครับ ช่วงพักเที่ยงโรงอาหารคอมแออัดมาก พอใช้ QueueUp ช่วยให้กะเวลาไปรับข้าวได้เป๊ะ ไม่ต้องไปยืนรอนาน",

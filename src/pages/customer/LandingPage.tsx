@@ -64,7 +64,7 @@ export const LandingPage: React.FC = () => {
   }, [queues]);
 
   const activeUserCount = useMemo(() => {
-    return 1420 + (CANTEEN_SURVEYS_DATA.length * 6);
+    return CANTEEN_SURVEYS_DATA.length;
   }, []);
 
   // Interactive Developer Contact Form State
@@ -444,9 +444,9 @@ export const LandingPage: React.FC = () => {
               <div className="text-3xl sm:text-4xl font-black text-orange-600 font-mono dark:text-orange-400">
                 {activeUserCount.toLocaleString()}+
               </div>
-              <div className="text-xs font-bold text-stone-900 mt-1 dark:text-zinc-200">ผู้ใช้งานประจำ</div>
+              <div className="text-xs font-bold text-stone-900 mt-1 dark:text-zinc-200">ผู้ร่วมประเมินและใช้งานจริง</div>
               <p className="text-[10px] text-stone-500 mt-0.5 dark:text-zinc-400">
-                นักศึกษาและบุคลากร ({SURVEY_SUMMARY_STATS.facultiesRepresentedCount} คณะ)
+                นักศึกษาและบุคลากร ({SURVEY_SUMMARY_STATS.facultiesRepresentedCount} คณะ มข.)
               </p>
             </div>
 
@@ -464,7 +464,7 @@ export const LandingPage: React.FC = () => {
               </div>
               <div className="text-xs font-bold text-stone-900 mt-1 dark:text-zinc-200">ร้านค้าในเครือข่าย</div>
               <p className="text-[10px] text-stone-500 mt-0.5 dark:text-zinc-400">
-                {foodItems.length > 0 ? `${foodItems.length} เมนูพร้อมเสิร์ฟ` : 'ศูนย์อาหารคอม & โรงอาหาร มข.'}
+                {foodItems.length > 0 ? `${foodItems.length}+ เมนูพร้อมเสิร์ฟ` : '46+ เมนูพร้อมเสิร์ฟ'}
               </p>
             </div>
 

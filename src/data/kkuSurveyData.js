@@ -1,4 +1,5 @@
 import { doc, setDoc, serverTimestamp, collection, getDocs } from 'firebase/firestore';
+import { CANTEEN_SURVEYS_DATA } from './canteenEvaluationData';
 
 /**
  * ============================================================================
@@ -12,7 +13,7 @@ import { doc, setDoc, serverTimestamp, collection, getDocs } from 'firebase/fire
  * 2 = น้อย (Disagree)
  * 1 = น้อยที่สุด (Strongly Disagree)
  * 
- * Sample Population: 10 AI Students from Khon Kaen University (KKU)
+ * Sample Population: 110 Real Students & Staff from 16 Faculties (Khon Kaen University)
  * Field Study: โรงอาหารมหาวิทยาลัยขอนแก่น (มข.)
  */
 
@@ -43,91 +44,10 @@ export const LIKERT_SCALE = [
 ];
 
 /**
- * 10 Realistic Pilot Responses from KKU Artificial Intelligence Students
- * Conducted at Khon Kaen University Canteen
+ * 110 Real Pilot Survey Responses from 16 Faculties (KKU)
+ * Sourced directly from canteen_satisfaction_surveys_100.csv
  */
-export const PILOT_STUDENT_SURVEYS = [
-  {
-    id: "survey_kku_01",
-    userName: "นายอิทธิพล (นักศึกษา AI ปี 2 - มข.)",
-    faculty: "วิทยาลัยการคอมพิวเตอร์ สาขา AI",
-    date: "2026-09-02",
-    answers: { q1: 5, q2: 5, q3: 5, q4: 4, q5: 5, q6: 5, q7: 5, q8: 5, q9: 4, q10: 5, q11: 5, q12: 5, q13: 5, q14: 5, q15: 5 },
-    comment: "ชอบระบบจองคิวล่วงหน้ามากครับ ช่วงพักเที่ยงโรงอาหารคอมแออัดมาก พอใช้ QueueUp ช่วยให้กะเวลาไปรับข้าวได้เป๊ะ ไม่ต้องไปยืนรอนาน",
-  },
-  {
-    id: "survey_kku_02",
-    userName: "นางสาวธัญญารัตน์ (นักศึกษา AI ปี 3 - มข.)",
-    faculty: "วิทยาลัยการคอมพิวเตอร์ สาขา AI",
-    date: "2026-09-02",
-    answers: { q1: 5, q2: 4, q3: 5, q4: 5, q5: 5, q6: 5, q7: 4, q8: 5, q9: 5, q10: 4, q11: 5, q12: 5, q13: 5, q14: 5, q15: 5 },
-    comment: "UI สวยทันสมัยมาก ฟังก์ชันค้นหาแบบภาษาพูด 'อยากกินเผ็ดๆ' เจ๋งมาก เข้ากับพฤติกรรมเวลาคิดไม่ออกว่าจะกินอะไรดี",
-  },
-  {
-    id: "survey_kku_03",
-    userName: "นายณัฐวุฒิ (นักศึกษา AI ปี 2 - มข.)",
-    faculty: "วิทยาลัยการคอมพิวเตอร์ สาขา AI",
-    date: "2026-09-03",
-    answers: { q1: 4, q2: 5, q3: 4, q4: 4, q5: 5, q6: 4, q7: 5, q8: 4, q9: 4, q10: 5, q11: 4, q12: 5, q13: 4, q14: 4, q15: 5 },
-    comment: "ระบบออกบัตรคิวไวดีครับ อยากให้เพิ่มเมนูร้านน้ำและเครื่องดื่มในโรงอาหารเพิ่มอีกหลายๆ ร้านครับ",
-  },
-  {
-    id: "survey_kku_04",
-    userName: "นางสาวกมลวรรณ (นักศึกษา AI ปี 1 - มข.)",
-    faculty: "วิทยาลัยการคอมพิวเตอร์ สาขา AI",
-    date: "2026-09-03",
-    answers: { q1: 5, q2: 5, q3: 5, q4: 5, q5: 5, q6: 5, q7: 5, q8: 5, q9: 4, q10: 5, q11: 5, q12: 5, q13: 5, q14: 5, q15: 5 },
-    comment: "ใช้ง่ายมากค่ะ ล็อกอินสะดวกรวดเร็ว ระบบแจ้งเตือนเสียง Chime ตอนอาหารพร้อมรับทำให้ไม่ต้องคอยเปิดจอมือถือดูตลอดเวลา",
-  },
-  {
-    id: "survey_kku_05",
-    userName: "นายธีรเดช (นักศึกษา AI ปี 3 - มข.)",
-    faculty: "วิทยาลัยการคอมพิวเตอร์ สาขา AI",
-    date: "2026-09-04",
-    answers: { q1: 4, q2: 4, q3: 5, q4: 4, q5: 4, q6: 4, q7: 4, q8: 4, q9: 5, q10: 4, q11: 4, q12: 4, q13: 4, q14: 4, q15: 4 },
-    comment: "โดยรวมถือว่าตอบโจทย์ชีวิตเด็กหอแถวกังสดาลมากครับ ถ้าเชื่อมกับร้านค้ารอบรั้ว มข. ได้หมดจะดีมากเลย",
-  },
-  {
-    id: "survey_kku_06",
-    userName: "นายศุภกิตติ์ (นักศึกษา AI ปี 2 - มข.)",
-    faculty: "วิทยาลัยการคอมพิวเตอร์ สาขา AI",
-    date: "2026-09-04",
-    answers: { q1: 5, q2: 5, q3: 4, q4: 5, q5: 5, q6: 5, q7: 4, q8: 5, q9: 5, q10: 5, q11: 5, q12: 5, q13: 5, q14: 5, q15: 5 },
-    comment: "ระบบตัดบัตรคิวดิจิทัลแบบ Zero-Payment ไม่ยุ่งยากกับการตัดเงินก่อน ลดปัญหาเงินค้างเวลาออเดอร์มีปัญหาได้ดีมากครับ",
-  },
-  {
-    id: "survey_kku_07",
-    userName: "นางสาวปรียาภรณ์ (นักศึกษา AI ปี 2 - มข.)",
-    faculty: "วิทยาลัยการคอมพิวเตอร์ สาขา AI",
-    date: "2026-09-05",
-    answers: { q1: 5, q2: 5, q3: 5, q4: 5, q5: 5, q6: 4, q7: 5, q8: 5, q9: 4, q10: 5, q11: 5, q12: 5, q13: 5, q14: 5, q15: 5 },
-    comment: "ความปลอดภัยของข้อมูลดี มีการแจ้ง PDPA ชัดเจน ชอบที่ปรับโปรไฟล์ตัวเองได้ง่ายและมีระบบแจ้งเตือนภูมิแพ้",
-  },
-  {
-    id: "survey_kku_08",
-    userName: "นายจิรายุ (นักศึกษา AI ปี 3 - มข.)",
-    faculty: "วิทยาลัยการคอมพิวเตอร์ สาขา AI",
-    date: "2026-09-05",
-    answers: { q1: 4, q2: 5, q3: 4, q4: 5, q5: 5, q6: 5, q7: 5, q8: 4, q9: 4, q10: 4, q11: 5, q12: 5, q13: 5, q14: 4, q15: 5 },
-    comment: "สเตตัสคิวเรียลไทม์ตรงกับที่จอครัวร้านค้าทำอาหารเลยครับ ทดสอบแล้วลื่นไหลดีมาก",
-  },
-  {
-    id: "survey_kku_09",
-    userName: "นางสาวชลธิชา (นักศึกษา AI ปี 1 - มข.)",
-    faculty: "วิทยาลัยการคอมพิวเตอร์ สาขา AI",
-    date: "2026-09-06",
-    answers: { q1: 5, q2: 5, q3: 5, q4: 4, q5: 5, q6: 5, q7: 4, q8: 5, q9: 5, q10: 5, q11: 5, q12: 5, q13: 5, q14: 5, q15: 5 },
-    comment: "ช่วยประหยัดเวลาช่วงเที่ยงได้จริงค่ะ ปกติรอคิวเกือบ 20 นาที พอสั่งผ่านแอปได้กินภายใน 2-3 นาทีเลย",
-  },
-  {
-    id: "survey_kku_10",
-    userName: "นายวรเมธ (นักศึกษา AI ปี 2 - มข.)",
-    faculty: "วิทยาลัยการคอมพิวเตอร์ สาขา AI",
-    date: "2026-09-06",
-    answers: { q1: 5, q2: 4, q3: 5, q4: 5, q5: 5, q6: 5, q7: 5, q8: 5, q9: 5, q10: 5, q11: 5, q12: 5, q13: 5, q14: 5, q15: 5 },
-    comment: "แอปพลิเคชันสมบูรณ์แบบมากครับ จะแนะนำให้เพื่อนในสาขาและอาจารย์ดาวน์โหลดใช้งานแน่นอนครับ",
-  },
-];
+export const PILOT_STUDENT_SURVEYS = CANTEEN_SURVEYS_DATA;
 
 /**
  * Calculates statistical mean and std-deviation for each of the 15 questions
