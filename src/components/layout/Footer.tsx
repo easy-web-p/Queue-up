@@ -49,8 +49,8 @@ export const Footer: React.FC<FooterProps> = ({ className = '', forceDark = fals
           }`}
         >
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center text-white shadow-xs">
-              <Layers className="w-4 h-4 text-white" />
+            <div className="w-7 h-7 rounded-lg bg-orange-500/10 border border-orange-500/20 p-0.5 flex items-center justify-center shrink-0 shadow-xs dark:bg-orange-500/15 dark:border-orange-500/30">
+              <img src="/app-icon.png" alt="QueueUp Logo" className="w-full h-full object-contain" />
             </div>
             <span className={`font-black ${isDark ? 'text-white' : 'text-stone-900 dark:text-zinc-100'}`}>
               Queue<span className="text-orange-500 dark:text-orange-400">Up</span>

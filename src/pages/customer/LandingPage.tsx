@@ -197,8 +197,8 @@ export const LandingPage: React.FC = () => {
             <div className="rounded-3xl bg-white border border-orange-200/90 p-5 sm:p-6 shadow-xl backdrop-blur-xl relative dark:bg-[#09090b] dark:border-zinc-800">
               <div className="flex items-center justify-between border-b border-orange-100 pb-4 mb-4 dark:border-zinc-800">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center text-white shadow-xs">
-                    <Layers className="w-5 h-5 text-white" />
+                  <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/20 p-1 flex items-center justify-center shrink-0 shadow-xs dark:bg-orange-500/15 dark:border-orange-500/30">
+                    <img src="/app-icon.png" alt="QueueUp Icon" className="w-full h-full object-contain" />
                   </div>
                   <div>
                     <span className="text-xs font-bold text-stone-900 dark:text-zinc-200">บัตรคิวดิจิทัล (Live Ticket)</span>

@@ -105,8 +105,8 @@ export const AppSidebar: React.FC = () => {
         {/* Header */}
         <div className="h-16 px-4 flex items-center justify-between border-b border-orange-100 dark:border-zinc-800 bg-orange-50/50 dark:bg-zinc-950/40">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-500 via-amber-500 to-red-500 flex items-center justify-center text-white shadow-md shadow-orange-500/20">
-              <Layers className="w-5 h-5 text-white stroke-[2.5]" />
+            <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/20 p-1 flex items-center justify-center shrink-0 shadow-xs dark:bg-orange-500/15 dark:border-orange-500/30">
+              <img src="/app-icon.png" alt="QueueUp Icon" className="w-full h-full object-contain" />
             </div>
             <div>
               <span className="font-black text-stone-900 dark:text-zinc-100 text-base">

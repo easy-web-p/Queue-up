@@ -72,9 +72,9 @@ export const Navbar: React.FC = () => {
             className="flex items-center gap-2.5 cursor-pointer group"
             title={currentUser ? "ไปที่หน้าแรก Homepage (เข้าสู่ระบบแล้ว)" : "ไปที่หน้า Landing Page"}
           >
-            {/* Logo in Orange/Amber Circle */}
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 via-amber-500 to-orange-600 flex items-center justify-center text-white shadow-md shadow-orange-500/20 group-hover:scale-105 transition-transform shrink-0">
-              <Layers className="w-5 h-5 text-white stroke-[2.5]" />
+            {/* Official App Logo Icon */}
+            <div className="w-10 h-10 rounded-2xl bg-orange-500/10 border border-orange-500/20 p-1 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0 shadow-xs dark:bg-orange-500/15 dark:border-orange-500/30">
+              <img src="/app-icon.png" alt="QueueUp Icon" className="w-full h-full object-contain" />
             </div>
             {/* App Name */}
             <div>
