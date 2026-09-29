@@ -206,6 +206,34 @@ async function run() {
         orderId: 'ord-1', amountSatang: 100000, status: 'PENDING'
       }));
 
+    // --- A school administrator is not a platform administrator ---
+    console.log('\n--- A school admin stays inside their own institution ---');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const seed = ctx.firestore();
+      await setDoc(doc(seed, 'users', 'uid-elsewhere'), { fullName: 'นักศึกษาอีกสถาบัน', phone: '0812345678' });
+      await setDoc(doc(seed, 'customer_wallets', 'uid-elsewhere'), { uid: 'uid-elsewhere', balanceSatang: 250000 });
+      await setDoc(doc(seed, 'wallet_transactions', 'wtx-elsewhere'), { uid: 'uid-elsewhere', amountSatang: -4500 });
+    });
+
+    // Exactly the claim a roster row of type "admin" grants.
+    const rosterAdmin = testEnv.authenticatedContext('uid-roster-admin', {
+      role: 'admin', schoolId: SCHOOL, email_verified: true
+    });
+    const schoolAdminDb = rosterAdmin.firestore();
+
+    await expectDenied('A school admin cannot read another institution\'s user profile',
+      getDoc(doc(schoolAdminDb, 'users', 'uid-elsewhere')));
+    await expectDenied('Nor overwrite it',
+      setDoc(doc(schoolAdminDb, 'users', 'uid-elsewhere'), { fullName: 'changed' }));
+    await expectDenied('Nor read a student\'s wallet balance',
+      getDoc(doc(schoolAdminDb, 'customer_wallets', 'uid-elsewhere')));
+    await expectDenied('Nor their wallet transactions',
+      getDoc(doc(schoolAdminDb, 'wallet_transactions', 'wtx-elsewhere')));
+    await expectDenied('Nor create a store document directly',
+      setDoc(doc(schoolAdminDb, 'stores', 'store-planted'), {
+        id: 'store-planted', name: 'ร้านปลอม', ownerId: 'uid-school-admin', schoolId: 'CHULA'
+      }));
+
     console.log('\n===============================================================');
     console.log(`📊 FIRESTORE RULES TEST RESULTS: ${passed}/${total} Passed (${passed === total ? 'ALL PASSED' : 'FAILURES DETECTED'})`);
     console.log('===============================================================\n');

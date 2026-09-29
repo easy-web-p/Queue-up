@@ -33,8 +33,11 @@
 | PIN รับอาหารผิด 5 ครั้งถูกล็อก และส่งมอบได้เฉพาะออเดอร์ที่ทำอาหารแล้ว | `merchantRoutes.js` | `orderHandover.test.js` |
 | แชทเข้าถึงได้เฉพาะคู่สนทนาและร้านเจ้าของห้อง | `chatAccess.js` | `chatIsolation.test.js` |
 | อีเมลที่ยังไม่ยืนยัน ไม่ได้สิทธิ์ผู้ดูแลระบบและไม่ได้สิทธิ์สมาชิกสถานศึกษา | `authenticate.js` | `identityTrust.test.js` |
+| ผู้ดูแลสถานศึกษาอ่านกระเป๋าเงินนักศึกษา/โปรไฟล์ข้ามสถาบันไม่ได้ | `firestore.rules` | `firestoreRules.test.js` |
+| สร้างร้านค้าต้องผ่าน API เท่านั้น เจ้าของและสถาบันมาจากบัญชีผู้เรียก | `storeRoutes.js` | `storeCreation.test.js` |
+| ผลประเมินถูกบันทึกจริง ไม่ใช่แค่ใน localStorage | `evaluationRoutes.js` | `evaluations.test.js` |
 
-รวม **21 ชุดทดสอบ 465 เคสฝั่งเซิร์ฟเวอร์ + 38 เทสต์ Firestore Rules + 9 เทสต์ E2E** ผ่านทั้งหมด
+รวม **21 ชุดทดสอบ 465 เคสฝั่งเซิร์ฟเวอร์ + 43 เทสต์ Firestore Rules + 9 เทสต์ E2E** ผ่านทั้งหมด
 
 ---
 

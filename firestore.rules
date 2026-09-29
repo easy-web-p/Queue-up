@@ -23,13 +23,13 @@ service cloud.firestore {
       return request.auth.token.get('admin', false) == true;
     }
 
-    function isAdmin() {
-      return isAuthenticated() && (
-        claimRole() == 'admin' ||
-        claimRole() == 'super_admin' ||
-        claimAdminFlag()
-      );
-    }
+    // A school administrator carries role 'admin' together with a schoolId, and
+    // is NOT a platform administrator. isSuperAdmin() used to accept that claim, so
+    // every school admin — and anyone they listed on a roster as type "admin" —
+    // could read and overwrite any user profile on the platform, read any
+    // student's wallet balance and transaction history, and create store
+    // documents directly, in any institution. A school admin's powers are the
+    // scoped ones in isSchoolAdmin(); platform-wide access is isSuperAdmin().
 
     function isSuperAdmin() {
       return isAuthenticated() && (
@@ -70,11 +70,11 @@ service cloud.firestore {
 
     // 1. Private User Profile: Only accessible by account owner and Admin
     match /users/{userId} {
-      allow read, write: if isOwner(userId) || isAdmin();
+      allow read, write: if isOwner(userId) || isSuperAdmin();
 
       // User Order Summary Stats: Read by owner, written only by Server Transaction
       match /stats/{statDoc} {
-        allow read: if isOwner(userId) || isAdmin();
+        allow read: if isOwner(userId) || isSuperAdmin();
         allow write: if false; // Server authoritative only
       }
     }
@@ -88,7 +88,7 @@ service cloud.firestore {
     // 3. Stores Collection
     match /stores/{storeId} {
       allow read: if true;
-      allow create: if isSuperAdmin() || isAdmin();
+      allow create: if isSuperAdmin() || isSuperAdmin();
       allow update: if isSuperAdmin() || (
         isAuthenticated() && 
         resource.data.ownerId == request.auth.uid &&
@@ -102,7 +102,7 @@ service cloud.firestore {
         allow read: if isAuthenticated() && (
           request.auth.uid == memberId || 
           resource.data.userId == request.auth.uid ||
-          isAdmin()
+          isSuperAdmin()
         );
         allow write: if isSuperAdmin() || (isAuthenticated() && get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid);
       }
@@ -111,7 +111,7 @@ service cloud.firestore {
       match /daily_stats/{date} {
         allow read: if isAuthenticated() && (
           get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid || 
-          isAdmin()
+          isSuperAdmin()
         );
         allow write: if false;
       }
@@ -144,7 +144,7 @@ service cloud.firestore {
         allow read: if isAuthenticated() && (
           get(/databases/$(database)/documents/orders/$(orderId)).data.customerId == request.auth.uid ||
           isStoreOperator(get(/databases/$(database)/documents/orders/$(orderId)).data.storeId) ||
-          isAdmin()
+          isSuperAdmin()
         );
         allow write: if false;
       }
@@ -178,7 +178,7 @@ service cloud.firestore {
           isStoreOperator(resource.data.storeId) ||
           isSuperAdmin()
         );
-      allow delete: if isAdmin();
+      allow delete: if isSuperAdmin();
 
       // Typing presence: one document per person, id == their uid.
       // Decorative, but still scoped — only a participant or the thread's store
@@ -217,7 +217,7 @@ service cloud.firestore {
     // 7. Canteens
     match /canteens/{canteenId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isSuperAdmin();
     }
 
     // 8. School Applications: Public submission, Super Admin management ONLY
@@ -270,17 +270,17 @@ service cloud.firestore {
 
     // 11. User Devices (FCM Push Tokens)
     match /user_devices/{deviceId} {
-      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isSuperAdmin());
       allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
       allow update: if isAuthenticated() && resource.data.uid == request.auth.uid && request.resource.data.uid == request.auth.uid;
-      allow delete: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.uid == request.auth.uid || isSuperAdmin());
     }
 
     // 12. Notifications (Central Notification Inbox)
     match /notifications/{notificationId} {
       allow read: if isAuthenticated() && (
         resource.data.recipientId == request.auth.uid ||
-        isAdmin()
+        isSuperAdmin()
       );
       allow create, delete: if false; // Server authoritative via Firebase Admin SDK only
       allow update: if isAuthenticated() &&
@@ -292,13 +292,13 @@ service cloud.firestore {
     // The owner may read their own so the UI can subscribe to live updates;
     // every write goes through /api/wallet and the Admin SDK.
     match /customer_wallets/{walletUid} {
-      allow read: if isOwner(walletUid) || isAdmin();
+      allow read: if isOwner(walletUid) || isSuperAdmin();
       allow write: if false;
     }
 
     match /wallet_transactions/{transactionId} {
       allow read: if isAuthenticated() && (
-        resource.data.uid == request.auth.uid || isAdmin()
+        resource.data.uid == request.auth.uid || isSuperAdmin()
       );
       allow write: if false;
     }
