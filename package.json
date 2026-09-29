@@ -18,7 +18,7 @@
     "test:deploy": "node scripts/run-tests.mjs deployment evaluations",
     "test:e2e": "playwright test",
     "test:money": "node scripts/run-tests.mjs ledgerIntegrity customerWallet payoutLifecycle orderCancellation paymentSettlement settlementSweeps platformOperations orderHandover",
-    "test:rules": "firebase emulators:exec --only firestore --project demo-queueup-rules \"node server/tests/firestoreRules.test.js\"",
+    "test:rules": "npx --yes firebase-tools@13 emulators:exec --only firestore --project demo-queueup-rules \"node server/tests/firestoreRules.test.js\"",
     "test:utc": "TZ=UTC npm test",
     "deploy:rules": "npm run test:rules && npx --yes firebase-tools@13 deploy --only firestore:rules,firestore:indexes --project queueup-65e82",
     "dev:server": "node server.js"

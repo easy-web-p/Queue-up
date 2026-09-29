@@ -43,8 +43,12 @@ jobs:
         env:
           TZ: UTC
 
+      # Through the npm script, so CI and a developer's machine run the same
+      # command. They had drifted: the script called a bare `firebase` binary
+      # that only exists with a global install, so npm run test:rules failed for
+      # everyone while CI passed.
       - name: Firestore rules tests
-        run: npx --yes firebase-tools@latest emulators:exec --only firestore --project demo-queueup-rules "node server/tests/firestoreRules.test.js"
+        run: npm run test:rules
 
       # The serverless entry point must stay importable: a broken api/index.js
       # only surfaces as a 500 on every API route after deploy.
