@@ -28,6 +28,7 @@ import { customerWalletRouter } from './routes/customerWalletRoutes.js';
 import { cronRouter } from './routes/cronRoutes.js';
 import { platformRouter } from './routes/platformRoutes.js';
 import { storeRouter } from './routes/storeRoutes.js';
+import { evaluationRouter } from './routes/evaluationRoutes.js';
 import { firebaseAdminStatus } from './firebaseAdmin.js';
 import { optionalSecret, isProduction, missingRequiredSecrets } from './config/secrets.js';
 import {
@@ -132,6 +133,7 @@ export function createApp({ serveStatic = true } = {}) {
   app.post('/api/platform/payment-exceptions/:id/resolve', writeLimiter);
   app.post('/api/schools/membership/claim', writeLimiter);
   app.post('/api/stores', writeLimiter);
+  app.post('/api/evaluations', writeLimiter);
   app.use('/api', apiLimiter);
 
   // 4. Mount Command & Financial API routes
@@ -147,6 +149,7 @@ export function createApp({ serveStatic = true } = {}) {
   app.use('/api/cron', cronRouter);
   app.use('/api/platform', platformRouter);
   app.use('/api/stores', storeRouter);
+  app.use('/api/evaluations', evaluationRouter);
   app.use('/api', notificationRouter);
 
   // Unmatched API paths must not fall through to the SPA fallback below, which

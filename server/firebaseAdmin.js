@@ -137,7 +137,14 @@ if (!adminDb && (isProduction || isServerless)) {
 if (!adminDb && !adminInitError) {
   console.log('[FirebaseAdmin] Local development mode active: using persistent file-backed Firestore store.');
 
-  const localDbFile = path.resolve(__dirname, '../.local_db.json');
+  // Overridable so each test suite can run against its own fresh store. Sharing
+  // one file let residue from earlier suites — and earlier runs — reach code
+  // that scans whole collections, which is how the settlement sweep ended up
+  // expiring nine unrelated orders and stalling the event loop long enough to
+  // reset a live connection.
+  const localDbFile = process.env.QUEUEUP_LOCAL_DB
+    ? path.resolve(process.cwd(), process.env.QUEUEUP_LOCAL_DB)
+    : path.resolve(__dirname, '../.local_db.json');
   let memoryStore = {};
 
   const loadFromDisk = () => {

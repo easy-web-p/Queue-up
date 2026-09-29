@@ -1,15 +1,7 @@
 /**
  * Firebase Bridge for QueueUp Landing & Evaluation System
  */
-import {
-  collection,
-  getDocs,
-  addDoc,
-  serverTimestamp,
-  query,
-  orderBy,
-  limit
-} from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
 import { STORES, FOOD_ITEMS } from '../data/mockData';
 import { SYSTEM_EVALUATIONS_DATA } from '../data/canteenEvaluationData';
@@ -46,17 +38,19 @@ export async function fetchProductsFromFirestore() {
 }
 
 export async function fetchEvaluationsFromFirestore() {
+  // Read through the API. There is no rule for the evaluations collection, so a
+  // direct client read is refused by the catch-all — which is why this page only
+  // ever showed the baseline, however many evaluations had been submitted.
   try {
-    const q = query(collection(db, 'evaluations'), orderBy('createdAt', 'desc'), limit(150));
-    const snap = await getDocs(q);
-    if (!snap.empty) {
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      const existingIds = new Set(list.map((c) => c.id));
+    const res = await fetch('/api/evaluations?limit=150');
+    const data = await res.json();
+    if (res.ok && data.success && Array.isArray(data.evaluations) && data.evaluations.length > 0) {
+      const existingIds = new Set(data.evaluations.map((c) => c.id));
       const remainingBaseline = SYSTEM_EVALUATIONS_DATA.filter((b) => !existingIds.has(b.id));
-      return [...list, ...remainingBaseline];
+      return [...data.evaluations, ...remainingBaseline];
     }
   } catch (err) {
-    console.warn('[Firebase] fetchEvaluations fallback to local/mock:', err);
+    console.warn('[Evaluations] fetch fallback to local/baseline:', err);
   }
 
   try {
@@ -75,22 +69,25 @@ export async function fetchEvaluationsFromFirestore() {
 }
 
 export async function submitEvaluationToFirestore(newRating) {
-  const item = {
-    ...newRating,
-    createdAt: { seconds: Math.floor(Date.now() / 1000) },
-    id: "eval_" + Date.now(),
-  };
+  // Submitted through the API, and a failure is raised rather than swallowed.
+  // Writing straight to Firestore was refused by rules every time, and this
+  // function caught the refusal and returned the record anyway — so the page
+  // thanked people for an evaluation that had gone nowhere.
+  const res = await fetch('/api/evaluations', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(newRating)
+  });
 
-  try {
-    const docRef = await addDoc(collection(db, 'evaluations'), {
-      ...newRating,
-      createdAt: serverTimestamp(),
-    });
-    item.id = docRef.id;
-  } catch (err) {
-    console.warn('[Firebase] submitEvaluation fallback to local:', err);
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data?.success) {
+    throw new Error(data?.message || data?.error || 'ไม่สามารถบันทึกผลประเมินได้');
   }
 
+  const item = data.evaluation;
+
+  // Kept locally as well, so the submitter still sees their own entry straight
+  // away even if the list is served from a cache.
   try {
     const local = JSON.parse(localStorage.getItem('queueup_user_evaluations') || '[]');
     localStorage.setItem('queueup_user_evaluations', JSON.stringify([item, ...local]));
