@@ -239,42 +239,16 @@ notificationRouter.post('/notifications/test', authenticate, async (req, res) =>
 });
 
 /**
- * 6. Send Chat Notification (Phase 9)
- * Triggers push notification to customer or merchant when a new message is posted
+ * There used to be a POST /chat/messages here as well.
+ *
+ * This router mounts at /api, so that handler answered the same path as the chat
+ * router's own message endpoint — and lost, because /api/chat is mounted first.
+ * It was unreachable, which was lucky: it took recipientId straight from the
+ * body with no check of who that was, so reordering the mounts would have handed
+ * every signed-in account the ability to push a notification, under any sender
+ * name, to anyone on the platform. The chat router already notifies the
+ * recipient when it stores a message.
  */
-notificationRouter.post('/chat/messages', authenticate, async (req, res) => {
-  try {
-    const { recipientId, senderName, message, chatId, storeId, orderId } = req.body;
-    if (!recipientId || !message) {
-      return res.status(400).json({
-        success: false,
-        error: 'MISSING_FIELDS',
-        message: 'recipientId and message are required.'
-      });
-    }
-
-    const cleanSnippet = message.length > 80 ? message.substring(0, 80) + '...' : message;
-
-    const result = await NotificationEngine.sendChatMessage({
-      recipientId,
-      senderName: senderName || req.user.name || 'ผู้ส่งข้อความ',
-      messageSnippet: cleanSnippet,
-      chatId: chatId || `chat_${Date.now()}`,
-      schoolId: req.user.schoolId || 'school-default',
-      storeId,
-      orderId
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: 'Chat push notification dispatched successfully.',
-      result
-    });
-  } catch (err) {
-    console.error('[NotificationRoutes] Error dispatching chat push:', err);
-    return res.status(500).json({ success: false, error: err.message });
-  }
-});
 
 /**
  * 6.1 Test LINE Notify Endpoint

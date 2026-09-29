@@ -131,6 +131,45 @@ async function runTests() {
     else process.env.CRON_SECRET = priorSecret;
   }
 
+  // --- No two routers may claim the same path ---
+  // Express serves whichever was mounted first, so the loser is unreachable and
+  // its authorization is never exercised. That is how a handler taking
+  // recipientId from the body — a push to anyone on the platform, under any
+  // name — sat in the tree looking like working code.
+  console.log('\n--- Route collisions ---');
+  const routeApp = createApp({ serveStatic: false });
+  const seen = new Map();
+  const collisions = [];
+
+  // Only routes inside mounted routers are compared. A path registered directly
+  // on the app is how the rate limiters attach — deliberately sharing a path with
+  // the handler they guard, and passing the request along rather than answering.
+  const walk = (stack, prefix, insideRouter) => {
+    for (const layer of stack || []) {
+      if (layer.route) {
+        if (!insideRouter) continue;
+        const methods = Object.keys(layer.route.methods || {});
+        for (const method of methods) {
+          const key = `${method.toUpperCase()} ${prefix}${layer.route.path}`;
+          if (seen.has(key)) collisions.push(key);
+          else seen.set(key, true);
+        }
+      } else if (layer.name === 'router' && layer.handle?.stack) {
+        // Recover the mount path from the layer's regexp.
+        const source = layer.regexp?.source || '';
+        const match = source.match(/^\^\\\/(.*?)\\\/\?/);
+        const mounted = match ? `/${match[1].replace(/\\\//g, '/')}` : '';
+        walk(layer.handle.stack, `${prefix}${mounted}`, true);
+      }
+    }
+  };
+  walk(routeApp._router?.stack, '', false);
+
+  check(seen.size > 30, 'The router tree was actually walked', `${seen.size} routes`);
+  check(collisions.length === 0,
+    'No two routers answer the same method and path',
+    collisions.length ? collisions.join(', ') : 'none');
+
   // --- A discontinued integration must say so ---
   console.log('\n--- LINE Notify ---');
   const { LineNotifyService } = await import('../services/lineNotifyService.js');
