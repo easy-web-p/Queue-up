@@ -1,4 +1,3 @@
-import { doc, setDoc, serverTimestamp, collection, getDocs } from 'firebase/firestore';
 import { CANTEEN_SURVEYS_DATA } from './canteenEvaluationData';
 
 /**
@@ -165,76 +164,54 @@ export function exportSurveysToCSV(surveyList = PILOT_STUDENT_SURVEYS) {
 }
 
 /**
- * Seed 10 realistic mock pilot student surveys into Firestore 'canteen_surveys'
+ * Seeding surveys from the browser was removed.
+ *
+ * canteen_surveys is written by the server only — the rules refused every write
+ * this made, and nothing called it. Seed the collection with the Admin SDK if
+ * the page should show something other than the dataset in the bundle.
  */
-export async function seedSurveysToFirestore(db, surveys = PILOT_STUDENT_SURVEYS) {
-  if (!db) return { success: false, error: "Database instance required", count: 0 };
-  let count = 0;
-  try {
-    for (const item of surveys) {
-      await setDoc(
-        doc(db, "canteen_surveys", item.id),
-        {
-          ...item,
-          seededAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
-      count++;
-    }
-    return { success: true, count };
-  } catch (err) {
-    console.warn("Firestore seedSurveys warning:", err);
-    return { success: false, error: err?.message || String(err), count };
-  }
-}
 
 /**
- * Fetch all surveys from Firestore 'canteen_surveys', fallback to local persistence
+ * Reads the survey responses the server holds, falling back to what this
+ * browser has kept. The client used to read the collection directly, which the
+ * rules refuse, so the page only ever charted the dataset in the bundle.
  */
-export async function fetchSurveysFromFirestore(db) {
-  if (!db) return getStoredSatisfactionSurveys();
+export async function fetchSurveysFromFirestore() {
   try {
-    const snap = await getDocs(collection(db, "canteen_surveys"));
-    const list = [];
-    snap.forEach((docItem) => {
-      list.push({ id: docItem.id, ...docItem.data() });
-    });
-    if (list.length > 0) {
+    const res = await fetch('/api/surveys?limit=200');
+    const data = await res.json();
+    if (res.ok && data.success && Array.isArray(data.surveys) && data.surveys.length > 0) {
       const local = getStoredSatisfactionSurveys();
-      const existingIds = new Set(list.map((s) => s.id));
-      return [...list, ...local.filter((l) => !existingIds.has(l.id))];
+      const existingIds = new Set(data.surveys.map((s) => s.id));
+      return [...data.surveys, ...local.filter((l) => !existingIds.has(l.id))];
     }
   } catch (err) {
-    console.warn("Could not fetch surveys from Firestore, falling back to local:", err);
+    console.warn('[Surveys] fetch fallback to local:', err);
   }
   return getStoredSatisfactionSurveys();
 }
 
 /**
- * Submit a new survey response to Firestore and local persistence
+ * Submits one response.
+ *
+ * Writing to canteen_surveys from the browser was refused by rules every time
+ * and the refusal was swallowed, so every student's answers were thanked for and
+ * then dropped — the data this project reports on. A failure is raised now, and
+ * the local copy is kept only once the server has the response.
  */
-export async function submitSurveyToFirestore(db, surveyData) {
-  const surveyId = surveyData.id || `survey_${Date.now()}`;
-  const fullSurvey = {
-    ...surveyData,
-    id: surveyId,
-    date: surveyData.date || new Date().toISOString().slice(0, 10),
-  };
+export async function submitSurveyToFirestore(_db, surveyData) {
+  const res = await fetch('/api/surveys', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(surveyData)
+  });
 
-  // Guarantee client-side persistence immediately
-  saveSatisfactionSurvey(fullSurvey);
-
-  if (db) {
-    try {
-      await setDoc(doc(db, "canteen_surveys", surveyId), {
-        ...fullSurvey,
-        createdAt: serverTimestamp(),
-      });
-    } catch (err) {
-      console.warn("Firestore submitSurvey write error (stored locally):", err);
-    }
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data?.success) {
+    throw new Error(data?.message || data?.error || 'ไม่สามารถบันทึกแบบประเมินได้');
   }
 
-  return fullSurvey;
+  saveSatisfactionSurvey(data.survey);
+  return data.survey;
 }
+

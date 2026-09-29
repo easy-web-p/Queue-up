@@ -41,14 +41,28 @@ export function logAnalyticsEvent(eventName: string, params?: Record<string, unk
   console.log(`[Analytics] ${eventName}:`, params);
 }
 
-// Validate connection on boot
-export async function testFirestoreConnection() {
+/**
+ * Reports whether Firestore is reachable on boot.
+ *
+ * This read a document in system_health, a collection with no rule, so the
+ * answer was always permission-denied and the probe learned nothing — it only
+ * checked for the offline message and ignored everything else. A refusal is
+ * still the backend answering, so it now counts as reachable: only a genuinely
+ * offline client is worth warning about, and the read targets a collection the
+ * rules actually expose.
+ */
+export async function testFirestoreConnection(): Promise<boolean> {
   try {
-    await getDocFromServer(doc(db, 'system_health', 'ping'));
+    await getDocFromServer(doc(db, 'stores', '__connectivity_probe__'));
+    return true;
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('the client is offline') || message.includes('Failed to get document')) {
       console.warn('[Firestore] Client is in offline mode; using IndexedDB cache.');
+      return false;
     }
+    // Anything else — including permission-denied — means the service answered.
+    return true;
   }
 }
 

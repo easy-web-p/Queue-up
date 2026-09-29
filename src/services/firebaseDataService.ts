@@ -602,24 +602,14 @@ export const FirebaseDataService = {
   },
 
   /**
-   * บันทึกข้อมูลการค้นหา (Record Search Query Log to Cloud Firestore)
+   * Search logging was removed.
+   *
+   * It wrote to search_logs, a collection with no rule, so every write was
+   * refused — and nothing in the app has ever read the collection back. Kept as
+   * a no-op so callers need not change; give it a home on the API before
+   * reviving it.
    */
-  async recordSearchLog(queryText: string, userId?: string): Promise<void> {
-    const trimmed = queryText.trim();
-    if (!trimmed || trimmed.length < 2) return;
-
-    try {
-      const logId = `search-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-      const logRef = doc(db, 'search_logs', logId);
-      await setDoc(logRef, {
-        id: logId,
-        query: trimmed,
-        userId: userId || 'guest',
-        timestamp: new Date().toISOString(),
-        createdAt: serverTimestamp()
-      }, { merge: true });
-    } catch (e) {
-      // Cloud logging is background best-effort, silent fallback to local
-    }
+  async recordSearchLog(_queryText: string, _userId?: string): Promise<void> {
+    // Intentionally does nothing.
   }
 };

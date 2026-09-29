@@ -1,0 +1,72 @@
+# Keeps the deployed Firestore rules the same as the ones in this repository.
+#
+# The rules are the only thing standing between a client and the database, so a
+# fix committed here does nothing until it is deployed. That gap is easy to
+# forget and impossible to see: the repository looks correct while production
+# is not. This closes it — whenever firestore.rules changes on main, the rules
+# are deployed.
+#
+# It needs one repository secret, FIREBASE_SERVICE_ACCOUNT: the JSON key of a
+# service account on the Firebase project with the "Firebase Rules Admin" role
+# (Project Settings → Service accounts → Generate new private key). Without the
+# secret the job says what is missing and stops, rather than failing the build.
+
+name: Deploy Firestore rules
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'firestore.rules'
+      - '.github/workflows/deploy-rules.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-rules
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - run: npm ci
+
+      # The rules are tested against the emulator before they are deployed, so a
+      # rule that locks out legitimate access never reaches the live database.
+      - name: Test the rules first
+        run: npm run test:rules
+
+      - name: Deploy
+        env:
+          SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$SERVICE_ACCOUNT" ]; then
+            echo "::warning::FIREBASE_SERVICE_ACCOUNT is not set, so the rules in this repository are NOT deployed."
+            echo "Add it under Settings → Secrets and variables → Actions, or deploy by hand with: npm run deploy:rules"
+            exit 0
+          fi
+          printf '%s' "$SERVICE_ACCOUNT" > "$RUNNER_TEMP/service-account.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/service-account.json"
+          # Rules only. Index changes can remove indexes that live queries
+          # depend on, which is not a decision a push should make on its own —
+          # those go through npm run deploy:rules, where a person sees the
+          # prompts.
+          npx --yes firebase-tools@13 deploy \
+            --only firestore:rules \
+            --project queueup-65e82 \
+            --non-interactive
+          rm -f "$RUNNER_TEMP/service-account.json"

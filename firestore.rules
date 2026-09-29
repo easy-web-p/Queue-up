@@ -288,6 +288,16 @@ service cloud.firestore {
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
     }
 
+    // 12b. Canteen satisfaction surveys.
+    // The dataset ships in the client bundle already, so reading it is public.
+    // Writing is server-only: the client-side seeder that used to target this
+    // collection was refused by the catch-all on every call, which is why the
+    // page always fell back to the copy compiled into the bundle.
+    match /canteen_surveys/{surveyId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // 13. Campus Wallet: balances and their ledger are server authoritative.
     // The owner may read their own so the UI can subscribe to live updates;
     // every write goes through /api/wallet and the Admin SDK.

@@ -169,7 +169,7 @@ export default function Queueup() {
   // Load 15-question satisfaction surveys from Firestore / LocalStorage
   useEffect(() => {
     let cancelled = false;
-    fetchSurveysFromFirestore(db)
+    fetchSurveysFromFirestore()
       .then((data) => {
         if (!cancelled && Array.isArray(data) && data.length > 0) {
           setSurveys(data);
@@ -538,7 +538,7 @@ export default function Queueup() {
         comment: surveyComment.trim(),
         date: new Date().toISOString().slice(0, 10),
       };
-      const saved = await submitSurveyToFirestore(db, payload);
+      const saved = await submitSurveyToFirestore(null, payload);
       setSurveys((prev) => [saved, ...prev]);
       setIsSurveyModalOpen(false);
       setSurveyComment("");

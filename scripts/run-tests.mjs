@@ -38,7 +38,8 @@ const SUITES = [
   'chatIsolation',
   'identityTrust',
   'storeCreation',
-  'evaluations'
+  'evaluations',
+  'landingIntake'
 ];
 
 // A suite on disk that nobody listed here would never run, and a test that never
@@ -70,6 +71,17 @@ const keepGoing = process.argv.includes('--keep-going');
 const storeDir = path.resolve('.test-db');
 rmSync(storeDir, { recursive: true, force: true });
 mkdirSync(storeDir, { recursive: true });
+
+// A static check first: a collection the browser writes to without a rule is a
+// feature that reports success and stores nothing, and no runtime suite catches
+// it because the failure is swallowed at the call site.
+const collectionCheck = spawnSync(process.execPath, ['scripts/check-client-collections.mjs'], {
+  stdio: 'inherit'
+});
+if (collectionCheck.status !== 0) {
+  console.error('\n❌ Client Firestore access check failed; suites not run.');
+  process.exit(1);
+}
 
 let totalPassed = 0;
 let totalChecks = 0;

@@ -36,8 +36,10 @@
 | ผู้ดูแลสถานศึกษาอ่านกระเป๋าเงินนักศึกษา/โปรไฟล์ข้ามสถาบันไม่ได้ | `firestore.rules` | `firestoreRules.test.js` |
 | สร้างร้านค้าต้องผ่าน API เท่านั้น เจ้าของและสถาบันมาจากบัญชีผู้เรียก | `storeRoutes.js` | `storeCreation.test.js` |
 | ผลประเมินถูกบันทึกจริง ไม่ใช่แค่ใน localStorage | `evaluationRoutes.js` | `evaluations.test.js` |
+| แบบสอบถาม 15 ข้อ และคำขอเข้าร่วมโครงการนำร่อง ถูกบันทึกจริง | `surveyRoutes.js`, `pilotLeadRoutes.js` | `landingIntake.test.js` |
+| ทุก collection ที่ฝั่ง client แตะต้องมี rule รองรับ (ตรวจอัตโนมัติ) | `scripts/check-client-collections.mjs` | รันก่อนทุกชุดทดสอบ |
 
-รวม **21 ชุดทดสอบ 465 เคสฝั่งเซิร์ฟเวอร์ + 43 เทสต์ Firestore Rules + 9 เทสต์ E2E** ผ่านทั้งหมด
+รวม **22 ชุดทดสอบ 485 เคสฝั่งเซิร์ฟเวอร์ + 43 เทสต์ Firestore Rules + 9 เทสต์ E2E** ผ่านทั้งหมด
 
 ---
 
@@ -81,11 +83,20 @@
 
 จากนั้นคัดลอก **Signing secret** (`whsec_...`) ไปใส่ `STRIPE_WEBHOOK_SECRET`
 
-### 2.3 Firestore
+### 2.3 Firestore rules — **ต้อง deploy ก่อนใช้งานจริง**
 
 ```bash
-firebase deploy --only firestore:rules
+npm run deploy:rules
 ```
+
+คำสั่งนี้รันเทสต์ rules ก่อน แล้วค่อย deploy (rules + indexes)
+
+**สำคัญ:** rules ที่อยู่ในโค้ดยังไม่มีผลจนกว่าจะ deploy — และรอบนี้มีการแก้ช่องโหว่ที่
+ผู้ดูแลสถานศึกษาอ่านกระเป๋าเงินนักศึกษาทุกคนได้ ถ้ายังไม่ deploy ช่องโหว่นั้นยังเปิดอยู่
+
+หลังจากตั้ง secret `FIREBASE_SERVICE_ACCOUNT` ใน GitHub (Settings → Secrets and
+variables → Actions) ระบบจะ deploy rules ให้อัตโนมัติทุกครั้งที่ `firestore.rules`
+ถูกแก้บน `main` — ดู `.github/workflows/deploy-rules.yml`
 
 กฎปิดทุก collection ที่เกี่ยวกับเงินไม่ให้ client อ่าน (`ledger_entries`, `merchant_balances`,
 `refund_requests`, `payout_requests`, `payment_exceptions`) — ถ้าไม่ deploy กฎใหม่ กฎเดิมยังอยู่
