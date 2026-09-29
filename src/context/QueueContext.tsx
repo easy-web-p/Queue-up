@@ -135,7 +135,7 @@ interface QueueContextType {
   userStore: Store | null;
   openCreateStore: () => void;
   openStoreAdmin: (storeId?: string) => void;
-  addNewStore: (newStoreData: Partial<Store>, initialMenuItems?: Partial<FoodItem>[]) => Store;
+  addNewStore: (newStoreData: Partial<Store>, initialMenuItems?: Partial<FoodItem>[]) => Promise<Store>;
   updateStore: (storeId: string, updatedData: Partial<Store>) => void;
   deleteStore: (storeId: string) => void;
   seedDemoQueuesForStore: (storeId: string) => void;
@@ -1605,11 +1605,51 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   };
 
-  // Add new store function
-  const addNewStore = (newStoreData: Partial<Store>, initialMenuItems?: Partial<FoodItem>[]): Store => {
-    const id = `store-${Date.now()}`;
-    const ownerId = currentUser?.id || `USR-${Math.floor(10000 + Math.random() * 90000)}`;
+  /**
+   * Opens a shop through the API.
+   *
+   * This used to build the shop in the browser and ask the client SDK to write
+   * it to Firestore. Rules reserve store creation for the server and the write
+   * was refused, but the refusal was swallowed — so the form said "created"
+   * while the shop lived only in this browser's localStorage, invisible to the
+   * API and impossible to order from. The server now creates it and hands back
+   * the authoritative record; a failure throws so the page can say so.
+   */
+  const addNewStore = async (newStoreData: Partial<Store>, initialMenuItems?: Partial<FoodItem>[]): Promise<Store> => {
+    const created = await apiClient.createStore({
+      name: newStoreData.name || 'ร้านอาหารใหม่',
+      nameEn: newStoreData.nameEn,
+      description: newStoreData.description,
+      category: newStoreData.category,
+      address: newStoreData.address,
+      logo: newStoreData.logo,
+      coverImage: newStoreData.coverImage,
+      image: newStoreData.image,
+      averageWaitMinutes: newStoreData.averageWaitMinutes,
+      priceRange: newStoreData.priceRange,
+      tags: newStoreData.tags,
+      ownerName: newStoreData.ownerName,
+      ownerPhone: newStoreData.ownerPhone,
+      promptPayNumber: newStoreData.promptPayNumber,
+      initialMenuItems: (initialMenuItems || []).map((item) => ({
+        name: item.name,
+        nameEn: item.nameEn,
+        price: Number(item.price) || 0,
+        description: item.description,
+        image: item.image,
+        preparationMinutes: item.preparationMinutes
+      }))
+    });
+
+    const serverStore = created.store as unknown as Store;
+    const serverMenu = (created.menuItems || []) as unknown as FoodItem[];
+
+    // Ids come from the server, so what this browser shows and what the API
+    // knows are the same shop.
+    const id = serverStore.id;
+    const ownerId = serverStore.ownerId;
     const fullStore: Store = {
+      ...serverStore,
       id,
       ownerId,
       ownerName: currentUser?.fullName || newStoreData.ownerName || 'ผู้ประกอบการ',
@@ -1634,33 +1674,17 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       featuredMenuIds: []
     };
 
-    // If initial menu items provided, create them and add to foodItems
-    if (initialMenuItems && initialMenuItems.length > 0) {
-      const createdFoods: FoodItem[] = initialMenuItems.map((item, idx) => ({
-        id: `food-${Date.now()}-${idx}`,
-        storeId: id,
-        storeName: fullStore.name,
-        name: item.name || `เมนูพิเศษ ${idx + 1}`,
-        nameEn: item.nameEn || `Signature Dish ${idx + 1}`,
-        price: Number(item.price) || 50,
-        description: item.description || 'เมนูแนะนำปรุงสดใหม่ทุกวัน รสชาติกลมกล่อม',
-        category: fullStore.category,
-        image: item.image || fullStore.image,
-        rating: 5.0,
-        orderCount: 0,
-        isAvailable: true,
-        preparationMinutes: item.preparationMinutes || 10,
-        tags: ['เมนูแนะนำ', 'ซิกเนเจอร์']
-      }));
-      fullStore.featuredMenuIds = createdFoods.map(f => f.id);
+    // The menu the server actually wrote, not a second copy built here: a menu
+    // item the API does not know about cannot be ordered.
+    if (serverMenu.length > 0) {
+      fullStore.featuredMenuIds = serverMenu.map(f => f.id);
       setFoodItems(prev => {
-        const updated = [...createdFoods, ...prev];
+        const updated = [...serverMenu, ...prev];
         try {
           localStorage.setItem('queueup_food_items_v4', JSON.stringify(updated));
         } catch (e) {
           console.error(e);
         }
-        FirebaseDataService.syncFoodItemsToFirestore(updated);
         return updated;
       });
     }
@@ -1672,11 +1696,13 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       } catch (e) {
         console.error(e);
       }
-      FirebaseDataService.syncStoresToFirestore(updated);
       return updated;
     });
 
-    // Update current user to link to this store and set role to merchant
+    // Link the signed-in account to the shop it just opened. There used to be
+    // an else-branch here that invented an owner called owner@queueup.com when
+    // nobody was signed in; the API refuses an unauthenticated create, so that
+    // identity could never have matched the shop the server actually wrote.
     if (currentUser) {
       const updatedUser: AuthUser = {
         ...currentUser,
@@ -1687,23 +1713,6 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setRoleState('merchant');
       try {
         localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(updatedUser));
-      } catch (e) {
-        console.error(e);
-      }
-    } else {
-      const newUser: AuthUser = {
-        id: ownerId,
-        fullName: newStoreData.ownerName || 'เจ้าของร้าน QueueUp',
-        email: 'owner@queueup.com',
-        phone: newStoreData.ownerPhone || '089-876-5432',
-        role: 'merchant',
-        storeId: id,
-        registeredAt: new Date().toISOString()
-      };
-      setCurrentUser(newUser);
-      setRoleState('merchant');
-      try {
-        localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(newUser));
       } catch (e) {
         console.error(e);
       }

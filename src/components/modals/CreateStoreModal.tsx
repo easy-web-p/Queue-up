@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 
 export const CreateStoreModal: React.FC = () => {
-  const { isCreateStoreModalOpen, setIsCreateStoreModalOpen, addNewStore, currentUser, openCreateStore } = useQueue();
+  const { isCreateStoreModalOpen, setIsCreateStoreModalOpen, addNewStore, currentUser, openCreateStore, addToast } = useQueue();
 
   const [name, setName] = useState('');
   const [nameEn, setNameEn] = useState('');
@@ -26,7 +26,7 @@ export const CreateStoreModal: React.FC = () => {
   const [image, setImage] = useState('https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80');
   const [tagsInput, setTagsInput] = useState('อาหารจานด่วน, ข้าวราดแกง, รสเด็ด');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
 
@@ -35,15 +35,24 @@ export const CreateStoreModal: React.FC = () => {
       .map(t => t.trim())
       .filter(Boolean);
 
-    addNewStore({
+    try {
+      await addNewStore({
       name: name.trim(),
       nameEn: nameEn.trim() || name.trim(),
       description: description.trim() || 'ร้านอาหารในโรงอาหาร เสิร์ฟอาหารปรุงสดใหม่ทุกจาน',
       category,
       address: boothNumber ? `โรงอาหาร อาคารเรียนรวม ซุ้มที่ ${boothNumber}` : 'ศูนย์อาหาร อาคารเรียนรวม',
       image,
-      tags: tags.length > 0 ? tags : ['อาหารจานเดียว', 'เมนูยอดนิยม']
-    });
+        tags: tags.length > 0 ? tags : ['อาหารจานเดียว', 'เมนูยอดนิยม']
+      });
+    } catch (err) {
+      addToast(
+        'สร้างร้านค้าไม่สำเร็จ',
+        err instanceof Error ? err.message : 'กรุณาลองใหม่อีกครั้ง',
+        'error'
+      );
+      return;
+    }
 
     setIsCreateStoreModalOpen(false);
     // Reset fields

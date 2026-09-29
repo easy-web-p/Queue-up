@@ -24,7 +24,8 @@ import {
 } from 'lucide-react';
 
 export const CreateStorePage: React.FC = () => {
-  const { addNewStore, currentUser, setCurrentView } = useQueue();
+  const { addNewStore, currentUser, setCurrentView, addToast } = useQueue();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Onboarding guidance popup state
   const [showGuideModal, setShowGuideModal] = useState<boolean>(true);
@@ -70,9 +71,9 @@ export const CreateStorePage: React.FC = () => {
     { label: 'ของหวาน/เบเกอรี่', url: 'https://images.unsplash.com/photo-1587314168485-3236d6710814?w=150&auto=format&fit=crop&q=80' }
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || isSubmitting) return;
 
     const tags = tagsInput
       .split(',')
@@ -102,7 +103,11 @@ export const CreateStorePage: React.FC = () => {
       });
     }
 
-    addNewStore(
+    // Awaited, and failures are shown. The old call could not fail: it wrote to
+    // localStorage and reported success while Firestore refused the write.
+    setIsSubmitting(true);
+    try {
+      await addNewStore(
       {
         name: name.trim(),
         nameEn: nameEn.trim() || name.trim(),
@@ -120,8 +125,17 @@ export const CreateStorePage: React.FC = () => {
         ownerPhone: phone.trim(),
         promptPayNumber: promptPayNumber.trim()
       },
-      initialMenus
-    );
+        initialMenus
+      );
+    } catch (err) {
+      addToast(
+        'สร้างร้านค้าไม่สำเร็จ',
+        err instanceof Error ? err.message : 'กรุณาลองใหม่อีกครั้ง',
+        'error'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

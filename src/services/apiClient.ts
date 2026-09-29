@@ -606,6 +606,54 @@ class ApiClient {
   }
 
   /**
+   * Opens a shop owned by the signed-in account.
+   *
+   * Store creation is server-only: firestore.rules refuse it from the client, so
+   * the old flow wrote to localStorage, had its Firestore write rejected, and
+   * reported success anyway.
+   */
+  async createStore(payload: {
+    name: string;
+    nameEn?: string;
+    description?: string;
+    category?: string;
+    address?: string;
+    logo?: string;
+    coverImage?: string;
+    image?: string;
+    averageWaitMinutes?: number;
+    priceRange?: string;
+    tags?: string[];
+    ownerName?: string;
+    ownerPhone?: string;
+    promptPayNumber?: string;
+    initialMenuItems?: { name?: string; nameEn?: string; price?: number; description?: string; image?: string; preparationMinutes?: number }[];
+  }): Promise<{ success: boolean; store: Record<string, unknown>; menuItems: Record<string, unknown>[] }> {
+    const headers = await this.getAuthHeaders();
+    const response = await fetch(`${this.baseUrl}/stores`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || data.error || 'ไม่สามารถสร้างร้านค้าได้');
+    }
+    return data;
+  }
+
+  /** The shops this account owns, as the server knows them. */
+  async listMyStores(): Promise<{ success: boolean; stores: Record<string, unknown>[] }> {
+    const headers = await this.getAuthHeaders();
+    const response = await fetch(`${this.baseUrl}/stores/mine`, { headers });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || data.error || 'ไม่สามารถโหลดร้านค้าของคุณได้');
+    }
+    return data;
+  }
+
+  /**
    * Platform operator: withdrawal requests across every store.
    *
    * Restricted to platform administrators server-side; a merchant gets a 403.
