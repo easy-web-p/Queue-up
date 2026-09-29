@@ -6,9 +6,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
 
 :root {
-  --qup-primary: var(--qu-accent);
-  --qup-primary-hover: var(--qu-accent);
-  --qup-primary-gradient: linear-gradient(135deg, var(--qu-accent) 0%, var(--qu-accent) 50%, #c42b0c 100%);
+  --qu-accent: #FF7A1A;
+  --qu-accent-hover: #ea580c;
+  --qu-text: #ffffff;
+  --qup-primary: #FF7A1A;
+  --qup-primary-hover: #ea580c;
+  --qup-primary-gradient: linear-gradient(135deg, #FF7A1A 0%, #fb923c 50%, #ea580c 100%);
   --qup-accent-purple: #7c3aed;
   --qup-accent-gradient: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
   --qup-bg-dark: #0f172a;
@@ -16,7 +19,7 @@
   --qup-text-light: #f8fafc;
   --qup-text-muted: #94a3b8;
   --qup-border-glass: rgba(255, 255, 255, 0.12);
-  --qup-shadow-glow: 0 10px 30px -10px rgba(238, 77, 45, 0.4);
+  --qup-shadow-glow: 0 10px 30px -10px rgba(255, 122, 26, 0.4);
 }
 
 .qup-landing-wrapper {
@@ -334,10 +337,12 @@
 .qup-stat-number {
   font-size: 2.5rem;
   font-weight: 800;
-  background: var(--qup-primary-gradient);
+  color: #FF7A1A;
+  background: linear-gradient(135deg, #FF7A1A 0%, #fb923c 50%, #f59e0b 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   margin-bottom: 6px;
+  line-height: 1.2;
 }
 
 .qup-stat-label {

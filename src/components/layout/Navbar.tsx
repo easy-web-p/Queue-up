@@ -14,8 +14,7 @@ import {
   Store,
   Menu,
   MessageSquare,
-  LogIn,
-  Sparkles
+  LogIn
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -49,12 +48,6 @@ export const Navbar: React.FC = () => {
     }
   };
 
-  const handleGoToAbout = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setCurrentView('about');
-    navigate('/about');
-  };
-
   const activeQueue = userActiveQueue;
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -79,9 +72,9 @@ export const Navbar: React.FC = () => {
             className="flex items-center gap-2.5 cursor-pointer group"
             title={currentUser ? "ไปที่หน้าแรก Homepage (เข้าสู่ระบบแล้ว)" : "ไปที่หน้า Landing Page"}
           >
-            {/* Logo in Orange/Amber Circle */}
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 via-amber-500 to-orange-600 flex items-center justify-center text-white shadow-md shadow-orange-500/20 group-hover:scale-105 transition-transform shrink-0">
-              <Layers className="w-5 h-5 text-white stroke-[2.5]" />
+            {/* Official App Logo Icon */}
+            <div className="w-10 h-10 rounded-2xl bg-orange-500/10 border border-orange-500/20 p-1 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0 shadow-xs dark:bg-orange-500/15 dark:border-orange-500/30">
+              <img src="/app-icon.png" alt="QueueUp Icon" className="w-full h-full object-contain" />
             </div>
             {/* App Name */}
             <div>
@@ -114,18 +107,7 @@ export const Navbar: React.FC = () => {
                 <span>เข้าสู่ระบบ / สมัครสมาชิก</span>
               </button>
 
-              {/* 2. ปุ่มเกี่ยวกับเรา (Outline Pill) */}
-              <a
-                href="/about"
-                onClick={handleGoToAbout}
-                className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-bold border border-stone-200/90 hover:border-orange-300 bg-white hover:bg-orange-50/60 text-stone-700 hover:text-stone-900 dark:bg-zinc-900/90 dark:border-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-800 transition-all cursor-pointer no-underline shadow-2xs"
-                title="เกี่ยวกับเรา และรายงานโครงการ"
-              >
-                <Sparkles className="w-4 h-4 text-orange-500 shrink-0" />
-                <span>เกี่ยวกับเรา</span>
-              </a>
-
-              {/* 3. ปุ่มช่วยเหลือ (Outline Pill) */}
+              {/* 2. ปุ่มช่วยเหลือ (Outline Pill) */}
               <button
                 onClick={() => setIsHelpModalOpen(true)}
                 className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-bold border border-stone-200/90 hover:border-orange-300 bg-white hover:bg-orange-50/60 text-stone-700 hover:text-stone-900 dark:bg-zinc-900/90 dark:border-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-800 transition-all cursor-pointer shadow-2xs"
