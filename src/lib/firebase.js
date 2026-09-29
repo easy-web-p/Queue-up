@@ -21,17 +21,17 @@ export async function fetchShopsFromFirestore() {
 }
 
 export async function fetchProductsFromFirestore() {
-  // `menu_items` is canonical; `food_items` is still read so records written
-  // under the old collection name keep appearing during the migration.
+  // menu_items is the canonical collection and the only one rules expose to a
+  // client. The old food_items name was read here too, but there is no rule for
+  // it, so that read was refused on every call and contributed nothing except a
+  // console warning on each page load.
   const byId = new Map();
 
-  for (const collectionName of ['food_items', 'menu_items']) {
-    try {
-      const snap = await getDocs(collection(db, collectionName));
-      snap.docs.forEach((d) => byId.set(d.id, { id: d.id, ...d.data() }));
-    } catch (err) {
-      console.warn(`[Firebase] fetchProducts ${collectionName} note:`, err);
-    }
+  try {
+    const snap = await getDocs(collection(db, 'menu_items'));
+    snap.docs.forEach((d) => byId.set(d.id, { id: d.id, ...d.data() }));
+  } catch (err) {
+    console.warn('[Firebase] fetchProducts note:', err);
   }
 
   return byId.size > 0 ? Array.from(byId.values()) : FOOD_ITEMS;

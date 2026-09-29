@@ -131,6 +131,33 @@ async function runTests() {
     else process.env.CRON_SECRET = priorSecret;
   }
 
+  // --- A discontinued integration must say so ---
+  console.log('\n--- LINE Notify ---');
+  const { LineNotifyService } = await import('../services/lineNotifyService.js');
+
+  const priorEndpoint = process.env.LINE_NOTIFY_ENDPOINT;
+  delete process.env.LINE_NOTIFY_ENDPOINT;
+
+  let lineResult = await LineNotifyService.send({ token: 'test-token', message: 'hello' });
+  check(lineResult.success === false && lineResult.reason === 'LINE_NOTIFY_DISCONTINUED',
+    'With no replacement configured, LINE sends refuse instead of calling a dead endpoint',
+    `reason ${lineResult.reason}`);
+  check(/2025-03-31/.test(lineResult.error || ''),
+    'And say when the service was shut down, so a stale token is not debugged for hours');
+
+  process.env.LINE_NOTIFY_ENDPOINT = 'https://notify-api.line.me/api/notify';
+  lineResult = await LineNotifyService.send({ token: 'test-token', message: 'hello' });
+  check(lineResult.reason === 'LINE_NOTIFY_DISCONTINUED',
+    'Pointing it back at the discontinued endpoint is recognised, not retried',
+    `reason ${lineResult.reason}`);
+
+  lineResult = await LineNotifyService.send({ message: 'no token' });
+  check(lineResult.reason === 'NO_TOKEN_CONFIGURED',
+    'A missing token is still reported as a missing token', `reason ${lineResult.reason}`);
+
+  if (priorEndpoint === undefined) delete process.env.LINE_NOTIFY_ENDPOINT;
+  else process.env.LINE_NOTIFY_ENDPOINT = priorEndpoint;
+
   // --- A misconfigured deployment must name what is missing ---
   // Throwing at import would take the health probe down with everything else,
   // leaving an operator with an opaque 500 and nothing to act on.

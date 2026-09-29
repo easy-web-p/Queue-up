@@ -1,7 +1,25 @@
 /**
- * LINE Notify Service for QueueUp
- * Dispatches real-time queue, order, and status alerts to LINE.
+ * LINE alerts for QueueUp.
+ *
+ * LINE shut LINE Notify down on 31 March 2025, so notify-api.line.me answers
+ * nothing useful any more. Every call from here was a request that could only
+ * fail — quietly, since the failure was logged and swallowed — while still
+ * costing a round trip on a serverless function with no timeout on it.
+ *
+ * Rather than delete the integration and the token plumbing around it, the
+ * service now refuses immediately and says why, so nobody spends an afternoon
+ * wondering why their token does not work. Setting LINE_NOTIFY_ENDPOINT points
+ * it at a replacement — the LINE Messaging API, or a bridge of your own — and
+ * it starts sending again, with a timeout so a hanging endpoint can never hold
+ * a function open.
  */
+
+/** Discontinued 2025-03-31. Kept to recognise a stale configuration. */
+const DISCONTINUED_ENDPOINT = 'https://notify-api.line.me/api/notify';
+
+/** How long to wait before giving up on whatever endpoint is configured. */
+const SEND_TIMEOUT_MS = 5000;
+
 export class LineNotifyService {
   /**
    * Send notification via LINE Notify API
@@ -20,8 +38,18 @@ export class LineNotifyService {
       return { success: false, reason: 'EMPTY_MESSAGE' };
     }
 
+    const endpoint = (process.env.LINE_NOTIFY_ENDPOINT || '').trim();
+    if (!endpoint || endpoint === DISCONTINUED_ENDPOINT) {
+      return {
+        success: false,
+        reason: 'LINE_NOTIFY_DISCONTINUED',
+        error: 'LINE Notify was shut down on 2025-03-31. Set LINE_NOTIFY_ENDPOINT to a '
+          + 'replacement (the LINE Messaging API, or your own bridge) to send LINE alerts again.'
+      };
+    }
+
     try {
-      const response = await fetch('https://notify-api.line.me/api/notify', {
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -29,7 +57,10 @@ export class LineNotifyService {
         },
         body: new URLSearchParams({
           message: `\n${message}`
-        })
+        }),
+        // Without this a hanging endpoint holds a serverless invocation open
+        // until the platform kills it.
+        signal: AbortSignal.timeout(SEND_TIMEOUT_MS)
       });
 
       if (response.ok) {

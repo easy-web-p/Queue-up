@@ -297,6 +297,17 @@ notificationRouter.post('/test-line', authenticate, async (req, res) => {
       message: message || '🟢 [QueueUp] ทดสอบการเชื่อมต่อ LINE Notify สำเร็จเรียบร้อยแล้วค่ะ!'
     });
 
+    // A token that cannot work no matter how correct it is deserves a clearer
+    // answer than "send failed".
+    if (result.reason === 'LINE_NOTIFY_DISCONTINUED') {
+      return res.status(503).json({
+        success: false,
+        error: 'LINE_NOTIFY_DISCONTINUED',
+        message: 'LINE ปิดบริการ LINE Notify ตั้งแต่ 31 มีนาคม 2025 แล้ว '
+          + 'การแจ้งเตือนหลักของ QueueUp ใช้ FCM และกล่องข้อความในแอปแทน'
+      });
+    }
+
     if (result.success) {
       return res.status(200).json({
         success: true,
