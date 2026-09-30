@@ -12,7 +12,6 @@ import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/f
 import { setupForegroundPushListener, syncPushTokenOnBoot } from '../services/pushTokenService';
 import { playChimeSound } from '../services/soundService';
 import { FirebaseDataService } from '../services/firebaseDataService';
-import { seedCanteensToFirestore } from '../services/canteenService';
 import { otpService } from '../services/otpService';
 import {
   UserLocationPoint,
@@ -100,7 +99,7 @@ interface QueueContextType {
     specialNote?: string;
     reservationId?: string;
     slotId?: string;
-  }) => QueueOrder;
+  }) => Promise<QueueOrder>;
   updateOrderStatus: (orderId: string, status: QueueStatus) => void;
   cancelOrder: (orderId: string) => void;
 
@@ -136,8 +135,8 @@ interface QueueContextType {
   openCreateStore: () => void;
   openStoreAdmin: (storeId?: string) => void;
   addNewStore: (newStoreData: Partial<Store>, initialMenuItems?: Partial<FoodItem>[]) => Promise<Store>;
-  updateStore: (storeId: string, updatedData: Partial<Store>) => void;
-  deleteStore: (storeId: string) => void;
+  updateStore: (storeId: string, updatedData: Partial<Store>) => Promise<void>;
+  deleteStore: (storeId: string) => Promise<void>;
   seedDemoQueuesForStore: (storeId: string) => void;
   kdsSelectedStoreId: string | null;
   setKdsSelectedStoreId: (storeId: string | null) => void;
@@ -296,7 +295,11 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Periodically refresh current time for Auto theme calculation & auto-sync canteens to Firestore
   useEffect(() => {
-    seedCanteensToFirestore().catch(err => console.warn('Firestore canteens auto-sync:', err));
+    // The canteen seeder used to run here on every boot. Rules let only a
+    // platform admin write that collection, so for everyone else it was twelve
+    // refused writes per page load — and for an admin it wrote the bundled demo
+    // canteens into production. Seed it from the server if it needs seeding.
+
   }, []);
   useEffect(() => {
     const timer = setInterval(() => {
@@ -1736,46 +1739,93 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   // Update existing store details (Logo, cover image, name, info, payment)
-  const updateStore = (storeId: string, updatedData: Partial<Store>) => {
-    setStores(prev => {
-      const updated = prev.map(s => {
-        if (s.id === storeId) {
-          return {
-            ...s,
-            ...updatedData,
-            image: updatedData.coverImage || updatedData.image || s.image,
-            logo: updatedData.logo || s.logo
-          };
-        }
-        return s;
+  /**
+   * Saves a shop's details through the API.
+   *
+   * This used to write the whole store array back to Firestore in a loop. Rules
+   * only let an owner write their own store, so the loop threw on the first one
+   * belonging to somebody else and stopped — sometimes before reaching the shop
+   * that had just been edited — and the toast said "saved" regardless.
+   */
+  const updateStore = async (storeId: string, updatedData: Partial<Store>) => {
+    try {
+      const { store } = await apiClient.updateStore(storeId, {
+        name: updatedData.name,
+        nameEn: updatedData.nameEn,
+        description: updatedData.description,
+        address: updatedData.address,
+        ownerName: updatedData.ownerName,
+        ownerPhone: updatedData.ownerPhone,
+        promptPayNumber: updatedData.promptPayNumber,
+        category: updatedData.category,
+        priceRange: updatedData.priceRange,
+        averageWaitMinutes: updatedData.averageWaitMinutes,
+        isOpen: updatedData.isOpen,
+        logo: updatedData.logo,
+        coverImage: updatedData.coverImage,
+        image: updatedData.coverImage || updatedData.image,
+        tags: updatedData.tags
       });
-      try {
-        localStorage.setItem('queueup_stores_v4', JSON.stringify(updated));
-      } catch (e) {
-        console.error('Failed to persist stores:', e);
-      }
-      FirebaseDataService.syncStoresToFirestore(updated);
-      return updated;
-    });
-    addToast('อัปเดตข้อมูลร้านค้าเรียบร้อย', 'ข้อมูลร้านและรูปภาพได้รับการบันทึกแล้ว', 'success');
+
+      const saved = store as unknown as Store;
+      setStores(prev => {
+        const updated = prev.map(s => (s.id === storeId ? { ...s, ...saved } : s));
+        try {
+          localStorage.setItem('queueup_stores_v4', JSON.stringify(updated));
+        } catch (e) {
+          console.error('Failed to persist stores:', e);
+        }
+        return updated;
+      });
+
+      addToast('อัปเดตข้อมูลร้านค้าเรียบร้อย', 'ข้อมูลร้านและรูปภาพได้รับการบันทึกแล้ว', 'success');
+    } catch (err) {
+      addToast(
+        'บันทึกข้อมูลร้านค้าไม่สำเร็จ',
+        err instanceof Error ? err.message : 'กรุณาลองใหม่อีกครั้ง',
+        'error'
+      );
+      throw err;
+    }
   };
 
   // Delete store (Used by Admin or Merchant for cleaning up test stores like "ก๋ดัด")
-  const deleteStore = (storeId: string) => {
+  /**
+   * Deletes a shop through the API.
+   *
+   * Deleting used to mean writing the *remaining* stores back to Firestore,
+   * which deletes nothing: the shop stayed in the database and reappeared on the
+   * next refresh, having already been announced as deleted. The server also
+   * refuses to erase a shop that has orders, since that history belongs to
+   * customers — it is closed instead.
+   */
+  const deleteStore = async (storeId: string) => {
+    const targetStore = stores.find(s => s.id === storeId);
+
+    try {
+      await apiClient.deleteStore(storeId);
+    } catch (err) {
+      addToast(
+        'ลบร้านค้าไม่สำเร็จ',
+        err instanceof Error ? err.message : 'กรุณาลองใหม่อีกครั้ง',
+        'error'
+      );
+      throw err;
+    }
+
     setStores(prev => {
-      const targetStore = prev.find(s => s.id === storeId);
       const filtered = prev.filter(s => s.id !== storeId);
       try {
         localStorage.setItem('queueup_stores_v4', JSON.stringify(filtered));
       } catch (e) {
         console.error(e);
       }
-      FirebaseDataService.syncStoresToFirestore(filtered);
-      if (targetStore) {
-        addToast('ลบร้านค้าเรียบร้อย', `ลบร้าน "${targetStore.name}" ออกจากระบบแล้ว`, 'info');
-      }
       return filtered;
     });
+
+    if (targetStore) {
+      addToast('ลบร้านค้าเรียบร้อย', `ลบร้าน "${targetStore.name}" ออกจากระบบแล้ว`, 'info');
+    }
 
     // Clean up queues and foods of that store
     setQueues(prev => {
@@ -2496,7 +2546,7 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const cartItemCount = cart.reduce((acc, item) => acc + item.quantity, 0);
 
   // Place order -> Authoritative pipeline (Allergen check, Security shield, Slot limit, Satang accuracy)
-  const placeOrder = ({
+  const placeOrder = async ({
     customerName,
     customerPhone,
     pickupTime,
@@ -2512,7 +2562,7 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     specialNote?: string;
     reservationId?: string;
     slotId?: string;
-  }): QueueOrder => {
+  }): Promise<QueueOrder> => {
     const targetStore = stores.find(s => s.id === (cart[0]?.food.storeId || 'store-1')) || stores[0];
 
     // Execute Authoritative Core Tier Validation
@@ -2543,12 +2593,77 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       throw new Error(authResult.error?.message || 'Authoritative order creation failed');
     }
 
-    const newOrder = authResult.order;
+    // Built locally for the pre-flight checks above only. The record the
+    // customer is shown comes from the server, below.
+    const draftOrder = authResult.order;
 
     // Notify allergen warning if detected
     if (authResult.allergenWarning?.warningMessage) {
       addToast('ข้อควรระวังสารก่อภูมิแพ้', authResult.allergenWarning.warningMessage, 'warning');
     }
+
+    // The server creates the order. This used to be fired without being
+    // awaited, with its errors logged and dropped, while the screen moved on to
+    // tracking a locally-built order: a customer could be shown a confirmed
+    // queue number for an order the server had refused, and the shop would
+    // never see it. CheckoutModal then called this endpoint a second time with
+    // a different idempotency key, so an ordinary checkout created two orders —
+    // and a Campus Wallet checkout was debited twice.
+    const idempotencyKey = reservationId
+      || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `idemp_${Date.now()}`);
+
+    let serverResult;
+    try {
+      serverResult = await apiClient.createOrder({
+        storeId: targetStore.id,
+        items: cart.map(i => ({
+          menuItemId: i.food.id,
+          quantity: i.quantity,
+          selectedOptions: i.selectedOptions?.map(o => ({
+            groupName: o.groupName || '',
+            choiceName: o.choiceName,
+            priceDelta: o.priceDelta
+          })),
+          specialNote: i.specialNote
+        })),
+        paymentMethod,
+        allergenAcknowledged: true,
+        customerId: currentUser?.id,
+        customerEmail: currentUser?.email,
+        customerName: draftOrder.customerName,
+        customerPhone: draftOrder.customerPhone,
+        pickupTime,
+        specialNote,
+        reservationId,
+        slotId,
+        workload: cart.reduce((sum, item) => sum + (item.quantity || 1), 0),
+        idempotencyKey
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'ไม่สามารถสร้างคำสั่งซื้อได้';
+      addToast('สั่งอาหารไม่สำเร็จ', message, 'error');
+      throw err instanceof Error ? err : new Error(message);
+    }
+
+    const serverOrder = serverResult.order as unknown as Record<string, unknown> | undefined;
+
+    // The server decides the id, the amount and the queue number — a queue
+    // number only exists once the shop accepts, so orderNumber reads
+    // "รอร้านค้ายืนยัน" until then rather than a number invented here.
+    const newOrder: QueueOrder = {
+      ...draftOrder,
+      id: serverResult.orderId || draftOrder.id,
+      queueNumber: (serverResult.orderNumber as string) || 'รอร้านค้ายืนยัน',
+      total: typeof serverOrder?.total === 'number' ? serverOrder.total : draftOrder.total,
+      subtotal: typeof serverOrder?.subtotal === 'number' ? serverOrder.subtotal : draftOrder.subtotal,
+      discount: typeof serverOrder?.discount === 'number' ? serverOrder.discount : draftOrder.discount,
+      status: (serverOrder?.status as QueueOrder['status']) || draftOrder.status,
+      paymentStatus: serverOrder?.paymentStatus === 'PAID' ? 'PAID' : 'PENDING',
+      exchangePin: (serverResult.exchangePin as string) || draftOrder.exchangePin,
+      serverCreatedAt: (serverOrder?.createdAt as string) || draftOrder.serverCreatedAt,
+      version: typeof serverOrder?.version === 'number' ? serverOrder.version : draftOrder.version,
+      idempotencyKey
+    };
 
     // Record in merchant audit ledger
     MerchantService.recordAudit({
@@ -2569,33 +2684,10 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Clear draft cart in LocalStorage
     cartStorage.clearCart();
 
-    // Command Model: Send authoritative order creation to Express API transaction
-    const idempotencyKey = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `idemp_${Date.now()}`;
-    apiClient.createOrder({
-      storeId: targetStore.id,
-      items: cart.map(i => ({
-        menuItemId: i.food.id,
-        quantity: i.quantity,
-        selectedOptions: i.selectedOptions,
-        specialNote: i.specialNote
-      })),
-      paymentMethod,
-      allergenAcknowledged: true,
-      customerId: currentUser?.id,
-      customerEmail: currentUser?.email,
-      customerName: newOrder.customerName,
-      customerPhone: newOrder.customerPhone,
-      pickupTime,
-      specialNote,
-      idempotencyKey
-    }).catch(err => {
-      console.warn('[QueueContext] Express API createOrder async handled:', err);
-    });
-
-    // Firestore SDK persistent cache write
-    FirebaseDataService.saveOrder(newOrder).catch(err => {
-      console.warn('Firebase order save handled:', err);
-    });
+    // The order is already created above, once, and awaited. It is cached
+    // locally so the tracking screen survives a refresh; the Firestore write
+    // that used to sit here was refused by rules on every call.
+    FirebaseDataService.cacheOrderLocally(newOrder);
 
     logAnalyticsEvent('purchase', {
       transaction_id: newOrder.id,
@@ -2604,7 +2696,16 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       items_count: newOrder.items.length
     });
 
-    addToast('จองคิวสำเร็จ!', `หมายเลขคิวของคุณคือ ${newOrder.queueNumber}`, 'success');
+    // A queue number is issued when the shop accepts, so until then say that
+    // rather than reading an invented number back to the customer.
+    const hasQueueNumber = /^[A-Za-z]?\d+$/.test(newOrder.queueNumber || '');
+    addToast(
+      'ส่งคำสั่งซื้อสำเร็จ!',
+      hasQueueNumber
+        ? `หมายเลขคิวของคุณคือ ${newOrder.queueNumber}`
+        : 'ระบบได้รับออเดอร์แล้ว รอร้านค้ายืนยันและออกหมายเลขคิวค่ะ',
+      'success'
+    );
     return newOrder;
   };
 

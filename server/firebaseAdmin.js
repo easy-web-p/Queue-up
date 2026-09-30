@@ -192,20 +192,13 @@ if (!adminDb && !adminInitError) {
 
     async get() {
       loadFromDisk();
-      let data = memoryStore[this.fullKey];
+      const data = memoryStore[this.fullKey];
 
-      // Auto-provision default store if reading stores collection
-      if (!data && this.collectionPath === 'stores') {
-        data = {
-          id: this.id,
-          name: 'QueueUp Express Kitchen',
-          isOpen: true,
-          currentQueueCount: 0,
-          contactChannels: { line: '@queueup', tel: '081-234-5678' }
-        };
-        memoryStore[this.fullKey] = data;
-        saveToDisk();
-      }
+      // Reading a missing store used to create one here, named "QueueUp Express
+      // Kitchen". So `exists` was never false for a store: no test could show a
+      // shop was absent, deleting one appeared to fail because the verifying read
+      // put it back, and every STORE_NOT_FOUND path passed against any id at all.
+      // A fixture that invents data hides the bugs it is supposed to catch.
 
       return {
         exists: !!data,

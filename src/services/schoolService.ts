@@ -154,104 +154,17 @@ export const SchoolService = {
         return { success: true, schoolId: res.schoolId };
       }
     } catch (err) {
-      console.warn('[SchoolService] Approval API unavailable, falling back to local store:', err);
+      // No local fallback. Approval creates a school, imports its roster and
+      // issues the custom claims that firestore.rules read — and only the server
+      // can set claims. Writing the documents from here produced a school whose
+      // members the rules did not recognise, so a failure is reported instead.
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`ไม่สามารถอนุมัติสถานศึกษาได้: ${message}`);
     }
 
-    const applications = await this.fetchApplications();
-    const app = applications.find(a => a.id === applicationId);
-
-    if (!app) {
-      throw new Error(`ไม่พบคำขอสมัครรหัส ${applicationId}`);
-    }
-
-    const schoolId = app.schoolData.schoolCode || `SCH_${Date.now()}`;
-    const approvedAt = new Date().toISOString();
-
-    const newSchool: School = {
-      schoolId,
-      schoolCode: app.schoolData.schoolCode,
-      schoolName: app.schoolData.schoolName,
-      province: app.schoolData.province,
-      contactEmail: app.schoolData.contactEmail,
-      contactPhone: app.schoolData.contactPhone,
-      emailDomain: app.schoolData.emailDomain,
-      status: 'active',
-      totalStudents: app.memberStats.studentCount,
-      totalAdmins: app.memberStats.adminCount,
-      totalStores: 0,
-      createdAt: app.submittedAt,
-      approvedAt
-    };
-
-    // สร้าง School Members
-    const membersToCreate: SchoolMember[] = app.parsedMembers.map(m => ({
-      id: `${schoolId}_${m.id}`,
-      schoolId,
-      identifier: m.id,
-      fullName: m.fullName,
-      email: m.email,
-      phone: m.phone,
-      classRoom: m.classRoom,
-      role: m.type,
-      status: 'active',
-      isRegistered: false,
-      createdAt: approvedAt
-    }));
-
-    // 1. บันทึกลง LocalStorage
-    try {
-      // อัปเดต application
-      const updatedApps = applications.map(a => 
-        a.id === applicationId 
-          ? { ...a, status: 'approved' as const, reviewedAt: approvedAt, reviewedBy } 
-          : a
-      );
-      localStorage.setItem(LOCAL_STORAGE_APPLICATIONS_KEY, JSON.stringify(updatedApps));
-
-      // บันทึก school
-      const localSchoolsStr = localStorage.getItem(LOCAL_STORAGE_SCHOOLS_KEY);
-      const localSchools: School[] = localSchoolsStr ? JSON.parse(localSchoolsStr) : [];
-      const updatedSchools = [newSchool, ...localSchools.filter(s => s.schoolId !== schoolId)];
-      localStorage.setItem(LOCAL_STORAGE_SCHOOLS_KEY, JSON.stringify(updatedSchools));
-
-      // บันทึก members
-      const localMembersStr = localStorage.getItem(LOCAL_STORAGE_MEMBERS_KEY);
-      const localMembers: SchoolMember[] = localMembersStr ? JSON.parse(localMembersStr) : [];
-      const updatedMembers = [...membersToCreate, ...localMembers.filter(m => m.schoolId !== schoolId)];
-      localStorage.setItem(LOCAL_STORAGE_MEMBERS_KEY, JSON.stringify(updatedMembers));
-    } catch (e) {
-      console.warn('LocalStorage approve update error:', e);
-    }
-
-    // 2. บันทึกลง Cloud Firestore
-    try {
-      // Update application
-      const appRef = doc(db, SCHOOL_APPLICATIONS_COLLECTION, applicationId);
-      await updateDoc(appRef, {
-        status: 'approved',
-        reviewedAt: approvedAt,
-        reviewedBy
-      });
-
-      // Set school
-      const schoolRef = doc(db, SCHOOLS_COLLECTION, schoolId);
-      await setDoc(schoolRef, newSchool);
-
-      // Set members
-      for (const member of membersToCreate) {
-        const memberRef = doc(db, SCHOOL_MEMBERS_COLLECTION, member.id);
-        await setDoc(memberRef, member);
-      }
-    } catch (err) {
-      console.warn('Firestore approval sync fallback to local:', err);
-    }
-
-    return { success: true, schoolId };
+    throw new Error('ไม่สามารถอนุมัติสถานศึกษาได้ กรุณาลองใหม่อีกครั้ง');
   },
 
-  /**
-   * ปฏิเสธคำขอสมัครสถานศึกษา (Reject School Application)
-   */
   async rejectApplication(applicationId: string, rejectionReason: string, reviewedBy: string = 'SuperAdmin'): Promise<{ success: boolean }> {
     try {
       const res = await apiClient.post<{ success: boolean }>(
@@ -260,43 +173,15 @@ export const SchoolService = {
       );
       if (res?.success) return { success: true };
     } catch (err) {
-      console.warn('[SchoolService] Rejection API unavailable, falling back to local store:', err);
+      // Rejection is recorded on the application, which only a platform admin
+      // may write. A local copy of that decision helps nobody.
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`ไม่สามารถปฏิเสธคำขอได้: ${message}`);
     }
 
-    const applications = await this.fetchApplications();
-    const reviewedAt = new Date().toISOString();
-
-    // 1. LocalStorage
-    try {
-      const updatedApps = applications.map(a => 
-        a.id === applicationId 
-          ? { ...a, status: 'rejected' as const, rejectionReason, reviewedAt, reviewedBy } 
-          : a
-      );
-      localStorage.setItem(LOCAL_STORAGE_APPLICATIONS_KEY, JSON.stringify(updatedApps));
-    } catch (e) {
-      console.warn('LocalStorage reject update error:', e);
-    }
-
-    // 2. Firestore
-    try {
-      const appRef = doc(db, SCHOOL_APPLICATIONS_COLLECTION, applicationId);
-      await updateDoc(appRef, {
-        status: 'rejected',
-        rejectionReason,
-        reviewedAt,
-        reviewedBy
-      });
-    } catch (err) {
-      console.warn('Firestore reject update error:', err);
-    }
-
-    return { success: true };
+    throw new Error('ไม่สามารถปฏิเสธคำขอได้ กรุณาลองใหม่อีกครั้ง');
   },
 
-  /**
-   * ดึงรายชื่อสถานศึกษาทั้งหมดที่ Active
-   */
   async fetchSchools(): Promise<School[]> {
     let list: School[] = [];
     try {

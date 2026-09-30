@@ -91,8 +91,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     ].filter(Boolean).join(' ');
 
     try {
-      // 1. Create authoritative order via Command Model (with reservationId -> orderId = reservationId)
-      const newOrder = placeOrder({
+      // 1. Create the order. placeOrder awaits the server and returns the record
+      // the server actually created, so a refusal lands in the catch below
+      // instead of being shown as a confirmed order.
+      const newOrder = await placeOrder({
         customerName: customerName.trim() || currentUser?.fullName || 'คุณลูกค้า',
         customerPhone: customerPhone.trim() || currentUser?.phone || '089-123-4567',
         pickupTime,
@@ -102,35 +104,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         slotId
       });
 
-      // Sync authoritative order with Express backend transaction
-      try {
-        await apiClient.createOrder({
-          storeId: cart[0]?.food?.storeId || 'store-1',
-          items: cart.map(i => ({
-            menuItemId: i.food.id,
-            quantity: i.quantity,
-            selectedOptions: i.selectedOptions?.map(o => ({
-              groupName: o.groupName || '',
-              choiceName: o.choiceName,
-              priceDelta: o.priceDelta
-            })),
-            specialNote: i.specialNote
-          })),
-          paymentMethod,
-          allergenAcknowledged: true,
-          customerId: currentUser?.id,
-          customerEmail: currentUser?.email,
-          customerName: customerName.trim() || currentUser?.fullName || 'คุณลูกค้า',
-          customerPhone: customerPhone.trim() || currentUser?.phone || '089-123-4567',
-          pickupTime,
-          specialNote: combinedNote || undefined,
-          reservationId,
-          slotId,
-          workload: cart.reduce((s, it) => s + (it.quantity || 1), 0)
-        });
-      } catch (backendErr) {
-        console.warn('[CheckoutModal] Express backend createOrder sync note:', backendErr);
-      }
+      // The duplicate createOrder call that used to sit here carried its own
+      // idempotency key, so every checkout without a slot reservation created
+      // two orders — and a Campus Wallet checkout was debited twice. placeOrder
+      // makes the one call.
 
       // 2. If online payment is selected for PromptPay or Card, initiate Stripe Checkout
       if (paymentMethod === 'CAMPUS_WALLET') {

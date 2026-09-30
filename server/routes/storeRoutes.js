@@ -14,7 +14,14 @@
 
 import { Router } from 'express';
 import { adminDb } from '../firebaseAdmin.js';
-import { authenticate } from '../middleware/authenticate.js';
+import {
+  authenticate,
+  requireStoreOwnership,
+  requireSuperAdmin
+} from '../middleware/authenticate.js';
+
+/** The shop a :storeId route targets. */
+const storeIdFromParam = (req) => req.params?.storeId || null;
 
 export const storeRouter = Router();
 
@@ -195,5 +202,115 @@ storeRouter.get('/mine', authenticate, async (req, res) => {
   } catch (err) {
     console.error('[Store API] List own stores error:', err);
     return res.status(500).json({ success: false, error: 'STORE_LIST_FAILED', message: err.message });
+  }
+});
+
+/**
+ * PATCH /api/stores/:storeId
+ * Edits a shop's own details.
+ *
+ * The browser used to persist edits by writing the whole store array back to
+ * Firestore in a loop. Rules only let an owner write their own store, so the
+ * loop threw on the first store belonging to somebody else and stopped — often
+ * before reaching the one that had actually been edited — while the screen said
+ * the change was saved.
+ */
+storeRouter.patch('/:storeId', authenticate, requireStoreOwnership(storeIdFromParam), async (req, res) => {
+  try {
+    const { storeId } = req.params;
+    const ref = adminDb.collection('stores').doc(storeId);
+    const snap = await ref.get();
+    if (!snap.exists) {
+      return res.status(404).json({ success: false, error: 'STORE_NOT_FOUND' });
+    }
+
+    const body = req.body || {};
+    const updates = { updatedAt: new Date().toISOString() };
+
+    // Only these, and never ownerId, schoolId or id: a shop may not move itself
+    // to another campus or another owner by editing its profile.
+    if (body.name !== undefined) {
+      const name = text(body.name, MAX_NAME);
+      if (!name) {
+        return res.status(400).json({
+          success: false,
+          error: 'STORE_NAME_REQUIRED',
+          message: 'ชื่อร้านค้าว่างไม่ได้'
+        });
+      }
+      updates.name = name;
+    }
+    if (body.nameEn !== undefined) updates.nameEn = text(body.nameEn, MAX_NAME);
+    if (body.description !== undefined) updates.description = text(body.description, MAX_TEXT);
+    if (body.address !== undefined) updates.address = text(body.address, MAX_TEXT);
+    if (body.ownerName !== undefined) updates.ownerName = text(body.ownerName, MAX_NAME);
+    if (body.ownerPhone !== undefined) updates.ownerPhone = text(body.ownerPhone, 32);
+    if (body.promptPayNumber !== undefined) updates.promptPayNumber = text(body.promptPayNumber, 32);
+    if (body.category !== undefined && CATEGORIES.has(body.category)) updates.category = body.category;
+    if (body.priceRange !== undefined && ['฿', '฿฿', '฿฿฿'].includes(body.priceRange)) {
+      updates.priceRange = body.priceRange;
+    }
+    if (body.averageWaitMinutes !== undefined) {
+      updates.averageWaitMinutes = Math.min(Math.max(Number(body.averageWaitMinutes) || 10, 1), 180);
+    }
+    if (body.isOpen !== undefined) updates.isOpen = body.isOpen === true;
+    if (body.logo !== undefined) updates.logo = httpsUrl(body.logo);
+    if (body.coverImage !== undefined) updates.coverImage = httpsUrl(body.coverImage);
+    if (body.image !== undefined) updates.image = httpsUrl(body.image);
+    if (Array.isArray(body.tags)) {
+      updates.tags = body.tags.map((tag) => text(tag, 40)).filter(Boolean).slice(0, 8);
+    }
+
+    await ref.set(updates, { merge: true });
+    const updated = (await ref.get()).data();
+
+    return res.status(200).json({ success: true, store: { id: storeId, ...updated } });
+  } catch (err) {
+    console.error('[Store API] Update store error:', err);
+    return res.status(500).json({ success: false, error: 'STORE_UPDATE_FAILED', message: err.message });
+  }
+});
+
+/**
+ * DELETE /api/stores/:storeId
+ * Removes a shop and its menu.
+ *
+ * Deleting used to mean writing the *remaining* stores back to Firestore, which
+ * deletes nothing — the shop stayed in the database and came back on the next
+ * refresh, having already been announced as deleted. Restricted to platform
+ * administrators, matching the rules, and refused outright once the shop has
+ * orders: that history belongs to customers, so such a shop is closed rather
+ * than erased.
+ */
+storeRouter.delete('/:storeId', authenticate, requireSuperAdmin, async (req, res) => {
+  try {
+    const { storeId } = req.params;
+    const ref = adminDb.collection('stores').doc(storeId);
+    if (!(await ref.get()).exists) {
+      return res.status(404).json({ success: false, error: 'STORE_NOT_FOUND' });
+    }
+
+    const orders = await adminDb.collection('orders').where('storeId', '==', storeId).get();
+    if (!orders.empty) {
+      return res.status(409).json({
+        success: false,
+        error: 'STORE_HAS_ORDERS',
+        message: `ร้านนี้มีประวัติคำสั่งซื้อ ${orders.size} รายการ จึงลบไม่ได้ `
+          + 'กรุณาปิดร้านแทน (isOpen: false) เพื่อไม่ให้ประวัติของลูกค้าหาย',
+        orderCount: orders.size
+      });
+    }
+
+    const menu = await adminDb.collection('menu_items').where('storeId', '==', storeId).get();
+    const batch = adminDb.batch();
+    for (const doc of menu.docs) batch.delete(doc.ref);
+    batch.delete(ref);
+    await batch.commit();
+
+    console.log(`[Store API] ${req.user.uid} deleted ${storeId} and ${menu.size} menu item(s).`);
+    return res.status(200).json({ success: true, storeId, deletedMenuItems: menu.size });
+  } catch (err) {
+    console.error('[Store API] Delete store error:', err);
+    return res.status(500).json({ success: false, error: 'STORE_DELETE_FAILED', message: err.message });
   }
 });

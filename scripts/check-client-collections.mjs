@@ -28,10 +28,14 @@ const RULES = 'firestore.rules';
  * as silently as one with no rule at all.
  */
 const CLIENT_WRITABLE = new Set([
-  'chats',        // messages and typing presence, scoped by participant
-  'notifications', // the recipient marking their own as read
-  'user_devices',  // a device registering its own push token
-  'users'          // a person editing their own profile
+  'chats',               // messages and typing presence, scoped by participant
+  'notifications',       // the recipient marking their own as read
+  'user_devices',        // a device registering its own push token
+  'users',               // a person editing their own profile
+  'menu_items',          // a shop editing its own menu (isStoreOperator)
+  'school_applications', // a school registering itself (create: if true)
+  'school_members',      // a member claiming the row that matches their email
+  'system_diagnostics'   // the admin diagnostics page probing write latency
 ]);
 
 /**
@@ -67,8 +71,12 @@ const ruled = new Set(
   [...rules.matchAll(/match\s+\/([a-zA-Z_][a-zA-Z0-9_]*)\//g)].map((m) => m[1])
 );
 
-// collection(db, 'name') / doc(db, 'name', ...) — a direct client access.
-const ACCESS = /\b(?:collection|doc)\(\s*db\s*,\s*['"]([a-z_][a-z0-9_]*)['"]/g;
+// collection(db, 'name') / doc(db, 'name', ...) — a direct client access. The
+// name is often a module constant rather than a literal, which is how
+// syncStoresToFirestore's write to `stores` slipped past an earlier version of
+// this check, so constants declared in the same file are resolved first.
+const ACCESS = /\b(?:collection|doc)\(\s*db\s*,\s*(?:['"]([a-z_][a-z0-9_]*)['"]|([A-Z][A-Z0-9_]*))/g;
+const CONST_DECL = /\bconst\s+([A-Z][A-Z0-9_]*)\s*=\s*['"]([a-z_][a-z0-9_]*)['"]/g;
 // The write calls, matched on the same line as the reference they act on.
 const WRITE_CALL = /\b(?:setDoc|addDoc|updateDoc|deleteDoc|writeBatch)\s*\(/;
 
@@ -79,8 +87,13 @@ for (const file of walk(SRC)) {
   const source = readFileSync(file, 'utf8');
   const lines = source.split('\n');
 
+  const constants = new Map(
+    [...source.matchAll(CONST_DECL)].map((m) => [m[1], m[2]])
+  );
+
   for (const match of source.matchAll(ACCESS)) {
-    const name = match[1];
+    const name = match[1] || constants.get(match[2]);
+    if (!name) continue;
     const line = source.slice(0, match.index).split('\n').length - 1;
 
     if (!ruled.has(name) && !SERVER_ONLY.has(name)) {
@@ -88,9 +101,11 @@ for (const file of walk(SRC)) {
       unruled.get(name).add(file);
     }
 
-    // A write is on the same line, or on one of the two before it — the shape
-    // `await setDoc(\n  doc(db, 'x', id),` spreads across lines.
-    const context = lines.slice(Math.max(0, line - 2), line + 1).join('\n');
+    // A write can sit on the same line, just above (`await setDoc(\n  doc(db,
+    // 'x', id),`), or just below (`const ref = doc(db, X, id);\n await
+    // setDoc(ref, …)`) — that last shape is how the write to `stores` hid from
+    // an earlier version of this check.
+    const context = lines.slice(Math.max(0, line - 2), line + 4).join('\n');
     if (WRITE_CALL.test(context) && !CLIENT_WRITABLE.has(name)) {
       if (!writes.has(name)) writes.set(name, new Set());
       writes.get(name).add(`${file}:${line + 1}`);
@@ -122,7 +137,34 @@ if (failed) {
   process.exit(1);
 }
 
+/**
+ * Creating an order must happen in exactly one place.
+ *
+ * It was called from two: placeOrder fired one, unawaited, and CheckoutModal
+ * fired another with its own idempotency key. Two keys mean two orders, so an
+ * ordinary checkout created two and a Campus Wallet checkout was debited twice.
+ * Nothing in this environment can drive a React checkout, so the invariant is
+ * held here instead.
+ */
+const CREATE_ORDER_CALL = /\bapiClient\.createOrder\s*\(/g;
+const createOrderSites = [];
+for (const file of walk(SRC)) {
+  const source = readFileSync(file, 'utf8');
+  for (const match of source.matchAll(CREATE_ORDER_CALL)) {
+    createOrderSites.push(`${file}:${source.slice(0, match.index).split('\n').length}`);
+  }
+}
+
+if (createOrderSites.length > 1) {
+  console.error('❌ apiClient.createOrder is called from more than one place:');
+  for (const site of createOrderSites) console.error(`   ${site}`);
+  console.error('\n   Each call generates its own idempotency key when none is given, so two');
+  console.error('   calls per checkout create two orders and charge a wallet twice.');
+  process.exit(1);
+}
+
 console.log(
   `✅ Client Firestore access is accounted for: ${ruled.size} ruled collections, `
   + `${CLIENT_WRITABLE.size} writable from the browser, ${SERVER_ONLY.size} server-only.`
 );
+console.log(`✅ Order creation has a single call site (${createOrderSites[0] || 'none found'}).`);

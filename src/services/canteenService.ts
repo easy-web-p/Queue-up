@@ -172,32 +172,14 @@ export const INITIAL_CANTEENS: Canteen[] = [
 const CANTEENS_COLLECTION = 'canteens';
 
 /**
- * Seed all 12 canteens to Firestore collection `canteens`.
- * Uses doc ID `canteen_${id}` so it is idempotent and won't duplicate.
+ * Seeding canteens from the browser was removed.
+ *
+ * Rules let only a platform admin write this collection, so on every page load
+ * it was twelve refused writes — and for an admin it wrote the bundled list into
+ * production. The list below is real reference data that ships with the app, so
+ * it is simply used when the collection is empty; seed it from the server if the
+ * database should hold it.
  */
-export async function seedCanteensToFirestore(): Promise<void> {
-  try {
-    for (const canteen of INITIAL_CANTEENS) {
-      const docRef = doc(db, CANTEENS_COLLECTION, `canteen_${canteen.id}`);
-      await setDoc(docRef, {
-        canteenId: canteen.id,
-        nameTh: canteen.nameTh,
-        nameEn: canteen.nameEn,
-        zone: canteen.zone,
-        lat: canteen.lat,
-        lng: canteen.lng,
-        openingHours: canteen.openingHours,
-        storeCount: canteen.storeCount,
-        smartTransit: canteen.smartTransit,
-        popularMenus: canteen.popularMenus,
-        mapsUrl: canteen.mapsUrl,
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
-    }
-  } catch (error) {
-    console.error('Error seeding canteens to Firestore:', error);
-  }
-}
 
 /**
  * Fetch canteens from Firestore with fallback to INITIAL_CANTEENS
@@ -207,11 +189,7 @@ export async function fetchCanteensFromFirestore(): Promise<Canteen[]> {
     const q = query(collection(db, CANTEENS_COLLECTION), orderBy('canteenId', 'asc'));
     const snapshot = await getDocs(q);
 
-    if (snapshot.empty) {
-      // Auto-seed if empty
-      await seedCanteensToFirestore();
-      return INITIAL_CANTEENS;
-    }
+    if (snapshot.empty) return INITIAL_CANTEENS;
 
     const canteens: Canteen[] = [];
     snapshot.forEach(docSnap => {
@@ -248,7 +226,7 @@ export function subscribeCanteens(callback: (canteens: Canteen[]) => void): () =
       q,
       (snapshot) => {
         if (snapshot.empty) {
-          seedCanteensToFirestore().then(() => callback(INITIAL_CANTEENS));
+          callback(INITIAL_CANTEENS);
           return;
         }
         const list: Canteen[] = [];

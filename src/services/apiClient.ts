@@ -642,6 +642,38 @@ class ApiClient {
     return data;
   }
 
+  /** Edits a shop the caller operates. */
+  async updateStore(
+    storeId: string,
+    patch: Record<string, unknown>
+  ): Promise<{ success: boolean; store: Record<string, unknown> }> {
+    const headers = await this.getAuthHeaders();
+    const response = await fetch(`${this.baseUrl}/stores/${encodeURIComponent(storeId)}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(patch)
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || data.error || 'ไม่สามารถบันทึกข้อมูลร้านค้าได้');
+    }
+    return data;
+  }
+
+  /** Removes a shop. Platform administrators only, and never one with orders. */
+  async deleteStore(storeId: string): Promise<{ success: boolean; deletedMenuItems: number }> {
+    const headers = await this.getAuthHeaders();
+    const response = await fetch(`${this.baseUrl}/stores/${encodeURIComponent(storeId)}`, {
+      method: 'DELETE',
+      headers
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || data.error || 'ไม่สามารถลบร้านค้าได้');
+    }
+    return data;
+  }
+
   /** The shops this account owns, as the server knows them. */
   async listMyStores(): Promise<{ success: boolean; stores: Record<string, unknown>[] }> {
     const headers = await this.getAuthHeaders();

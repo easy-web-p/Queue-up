@@ -177,6 +177,94 @@ async function runTests() {
     check(res.status === 409 && res.data?.error === 'STORE_LIMIT_REACHED',
       'One account cannot open shops without end', `${res.status} ${res.data?.error}`);
 
+    // --- Editing a shop ---
+    console.log('\n--- Editing a shop ---');
+    res = await api(`/api/stores/${store.id}`, 'PATCH', { name: 'ร้านไก่ทอดหาดใหญ่ สาขา 2' },
+      as(FOUNDER, { role: 'merchant' }));
+    check(res.status === 200 && res.data?.store?.name === 'ร้านไก่ทอดหาดใหญ่ สาขา 2',
+      'The owner renames their shop and it persists', `status ${res.status}`);
+
+    let saved = (await adminDb.collection('stores').doc(store.id).get()).data();
+    check(saved.name === 'ร้านไก่ทอดหาดใหญ่ สาขา 2',
+      'The database holds the new name, not just the screen', `"${saved.name}"`);
+
+    res = await api(`/api/stores/${store.id}`, 'PATCH', {
+      ownerId: OTHER, schoolId: 'CHULA', id: 'something-else', rating: 5
+    }, as(FOUNDER, { role: 'merchant' }));
+    saved = (await adminDb.collection('stores').doc(store.id).get()).data();
+    check(saved.ownerId === FOUNDER && saved.schoolId === 'KKU',
+      'An edit cannot hand the shop to someone else or move it to another campus',
+      `owner ${saved.ownerId}, school ${saved.schoolId}`);
+
+    res = await api(`/api/stores/${store.id}`, 'PATCH', { name: '   ' },
+      as(FOUNDER, { role: 'merchant' }));
+    check(res.status === 400, 'It cannot be renamed to nothing', `status ${res.status}`);
+
+    res = await api(`/api/stores/${store.id}`, 'PATCH', { name: 'ยึดร้าน' }, as(OTHER));
+    check(res.status === 403, 'Somebody else cannot edit it', `status ${res.status}`);
+
+    res = await api(`/api/stores/${store.id}`, 'PATCH', { isOpen: false },
+      as(FOUNDER, { role: 'merchant' }));
+    saved = (await adminDb.collection('stores').doc(store.id).get()).data();
+    check(res.status === 200 && saved.isOpen === false,
+      'A shop can close itself', `isOpen ${saved.isOpen}`);
+
+    // --- Deleting a shop ---
+    console.log('\n--- Deleting a shop ---');
+    res = await api(`/api/stores/${store.id}`, 'DELETE', null, as(FOUNDER, { role: 'merchant' }));
+    check(res.status === 403,
+      'A shop owner cannot delete their own shop', `status ${res.status}`);
+
+    // store.id has the order placed earlier in this suite.
+    res = await api(`/api/stores/${store.id}`, 'DELETE', null,
+      as(`root-${suffix}`, { role: 'admin' }));
+    check(res.status === 409 && res.data?.error === 'STORE_HAS_ORDERS',
+      'Not even an administrator erases a shop with order history',
+      `${res.status} ${res.data?.error}`);
+    check(Boolean((await adminDb.collection('stores').doc(store.id).get()).exists),
+      'So the shop is still there — a delete that deletes nothing must not say it did');
+
+    const emptyRes = await api('/api/stores', 'POST', {
+      name: 'ร้านไม่มีออเดอร์',
+      initialMenuItems: [{ name: 'เมนูเดียว', price: 20 }]
+    }, as(`solo-${suffix}`));
+    const emptyStore = emptyRes.data?.store;
+    const emptyMenuId = emptyRes.data?.menuItems?.[0]?.id;
+
+    res = await api(`/api/stores/${emptyStore.id}`, 'DELETE', null,
+      as(`root-${suffix}`, { role: 'admin' }));
+    check(res.status === 200 && res.data?.deletedMenuItems === 1,
+      'A shop with no orders is deleted, menu and all', `status ${res.status}`);
+    check(!(await adminDb.collection('stores').doc(emptyStore.id).get()).exists,
+      'And it is really gone from the database');
+    check(!(await adminDb.collection('menu_items').doc(emptyMenuId).get()).exists,
+      'Its menu items go with it rather than being orphaned');
+
+    res = await api(`/api/stores/does-not-exist`, 'DELETE', null,
+      as(`root-${suffix}`, { role: 'admin' }));
+    check(res.status === 404, 'Deleting a shop that never existed is a 404', `status ${res.status}`);
+
+    // --- A shop that does not exist is not a shop ---
+    // The local store used to invent a store document on any read of a missing
+    // one, so `exists` was never false: every not-found path passed against any
+    // id, and none of them was really being tested.
+    console.log('\n--- An order against a shop that does not exist ---');
+    res = await api('/api/orders', 'POST', {
+      storeId: 'store-never-created',
+      items: [{ menuItemId: 'menu-imaginary', quantity: 1 }],
+      paymentMethod: 'cash',
+      idempotencyKey: `ghost-store-${suffix}`
+    }, as(`customer-ghost-${suffix}`));
+    check(res.status === 400 && /STORE_NOT_FOUND/.test(res.data?.message || ''),
+      'Ordering from a shop that was never created is refused',
+      `${res.status} ${(res.data?.message || '').slice(0, 40)}`);
+
+    res = await api(`/api/stores/${emptyStore.id}`, 'PATCH', { name: 'ผีร้าน' },
+      as(`root-${suffix}`, { role: 'admin' }));
+    check(res.status === 404,
+      'And the shop just deleted cannot be edited back into existence',
+      `status ${res.status}`);
+
     console.log('\n===============================================================');
     console.log(`📊 STORE CREATION RESULTS: ${passed}/${total} Passed (${passed === total ? 'ALL PASSED' : 'FAILURES DETECTED'})`);
     console.log('===============================================================\n');

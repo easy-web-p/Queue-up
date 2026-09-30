@@ -135,6 +135,7 @@ export function createApp({ serveStatic = true } = {}) {
   app.post('/api/platform/payment-exceptions/:id/resolve', writeLimiter);
   app.post('/api/schools/membership/claim', writeLimiter);
   app.post('/api/stores', writeLimiter);
+  app.patch('/api/stores/:storeId', writeLimiter);
   app.post('/api/evaluations', writeLimiter);
   app.post('/api/pilot-leads', writeLimiter);
   app.post('/api/surveys', writeLimiter);

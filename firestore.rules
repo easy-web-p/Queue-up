@@ -288,6 +288,15 @@ service cloud.firestore {
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
     }
 
+    // 12a. Connectivity diagnostics.
+    // The admin diagnostics page measures write latency by writing a throwaway
+    // document. With no rule the write was refused, so the page reported the
+    // database unreachable on a perfectly healthy project. Platform admins only,
+    // since that is who the page is for.
+    match /system_diagnostics/{probeId} {
+      allow read, write: if isSuperAdmin();
+    }
+
     // 12b. Canteen satisfaction surveys.
     // The dataset ships in the client bundle already, so reading it is public.
     // Writing is server-only: the client-side seeder that used to target this

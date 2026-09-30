@@ -15,15 +15,14 @@ import { db } from './firebase';
 import { apiClient } from './apiClient';
 import { QueueOrder, AuthUser, QueueStatus, Store, FoodItem } from '../types';
 import { INITIAL_QUEUES, STORES, FOOD_ITEMS } from '../data/mockData';
+import { resolveCatalog, isDevelopmentBuild } from './catalogFallback';
 
 const ORDERS_COLLECTION = 'orders';
 const USERS_COLLECTION = 'users';
 const STORES_COLLECTION = 'stores';
 // `menu_items` is the canonical collection: it is the one firestore.rules and
 // the composite indexes cover, and the one authoritative order pricing reads.
-// `food_items` is still read so data written under the old name keeps showing.
 const MENU_ITEMS_COLLECTION = 'menu_items';
-const LEGACY_FOOD_ITEMS_COLLECTION = 'food_items';
 const DIAGNOSTICS_COLLECTION = 'system_diagnostics';
 
 const LOCAL_STORAGE_ORDERS_KEY = 'queueup_orders_v1';
@@ -57,8 +56,15 @@ export const FirebaseDataService = {
    * บันทึกคำสั่งซื้อ (Save Order)
    * บันทึกเข้า Firestore และ LocalStorage
    */
-  async saveOrder(order: QueueOrder): Promise<{ success: boolean; source: 'firestore' | 'local'; error?: string }> {
-    // 1. บันทึกลง LocalStorage เสมอเพื่อความเสถียร
+  /**
+   * Keeps a copy of an order in this browser so the tracking screen survives a
+   * refresh.
+   *
+   * This used to write to Firestore as well, which rules forbid — orders are
+   * created through /api/orders and nowhere else — and it returned
+   * `{ success: true }` either way, so a refused write read as a saved order.
+   */
+  cacheOrderLocally(order: QueueOrder): void {
     try {
       const existingStr = localStorage.getItem(LOCAL_STORAGE_ORDERS_KEY);
       const existingOrders: QueueOrder[] = existingStr ? JSON.parse(existingStr) : [];
@@ -66,28 +72,6 @@ export const FirebaseDataService = {
       localStorage.setItem(LOCAL_STORAGE_ORDERS_KEY, JSON.stringify(updated));
     } catch (localErr) {
       console.warn('LocalStorage save error:', localErr);
-    }
-
-    // 2. บันทึกลง Cloud Firestore
-    try {
-      const orderRef = doc(db, ORDERS_COLLECTION, order.id);
-      await setDoc(orderRef, {
-        ...order,
-        syncedAt: serverTimestamp(),
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
-
-      return { success: true, source: 'firestore' };
-    } catch (cloudErr: unknown) {
-      const errMsg = cloudErr instanceof Error ? cloudErr.message : String(cloudErr);
-      console.warn('Firestore save order fallback to local:', errMsg);
-      return { 
-        success: true, 
-        source: 'local', 
-        error: errMsg.includes('permission-denied') 
-          ? 'Firestore Security Rules ยังไม่ได้เปิดสิทธิ์สาธารณะ (ระบบบันทึกใน LocalStorage เรียบร้อย)' 
-          : errMsg 
-      };
     }
   },
 
@@ -242,49 +226,28 @@ export const FirebaseDataService = {
   },
 
   /**
-   * ซิงค์ร้านค้าและโรงอาหารทั้งหมดขึ้น Cloud Firestore
+   * Store writes belong to the server.
+   *
+   * There used to be a syncStoresToFirestore here that wrote the entire store
+   * array. Rules only let an owner write their own store, so the loop threw on
+   * the first store belonging to somebody else and stopped, and using it to
+   * "delete" a store by writing the remaining ones deleted nothing at all.
+   * Stores are created, edited and removed through /api/stores.
    */
-  async syncStoresToFirestore(storesToSync: Store[] = STORES): Promise<void> {
-    try {
-      for (const store of storesToSync) {
-        const storeRef = doc(db, STORES_COLLECTION, store.id);
-        await setDoc(storeRef, {
-          ...store,
-          syncedAt: serverTimestamp(),
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
-      }
-    } catch (error) {
-      console.warn('Sync stores to Firestore note:', error);
-    }
-  },
+
 
   /**
    * ดึงข้อมูลร้านค้าและโรงอาหารจริงจาก Cloud Firestore (พร้อม fallback)
    */
   async fetchStoresFromFirestore(): Promise<Store[]> {
     try {
-      const q = query(collection(db, STORES_COLLECTION));
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        const cloudStores: Store[] = [];
-        snap.forEach(docSnap => {
-          cloudStores.push(docSnap.data() as Store);
-        });
-
-        // Merge with STORES to ensure all defaults exist
-        const map = new Map<string, Store>();
-        STORES.forEach(s => map.set(s.id, s));
-        cloudStores.forEach(s => map.set(s.id, { ...(map.get(s.id) || {}), ...s }));
-        return Array.from(map.values());
-      } else {
-        // If empty, seed to Firestore
-        await this.syncStoresToFirestore();
-        return STORES;
-      }
+      const snap = await getDocs(query(collection(db, STORES_COLLECTION)));
+      const cloudStores: Store[] = [];
+      snap.forEach(docSnap => cloudStores.push(docSnap.data() as Store));
+      return resolveCatalog(cloudStores, STORES, { isDevelopment: isDevelopmentBuild() });
     } catch (err) {
       console.warn('Fetch stores fallback:', err);
-      return STORES;
+      return resolveCatalog([], STORES, { isDevelopment: isDevelopmentBuild() });
     }
   },
 
@@ -295,17 +258,9 @@ export const FirebaseDataService = {
     try {
       const q = query(collection(db, STORES_COLLECTION));
       return onSnapshot(q, (snapshot) => {
-        if (snapshot.empty) {
-          this.syncStoresToFirestore().then(() => callback(STORES));
-          return;
-        }
-        const map = new Map<string, Store>();
-        STORES.forEach(s => map.set(s.id, s));
-        snapshot.forEach(docSnap => {
-          const store = docSnap.data() as Store;
-          map.set(store.id, { ...(map.get(store.id) || {}), ...store });
-        });
-        callback(Array.from(map.values()));
+        const cloudStores: Store[] = [];
+        snapshot.forEach(docSnap => cloudStores.push(docSnap.data() as Store));
+        callback(resolveCatalog(cloudStores, STORES, { isDevelopment: isDevelopmentBuild() }));
       }, (error) => {
         console.warn('Realtime stores subscription error:', error);
       });
@@ -353,33 +308,17 @@ export const FirebaseDataService = {
    */
   async fetchFoodItemsFromFirestore(): Promise<FoodItem[]> {
     try {
-      const [canonicalSnap, legacySnap] = await Promise.all([
-        getDocs(query(collection(db, MENU_ITEMS_COLLECTION))),
-        getDocs(query(collection(db, LEGACY_FOOD_ITEMS_COLLECTION))).catch(() => null)
-      ]);
+      // menu_items only. The legacy food_items collection has no rule, so that
+      // read was refused on every call and the failure was swallowed by a
+      // .catch — it contributed nothing but a request per page load.
+      const canonicalSnap = await getDocs(query(collection(db, MENU_ITEMS_COLLECTION)));
 
-      const snap = canonicalSnap;
-      if (!snap.empty || (legacySnap && !legacySnap.empty)) {
-        const cloudFoods: FoodItem[] = [];
-        // Legacy first so a canonical record of the same id wins.
-        legacySnap?.forEach(docSnap => {
-          cloudFoods.push(docSnap.data() as FoodItem);
-        });
-        snap.forEach(docSnap => {
-          cloudFoods.push(docSnap.data() as FoodItem);
-        });
-
-        const map = new Map<string, FoodItem>();
-        FOOD_ITEMS.forEach(f => map.set(f.id, f));
-        cloudFoods.forEach(f => map.set(f.id, { ...(map.get(f.id) || {}), ...f }));
-        return Array.from(map.values());
-      } else {
-        await this.syncFoodItemsToFirestore();
-        return FOOD_ITEMS;
-      }
+      const cloudFoods: FoodItem[] = [];
+      canonicalSnap.forEach(docSnap => cloudFoods.push(docSnap.data() as FoodItem));
+      return resolveCatalog(cloudFoods, FOOD_ITEMS, { isDevelopment: isDevelopmentBuild() });
     } catch (err) {
       console.warn('Fetch food items fallback:', err);
-      return FOOD_ITEMS;
+      return resolveCatalog([], FOOD_ITEMS, { isDevelopment: isDevelopmentBuild() });
     }
   },
 
@@ -390,17 +329,9 @@ export const FirebaseDataService = {
     try {
       const q = query(collection(db, MENU_ITEMS_COLLECTION));
       return onSnapshot(q, (snapshot) => {
-        if (snapshot.empty) {
-          this.syncFoodItemsToFirestore().then(() => callback(FOOD_ITEMS));
-          return;
-        }
-        const map = new Map<string, FoodItem>();
-        FOOD_ITEMS.forEach(f => map.set(f.id, f));
-        snapshot.forEach(docSnap => {
-          const item = docSnap.data() as FoodItem;
-          map.set(item.id, { ...(map.get(item.id) || {}), ...item });
-        });
-        callback(Array.from(map.values()));
+        const cloudFoods: FoodItem[] = [];
+        snapshot.forEach(docSnap => cloudFoods.push(docSnap.data() as FoodItem));
+        callback(resolveCatalog(cloudFoods, FOOD_ITEMS, { isDevelopment: isDevelopmentBuild() }));
       }, (error) => {
         console.warn('Realtime food items subscription error:', error);
       });
