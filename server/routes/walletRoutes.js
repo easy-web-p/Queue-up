@@ -18,6 +18,10 @@ export const walletRouter = Router();
 const stripeSecretKey = optionalSecret('STRIPE_SECRET_KEY');
 const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
 
+/** A payout is at least ฿100, and no single request moves more than ฿500,000. */
+const MIN_PAYOUT_SATANG = 10000;
+const MAX_PAYOUT_SATANG = 50000000;
+
 /** Guard for endpoints that cannot work without a configured Stripe key. */
 function requireStripe(res) {
   if (stripe) return true;
@@ -136,11 +140,24 @@ walletRouter.post('/payouts', authenticate, requireStoreOwnership(), async (req,
       });
     }
 
-    if (!storeId || !amountSatang || amountSatang < 10000) {
+    // `amountSatang < 10000` alone let anything through that is not a number:
+    // a comparison against "abc" is false rather than an error, so the request
+    // was accepted, posted into the ledger, and left the store's availableSatang
+    // as NaN — against which every later balance check also compared false.
+    const amount = Number(amountSatang);
+    if (!storeId || !Number.isSafeInteger(amount) || amount < MIN_PAYOUT_SATANG) {
       return res.status(400).json({
         success: false,
         error: 'INVALID_AMOUNT',
         message: 'Minimum payout amount is ฿100 (10,000 Satang).'
+      });
+    }
+
+    if (amount > MAX_PAYOUT_SATANG) {
+      return res.status(400).json({
+        success: false,
+        error: 'AMOUNT_TOO_LARGE',
+        message: `ถอนได้ครั้งละไม่เกิน ฿${(MAX_PAYOUT_SATANG / 100).toLocaleString('th-TH')}`
       });
     }
 
@@ -154,14 +171,14 @@ walletRouter.post('/payouts', authenticate, requireStoreOwnership(), async (req,
       const balanceSnap = await t.get(balanceRef);
       const balance = balanceSnap.exists ? balanceSnap.data() : { availableSatang: 0 };
 
-      if ((balance.availableSatang || 0) < amountSatang) {
+      if ((balance.availableSatang || 0) < amount) {
         throw new Error(`INSUFFICIENT_FUNDS: ยอดเงินที่ถอนได้ไม่เพียงพอ (มี ฿${((balance.availableSatang || 0) / 100).toFixed(2)})`);
       }
 
       const newPayout = {
         id: payoutId,
         storeId,
-        amountSatang,
+        amountSatang: amount,
         currency: 'thb',
         status: 'REQUESTED',
         bankAccountSnapshot: bank,
@@ -176,7 +193,7 @@ walletRouter.post('/payouts', authenticate, requireStoreOwnership(), async (req,
       await recordPayoutReserved(t, adminDb, {
         payoutId,
         storeId,
-        amountSatang,
+        amountSatang: amount,
         now
       });
 

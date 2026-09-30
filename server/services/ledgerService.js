@@ -11,6 +11,56 @@ function generateEntryId() {
 }
 
 /**
+ * Every figure in this file is a whole number of satang, and the callers are
+ * routes reading request bodies. Nothing checked that: a payout requested for
+ * amountSatang "abc" passed the route's own `amountSatang < 10000` guard —
+ * a comparison against a non-number is false, not an error — was posted into
+ * the books as a debit of "abc", and turned the store's availableSatang into
+ * NaN, after which every later balance check compared against NaN and passed.
+ * The books are the last place that should take an unchecked number, so the
+ * assertion lives here and not only at each caller.
+ */
+function assertSatang(label, value) {
+  if (!Number.isSafeInteger(value)) {
+    throw new Error(
+      `LEDGER_AMOUNT_INVALID: ${label} must be a whole number of satang, received ${JSON.stringify(value)}`
+    );
+  }
+  return value;
+}
+
+/**
+ * Writes one transaction group, having first checked that it is one: every leg a
+ * non-negative whole number of satang, and total debits equal to total credits.
+ * An unbalanced group is a corrupted ledger, and the reconcilers would only find
+ * it long after the money had moved.
+ */
+function postEntries(t, adminDb, entries) {
+  let debits = 0;
+  let credits = 0;
+
+  for (const leg of entries) {
+    const debit = assertSatang(`${leg.account} debitSatang`, leg.debitSatang);
+    const credit = assertSatang(`${leg.account} creditSatang`, leg.creditSatang);
+    if (debit < 0 || credit < 0) {
+      throw new Error(`LEDGER_AMOUNT_INVALID: ${leg.account} cannot post a negative amount`);
+    }
+    debits += debit;
+    credits += credit;
+  }
+
+  if (debits !== credits) {
+    throw new Error(
+      `LEDGER_UNBALANCED: transaction group debits ${debits} do not equal credits ${credits}`
+    );
+  }
+
+  for (const leg of entries) {
+    t.set(adminDb.collection('ledger_entries').doc(leg.id), leg);
+  }
+}
+
+/**
  * Helper to update merchant balance within transaction
  */
 function updateBalance(t, adminDb, storeId, deltaFields, now) {
@@ -18,6 +68,7 @@ function updateBalance(t, adminDb, storeId, deltaFields, now) {
   const increments = {};
 
   for (const [key, val] of Object.entries(deltaFields)) {
+    assertSatang(`${key} delta`, val);
     if (val !== 0) {
       increments[key] = FieldValue.increment(val);
     }
@@ -110,10 +161,7 @@ export async function recordCustomerPayment(t, adminDb, {
     });
   }
 
-  for (const entry of entries) {
-    const entryRef = adminDb.collection('ledger_entries').doc(entry.id);
-    t.set(entryRef, entry);
-  }
+  postEntries(t, adminDb, entries);
 
   // Credit merchant pending balance
   updateBalance(t, adminDb, storeId, { pendingSatang: merchantNetSatang }, now);
@@ -160,9 +208,7 @@ export async function recordOrderFulfilled(t, adminDb, {
     }
   ];
 
-  for (const entry of entries) {
-    t.set(adminDb.collection('ledger_entries').doc(entry.id), entry);
-  }
+  postEntries(t, adminDb, entries);
 
   // Update merchant balance: -pending, +onHold
   updateBalance(t, adminDb, storeId, {
@@ -212,9 +258,7 @@ export async function recordFundsReleased(t, adminDb, {
     }
   ];
 
-  for (const entry of entries) {
-    t.set(adminDb.collection('ledger_entries').doc(entry.id), entry);
-  }
+  postEntries(t, adminDb, entries);
 
   // Update merchant balance: -onHold, +available
   updateBalance(t, adminDb, storeId, {
@@ -264,9 +308,7 @@ export async function recordPayoutReserved(t, adminDb, {
     }
   ];
 
-  for (const entry of entries) {
-    t.set(adminDb.collection('ledger_entries').doc(entry.id), entry);
-  }
+  postEntries(t, adminDb, entries);
 
   // Update merchant balance: -available, +payoutReserved
   updateBalance(t, adminDb, storeId, {
@@ -316,9 +358,7 @@ export async function recordPayoutCompleted(t, adminDb, {
     }
   ];
 
-  for (const entry of entries) {
-    t.set(adminDb.collection('ledger_entries').doc(entry.id), entry);
-  }
+  postEntries(t, adminDb, entries);
 
   // Update merchant balance: -payoutReserved, +totalPaidOut
   updateBalance(t, adminDb, storeId, {
@@ -372,9 +412,7 @@ export async function recordPayoutFailed(t, adminDb, {
     }
   ];
 
-  for (const entry of entries) {
-    t.set(adminDb.collection('ledger_entries').doc(entry.id), entry);
-  }
+  postEntries(t, adminDb, entries);
 
   updateBalance(t, adminDb, storeId, {
     payoutReservedSatang: -amountSatang,
@@ -450,9 +488,7 @@ export async function recordRefund(t, adminDb, {
     }
   ];
 
-  for (const entry of entries) {
-    t.set(adminDb.collection('ledger_entries').doc(entry.id), entry);
-  }
+  postEntries(t, adminDb, entries);
 
   // Decrement merchant pending balance
   updateBalance(t, adminDb, storeId, { pendingSatang: -merchantNetSatang }, now);

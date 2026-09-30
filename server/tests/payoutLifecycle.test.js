@@ -21,6 +21,7 @@ import express from 'express';
 import { walletRouter } from '../routes/walletRoutes.js';
 import { adminDb } from '../firebaseAdmin.js';
 import { verifySessionAgainstOrder } from '../services/paymentVerification.js';
+import { recordPayoutReserved } from '../services/ledgerService.js';
 
 console.log('===============================================================');
 console.log('🏦 QUEUEUP MERCHANT PAYOUT LIFECYCLE SUITE');
@@ -104,6 +105,61 @@ async function runTests() {
       { storeId: STORE, amountSatang: 40000, bankAccountSnapshot: { bankName: 'ธนาคาร' } }, asOwner);
     check(noBank.status === 400,
       'Partial bank details are refused too', `status ${noBank.status}`);
+
+    // --- The amount has to be an amount ---
+    console.log('\n--- A payout amount must be a whole number of satang ---');
+    const balanceBefore = await balance();
+
+    let bad = await request(baseUrl, '/api/merchant/payouts', 'POST',
+      { storeId: STORE, amountSatang: 'abc', bankAccountSnapshot: BANK }, asOwner);
+    check(bad.status === 400 && bad.data?.error === 'INVALID_AMOUNT',
+      'A non-numeric amount is refused rather than compared and let through',
+      `status ${bad.status}, error ${bad.data?.error}`);
+
+    let afterBad = await balance();
+    check(afterBad.availableSatang === balanceBefore.availableSatang,
+      'The refused request left the available balance a number, not NaN',
+      `available ${afterBad.availableSatang}`);
+
+    bad = await request(baseUrl, '/api/merchant/payouts', 'POST',
+      { storeId: STORE, amountSatang: 40000.5, bankAccountSnapshot: BANK }, asOwner);
+    check(bad.status === 400 && bad.data?.error === 'INVALID_AMOUNT',
+      'A fractional satang amount is refused', `error ${bad.data?.error}`);
+
+    bad = await request(baseUrl, '/api/merchant/payouts', 'POST',
+      { storeId: STORE, amountSatang: -40000, bankAccountSnapshot: BANK }, asOwner);
+    check(bad.status === 400 && bad.data?.error === 'INVALID_AMOUNT',
+      'A negative amount is refused', `error ${bad.data?.error}`);
+
+    bad = await request(baseUrl, '/api/merchant/payouts', 'POST',
+      { storeId: STORE, amountSatang: 900000000, bankAccountSnapshot: BANK }, asOwner);
+    check(bad.status === 400 && bad.data?.error === 'AMOUNT_TOO_LARGE',
+      'One request cannot move an unbounded sum', `error ${bad.data?.error}`);
+
+    // And the books refuse it even if a caller ever gets past a route again.
+    let ledgerRefused = false;
+    try {
+      await adminDb.runTransaction((t) => recordPayoutReserved(t, adminDb, {
+        payoutId: `payout-ledger-guard-${suffix}`,
+        storeId: STORE,
+        amountSatang: 'abc'
+      }));
+    } catch (err) {
+      ledgerRefused = /LEDGER_AMOUNT_INVALID/.test(err.message);
+    }
+    check(ledgerRefused, 'The ledger itself refuses an amount that is not whole satang');
+
+    let unbalancedRefused = false;
+    try {
+      await adminDb.runTransaction((t) => recordPayoutReserved(t, adminDb, {
+        payoutId: `payout-ledger-guard2-${suffix}`,
+        storeId: STORE,
+        amountSatang: Number.MAX_SAFE_INTEGER + 2
+      }));
+    } catch (err) {
+      unbalancedRefused = /LEDGER_AMOUNT_INVALID/.test(err.message);
+    }
+    check(unbalancedRefused, 'And one too large to be represented exactly');
 
     // --- Requesting reserves, and stops there ---
     console.log('\n--- A payout request reserves, it does not pay ---');
