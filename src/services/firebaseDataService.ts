@@ -76,51 +76,14 @@ export const FirebaseDataService = {
   },
 
   /**
-   * อัปเดตสถานะคิวคำสั่งซื้อ (Update Order Status)
+   * Order status changes belong to the API.
+   *
+   * There used to be an updateOrderStatus here writing status — and inventing a
+   * paymentStatus of PAID — straight to the order document. Rules forbid client
+   * order writes, so it was refused every time, and it returned
+   * `{ success: true, source: 'local' }` either way.
    */
-  async updateOrderStatus(orderId: string, status: QueueStatus, paymentStatus?: 'PENDING' | 'PAID'): Promise<{ success: boolean; source: 'firestore' | 'local' }> {
-    // 1. อัปเดต LocalStorage
-    try {
-      const existingStr = localStorage.getItem(LOCAL_STORAGE_ORDERS_KEY);
-      if (existingStr) {
-        const orders: QueueOrder[] = JSON.parse(existingStr);
-        const updated = orders.map(o => {
-          if (o.id === orderId) {
-            return {
-              ...o,
-              status,
-              paymentStatus: paymentStatus || (status !== 'PAYMENT_PENDING' ? 'PAID' : o.paymentStatus),
-              version: (o.version || 1) + 1
-            };
-          }
-          return o;
-        });
-        localStorage.setItem(LOCAL_STORAGE_ORDERS_KEY, JSON.stringify(updated));
-      }
-    } catch (e) {
-      console.warn('LocalStorage status update warning:', e);
-    }
 
-    // 2. อัปเดต Firestore
-    try {
-      const orderRef = doc(db, ORDERS_COLLECTION, orderId);
-      const updatePayload: Record<string, unknown> = {
-        status,
-        updatedAt: new Date().toISOString(),
-        serverUpdatedAt: new Date().toISOString()
-      };
-      if (paymentStatus) {
-        updatePayload.paymentStatus = paymentStatus;
-      } else if (status !== 'PAYMENT_PENDING') {
-        updatePayload.paymentStatus = 'PAID';
-      }
-      await updateDoc(orderRef, updatePayload);
-      return { success: true, source: 'firestore' };
-    } catch (cloudErr) {
-      console.warn('Firestore update order status fallback:', cloudErr);
-      return { success: true, source: 'local' };
-    }
-  },
 
   /**
    * ดึงข้อมูลคำสั่งซื้อทั้งหมด (Fetch Orders)

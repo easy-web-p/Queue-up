@@ -239,6 +239,25 @@ async function runTests() {
     check(res.status === 400 && res.data?.error === 'MISSING_PIN',
       'Completing with no PIN at all is refused', `error ${res.data?.error}`);
 
+    // --- And no way around the PIN ---
+    // The kitchen screen used to fall back to the generic status endpoint
+    // whenever the PIN check failed, and that endpoint took COMPLETED without
+    // asking for a PIN at all — so a wrong PIN still handed the food over.
+    console.log('\n--- The generic status endpoint is not a way past the PIN ---');
+    res = await api(`/api/orders/${placed.orderId}/status`, 'PATCH',
+      { status: 'COMPLETED' }, MERCHANT);
+    check(res.status === 400 && res.data?.error === 'USE_PIN_HANDOVER',
+      'A shop cannot complete an order through the status endpoint',
+      `${res.status} ${res.data?.error}`);
+    stored = await order(placed.orderId);
+    check(stored.status !== 'COMPLETED',
+      'The order is not handed over', `status ${stored.status}`);
+
+    res = await api(`/api/orders/${placed.orderId}/status`, 'PATCH',
+      { status: 'COMPLETED' }, as(`root-handover-${suffix}`, 'admin'));
+    check(res.status === 400,
+      'Not even a platform admin skips it that way', `status ${res.status}`);
+
     console.log('\n===============================================================');
     console.log(`📊 ORDER HANDOVER RESULTS: ${passed}/${total} Passed (${passed === total ? 'ALL PASSED' : 'FAILURES DETECTED'})`);
     console.log('===============================================================\n');

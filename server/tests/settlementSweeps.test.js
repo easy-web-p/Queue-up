@@ -226,12 +226,23 @@ async function runTests() {
 
     // --- Held funds reach the merchant on their own ---
     console.log('\n--- Releasing held funds ---');
-    const completed = await walletOrder(2);
+    // Handed over the way a shop actually does it: with the customer's PIN. The
+    // generic status endpoint no longer accepts COMPLETED, because accepting it
+    // made the PIN optional.
+    const completedRes = await api('/api/orders', 'POST', {
+      storeId: STORE,
+      items: [{ menuItemId: MENU, quantity: 2 }],
+      paymentMethod: 'CAMPUS_WALLET',
+      idempotencyKey: `sweep-complete-${suffix}`
+    }, as(STUDENT));
+    const completed = completedRes.data?.orderId;
+    const completedPin = completedRes.data?.exchangePin;
+
     await api(`/api/merchant/orders/${completed}/accept`, 'POST', {}, as(OWNER, 'merchant'));
     await api(`/api/orders/${completed}/status`, 'PATCH',
       { status: 'READY' }, as(OWNER, 'merchant'));
-    await api(`/api/orders/${completed}/status`, 'PATCH',
-      { status: 'COMPLETED' }, as(OWNER, 'merchant'));
+    await api(`/api/merchant/orders/${completed}/complete`, 'POST',
+      { exchangePin: completedPin }, as(OWNER, 'merchant'));
 
     stored = await order(completed);
     check(stored.settlementStatus === 'ON_HOLD',

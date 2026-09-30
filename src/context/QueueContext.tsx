@@ -100,8 +100,9 @@ interface QueueContextType {
     reservationId?: string;
     slotId?: string;
   }) => Promise<QueueOrder>;
-  updateOrderStatus: (orderId: string, status: QueueStatus) => void;
-  cancelOrder: (orderId: string) => void;
+  updateOrderStatus: (orderId: string, status: QueueStatus) => Promise<void>;
+  applyOrderStatusLocally: (orderId: string, status: QueueStatus) => void;
+  cancelOrder: (orderId: string) => Promise<void>;
 
   // Search & Filters
   searchQuery: string;
@@ -2709,40 +2710,26 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return newOrder;
   };
 
-  const updateOrderStatus = (orderId: string, status: QueueStatus) => {
+  /** Applies a status the server has already confirmed to local state. */
+  const applyOrderStatusLocally = (orderId: string, status: QueueStatus) => {
     setQueues(prev => prev.map(order => {
-      if (order.id === orderId) {
-        // Record audit
-        MerchantService.recordAudit({
-          storeId: order.storeId,
-          actor: 'จอครัว KDS / ผู้จัดการร้าน',
-          action: 'STATUS_UPDATE',
-          details: `เปลี่ยนสถานะคิว ${order.queueNumber} เป็น ${status}`,
-          targetId: order.id,
-          severity: 'info'
-        });
+      if (order.id !== orderId) return order;
 
-        return {
-          ...order,
-          status,
-          paymentStatus: status !== 'PAYMENT_PENDING' ? 'PAID' : order.paymentStatus
-        };
-      }
-      return order;
+      MerchantService.recordAudit({
+        storeId: order.storeId,
+        actor: 'จอครัว KDS / ผู้จัดการร้าน',
+        action: 'STATUS_UPDATE',
+        details: `เปลี่ยนสถานะคิว ${order.queueNumber} เป็น ${status}`,
+        targetId: order.id,
+        severity: 'info'
+      });
+
+      return {
+        ...order,
+        status,
+        paymentStatus: status !== 'PAYMENT_PENDING' ? 'PAID' : order.paymentStatus
+      };
     }));
-
-    // Command Model: Send State Machine update to Express API
-    apiClient.updateOrderStatus({
-      orderId,
-      nextStatus: status
-    }).catch(err => {
-      console.warn('[QueueContext] Express API updateOrderStatus async handled:', err);
-    });
-
-    // Firestore SDK persistent cache update
-    FirebaseDataService.updateOrderStatus(orderId, status).catch(e => {
-      console.warn('Firebase order status update note:', e);
-    });
 
     const statusTexts: Record<QueueStatus, string> = {
       DRAFT: 'แบบร่าง',
@@ -2779,8 +2766,35 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const cancelOrder = (orderId: string) => {
-    updateOrderStatus(orderId, 'CANCELLED');
+  /**
+   * Moves an order to the next status, through the server.
+   *
+   * The API call used to be fired without being awaited, with its errors logged
+   * and dropped, after local state had already moved. So an invalid transition,
+   * a closed cancellation window or somebody else's order all looked like
+   * success on screen while the server kept the old status — the kitchen and the
+   * customer then disagreed about the same order.
+   */
+  const updateOrderStatus = async (orderId: string, status: QueueStatus) => {
+    try {
+      await apiClient.updateOrderStatus({ orderId, nextStatus: status });
+    } catch (err) {
+      addToast(
+        'เปลี่ยนสถานะไม่สำเร็จ',
+        err instanceof Error ? err.message : 'กรุณาลองใหม่อีกครั้ง',
+        'error'
+      );
+      throw err;
+    }
+
+    applyOrderStatusLocally(orderId, status);
+  };
+
+  const cancelOrder = async (orderId: string) => {
+    // updateOrderStatus reports its own failure, so the confirmation below only
+    // runs once the server has actually cancelled — and refunded, where there
+    // was something to refund.
+    await updateOrderStatus(orderId, 'CANCELLED');
     addToast('ยกเลิกคิวแล้ว', 'ระบบได้ทำการยกเลิกคิวของคุณเรียบร้อย', 'warning');
   };
 
@@ -2867,6 +2881,7 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setActiveQueueId,
         placeOrder,
         updateOrderStatus,
+        applyOrderStatusLocally,
         cancelOrder,
         searchQuery,
         setSearchQuery,

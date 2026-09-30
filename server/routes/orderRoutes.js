@@ -478,6 +478,18 @@ orderRouter.patch('/:id/status', authenticate, async (req, res) => {
       });
     }
 
+    // Handing food over is the PIN endpoint's job. Allowing COMPLETED here made
+    // the pickup PIN optional: the kitchen screen fell back to this endpoint
+    // whenever the PIN check failed, so a wrong PIN still completed the order.
+    if (nextStatus === 'COMPLETED') {
+      return res.status(400).json({
+        success: false,
+        error: 'USE_PIN_HANDOVER',
+        message: 'การส่งมอบอาหารต้องยืนยันด้วยรหัส PIN ของลูกค้า '
+          + 'กรุณาใช้ POST /api/merchant/orders/:id/complete'
+      });
+    }
+
     // Asking for the status it already has is a repeat, not a request to run
     // the transition again — and saying the cancellation window has closed on an
     // order that is already cancelled would only confuse the caller.

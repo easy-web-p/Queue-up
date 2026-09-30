@@ -79,6 +79,12 @@ const ACCESS = /\b(?:collection|doc)\(\s*db\s*,\s*(?:['"]([a-z_][a-z0-9_]*)['"]|
 const CONST_DECL = /\bconst\s+([A-Z][A-Z0-9_]*)\s*=\s*['"]([a-z_][a-z0-9_]*)['"]/g;
 // The write calls, matched on the same line as the reference they act on.
 const WRITE_CALL = /\b(?:setDoc|addDoc|updateDoc|deleteDoc|writeBatch)\s*\(/;
+// `const ref = doc(db, C, id)` binds a name to a collection; a write through
+// that name counts however far below it appears. Guessing a window of nearby
+// lines missed updateOrderStatus, whose write sits ten lines under its ref.
+const REF_BINDING = /\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*(?:collection|doc)\(\s*db\s*,\s*(?:['"]([a-z_][a-z0-9_]*)['"]|([A-Z][A-Z0-9_]*))/g;
+const WRITE_THROUGH = (name) =>
+  new RegExp(`\\b(?:setDoc|addDoc|updateDoc|deleteDoc)\\s*\\(\\s*${name}\\b`);
 
 const unruled = new Map();
 const writes = new Map();
@@ -110,6 +116,30 @@ for (const file of walk(SRC)) {
       if (!writes.has(name)) writes.set(name, new Set());
       writes.get(name).add(`${file}:${line + 1}`);
     }
+  }
+}
+
+// Writes reached through a named reference.
+for (const file of walk(SRC)) {
+  const source = readFileSync(file, 'utf8');
+  const constants = new Map([...source.matchAll(CONST_DECL)].map((m) => [m[1], m[2]]));
+
+  for (const binding of source.matchAll(REF_BINDING)) {
+    const [, refName, literal, constName] = binding;
+    const collectionName = literal || constants.get(constName);
+    if (!collectionName || CLIENT_WRITABLE.has(collectionName)) continue;
+
+    // Only from this binding until the name is bound again — `ref` is a local
+    // name reused across functions, and searching the whole file read a write in
+    // one function as a write to another function's collection.
+    const from = binding.index + binding[0].length;
+    const rebinding = source.slice(from).search(new RegExp(`\\bconst\\s+${refName}\\s*=`));
+    const scope = source.slice(from, rebinding === -1 ? from + 4000 : from + rebinding);
+    if (!WRITE_THROUGH(refName).test(scope)) continue;
+
+    const line = source.slice(0, binding.index).split('\n').length;
+    if (!writes.has(collectionName)) writes.set(collectionName, new Set());
+    writes.get(collectionName).add(`${file}:${line}`);
   }
 }
 

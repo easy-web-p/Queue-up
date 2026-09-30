@@ -26,7 +26,7 @@ import {
 export const KitchenDisplaySystem: React.FC = () => {
   const {
     queues,
-    updateOrderStatus,
+    applyOrderStatusLocally,
     addToast,
     stores,
     userStore,
@@ -186,61 +186,59 @@ export const KitchenDisplaySystem: React.FC = () => {
       return;
     }
 
+    // One attempt through the endpoint that owns the transition, and the screen
+    // only moves when the server says it moved.
+    //
+    // Each of these used to swallow its failure, retry through the generic
+    // status endpoint, swallow that too, update local state regardless and then
+    // show a success toast. So a refused transition looked done on the kitchen
+    // screen — and for handover it was worse: the generic endpoint took
+    // COMPLETED without a PIN, so a wrong PIN still read as "handed over". The
+    // server now refuses COMPLETED there, which is why there is no fallback.
+    const failed = (err: unknown, title: string) => {
+      addToast(title, err instanceof Error ? err.message : 'กรุณาลองใหม่อีกครั้ง', 'error');
+    };
+
     if (order.status === 'PAYMENT_PENDING' || order.status === 'PAID_AWAITING_MERCHANT') {
       try {
         await apiClient.acceptMerchantOrder(order.id);
       } catch (err) {
-        console.warn('[KDS] Accept merchant order note:', err);
-        try {
-          await apiClient.updateOrderStatus({
-            orderId: order.id,
-            nextStatus: 'PREPARING',
-            expectedVersion: order.version
-          });
-        } catch {}
+        failed(err, 'รับออเดอร์ไม่สำเร็จ');
+        return;
       }
-      updateOrderStatus(order.id, 'PREPARING');
+      applyOrderStatusLocally(order.id, 'PREPARING');
       addToast('🍳 เริ่มปรุงอาหาร', `เริ่มทำออเดอร์คิว ${order.queueNumber} แล้ว`, 'info');
       return;
     } else if (order.status === 'PREPARING' || order.status === 'MERCHANT_ACCEPTED') {
       try {
         await apiClient.readyMerchantOrder(order.id);
       } catch (err) {
-        console.warn('[KDS] Mark ready note:', err);
-        try {
-          await apiClient.updateOrderStatus({
-            orderId: order.id,
-            nextStatus: 'READY',
-            expectedVersion: order.version
-          });
-        } catch {}
+        failed(err, 'แจ้งพร้อมรับไม่สำเร็จ');
+        return;
       }
-      updateOrderStatus(order.id, 'READY');
+      applyOrderStatusLocally(order.id, 'READY');
       announceQueueCall(order.queueNumber, order.storeName);
       addToast('🔔 เรียกคิวสำเร็จ', `ส่งสัญญาณเรียกคิว ${order.queueNumber} พร้อมรับอาหาร`, 'success');
       return;
     } else if (order.status === 'READY' || order.status === 'READY_FOR_PICKUP') {
-      try {
-        if (order.exchangePin) {
-          await apiClient.completeMerchantOrder(order.id, order.exchangePin);
-        } else {
-          await apiClient.updateOrderStatus({
-            orderId: order.id,
-            nextStatus: 'COMPLETED',
-            expectedVersion: order.version
-          });
-        }
-      } catch (err) {
-        console.warn('[KDS] Complete order note:', err);
-        try {
-          await apiClient.updateOrderStatus({
-            orderId: order.id,
-            nextStatus: 'COMPLETED',
-            expectedVersion: order.version
-          });
-        } catch {}
+      // The customer's PIN is what proves the handover, so there is nothing to
+      // do here without it.
+      const pin = order.exchangePin || window.prompt(
+        `ขอรหัส PIN 4 หลักจากลูกค้าคิว ${order.queueNumber} เพื่อยืนยันการรับอาหาร:`,
+        ''
+      );
+      if (!pin) {
+        addToast('ต้องใช้รหัส PIN', 'การส่งมอบอาหารต้องยืนยันด้วยรหัส PIN ของลูกค้า', 'warning');
+        return;
       }
-      updateOrderStatus(order.id, 'COMPLETED');
+
+      try {
+        await apiClient.completeMerchantOrder(order.id, pin);
+      } catch (err) {
+        failed(err, 'ยืนยันรับอาหารไม่สำเร็จ');
+        return;
+      }
+      applyOrderStatusLocally(order.id, 'COMPLETED');
       addToast('✅ เสร็จสิ้น', `ส่งมอบออเดอร์คิว ${order.queueNumber} เรียบร้อย`, 'success');
       return;
     }

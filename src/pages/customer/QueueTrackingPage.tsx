@@ -494,9 +494,14 @@ export const QueueTrackingPage: React.FC = () => {
           )}
         </div>
 
-        {/* Demo Fast-Forward Status (convenient for testing UI state transitions) */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-stone-500 dark:text-zinc-400">ทดสอบเปลี่ยนสถานะ:</span>
+        {/*
+          Fast-forward buttons for walking the UI through its states while
+          developing. They were shipped to customers, where the server refuses
+          every one of them — a customer pressing "cooking done → ready" was
+          shown that their food was waiting for them at the counter.
+        */}
+        <div className={`flex items-center gap-2 ${import.meta.env.DEV ? '' : 'hidden'}`}>
+          <span className="text-xs text-stone-500 dark:text-zinc-400">ทดสอบเปลี่ยนสถานะ (dev):</span>
           {activeQueue.status === 'PAYMENT_PENDING' && (
             <Button
               size="sm"
