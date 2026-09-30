@@ -283,6 +283,10 @@ export type ExtendedPaymentStatus =
   | 'FAILED'
   | 'EXPIRED'
   | 'REFUND_PENDING'
+  // Part of the order was refunded through the gateway. The ledger only reverses
+  // a whole order, so one of these is held open in payment_exceptions until an
+  // operator posts the split by hand.
+  | 'PARTIALLY_REFUNDED'
   | 'REFUNDED';
 
 export interface CartItem {

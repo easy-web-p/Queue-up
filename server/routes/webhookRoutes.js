@@ -124,35 +124,58 @@ async function applyRefund({ paymentIntentId, refundId, amountRefundedSatang, no
       .filter((d) => d.data().status === 'PENDING')
       .map((d) => d.id);
 
-    await adminDb.runTransaction(async (t) => {
+    const result = await adminDb.runTransaction(async (t) => {
       const snap = await t.get(orderRef);
-      if (!snap.exists) return;
+      if (!snap.exists) return { applied: false };
       const order = snap.data();
 
-      if (order.paymentStatus === 'REFUNDED') return; // Redelivered event.
+      if (order.paymentStatus === 'REFUNDED') return { applied: false }; // Redelivered event.
 
-      const needsLedgerReversal = order.settlementStatus !== 'REVERSED'
-        && PENDING_SETTLEMENT_STATUSES.has(String(order.settlementStatus));
       const { totalSatang, platformFeeSatang, gatewayFeeSatang, merchantNetSatang } =
         resolveOrderBreakdown(order);
 
+      // charge.refunded fires for a partial refund too, and amount_refunded is
+      // the running total on the charge. This used to ignore it: any refund at
+      // all marked the order REFUNDED and reversed the whole order in the books.
+      // A ฿50 refund on a ฿500 order took the merchant's entire ฿441.17 credit
+      // and told the ledger the customer had been given everything back. The
+      // ledger has one reversal shape — the whole order — so a partial refund is
+      // recorded and handed to an operator rather than guessed at.
+      const refundedSatang = Math.max(0, Math.round(Number(amountRefundedSatang) || 0));
+      const isPartial = refundedSatang > 0 && refundedSatang < totalSatang;
+
+      // A partial refund already recorded at this same running total is a
+      // redelivery; a larger one is a further refund and is recorded again.
+      if (isPartial && order.paymentStatus === 'PARTIALLY_REFUNDED'
+          && Number(order.refundedSatang) === refundedSatang) {
+        return { applied: false };
+      }
+
+      const needsLedgerReversal = !isPartial
+        && order.settlementStatus !== 'REVERSED'
+        && PENDING_SETTLEMENT_STATUSES.has(String(order.settlementStatus));
+
       t.update(orderRef, {
-        paymentStatus: 'REFUNDED',
+        paymentStatus: isPartial ? 'PARTIALLY_REFUNDED' : 'REFUNDED',
         settlementStatus: needsLedgerReversal ? 'REVERSED' : order.settlementStatus,
-        refundedSatang: Number(amountRefundedSatang) || totalSatang,
+        refundedSatang: refundedSatang || totalSatang,
         refundedAt: now,
         stripeRefundId: refundId || order.stripeRefundId || null,
         version: (order.version || 1) + 1,
         updatedAt: now
       });
 
-      for (const requestId of openRequestIds) {
-        t.set(adminDb.collection('refund_requests').doc(requestId), {
-          status: 'COMPLETED',
-          stripeRefundId: refundId || null,
-          completedAt: now,
-          updatedAt: now
-        }, { merge: true });
+      // A partial refund does not satisfy a request for a full one, so those
+      // rows stay open.
+      if (!isPartial) {
+        for (const requestId of openRequestIds) {
+          t.set(adminDb.collection('refund_requests').doc(requestId), {
+            status: 'COMPLETED',
+            stripeRefundId: refundId || null,
+            completedAt: now,
+            updatedAt: now
+          }, { merge: true });
+        }
       }
 
       if (needsLedgerReversal) {
@@ -173,10 +196,34 @@ async function applyRefund({ paymentIntentId, refundId, amountRefundedSatang, no
         toStatus: order.status,
         changedBy: 'STRIPE_WEBHOOK',
         changerRole: 'system',
-        note: `Refund ${refundId || ''} confirmed by Stripe (฿${((Number(amountRefundedSatang) || totalSatang) / 100).toFixed(2)}).`,
+        note: isPartial
+          ? `Partial refund ${refundId || ''} confirmed by Stripe `
+            + `(฿${(refundedSatang / 100).toFixed(2)} of ฿${(totalSatang / 100).toFixed(2)}). `
+            + 'The ledger has not been adjusted.'
+          : `Refund ${refundId || ''} confirmed by Stripe (฿${((refundedSatang || totalSatang) / 100).toFixed(2)}).`,
         timestamp: now
       });
+
+      return { applied: true, isPartial, refundedSatang, totalSatang };
     });
+
+    if (!result.applied) continue;
+
+    if (result.isPartial) {
+      await recordPaymentException(adminDb, {
+        orderId,
+        reason: 'PARTIAL_REFUND_NOT_POSTED',
+        providerPaymentIntentId: paymentIntentId,
+        amountSatang: result.refundedSatang,
+        expectedSatang: result.totalSatang,
+        detail: `฿${(result.refundedSatang / 100).toFixed(2)} of ฿${(result.totalSatang / 100).toFixed(2)} `
+          + 'was refunded through Stripe. The double-entry ledger only reverses a whole order, '
+          + 'so the merchant and platform split needs posting by hand.',
+        now
+      });
+      console.log(`[Stripe Webhook] Partial refund recorded for order ${orderId}; ledger untouched.`);
+      continue;
+    }
 
     // A refund on money that has already moved past pending cannot be unwound
     // by a webhook: the store may have been paid it out.
@@ -186,7 +233,7 @@ async function applyRefund({ paymentIntentId, refundId, amountRefundedSatang, no
         orderId,
         reason: 'REFUND_AFTER_SETTLEMENT',
         providerPaymentIntentId: paymentIntentId,
-        amountSatang: Number(amountRefundedSatang) || null,
+        amountSatang: result.refundedSatang || null,
         detail: `Refund confirmed while settlement was ${after.settlementStatus}. `
           + 'The merchant balance needs adjusting by hand.',
         now
