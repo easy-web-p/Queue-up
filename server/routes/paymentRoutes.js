@@ -4,6 +4,7 @@ import { adminDb } from '../firebaseAdmin.js';
 import { optionalAuthenticate } from '../middleware/authenticate.js';
 import { optionalSecret } from '../config/secrets.js';
 import { verifySessionAgainstOrder } from '../services/paymentVerification.js';
+import { resolveAppBaseUrl } from '../services/appOrigin.js';
 import { settleOrderPayment, recordPaymentException } from '../services/paymentSettlement.js';
 import dotenv from 'dotenv';
 
@@ -84,8 +85,7 @@ paymentRouter.post('/create-checkout-session', optionalAuthenticate, async (req,
       orderId,
       storeName = 'QueueUp Restaurant',
       customerEmail,
-      paymentMethodType = 'promptpay',
-      returnUrl
+      paymentMethodType = 'promptpay'
     } = req.body;
 
     if (!orderId) {
@@ -104,9 +104,13 @@ paymentRouter.post('/create-checkout-session', optionalAuthenticate, async (req,
 
     if (!requireStripe(res)) return;
 
-    // Determine host origin
-    const origin = req.headers.origin || req.headers.referer || returnUrl || 'http://localhost:3000';
-    const baseUrl = origin.replace(/\/$/, '');
+    // Where Stripe returns the customer once they have paid. Resolved from this
+    // deployment's own configuration, never from the calling page: origin,
+    // referer and a returnUrl in the body all belong to whoever made the
+    // request, so honouring them let a session be created that sent a paying
+    // customer to any host at all, straight off a genuine stripe.com page and
+    // carrying the checkout session id with them.
+    const baseUrl = resolveAppBaseUrl(req);
 
     // Map payment methods supported by Stripe in THB
     const allowedPaymentMethods = paymentMethodType === 'promptpay'

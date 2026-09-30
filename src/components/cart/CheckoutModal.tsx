@@ -126,8 +126,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               quantity: i.quantity
             })),
             customerEmail: currentUser?.email,
-            paymentMethodType: paymentMethod === 'credit_card' ? 'card' : 'promptpay',
-            returnUrl: window.location.href
+            paymentMethodType: paymentMethod === 'credit_card' ? 'card' : 'promptpay'
           });
 
           if (session && session.url) {

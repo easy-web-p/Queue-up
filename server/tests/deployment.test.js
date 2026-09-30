@@ -11,6 +11,7 @@ process.env.ALLOW_MOCK_AUTH = 'true';
 
 import http from 'http';
 import { createApp } from '../app.js';
+import { resolveAppBaseUrl } from '../services/appOrigin.js';
 
 console.log('===============================================================');
 console.log('🚀 QUEUEUP DEPLOYMENT SHAPE TEST SUITE');
@@ -255,6 +256,56 @@ async function runTests() {
   check(probe.webhookStatus === 503,
     'The Stripe webhook refuses unsigned deliveries rather than accepting them',
     `status ${probe.webhookStatus}`);
+
+  // --- Where Stripe sends a customer back to ---
+  //
+  // success_url and cancel_url were built from `origin || referer || returnUrl`,
+  // all of which belong to whoever called the endpoint. A session could be
+  // created that sent the paying customer to any host at all, leaving a genuine
+  // stripe.com page with the checkout session id in the query string.
+  console.log('\n--- The Stripe return URL ---');
+  const appUrlBefore = process.env.APP_URL;
+  const allowedBefore = process.env.ALLOWED_ORIGINS;
+  const asReq = (headers) => ({ headers });
+
+  try {
+    delete process.env.APP_URL;
+    delete process.env.ALLOWED_ORIGINS;
+
+    check(resolveAppBaseUrl(asReq({ host: 'queue-up.example' })) === 'https://queue-up.example',
+      'With nothing configured it is the host this request was routed to',
+      resolveAppBaseUrl(asReq({ host: 'queue-up.example' })));
+
+    const spoofed = resolveAppBaseUrl(asReq({
+      host: 'queue-up.example',
+      origin: 'https://evil.example',
+      referer: 'https://evil.example/pay'
+    }));
+    check(spoofed === 'https://queue-up.example',
+      'An Origin or Referer from the calling page cannot redirect the customer',
+      spoofed);
+
+    check(resolveAppBaseUrl(asReq({ host: 'localhost:3000' })) === 'http://localhost:3000',
+      'Local development still resolves to plain http');
+
+    process.env.APP_URL = 'https://queue-up.example';
+    check(resolveAppBaseUrl(asReq({ host: 'evil.example', origin: 'https://evil.example' }))
+      === 'https://queue-up.example',
+      'A configured APP_URL wins over anything in the request');
+
+    process.env.ALLOWED_ORIGINS = 'https://campus.example, https://staging.example';
+    check(resolveAppBaseUrl(asReq({ host: 'x', origin: 'https://staging.example' }))
+      === 'https://staging.example',
+      'A multi-domain deployment returns people to the domain they started on');
+    check(resolveAppBaseUrl(asReq({ host: 'x', origin: 'https://evil.example' }))
+      === 'https://queue-up.example',
+      'And an origin it does not serve falls back to the configured one');
+  } finally {
+    if (appUrlBefore === undefined) delete process.env.APP_URL;
+    else process.env.APP_URL = appUrlBefore;
+    if (allowedBefore === undefined) delete process.env.ALLOWED_ORIGINS;
+    else process.env.ALLOWED_ORIGINS = allowedBefore;
+  }
 
   console.log('\n===============================================================');
   console.log(`📊 DEPLOYMENT TEST RESULTS: ${passed}/${total} Passed (${passed === total ? 'ALL PASSED' : 'FAILURES DETECTED'})`);

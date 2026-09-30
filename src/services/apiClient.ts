@@ -263,7 +263,6 @@ class ApiClient {
     items?: { name: string; price: number; quantity: number }[];
     customerEmail?: string;
     paymentMethodType?: 'promptpay' | 'card';
-    returnUrl?: string;
   }): Promise<{ success: boolean; sessionId: string; url: string }> {
     const headers = await this.getAuthHeaders();
     const response = await fetch(`${this.baseUrl}/payment/create-checkout-session`, {
