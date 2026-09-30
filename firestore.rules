@@ -23,13 +23,18 @@ service cloud.firestore {
       return request.auth.token.get('admin', false) == true;
     }
 
-    // A school administrator carries role 'admin' together with a schoolId, and
-    // is NOT a platform administrator. isSuperAdmin() used to accept that claim, so
-    // every school admin — and anyone they listed on a roster as type "admin" —
-    // could read and overwrite any user profile on the platform, read any
-    // student's wallet balance and transaction history, and create store
-    // documents directly, in any institution. A school admin's powers are the
-    // scoped ones in isSchoolAdmin(); platform-wide access is isSuperAdmin().
+    // There is deliberately no isAdmin() here. A school administrator carries
+    // role 'admin' together with a schoolId and is NOT a platform administrator:
+    // that claim comes from a roster row of type "admin", which any school admin
+    // can create. isAdmin() accepted it as platform-wide authority, so every
+    // school admin — and anyone they listed on a roster — could read and
+    // overwrite any user profile on the platform, read any student's wallet
+    // balance and transaction history, and create store documents directly, in
+    // any institution. A school admin's powers are the scoped ones in
+    // isSchoolAdmin(); platform-wide access is isSuperAdmin(). If you are
+    // pasting these rules back from the Firebase console and isAdmin() is still
+    // in that copy, the console is serving the pre-fix version: deploy this file
+    // over it with `npm run deploy:rules`, do not copy the console's copy here.
 
     function isSuperAdmin() {
       return isAuthenticated() && (
@@ -88,7 +93,7 @@ service cloud.firestore {
     // 3. Stores Collection
     match /stores/{storeId} {
       allow read: if true;
-      allow create: if isSuperAdmin() || isSuperAdmin();
+      allow create: if isSuperAdmin();
       allow update: if isSuperAdmin() || (
         isAuthenticated() && 
         resource.data.ownerId == request.auth.uid &&
