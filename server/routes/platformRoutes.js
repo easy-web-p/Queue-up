@@ -11,6 +11,7 @@
 import { Router } from 'express';
 import { adminDb } from '../firebaseAdmin.js';
 import { authenticate, requireSuperAdmin } from '../middleware/authenticate.js';
+import { resolveQueryLimit } from '../services/queryLimit.js';
 
 export const platformRouter = Router();
 
@@ -30,7 +31,7 @@ function byNewest(a, b) {
 platformRouter.get('/payouts', authenticate, requireSuperAdmin, async (req, res) => {
   try {
     const status = String(req.query.status || '').trim().toUpperCase();
-    const limit = Math.min(Number(req.query.limit) || 100, 300);
+    const limit = resolveQueryLimit(req.query.limit, 100, 300);
 
     const snap = await adminDb.collection('payout_requests').get();
     let payouts = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
@@ -67,7 +68,7 @@ platformRouter.get('/payouts', authenticate, requireSuperAdmin, async (req, res)
 platformRouter.get('/payment-exceptions', authenticate, requireSuperAdmin, async (req, res) => {
   try {
     const status = String(req.query.status || 'OPEN').trim().toUpperCase();
-    const limit = Math.min(Number(req.query.limit) || 100, 300);
+    const limit = resolveQueryLimit(req.query.limit, 100, 300);
 
     const snap = await adminDb.collection('payment_exceptions').get();
     let exceptions = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));

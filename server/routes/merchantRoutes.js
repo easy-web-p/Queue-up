@@ -13,6 +13,7 @@ import { resolveOrderBreakdown } from '../services/orderPricing.js';
 import { NotificationEngine } from '../services/notificationEngine.js';
 import { reverseOrderPayment } from '../services/orderRefundService.js';
 import dotenv from 'dotenv';
+import { resolveQueryLimit } from '../services/queryLimit.js';
 
 dotenv.config();
 
@@ -61,7 +62,7 @@ merchantRouter.get('/orders', authenticate, requireStoreOwnership(), async (req,
   try {
     // requireStoreOwnership resolved and authorised this storeId.
     const storeId = req.storeId;
-    const limit = Math.min(Number(req.query.limit) || 200, 500);
+    const limit = resolveQueryLimit(req.query.limit, 200, 500);
 
     const snapshot = await adminDb
       .collection('orders')

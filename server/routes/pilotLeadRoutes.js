@@ -14,6 +14,7 @@
 import { Router } from 'express';
 import { adminDb } from '../firebaseAdmin.js';
 import { optionalAuthenticate } from '../middleware/authenticate.js';
+import { resolveQueryLimit } from '../services/queryLimit.js';
 
 export const pilotLeadRouter = Router();
 
@@ -108,7 +109,7 @@ pilotLeadRouter.get('/', optionalAuthenticate, async (req, res) => {
     const leads = snap.docs
       .map((doc) => ({ id: doc.id, ...doc.data() }))
       .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-      .slice(0, Math.min(Number(req.query.limit) || 200, 500));
+      .slice(0, resolveQueryLimit(req.query.limit, 200, 500));
 
     return res.status(200).json({ success: true, leads });
   } catch (err) {

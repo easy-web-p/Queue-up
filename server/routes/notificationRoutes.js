@@ -7,20 +7,41 @@ import { resolveThreadAccess } from '../services/chatAccess.js';
 import { NotificationEngine } from '../services/notificationEngine.js';
 import { processAssistantReply } from '../services/aiChatEngine.js';
 import { LineNotifyService } from '../services/lineNotifyService.js';
+import { resolveQueryLimit } from '../services/queryLimit.js';
 
 export const notificationRouter = express.Router();
 
-// In-memory sliding window rate limiter: max 3 tests per 60 seconds per UID
+// In-memory sliding window rate limiter: max 3 tests per 60 seconds per UID.
+//
+// Per instance, which is the most this can be without a shared store: a
+// serverless deployment runs several instances and recycles them, so these
+// windows bound one instance's traffic rather than one user's. They are a brake
+// on accidental repetition, not a security control.
 const testPushRateLimitMap = new Map();
+
+/**
+ * Drops windows that have gone quiet. Without this the maps only ever grew: on a
+ * long-lived server every uid and every chat thread that ever called stayed in
+ * memory for the life of the process.
+ */
+function pruneWindows(map, now, windowMs) {
+  for (const [key, timestamps] of map) {
+    if (!timestamps.length || now - timestamps[timestamps.length - 1] >= windowMs) {
+      map.delete(key);
+    }
+  }
+}
 
 function isRateLimited(uid, maxRequests = 3, windowMs = 60000) {
   const now = Date.now();
   const history = (testPushRateLimitMap.get(uid) || []).filter(ts => now - ts < windowMs);
   if (history.length >= maxRequests) {
+    testPushRateLimitMap.set(uid, history);
     return true;
   }
   history.push(now);
   testPushRateLimitMap.set(uid, history);
+  pruneWindows(testPushRateLimitMap, now, windowMs);
   return false;
 }
 
@@ -141,8 +162,12 @@ notificationRouter.post('/devices/:deviceId/deactivate', authenticate, async (re
  */
 notificationRouter.get('/notifications', authenticate, async (req, res) => {
   try {
+    // parseInt straight from the query string had no ceiling and no floor:
+    // ?limit=999999 read the caller's whole notification history in one request,
+    // and ?limit=-1 or ?limit=abc reached Firestore as an invalid limit and came
+    // back as a 500.
     const uid = req.user.uid;
-    const limit = parseInt(req.query.limit || '50', 10);
+    const limit = resolveQueryLimit(req.query.limit, 50, 200);
 
     const snapshot = await adminDb
       .collection('notifications')
@@ -256,8 +281,15 @@ notificationRouter.post('/notifications/test', authenticate, async (req, res) =>
  */
 notificationRouter.post('/test-line', authenticate, async (req, res) => {
   try {
-    const { token, message } = req.body;
-    const testToken = token || req.user.lineNotifyToken || process.env.LINE_NOTIFY_TOKEN;
+    // The caller's own token, or their stored one. The platform's own
+    // LINE_NOTIFY_TOKEN used to be the last fallback, so any signed-in account
+    // could omit a token and have the server deliver a message of their choosing
+    // into the operator's LINE channel on the platform's credential. Only a
+    // platform administrator tests the platform's own token.
+    const { token } = req.body;
+    const testToken = token || req.user.lineNotifyToken
+      || (req.user.admin ? process.env.LINE_NOTIFY_TOKEN : null);
+
     if (!testToken) {
       return res.status(400).json({
         success: false,
@@ -266,9 +298,19 @@ notificationRouter.post('/test-line', authenticate, async (req, res) => {
       });
     }
 
+    // A connectivity test sends a fixed message. Taking the text from the body
+    // made this a "send anything to this token" endpoint rather than a test.
+    if (isRateLimited(`line:${req.user.uid}`, 3, 60000)) {
+      return res.status(429).json({
+        success: false,
+        error: 'RATE_LIMIT_EXCEEDED',
+        message: 'กรุณารอ 1 นาทีก่อนทดสอบการเชื่อมต่อ LINE อีกครั้ง'
+      });
+    }
+
     const result = await LineNotifyService.send({
       token: testToken,
-      message: message || '🟢 [QueueUp] ทดสอบการเชื่อมต่อ LINE Notify สำเร็จเรียบร้อยแล้วค่ะ!'
+      message: '🟢 [QueueUp] ทดสอบการเชื่อมต่อ LINE Notify สำเร็จเรียบร้อยแล้วค่ะ!'
     });
 
     // A token that cannot work no matter how correct it is deserves a clearer
@@ -304,9 +346,13 @@ const threadAssistantRateLimit = new Map();
 function isThreadRateLimited(chatId, maxCalls = 6, windowMs = 60000) {
   const now = Date.now();
   const history = (threadAssistantRateLimit.get(chatId) || []).filter(ts => now - ts < windowMs);
-  if (history.length >= maxCalls) return true;
+  if (history.length >= maxCalls) {
+    threadAssistantRateLimit.set(chatId, history);
+    return true;
+  }
   history.push(now);
   threadAssistantRateLimit.set(chatId, history);
+  pruneWindows(threadAssistantRateLimit, now, windowMs);
   return false;
 }
 

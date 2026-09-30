@@ -15,6 +15,7 @@
 import { Router } from 'express';
 import { adminDb } from '../firebaseAdmin.js';
 import { optionalAuthenticate } from '../middleware/authenticate.js';
+import { resolveQueryLimit } from '../services/queryLimit.js';
 
 export const evaluationRouter = Router();
 
@@ -109,7 +110,7 @@ evaluationRouter.post('/', optionalAuthenticate, async (req, res) => {
  */
 evaluationRouter.get('/', async (req, res) => {
   try {
-    const limit = Math.min(Number(req.query.limit) || 150, 300);
+    const limit = resolveQueryLimit(req.query.limit, 150, 300);
     const snap = await adminDb.collection(COLLECTION).get();
 
     const evaluations = snap.docs
