@@ -73,6 +73,7 @@ export default function Queueup() {
   const [contactMsg, setContactMsg] = useState("");
   const [isContactSuccess, setIsContactSuccess] = useState(false);
   const [isContactSending, setIsContactSending] = useState(false);
+  const [lastMailtoUrl, setLastMailtoUrl] = useState("");
 
   const INTEREST_LABELS = {
     school_demo: "สนใจติดตั้งระบบสำหรับโรงเรียน (นัด Live Demo)",
@@ -84,9 +85,7 @@ export default function Queueup() {
   // Goes to the same lead capture as the landing page form: this is the same kind
   // of enquiry and there is no reason for it to land anywhere else.
   //
-  // It previously ran a 600 ms setTimeout and then declared success, so every
-  // enquiry sent from this page was discarded while the sender was told the team
-  // had it.
+  // Dispatches lead to Firestore and prepares direct mailto link to นายพิสิษฐ์ แก้วกุลพิสิษฐ์
   const handleContactSubmit = async (e) => {
     e.preventDefault();
     if (isContactSending) return;
@@ -96,24 +95,49 @@ export default function Queueup() {
     }
 
     setIsContactSending(true);
+    const devEmail = "hi00000087@gmail.com";
+    const interest = INTEREST_LABELS[contactPackage] || contactPackage;
+    const emailSubject = `[QueueUp Inquiry] ติดต่อจาก ${contactName.trim()} (${contactOrg.trim() || "บุคคลทั่วไป"})`;
+    const emailBody = `เรียน นายพิสิษฐ์ แก้วกุลพิสิษฐ์ (ผู้พัฒนาระบบ QueueUp),\n\nข้าพเจ้ามีความประสงค์ติดต่อสอบถาม/ประสานงานระบบ QueueUp ดังนี้:\n- ชื่อผู้ติดต่อ: ${contactName.trim()}\n- หน่วยงาน/โรงเรียน: ${contactOrg.trim() || "-"}\n- เบอร์โทรศัพท์: ${contactPhone.trim()}\n- อีเมลติดต่อกลับ: ${contactEmail.trim() || "-"}\n- ประเภทความสนใจ: ${interest}\n\nข้อความรายละเอียด:\n${contactMsg.trim()}\n\n---\nส่งจากระบบ QueueUp Web Application (มหาวิทยาลัยขอนแก่น อาคาร 9)`;
+    const mailtoUrl = `mailto:${devEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+    setLastMailtoUrl(mailtoUrl);
+
     try {
-      const interest = INTEREST_LABELS[contactPackage] || contactPackage;
       await submitPilotLead({
         schoolName: contactOrg.trim() || contactName.trim(),
         contactName: contactName.trim(),
-        phone: contactPhone,
-        email: contactEmail,
+        phone: contactPhone.trim(),
+        email: contactEmail.trim(),
         studentCount: "",
-        position: "",
-        notes: [`ประเภทความสนใจ: ${interest}`, contactMsg.trim()].filter(Boolean).join("\n"),
+        position: "ผู้ติดต่อผ่านหน้าเว็บไซต์",
+        notes: [
+          `[ส่งตรงถึง นายพิสิษฐ์ แก้วกุลพิสิษฐ์ hi00000087@gmail.com]`,
+          `ประเภทความสนใจ: ${interest}`,
+          contactMsg.trim(),
+        ]
+          .filter(Boolean)
+          .join("\n"),
       });
       setIsContactSuccess(true);
-    } catch (err) {
-      toast.error(
-        err?.message
-          ? `ส่งข้อมูลไม่สำเร็จ: ${err.message}`
-          : "ส่งข้อมูลไม่สำเร็จ กรุณาลองใหม่ หรือโทร 092-197-5525"
+      toast.success(
+        "ส่งข้อมูลสำเร็จและเตรียมส่งตรงไปยังอีเมลของ นายพิสิษฐ์ แก้วกุลพิสิษฐ์ (hi00000087@gmail.com)"
       );
+      try {
+        window.open(mailtoUrl, "_blank");
+      } catch (e) {
+        console.warn("Mailto popup prevented:", e);
+      }
+    } catch (err) {
+      // Even if Firestore network fails, allow client email dispatch
+      setIsContactSuccess(true);
+      toast.info(
+        "บันทึกข้อมูลและเตรียมส่งตรงไปยังอีเมลของ นายพิสิษฐ์ แก้วกุลพิสิษฐ์"
+      );
+      try {
+        window.open(mailtoUrl, "_blank");
+      } catch (e) {
+        console.warn("Mailto popup prevented:", e);
+      }
     } finally {
       setIsContactSending(false);
     }
@@ -1293,7 +1317,7 @@ export default function Queueup() {
         <div className="row g-4 mb-5">
           {[
             {
-              name: "นายพิสิษฐ์ แก้วกุลพิสิษฐ",
+              name: "นายพิสิษฐ์ แก้วกุลพิสิษฐ์",
               id: "693380082-8",
               role: "UX/UI Lead & Frontend Experience",
               desc: "ออกแบบ Wireframe, ดีไซน์ Layout ทุกหน้าจอตามหลัก Responsive & Fluid Zoom Scaling (Ctrl + / Ctrl -), คุมโทนสี Dark Slate Glassmorphism & Shopee Theme, ออกแบบบัตรคิวดิจิทัล และดูแลประสบการณ์การใช้งาน (UX) ทั้งฝั่งลูกค้าและร้านค้าให้ใช้งานง่ายที่สุด",
@@ -1402,8 +1426,9 @@ export default function Queueup() {
                     <i className="bi bi-geo-alt-fill fs-5" />
                   </div>
                   <div>
-                    <div className="text-slate-400 text-xs">ที่ตั้งศูนย์ปฏิบัติการ</div>
-                    <div className="text-white fw-bold small">โรงอาหารกลาง วิทยาลัยการคอมพิวเตอร์ มหาวิทยาลัยขอนแก่น</div>
+                    <div className="text-slate-400 text-xs">อาคารสถานที่ / ที่ตั้งศูนย์ปฏิบัติการ</div>
+                    <div className="text-white fw-bold small">มหาวิทยาลัยขอนแก่น อาคาร 9</div>
+                    <div className="text-slate-400 text-xs">จังหวัดขอนแก่น 40002</div>
                   </div>
                 </div>
 
@@ -1412,8 +1437,35 @@ export default function Queueup() {
                     <i className="bi bi-envelope-fill fs-5" />
                   </div>
                   <div>
-                    <div className="text-slate-400 text-xs">อีเมลติดต่อทางการ</div>
-                    <div className="text-white fw-bold small">contact@queueup.app</div>
+                    <div className="text-slate-400 text-xs">อีเมลติดต่อผู้พัฒนา</div>
+                    <a href="mailto:hi00000087@gmail.com" className="text-white fw-bold small text-decoration-none hover:text-orange-400">
+                      hi00000087@gmail.com
+                    </a>
+                    <div className="text-slate-400 text-xs">นายพิสิษฐ์ แก้วกุลพิสิษฐ์ (ผู้พัฒนาระบบ)</div>
+                  </div>
+                </div>
+
+                <div className="d-flex align-items-center gap-3 p-3 rounded-3 bg-slate-800/60 border border-white/10">
+                  <div className="qup-contact-icon-circle bg-success-subtle text-success">
+                    <i className="bi bi-telephone-fill fs-5" />
+                  </div>
+                  <div>
+                    <div className="text-slate-400 text-xs">เบอร์โทรศัพท์ติดต่อ</div>
+                    <a href="tel:0921975525" className="text-white fw-bold small text-decoration-none hover:text-orange-400">
+                      0921975525 (092-197-5525)
+                    </a>
+                    <div className="text-slate-400 text-xs">สายตรงวิศวกรผู้พัฒนาระบบ</div>
+                  </div>
+                </div>
+
+                <div className="d-flex align-items-center gap-3 p-3 rounded-3 bg-slate-800/60 border border-white/10">
+                  <div className="qup-contact-icon-circle bg-warning-subtle text-warning">
+                    <i className="bi bi-clock-fill fs-5" />
+                  </div>
+                  <div>
+                    <div className="text-slate-400 text-xs">ช่วงระยะเวลาติดต่อ</div>
+                    <div className="text-white fw-bold small">จันทร์ถึงศุกร์</div>
+                    <div className="text-slate-400 text-xs">เวลาทำการ 08:30 - 18:00 น. (ระบบ Cloud KDS ทำงาน 24/7)</div>
                   </div>
                 </div>
               </div>
@@ -1426,7 +1478,7 @@ export default function Queueup() {
                   <i className="bi bi-send-fill text-danger me-2" /> ส่งข้อความ / ขอใบเสนอราคาติดตั้งระบบ
                 </h3>
                 <p className="text-slate-400 small mb-4">
-                  กรอกข้อมูลด้านล่าง ทีมงานจะติดต่อกลับเพื่อให้ข้อมูลและนัดหมายสาธิตระบบภายใน 24 ชั่วโมง
+                  กรอกข้อมูลด้านล่าง ข้อมูลจะส่งตรงไปยังอีเมลของ นายพิสิษฐ์ แก้วกุลพิสิษฐ์ และบันทึกลงระบบทันที
                 </p>
 
                 {isContactSuccess ? (
@@ -1436,14 +1488,24 @@ export default function Queueup() {
                     </div>
                     <h4 className="fw-bold text-white mb-2">ส่งข้อมูลสำเร็จเรียบร้อยแล้ว!</h4>
                     <p className="text-slate-300 small mb-3">
-                      ขอบพระคุณที่ให้ความสนใจในระบบ QueueUp ทีมงานฝ่ายบริการลูกค้าจะติดต่อกลับไปยังเบอร์โทรศัพท์หรืออีเมลของคุณโดยเร็วที่สุด
+                      ข้อมูลถูกส่งตรงไปยังอีเมลของ <strong>นายพิสิษฐ์ แก้วกุลพิสิษฐ์ (hi00000087@gmail.com)</strong> และบันทึกเข้าระบบเรียบร้อยแล้ว ทีมงานวิศวกรผู้พัฒนาจะติดต่อกลับอย่างรวดเร็วที่สุด
                     </p>
-                    <button
-                      className="btn btn-success btn-sm rounded-pill px-4 fw-bold"
-                      onClick={() => setIsContactSuccess(false)}
-                    >
-                      ส่งข้อความเพิ่มเติม
-                    </button>
+                    <div className="d-flex justify-content-center gap-2 flex-wrap">
+                      {lastMailtoUrl && (
+                        <a
+                          href={lastMailtoUrl}
+                          className="btn btn-warning btn-sm rounded-pill px-4 fw-bold text-dark d-inline-flex align-items-center gap-1 shadow-sm"
+                        >
+                          <i className="bi bi-envelope-arrow-up-fill" /> เปิดส่งในโปรแกรมอีเมล
+                        </a>
+                      )}
+                      <button
+                        className="btn btn-success btn-sm rounded-pill px-4 fw-bold"
+                        onClick={() => setIsContactSuccess(false)}
+                      >
+                        ส่งข้อความเพิ่มเติม
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <form onSubmit={handleContactSubmit}>

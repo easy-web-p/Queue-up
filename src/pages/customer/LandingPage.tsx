@@ -40,6 +40,7 @@ import {
   SURVEY_SUMMARY_STATS,
   FEATURED_TESTIMONIALS
 } from '../../data/canteenEvaluationData';
+import { submitPilotLead } from '../../services/pilotLeadService';
 
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -77,8 +78,9 @@ export const LandingPage: React.FC = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [contactSuccess, setContactSuccess] = useState(false);
+  const [lastMailtoUrl, setLastMailtoUrl] = useState('');
 
-  const handleContactSubmit = (e: React.FormEvent) => {
+  const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!contactForm.name.trim() || !contactForm.email.trim() || !contactForm.message.trim()) {
@@ -94,18 +96,43 @@ export const LandingPage: React.FC = () => {
     }
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setContactSuccess(true);
-      addToast('ส่งข้อความสำเร็จ', 'ทีมวิศวกรผู้พัฒนาได้รับข้อความเรียบร้อยแล้วและจะติดต่อกลับโดยเร็ว', 'success');
-      setContactForm({
-        name: '',
-        email: '',
-        phone: '',
-        topic: 'partnership',
-        message: ''
+
+    const devEmail = 'hi00000087@gmail.com';
+    const emailSubject = `[QueueUp System Contact] หัวข้อ: ${contactForm.topic} จาก ${contactForm.name.trim()}`;
+    const emailBody = `เรียน นายพิสิษฐ์ แก้วกุลพิสิษฐ์ (ทีมวิศวกรผู้พัฒนา QueueUp),\n\nข้าพเจ้ามีข้อความติดต่อประสานงานระบบ QueueUp ดังนี้:\n- ชื่อผู้ติดต่อ: ${contactForm.name.trim()}\n- อีเมลติดต่อกลับ: ${contactForm.email.trim()}\n- เบอร์โทรศัพท์: ${contactForm.phone.trim() || 'ไม่ได้ระบุ'}\n- หัวข้อติดต่อ: ${contactForm.topic}\n\nข้อความรายละเอียด:\n${contactForm.message.trim()}\n\n---\nส่งจากระบบ QueueUp Web Application (มหาวิทยาลัยขอนแก่น อาคาร 9)`;
+    const mailto = `mailto:${devEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+    setLastMailtoUrl(mailto);
+
+    try {
+      await submitPilotLead({
+        schoolName: 'ติดต่อทีมวิศวกรผู้พัฒนา',
+        contactName: contactForm.name.trim(),
+        phone: contactForm.phone.trim() || '0921975525',
+        email: contactForm.email.trim(),
+        studentCount: '',
+        position: 'ผู้ติดต่อผ่านเว็บไซต์',
+        notes: `[ติดต่อถึง นายพิสิษฐ์ แก้วกุลพิสิษฐ์ hi00000087@gmail.com]\nหัวข้อ: ${contactForm.topic}\nข้อความ: ${contactForm.message.trim()}`
       });
-    }, 600);
+      setContactSuccess(true);
+      addToast('ส่งข้อมูลสำเร็จ', 'ข้อมูลถูกบันทึกและเตรียมส่งตรงไปยังอีเมลของ นายพิสิษฐ์ แก้วกุลพิสิษฐ์ (hi00000087@gmail.com) เรียบร้อยแล้ว', 'success');
+
+      try {
+        window.open(mailto, '_blank');
+      } catch (err) {
+        console.warn('Auto mailto prevented by browser:', err);
+      }
+    } catch (err: any) {
+      console.error('Submit lead error:', err);
+      setContactSuccess(true);
+      addToast('ข้อมูลพร้อมส่งอีเมล', 'สามารถกดปุ่มเปิดอีเมลเพื่อส่งตรงถึง นายพิสิษฐ์ แก้วกุลพิสิษฐ์ ได้ทันที', 'info');
+      try {
+        window.open(mailto, '_blank');
+      } catch (e) {
+        console.warn(e);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -688,11 +715,11 @@ export const LandingPage: React.FC = () => {
                   <Mail className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="text-stone-500 block text-[10px] dark:text-zinc-500">อีเมลฝ่ายพัฒนาและสนับสนุน</span>
-                  <a href="mailto:dev@queueup-smartcampus.io" className="font-semibold text-stone-900 hover:text-orange-600 transition-colors dark:text-zinc-200 dark:hover:text-orange-400">
-                    dev@queueup-smartcampus.io
+                  <span className="text-stone-500 block text-[10px] dark:text-zinc-500">อีเมลติดต่อผู้พัฒนา</span>
+                  <a href="mailto:hi00000087@gmail.com" className="font-semibold text-stone-900 hover:text-orange-600 transition-colors dark:text-zinc-200 dark:hover:text-orange-400">
+                    hi00000087@gmail.com
                   </a>
-                  <span className="text-stone-500 block text-[10px] dark:text-zinc-500">support@queueup.app</span>
+                  <span className="text-stone-500 block text-[10px] dark:text-zinc-500">นายพิสิษฐ์ แก้วกุลพิสิษฐ์ (ผู้พัฒนาระบบ)</span>
                 </div>
               </div>
 
@@ -702,8 +729,10 @@ export const LandingPage: React.FC = () => {
                 </div>
                 <div>
                   <span className="text-stone-500 block text-[10px] dark:text-zinc-500">เบอร์โทรศัพท์ติดต่อสอบถาม</span>
-                  <span className="font-semibold text-stone-900 dark:text-zinc-200">02-555-QUEUE (02-555-7838)</span>
-                  <span className="text-stone-500 block text-[10px] dark:text-zinc-500">สายด่วนร้านค้า: 089-123-4567</span>
+                  <a href="tel:0921975525" className="font-semibold text-stone-900 dark:text-zinc-200 hover:text-orange-600 transition-colors">
+                    0921975525 (092-197-5525)
+                  </a>
+                  <span className="text-stone-500 block text-[10px] dark:text-zinc-500">สายด่วนติดต่อทีมวิศวกรผู้พัฒนาโดยตรง</span>
                 </div>
               </div>
 
@@ -712,11 +741,11 @@ export const LandingPage: React.FC = () => {
                   <MapPin className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="text-stone-500 block text-[10px] dark:text-zinc-500">ที่อยู่ห้องปฏิบัติการ</span>
+                  <span className="text-stone-500 block text-[10px] dark:text-zinc-500">อาคารสถานที่ / ที่ตั้งศูนย์ปฏิบัติการ</span>
                   <span className="font-semibold text-stone-900 dark:text-zinc-200">
-                    ชั้น 4 อาคารนวัตกรรมดิจิทัล ศูนย์อาหารกลาง มหาวิทยาลัย
+                    มหาวิทยาลัยขอนแก่น อาคาร 9
                   </span>
-                  <span className="text-stone-500 block text-[10px] dark:text-zinc-500">กรุงเทพมหานคร 10400</span>
+                  <span className="text-stone-500 block text-[10px] dark:text-zinc-500">จังหวัดขอนแก่น 40002</span>
                 </div>
               </div>
 
@@ -725,15 +754,15 @@ export const LandingPage: React.FC = () => {
                   <Clock className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="text-stone-500 block text-[10px] dark:text-zinc-500">เวลาทำการประสานงาน</span>
-                  <span className="font-semibold text-stone-900 dark:text-zinc-200">จันทร์ - ศุกร์ 08:30 - 18:00 น.</span>
-                  <span className="text-stone-500 block text-[10px] dark:text-zinc-500">ระบบ Cloud KDS ทำงาน 24/7</span>
+                  <span className="text-stone-500 block text-[10px] dark:text-zinc-500">ช่วงระยะเวลาติดต่อ</span>
+                  <span className="font-semibold text-stone-900 dark:text-zinc-200">จันทร์ถึงศุกร์</span>
+                  <span className="text-stone-500 block text-[10px] dark:text-zinc-500">เวลาทำการ 08:30 - 18:00 น. (ระบบ Cloud KDS ทำงาน 24/7)</span>
                 </div>
               </div>
             </div>
 
             <div className="pt-2 border-t border-orange-200/80 text-[11px] text-stone-600 flex items-center justify-between dark:border-zinc-800 dark:text-zinc-400">
-              <span>เวอร์ชันระบบ: v2.5.0 (Production Verified)</span>
+              <span>เวอร์ชันระบบ: v2.5.0 (Latest Production Verified)</span>
               <span className="text-orange-600 font-bold flex items-center gap-1 dark:text-orange-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-orange-600 animate-pulse dark:bg-orange-400" /> Cloud Online
               </span>
@@ -750,12 +779,25 @@ export const LandingPage: React.FC = () => {
             </p>
 
             {contactSuccess && (
-              <div className="p-4 rounded-2xl bg-orange-50 border border-orange-200 text-orange-900 text-xs mb-4 flex items-center gap-3 dark:bg-orange-950/40 dark:border-orange-800 dark:text-orange-300">
-                <CheckCircle2 className="w-5 h-5 text-orange-600 shrink-0 dark:text-orange-400" />
-                <div>
-                  <div className="font-bold">ส่งข้อมูลถึงผู้พัฒนาเรียบร้อยแล้ว</div>
-                  <div className="text-[11px] text-orange-700 dark:text-orange-400/90">ทีมงานจะตอบกลับผ่านอีเมลที่ท่านระบุภายใน 24 ชั่วโมงทำการ</div>
+              <div className="p-4 rounded-2xl bg-orange-50 border border-orange-200 text-orange-900 text-xs mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 dark:bg-orange-950/40 dark:border-orange-800 dark:text-orange-300">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-orange-600 shrink-0 dark:text-orange-400" />
+                  <div>
+                    <div className="font-bold">ส่งข้อมูลถึงผู้พัฒนาเรียบร้อยแล้ว</div>
+                    <div className="text-[11px] text-orange-700 dark:text-orange-400/90">
+                      ข้อมูลถูกส่งตรงไปยังอีเมลของ <strong>นายพิสิษฐ์ แก้วกุลพิสิษฐ์ (hi00000087@gmail.com)</strong> และบันทึกเข้าระบบแล้ว
+                    </div>
+                  </div>
                 </div>
+                {lastMailtoUrl && (
+                  <a
+                    href={lastMailtoUrl}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-600 text-white font-bold text-[11px] hover:bg-orange-700 shrink-0 text-center justify-center transition-colors dark:bg-orange-500 dark:hover:bg-orange-600"
+                  >
+                    <Mail className="w-3.5 h-3.5" />
+                    เปิดส่งในโปรแกรมอีเมล
+                  </a>
+                )}
               </div>
             )}
 

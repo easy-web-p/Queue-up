@@ -131,7 +131,7 @@ export const Footer: React.FC<FooterProps> = ({ className = '', forceDark = fals
           <div className="flex items-center gap-3">
             <span>© {new Date().getFullYear()} QueueUp Engineering Team. All rights reserved.</span>
             <span>•</span>
-            <span className={isDark ? 'text-slate-400' : 'text-stone-600 dark:text-zinc-400'}>Bangkok, Thailand</span>
+            <span className={isDark ? 'text-slate-400' : 'text-stone-600 dark:text-zinc-400'}>มหาวิทยาลัยขอนแก่น อาคาร 9 (KKU Building 9, Thailand)</span>
           </div>
 
           <div className="flex items-center gap-4">

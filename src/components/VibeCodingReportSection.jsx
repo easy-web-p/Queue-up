@@ -18,7 +18,7 @@ export default function VibeCodingReportSection() {
   };
 
   const teamMembers = [
-    { no: 1, name: "นายพิสิษฐ์ แก้วกุลพิสิษฐ", id: "693380082-8", role: "UX/UI Lead & Frontend Experience", desc: "ออกแบบ Wireframe, ดีไซน์ Layout ทุกหน้าจอตามหลัก Responsive & Fluid Zoom Scaling (Ctrl + / Ctrl -), คุมโทนสี Dark Slate Glassmorphism & Shopee Theme, ออกแบบบัตรคิวดิจิทัล และดูแลประสบการณ์การใช้งาน (UX) ทั้งฝั่งลูกค้าและร้านค้าให้ใช้งานง่ายที่สุด", color: "#FF7A1A", icon: "bi-palette-fill" },
+    { no: 1, name: "นายพิสิษฐ์ แก้วกุลพิสิษฐ์", id: "693380082-8", role: "UX/UI Lead & Frontend Experience", desc: "ออกแบบ Wireframe, ดีไซน์ Layout ทุกหน้าจอตามหลัก Responsive & Fluid Zoom Scaling (Ctrl + / Ctrl -), คุมโทนสี Dark Slate Glassmorphism & Shopee Theme, ออกแบบบัตรคิวดิจิทัล และดูแลประสบการณ์การใช้งาน (UX) ทั้งฝั่งลูกค้าและร้านค้าให้ใช้งานง่ายที่สุด", color: "#FF7A1A", icon: "bi-palette-fill" },
     { no: 2, name: "นายภานุ คำแก้ว", id: "693380586-0", role: "Backend & Firebase Database Lead", desc: "วางโครงสร้าง Cloud Firestore Collections (users, products, orders, shops, categories) เชื่อมต่อ LocalStorage Fallback และตั้งค่าระบบความปลอดภัยแยก 3 สิทธิ์ (Customer, Merchant, Admin)", color: "#38bdf8", icon: "bi-database-fill-gear" },
     { no: 3, name: "นายภูริทัต มหานิล", id: "693380588-6", role: "AI & Core Feature Developer", desc: "พัฒนาระบบค้นหาอัจฉริยะด้วยภาษาธรรมชาติ (NLP Smart Search เช่น 'อยากกินเผ็ดๆ', 'ไม่เกิน 50 บาท'), ระบบคำนวณส่วนลดตามช่วงเวลา (Time-Slot Booking) และระบบตะกร้าสินค้า", color: "#a855f7", icon: "bi-cpu-fill" },
     { no: 4, name: "นายพลกฤต นิลอยู่", id: "693380584-4", role: "KDS & Payment Integration Lead", desc: "พัฒนาหน้าจอครัว Kanban สำหรับร้านค้า (Kitchen Display System), ระบบเสียงแจ้งเตือนออเดอร์เข้า, การสร้าง Dynamic PromptPay QR Code และระบบจำลองตรวจสอบสลิป", color: "#22c55e", icon: "bi-credit-card-2-front-fill" },
@@ -69,7 +69,7 @@ export default function VibeCodingReportSection() {
           </div>
           <div>
             <span className="text-slate-400">เวอร์ชันระบบ:</span>{" "}
-            <span className="badge bg-blue-500/20 text-blue-400 border border-blue-500/30">v2.5 (Production Release Candidate)</span>
+            <span className="badge bg-blue-500/20 text-blue-400 border border-blue-500/30">v2.5.0 (Latest Production Verified)</span>
           </div>
         </div>
       </div>
@@ -461,7 +461,7 @@ export default function VibeCodingReportSection() {
                     </div>
                   </div>
                   <div className="mt-3 pt-2 border-t border-white/10 text-xs text-slate-300">
-                    <strong>เวอร์ชันล่าสุด (v.):</strong> <span className="text-[#FF7A1A] font-bold">v2.5 (Production Release Candidate)</span>
+                    <strong>เวอร์ชันล่าสุด (v.):</strong> <span className="text-[#FF7A1A] font-bold">v2.5.0 (Latest Production Verified)</span>
                   </div>
                 </div>
               </div>
@@ -487,14 +487,14 @@ export default function VibeCodingReportSection() {
                   <div>
                     <strong>ลิงก์เว็บแอปพลิเคชัน:</strong>{" "}
                     <a
-                      href="https://queueup-school.netlify.app"
+                      href="https://queue-up-nu.vercel.app"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-[#FF7A1A] font-bold underline hover:text-orange-400"
                     >
-                      https://queueup-school.netlify.app
+                      https://queue-up-nu.vercel.app
                     </a>{" "}
-                    <span className="text-slate-400">(และเวอร์ชันปัจจุบันบน Vercel)</span>
+                    <span className="text-slate-400">(Vercel Production) | สำรอง: <a href="https://queueup-school.netlify.app" target="_blank" rel="noopener noreferrer" className="text-sky-400 underline">https://queueup-school.netlify.app</a></span>
                   </div>
                   <div className="d-flex align-items-center gap-4 text-xs text-slate-300 pt-1">
                     <div><span className="text-emerald-400 font-bold">☑ Export เป็น CSV/Excel แล้ว</span></div>
@@ -674,7 +674,7 @@ export default function VibeCodingReportSection() {
               <h3 className="qup-report-block-title">ผลงานต้นแบบ (Prototype Showcase)</h3>
             </div>
             <a
-              href="https://queueup-school.netlify.app"
+              href="https://queue-up-nu.vercel.app"
               target="_blank"
               rel="noopener noreferrer"
               className="btn btn-sm btn-primary rounded-full px-3 text-xs"
@@ -689,7 +689,7 @@ export default function VibeCodingReportSection() {
                 <div><strong>ชื่อแอปพลิเคชัน:</strong> <span className="text-[#FF7A1A] font-bold">QueueUp — School Food CRM & Smart Pre-Order System</span></div>
               </div>
               <div className="col-md-6">
-                <div><strong>URL เว็บไซต์จริง:</strong> <code className="text-sky-400 font-mono">https://queueup-school.netlify.app</code></div>
+                <div><strong>URL เว็บไซต์จริง:</strong> <a href="https://queue-up-nu.vercel.app" target="_blank" rel="noopener noreferrer"><code className="text-sky-400 font-mono">https://queue-up-nu.vercel.app</code></a> <span className="text-slate-400 text-xs">(Vercel Production)</span></div>
               </div>
             </div>
 
