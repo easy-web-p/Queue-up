@@ -660,10 +660,10 @@ export const LandingPage: React.FC = () => {
           <span className="text-xs font-bold text-orange-600 dark:text-orange-400 uppercase tracking-widest">
             Contact & Partnership
           </span>
-          <h2 className="text-2xl sm:text-4xl font-black text-stone-900 tracking-tight dark:text-zinc-100">
+          <h2 className="text-2xl sm:text-4xl font-black text-stone-900 tracking-tight dark:text-white">
             ข้อมูลติดต่อทีมวิศวกรผู้พัฒนา (Developer Contact)
           </h2>
-          <p className="text-xs sm:text-sm text-stone-600 leading-relaxed dark:text-zinc-400">
+          <p className="text-xs sm:text-sm text-stone-600 leading-relaxed dark:text-zinc-300">
             สนใจนำระบบ QueueUp ไปติดตั้งในโรงอาหาร มหาวิทยาลัย อาคารสำนักงาน หรือเสนอแนะการพัฒนา ติดต่อเราได้ตลอดเวลา
           </p>
         </div>
