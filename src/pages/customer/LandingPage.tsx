@@ -572,7 +572,7 @@ export const LandingPage: React.FC = () => {
                   {SURVEY_SUMMARY_STATS.totalSurveys} ชุดข้อมูล
                 </span>
               </div>
-              <div className="flex items-center gap-1 text-stone-500 text-[11px]">
+              <div className="flex items-center gap-1 text-stone-500 dark:text-zinc-400 text-[11px]">
                 <span>{showSurveyDetails ? 'ย่อข้อมูล' : 'เปิดดูผลวิเคราะห์'}</span>
                 {showSurveyDetails ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </div>
@@ -642,7 +642,7 @@ export const LandingPage: React.FC = () => {
                           <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400">
                             ★ {row.averageScore.toFixed(2)} ({row.satisfactionPct}%)
                           </span>
-                          <span className="block text-[10px] text-stone-400">{row.date}</span>
+                          <span className="block text-[10px] text-stone-400 dark:text-zinc-500">{row.date}</span>
                         </div>
                       </div>
                     ))}
