@@ -184,6 +184,145 @@ async function runConcurrencyTests() {
   assert(sampleSlot.status === 'AVAILABLE', 'Slot status is AVAILABLE');
   assertEquals(sampleSlot.usedWorkload, 0, 'Slot usedWorkload is 0 after full release');
 
+  // -------------------------------------------------------------------
+  // TEST 5: Abandoning a hold must not touch workload that is already paid for
+  // -------------------------------------------------------------------
+  console.log('\n--- TEST 5: Abandoned checkout releases the hold, not confirmed workload ---');
+
+  const abandonStoreId = `store_abandon_${Date.now()}`;
+  const abandonSlotRef = SlotTransactionService.getSlotRef(abandonStoreId, testSlotId);
+  await abandonSlotRef.set({
+    slotId: testSlotId,
+    storeId: abandonStoreId,
+    capacity: 30,
+    confirmedWorkload: 0,
+    confirmedOrders: 0,
+    pending: [],
+    updatedAt: Date.now()
+  });
+
+  // One customer pays: workload 10 sits in confirmedWorkload.
+  await SlotTransactionService.reserveSlot({
+    storeId: abandonStoreId, slotId: testSlotId, reservationId: 'res_paid_order', workload: 10, uid: 'alice'
+  });
+  await SlotTransactionService.confirmSlot({
+    storeId: abandonStoreId, slotId: testSlotId, reservationId: 'res_paid_order'
+  });
+
+  // Another holds 7 and walks away from checkout.
+  await SlotTransactionService.reserveSlot({
+    storeId: abandonStoreId, slotId: testSlotId, reservationId: 'res_abandoned', workload: 7, uid: 'bob'
+  });
+
+  // Exactly what POST /api/capacity/release sends.
+  const abandonRelease = await SlotTransactionService.releaseSlot({
+    storeId: abandonStoreId, slotId: testSlotId, reservationId: 'res_abandoned', isConfirmed: false
+  });
+
+  assertEquals(abandonRelease.releasedFrom, 'PENDING', 'An abandoned hold is released from the pending pool');
+  assertEquals(abandonRelease.releasedWorkload, 7, 'The abandoned workload of 7 is released');
+
+  const abandonSlot = (await abandonSlotRef.get()).data();
+  const abandonPendingWorkload = (abandonSlot.pending || []).reduce((sum, r) => sum + r.workload, 0);
+  assertEquals(abandonSlot.confirmedWorkload, 10, "The paid order's confirmed workload is untouched");
+  assertEquals(abandonPendingWorkload, 0, 'The abandoned hold no longer occupies the slot');
+
+  // -------------------------------------------------------------------
+  // TEST 6: A confirmed reservation cannot be released as if it were pending
+  // -------------------------------------------------------------------
+  console.log('\n--- TEST 6: A paid reservation cannot be released through the pending path ---');
+
+  const paidRelease = await SlotTransactionService.releaseSlot({
+    storeId: abandonStoreId, slotId: testSlotId, reservationId: 'res_paid_order', isConfirmed: false
+  });
+  assert(paidRelease.success === false, 'Releasing a confirmed reservation without asking for it is refused');
+  assertEquals(paidRelease.reason, 'RESERVATION_NOT_PENDING', 'Refusal reason is RESERVATION_NOT_PENDING');
+
+  const afterPaidRelease = (await abandonSlotRef.get()).data();
+  assertEquals(afterPaidRelease.confirmedWorkload, 10, 'Confirmed workload survived the refused release');
+
+  const paidReservation = (await adminDb.collection('reservations').doc('res_paid_order').get()).data();
+  assert(paidReservation.status !== 'CANCELLED', 'The paid reservation was not marked CANCELLED');
+
+  // -------------------------------------------------------------------
+  // TEST 7: Reserving twice under one id is one reservation, not two
+  // -------------------------------------------------------------------
+  console.log('\n--- TEST 7: A retry of the same reservationId does not book capacity twice ---');
+
+  const retryStoreId = `store_retry_${Date.now()}`;
+  const retrySlotRef = SlotTransactionService.getSlotRef(retryStoreId, testSlotId);
+  await retrySlotRef.set({
+    slotId: testSlotId,
+    storeId: retryStoreId,
+    capacity: 30,
+    confirmedWorkload: 0,
+    confirmedOrders: 0,
+    pending: [],
+    updatedAt: Date.now()
+  });
+
+  await SlotTransactionService.reserveSlot({
+    storeId: retryStoreId, slotId: testSlotId, reservationId: 'res_retried', workload: 6, uid: 'carol'
+  });
+  const retry = await SlotTransactionService.reserveSlot({
+    storeId: retryStoreId, slotId: testSlotId, reservationId: 'res_retried', workload: 6, uid: 'carol'
+  });
+  assert(retry.success === true, 'The retry succeeds');
+
+  const retrySlot = (await retrySlotRef.get()).data();
+  const retryPendingWorkload = (retrySlot.pending || []).reduce((sum, r) => sum + r.workload, 0);
+  assertEquals(retrySlot.pending.length, 1, 'One pending entry exists for one reservationId');
+  assertEquals(retryPendingWorkload, 6, 'The retried reservation occupies 6, not 12');
+
+  // Confirming it must leave nothing pending behind.
+  await SlotTransactionService.confirmSlot({
+    storeId: retryStoreId, slotId: testSlotId, reservationId: 'res_retried'
+  });
+  const retryAfterConfirm = (await retrySlotRef.get()).data();
+  assertEquals(retryAfterConfirm.confirmedWorkload, 6, 'Confirming the retried reservation transfers 6');
+  assertEquals(retryAfterConfirm.pending.length, 0, 'No orphaned hold is left behind after confirmation');
+
+  // -------------------------------------------------------------------
+  // TEST 8: A reservation id already in use by someone else is refused
+  // -------------------------------------------------------------------
+  console.log("\n--- TEST 8: A caller cannot reserve under another customer's reservationId ---");
+
+  const hijackStoreId = `store_hijack_${Date.now()}`;
+  await SlotTransactionService.getSlotRef(hijackStoreId, testSlotId).set({
+    slotId: testSlotId,
+    storeId: hijackStoreId,
+    capacity: 30,
+    confirmedWorkload: 0,
+    confirmedOrders: 0,
+    pending: [],
+    updatedAt: Date.now()
+  });
+
+  await SlotTransactionService.reserveSlot({
+    storeId: hijackStoreId,
+    slotId: testSlotId,
+    reservationId: 'res_belongs_to_dave',
+    workload: 4,
+    uid: 'dave',
+    orderPayload: { items: [{ menuItemId: 'daves_lunch' }] }
+  });
+
+  const hijack = await SlotTransactionService.reserveSlot({
+    storeId: hijackStoreId,
+    slotId: testSlotId,
+    reservationId: 'res_belongs_to_dave',
+    workload: 1,
+    uid: 'attacker',
+    orderPayload: { items: [{ menuItemId: 'attackers_item' }] }
+  });
+
+  assert(hijack.success === false, "Reserving under another customer's reservationId is refused");
+  assertEquals(hijack.reason, 'RESERVATION_ID_TAKEN', 'Refusal reason is RESERVATION_ID_TAKEN');
+
+  const daveReservation = (await adminDb.collection('reservations').doc('res_belongs_to_dave').get()).data();
+  assertEquals(daveReservation.uid, 'dave', 'The reservation still belongs to its holder');
+  assertEquals(daveReservation.orderPayload.items[0].menuItemId, 'daves_lunch', "The holder's cart was not replaced");
+
   console.log('\n===============================================================');
   console.log(`📊 INTEGRATION TEST RESULTS: ${passedTests}/${totalTests} Passed (${passedTests === totalTests ? 'ALL PASSED' : 'FAILURES DETECTED'})`);
   console.log('===============================================================\n');

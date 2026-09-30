@@ -191,19 +191,37 @@ export function reserve({
     throw new Error('reservationId is strictly required for reserve()');
   }
 
+  // A retry of the same reservation is the same reservation. Appending a second
+  // pending entry under one id books its workload twice over: the slot loses the
+  // capacity twice, confirming only ever transfers one of the two entries, and
+  // the orphan then holds its share of the kitchen until its TTL runs out. So an
+  // existing hold for this id is replaced, not stacked on, and it is excluded
+  // from the capacity check — a caller must not be refused for the room their
+  // own earlier attempt is already occupying.
+  const currentPending = Array.isArray(pending) ? pending : [];
+  const priorHolds = currentPending.filter((r) => r.reservationId === reservationId);
+  const otherHolds = currentPending.filter((r) => r.reservationId !== reservationId);
+
   const check = canReserve({
     capacity,
     confirmedWorkload,
-    pending,
+    pending: otherHolds,
     newWorkload,
     now
   });
 
   if (!check.allowed) {
+    // A retry that cannot fit must not cost the caller the hold they already
+    // have, so any still-active prior hold is carried through untouched.
+    const survivingPriorHolds = cleanupExpiredPending(priorHolds, now).activePending;
     return {
       success: false,
       reason: check.reason,
-      details: check
+      details: {
+        ...check,
+        activePending: [...check.activePending, ...survivingPriorHolds],
+        cleanedCount: check.expiredPending.length + (priorHolds.length - survivingPriorHolds.length)
+      }
     };
   }
 
@@ -227,7 +245,8 @@ export function reserve({
     pendingWorkload: newPendingWorkload,
     usedWorkload: newUsedWorkload,
     remainingWorkload: Math.max(0, check.capacity - newUsedWorkload),
-    cleanedCount: check.expiredPending.length
+    cleanedCount: check.expiredPending.length,
+    replacedPriorHold: priorHolds.length > 0
   };
 }
 
@@ -310,28 +329,40 @@ export function releaseReservation({
   workloadToRelease = 0
 }) {
   let confirmed = Math.max(0, Number(confirmedWorkload) || 0);
-  let cleanedPending = [...pending];
+  let cleanedPending = Array.isArray(pending) ? [...pending] : [];
   let releasedAmount = 0;
+  let releasedFrom = 'NOTHING';
 
-  if (isConfirmed || workloadToRelease > 0) {
-    // Releasing confirmed workload (e.g. merchant rejected order, refund)
+  // Which pool holds this reservation is a fact about the slot, not something
+  // the caller gets to assert. A reservation still listed in `pending` has never
+  // been counted against confirmedWorkload, so taking its workload off
+  // confirmedWorkload hands back capacity belonging to orders that are already
+  // paid for — and leaves the abandoned hold itself in place. The old order of
+  // these branches did exactly that for every abandoned checkout, because
+  // releaseSlot fills workloadToRelease in from the reservation document.
+  const pendingIndex = reservationId
+    ? cleanedPending.findIndex((r) => r.reservationId === reservationId)
+    : -1;
+
+  if (pendingIndex !== -1) {
+    // Releasing a pending hold (e.g. the customer abandoned checkout).
+    releasedAmount = Number(cleanedPending[pendingIndex].workload) || 0;
+    cleanedPending = cleanedPending.filter((_, idx) => idx !== pendingIndex);
+    releasedFrom = 'PENDING';
+  } else if (isConfirmed || workloadToRelease > 0) {
+    // Releasing confirmed workload (e.g. merchant rejected the order, refund).
     const amount = Number(workloadToRelease) || 0;
     releasedAmount = Math.min(confirmed, amount);
     confirmed = Math.max(0, confirmed - releasedAmount);
-  } else if (reservationId) {
-    // Releasing pending reservation (e.g. user canceled checkout)
-    const target = cleanedPending.find(r => r.reservationId === reservationId);
-    if (target) {
-      releasedAmount = target.workload;
-      cleanedPending = cleanedPending.filter(r => r.reservationId !== reservationId);
-    }
+    releasedFrom = 'CONFIRMED';
   }
 
   return {
     success: true,
     confirmedWorkload: confirmed,
     pending: cleanedPending,
-    releasedWorkload: releasedAmount
+    releasedWorkload: releasedAmount,
+    releasedFrom
   };
 }
 

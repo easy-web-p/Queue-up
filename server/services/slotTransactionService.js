@@ -77,6 +77,30 @@ export const SlotTransactionService = {
       const slotSnap = await t.get(slotRef);
       const slotData = slotSnap.exists ? slotSnap.data() : null;
 
+      // The reservation id names a document, and it can arrive from the caller.
+      // Without this read the t.set() below would overwrite whatever is already
+      // filed under that id: its uid, its cart, its status and its orderId. That
+      // is also the document /api/capacity/release consults to decide who may
+      // free a hold, so taking it over takes over the hold with it.
+      const existingReservationSnap = await t.get(reservationRef);
+      if (existingReservationSnap.exists) {
+        const existing = existingReservationSnap.data();
+        if (existing.uid && existing.uid !== uid) {
+          return {
+            success: false,
+            reason: 'RESERVATION_ID_TAKEN',
+            code: 'RESERVATION_ID_TAKEN'
+          };
+        }
+        if (existing.status === 'CONFIRMED') {
+          return {
+            success: false,
+            reason: 'RESERVATION_ALREADY_CONFIRMED',
+            code: 'RESERVATION_ALREADY_CONFIRMED'
+          };
+        }
+      }
+
       const capacity = slotData?.capacity ?? defaultCapacity;
       const confirmedWorkload = slotData?.confirmedWorkload ?? 0;
       const pending = Array.isArray(slotData?.pending) ? slotData.pending : [];
@@ -330,6 +354,26 @@ export const SlotTransactionService = {
       const confirmedWorkload = slotData.confirmedWorkload ?? 0;
       const pending = Array.isArray(slotData.pending) ? slotData.pending : [];
 
+      const holdsPending = reservationId
+        ? pending.some((r) => r.reservationId === reservationId)
+        : false;
+
+      // Dropping an abandoned hold is all a customer-facing release may do.
+      // Releasing confirmed workload belongs to the refund and rejection paths,
+      // which ask for it explicitly: /api/capacity/release passes isConfirmed
+      // false, so without this a customer could send the reservationId of their
+      // own paid order and hand the kitchen's confirmed capacity back while the
+      // order still stood — and the reservation would be marked CANCELLED under
+      // a live order.
+      if (!holdsPending && !isConfirmed) {
+        return {
+          success: false,
+          reason: 'RESERVATION_NOT_PENDING',
+          releasedWorkload: 0,
+          confirmedWorkload
+        };
+      }
+
       const result = releaseReservation({
         confirmedWorkload,
         pending,
@@ -357,6 +401,7 @@ export const SlotTransactionService = {
       return {
         success: true,
         releasedWorkload: result.releasedWorkload,
+        releasedFrom: result.releasedFrom,
         confirmedWorkload: result.confirmedWorkload
       };
     });

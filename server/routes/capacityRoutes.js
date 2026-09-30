@@ -9,6 +9,7 @@
  */
 
 import { Router } from 'express';
+import { randomUUID } from 'node:crypto';
 import { adminDb } from '../firebaseAdmin.js';
 import { optionalAuthenticate, isStoreOperator } from '../middleware/authenticate.js';
 import { SlotTransactionService } from '../services/slotTransactionService.js';
@@ -141,8 +142,15 @@ capacityRouter.post('/reserve', optionalAuthenticate, async (req, res) => {
     const uid = req.user?.uid || 'guest-user';
     const schoolId = req.user?.schoolId || 'school-default';
 
-    // 5. Generate or use Reservation ID
-    const reservationId = clientReservationId || `res_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    // 5. Reservation id. An unauthenticated caller does not get to name the
+    // document: every guest carries the uid 'guest-user', so reserveSlot's
+    // ownership check cannot tell two guests apart, and a guest who passed
+    // another guest's id would take over their reservation and their hold.
+    // A signed-in caller may supply one — that is what makes a retry idempotent
+    // — and the uid on the existing document then protects it.
+    const reservationId = (req.user?.uid && clientReservationId)
+      ? clientReservationId
+      : `res_${randomUUID()}`;
 
     // 6. Run Atomic Firestore Transaction
     const result = await SlotTransactionService.reserveSlot({
@@ -157,6 +165,24 @@ capacityRouter.post('/reserve', optionalAuthenticate, async (req, res) => {
       idempotencyKey: key || null,
       ttlMs
     });
+
+    if (!result.success && result.reason === 'RESERVATION_ID_TAKEN') {
+      return res.status(409).json({
+        success: false,
+        error: 'RESERVATION_ID_TAKEN',
+        code: 'RESERVATION_ID_TAKEN',
+        message: 'รหัสการจองนี้เป็นของลูกค้าคนอื่น กรุณาเริ่มการจองใหม่'
+      });
+    }
+
+    if (!result.success && result.reason === 'RESERVATION_ALREADY_CONFIRMED') {
+      return res.status(409).json({
+        success: false,
+        error: 'RESERVATION_ALREADY_CONFIRMED',
+        code: 'RESERVATION_ALREADY_CONFIRMED',
+        message: 'การจองนี้ถูกยืนยันเป็นออเดอร์แล้ว กรุณาเริ่มการจองใหม่'
+      });
+    }
 
     if (!result.success) {
       return res.status(409).json({
@@ -217,21 +243,30 @@ capacityRouter.post('/release', optionalAuthenticate, async (req, res) => {
       });
     }
 
-    // Releasing someone else's hold would hand their slot to the caller.
+    // Releasing someone else's hold would hand their slot to the caller. Every
+    // reservation is written together with its hold in one transaction, so an id
+    // with no document behind it is nobody's hold to release — skipping the check
+    // when the document is missing skipped it altogether.
     const reservationSnap = await adminDb.collection('reservations').doc(reservationId).get();
-    if (reservationSnap.exists) {
-      const reservation = reservationSnap.data();
-      const callerUid = req.user?.uid || 'guest-user';
-      const isHolder = reservation.uid === callerUid;
-      const operatesStore = await isStoreOperator(req.user, storeId);
+    if (!reservationSnap.exists) {
+      return res.status(404).json({
+        success: false,
+        error: 'RESERVATION_NOT_FOUND',
+        message: 'ไม่พบการจองนี้'
+      });
+    }
 
-      if (!isHolder && !operatesStore) {
-        return res.status(403).json({
-          success: false,
-          error: 'FORBIDDEN',
-          message: 'This reservation belongs to another customer.'
-        });
-      }
+    const reservation = reservationSnap.data();
+    const callerUid = req.user?.uid || 'guest-user';
+    const isHolder = reservation.uid === callerUid;
+    const operatesStore = await isStoreOperator(req.user, storeId);
+
+    if (!isHolder && !operatesStore) {
+      return res.status(403).json({
+        success: false,
+        error: 'FORBIDDEN',
+        message: 'This reservation belongs to another customer.'
+      });
     }
 
     const result = await SlotTransactionService.releaseSlot({
@@ -240,6 +275,17 @@ capacityRouter.post('/release', optionalAuthenticate, async (req, res) => {
       reservationId,
       isConfirmed: false
     });
+
+    if (!result.success) {
+      return res.status(409).json({
+        success: false,
+        error: result.reason || 'RELEASE_REFUSED',
+        code: result.reason || 'RELEASE_REFUSED',
+        message: result.reason === 'RESERVATION_NOT_PENDING'
+          ? 'การจองนี้ถูกยืนยันเป็นออเดอร์แล้ว การคืนโควตาต้องทำผ่านการยกเลิกออเดอร์'
+          : 'ไม่สามารถคืนโควตาการจองนี้ได้'
+      });
+    }
 
     return res.status(200).json(result);
   } catch (error) {
