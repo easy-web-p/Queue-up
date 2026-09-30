@@ -252,9 +252,18 @@ schoolRouter.post('/:schoolId/roster', authenticate, requireSchoolAdmin(), async
 
     const written = await writeRoster(schoolId, members);
 
+    // Counted from the roster, not from this batch. members.filter() reported the
+    // size of the import rather than the size of the roster, so a school that
+    // added fifty more students saw its published total drop to fifty.
+    const rosterSnap = await adminDb.collection('school_members')
+      .where('schoolId', '==', schoolId)
+      .where('status', '==', 'active')
+      .get();
+    const roster = rosterSnap.docs.map((doc) => doc.data());
+
     await adminDb.collection('schools').doc(schoolId).set({
-      totalStudents: members.filter((m) => m.role === 'student').length,
-      totalAdmins: members.filter((m) => m.role !== 'student').length,
+      totalStudents: roster.filter((m) => m.role === 'student').length,
+      totalAdmins: roster.filter((m) => m.role !== 'student').length,
       rosterUpdatedAt: now
     }, { merge: true });
 
@@ -293,10 +302,20 @@ schoolRouter.post('/membership/claim', authenticate, async (req, res) => {
       });
     }
 
+    // Every active roster row carrying this address, not just the first one.
+    //
+    // This used to take .limit(1) with no ordering, and it runs on every sign-in.
+    // Any school administrator may put any email on their own roster, so two
+    // institutions can list the same address — and which of them won was whichever
+    // document the index returned first. Firestore orders an equality query by
+    // document id, and these ids are `${schoolId}_${identifier}`, so a school
+    // whose id sorts earlier captured the account: verified here, a dean who
+    // belonged to one university signed in and came back a plain customer of
+    // another, because an administrator there had added their address.
     const snap = await adminDb.collection('school_members')
       .where('email', '==', email)
       .where('status', '==', 'active')
-      .limit(1)
+      .limit(20)
       .get();
 
     if (snap.empty) {
@@ -307,7 +326,36 @@ schoolRouter.post('/membership/claim', authenticate, async (req, res) => {
       });
     }
 
-    const memberDoc = snap.docs[0];
+    const candidates = snap.docs;
+
+    // A row this account already holds is the row it holds.
+    let memberDoc = candidates.find((doc) => doc.data().claimedByUid === req.user.uid);
+
+    // Otherwise the institution the account is already bound to wins. Signing in
+    // must never move somebody between institutions; that is an administrator's
+    // action, not a side effect of authenticating.
+    if (!memberDoc && req.user.schoolId) {
+      memberDoc = candidates.find((doc) => doc.data().schoolId === req.user.schoolId);
+    }
+
+    // A single row is unambiguous — a first claim, or a transfer whose previous
+    // institution has already taken the account off its roster.
+    if (!memberDoc && candidates.length === 1) {
+      memberDoc = candidates[0];
+    }
+
+    // Several institutions list this address and none of them is the one this
+    // account belongs to. Picking one would be choosing somebody's institution
+    // for them, so it is refused and said out loud.
+    if (!memberDoc) {
+      return res.status(409).json({
+        success: false,
+        error: 'MULTIPLE_ROSTERS',
+        message: 'อีเมลนี้อยู่ในรายชื่อของหลายสถานศึกษา กรุณาติดต่อผู้ดูแลสถานศึกษาของคุณเพื่อยืนยันสังกัด',
+        schoolIds: candidates.map((doc) => doc.data().schoolId)
+      });
+    }
+
     const member = memberDoc.data();
 
     // Anti-hijack: a roster row already bound to another account is never

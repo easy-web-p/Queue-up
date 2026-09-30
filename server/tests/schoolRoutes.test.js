@@ -184,6 +184,61 @@ async function runTests() {
       as('uid-somchai', { email: 'somchai@kku.ac.th' }));
     check(res.status === 200, 'The original owner can re-claim idempotently', `status ${res.status}`);
 
+    // --- Another institution cannot take a member out of theirs ---
+    //
+    // Claiming runs on every sign-in, and any school administrator may put any
+    // address on their own roster. The lookup took the first matching row with no
+    // ordering, and Firestore orders an equality query by document id — these ids
+    // begin with the schoolId — so a school whose id sorted earlier captured the
+    // account on its next sign-in.
+    console.log('\n--- A rival institution cannot capture a member ---');
+    await adminDb.collection('schools').doc('AAA-COLLEGE').set({
+      id: 'AAA-COLLEGE', schoolCode: 'AAA-COLLEGE', schoolName: 'วิทยาลัยชื่อขึ้นต้นด้วย A'
+    });
+    await adminDb.collection('school_members').doc('AAA-COLLEGE_S-1').set({
+      id: 'AAA-COLLEGE_S-1', schoolId: 'AAA-COLLEGE', identifier: 'S-1',
+      fullName: 'สมชาย รักเรียน', email: 'somchai@kku.ac.th', role: 'admin',
+      status: 'active', isRegistered: false, claimedByUid: null
+    });
+
+    res = await request(baseUrl, '/api/schools/membership/claim', 'POST', {},
+      as('uid-somchai', { email: 'somchai@kku.ac.th', schoolId: SCHOOL }));
+    claims = (await adminAuth.getUser('uid-somchai')).customClaims;
+    check(res.status === 200 && res.data?.schoolId === SCHOOL && claims?.schoolId === SCHOOL,
+      'Signing in again keeps the student in their own institution',
+      `schoolId ${res.data?.schoolId}, claim ${claims?.schoolId}`);
+    check(claims?.role === 'customer',
+      "And does not take the rival roster's role", `role ${claims?.role}`);
+
+    // A never-claimed address on two rosters is ambiguous, and choosing one would
+    // be choosing somebody's institution for them.
+    await adminDb.collection('school_members').doc('AAA-COLLEGE_S-2').set({
+      id: 'AAA-COLLEGE_S-2', schoolId: 'AAA-COLLEGE', identifier: 'S-2',
+      fullName: 'สมศรี ตั้งใจ', email: 'somsri@kku.ac.th', role: 'student',
+      status: 'active', isRegistered: false, claimedByUid: null
+    });
+    res = await request(baseUrl, '/api/schools/membership/claim', 'POST', {},
+      as('uid-somsri', { email: 'somsri@kku.ac.th' }));
+    check(res.status === 409 && res.data?.error === 'MULTIPLE_ROSTERS',
+      'An address on two rosters is refused rather than assigned at random',
+      `${res.status} ${res.data?.error}`);
+
+    // --- The published member counts describe the roster, not the last import ---
+    console.log('\n--- Roster totals ---');
+    let school = (await adminDb.collection('schools').doc(SCHOOL).get()).data();
+    const studentsBefore = school.totalStudents;
+
+    res = await request(baseUrl, `/api/schools/${SCHOOL}/roster`, 'POST', {
+      members: [{ id: 'STD-7000001', fullName: 'นักศึกษาใหม่', email: 'new1@kku.ac.th', type: 'student' }]
+    }, ROOT);
+    check(res.status === 200 && res.data?.importedMemberCount === 1,
+      'A later import of one student succeeds', `imported ${res.data?.importedMemberCount}`);
+
+    school = (await adminDb.collection('schools').doc(SCHOOL).get()).data();
+    check(school.totalStudents === studentsBefore + 1,
+      'The total counts the whole roster, not just that import',
+      `was ${studentsBefore}, now ${school.totalStudents}`);
+
     // --- Administering claims directly ---
     console.log('\n--- Platform claim administration ---');
     res = await request(baseUrl, '/api/schools/users/uid-somchai/claims', 'POST',
