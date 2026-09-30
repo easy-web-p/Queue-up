@@ -118,6 +118,13 @@ async function seed() {
   await adminDb.collection('menu_items').doc(MENU).set({
     id: MENU, storeId: STORE, name: 'ข้าวหมูแดง', price: 50, isAvailable: true
   });
+
+  // The student is on the school's roster, which is what makes them somebody the
+  // campus counter may top up: a school administrator credits their own members.
+  await adminDb.collection('school_members').doc(`member-${STUDENT}`).set({
+    id: `member-${STUDENT}`, schoolId: SCHOOL, email: `${STUDENT}@kku.ac.th`,
+    role: 'student', status: 'active', claimedByUid: STUDENT, isRegistered: true
+  });
 }
 
 async function walletOrder(quantity = 1, extra = {}) {

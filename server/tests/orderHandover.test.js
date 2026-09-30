@@ -100,6 +100,13 @@ async function seed() {
   await adminDb.collection('menu_items').doc(MENU).set({
     id: MENU, storeId: STORE, name: 'ก๋วยจั๊บญวน', price: 50, isAvailable: true
   });
+
+  // The student is on the school's roster, which is what makes them somebody the
+  // campus counter may top up: a school administrator credits their own members.
+  await adminDb.collection('school_members').doc(`member-${STUDENT}`).set({
+    id: `member-${STUDENT}`, schoolId: SCHOOL, email: `${STUDENT}@kku.ac.th`,
+    role: 'student', status: 'active', claimedByUid: STUDENT, isRegistered: true
+  });
 }
 
 /** A wallet order, so the money path is exercised without a gateway. */
@@ -254,7 +261,7 @@ async function runTests() {
       'The order is not handed over', `status ${stored.status}`);
 
     res = await api(`/api/orders/${placed.orderId}/status`, 'PATCH',
-      { status: 'COMPLETED' }, as(`root-handover-${suffix}`, 'admin'));
+      { status: 'COMPLETED' }, as(`root-handover-${suffix}`, 'super_admin'));
     check(res.status === 400,
       'Not even a platform admin skips it that way', `status ${res.status}`);
 

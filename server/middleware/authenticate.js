@@ -34,7 +34,11 @@ function buildMockUser(req) {
     role,
     storeId: req.headers['x-mock-store-id'] || null,
     schoolId: req.headers['x-mock-school-id'] || 'school-default',
-    admin: role === 'admin',
+    // Exactly what buildVerifiedUser derives from a real token. `role === 'admin'`
+    // used to set this, which is the school-admin claim: every test that signs in
+    // as a school admin was really exercising a platform administrator, so the
+    // harness could not see a scoped check failing to be scoped.
+    admin: role === 'super_admin',
     // Mock auth is an explicit, opt-in development mode, so the identity it
     // produces is accepted as authentic; isMock records where it came from.
     // x-mock-email-verified: false lets a test express an account whose address

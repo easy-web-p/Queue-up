@@ -150,6 +150,21 @@ async function runTests() {
     check(payout.status === 'REQUESTED',
       'The payout is untouched', `status ${payout.status}`);
 
+    // role 'admin' is the school administrator's claim. A real token gives it no
+    // platform authority, and the development mock-auth path used to: it set the
+    // platform admin flag from `role === 'admin'`, so every suite that signed in
+    // as a school administrator was really exercising a platform one, and no
+    // scoped check could be caught failing to be scoped.
+    const schoolAdmin = account(`dean-${suffix}`, { email: `dean-${suffix}@kku.ac.th`, role: 'admin' });
+    res = await api(`/api/merchant/payouts/${payoutId}/complete`, 'POST', {}, schoolAdmin);
+    check(res.status === 403,
+      'A school administrator is not a platform administrator, mock auth included',
+      `status ${res.status}`);
+
+    payout = (await adminDb.collection('payout_requests').doc(payoutId).get()).data();
+    check(payout.status === 'REQUESTED',
+      'So the payout is still only requested', `status ${payout.status}`);
+
     const realAdmin = account(`boss-${suffix}`, { email: 'boss@queueup.test', role: 'admin' });
     res = await api(`/api/merchant/payouts/${payoutId}/complete`, 'POST', {}, realAdmin);
     check(res.status === 200,

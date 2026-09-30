@@ -129,6 +129,8 @@ export function createApp({ serveStatic = true } = {}) {
   app.post('/api/chat/messages', writeLimiter);
   app.post('/api/capacity/reserve', writeLimiter);
   app.post('/api/merchant/payouts', writeLimiter);
+  // A counter top-up creates spendable balance, so it belongs with the money writes.
+  app.post('/api/wallet/:uid/credit', writeLimiter);
   // Attesting or reversing a transfer is the highest-value write in the system.
   app.post('/api/merchant/payouts/:payoutId/complete', writeLimiter);
   app.post('/api/merchant/payouts/:payoutId/fail', writeLimiter);

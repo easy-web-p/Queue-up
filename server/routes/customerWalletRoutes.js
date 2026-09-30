@@ -21,6 +21,27 @@ export const customerWalletRouter = Router();
 const MAX_CREDIT_SATANG = 500000; // ฿5,000
 
 /**
+ * Whether this account is on that school's roster and claimed by them.
+ *
+ * A counter top-up creates spendable money, and a school administrator's
+ * authority reaches their own institution and no further. requireSchoolAdmin
+ * only checks that the caller administers the school they named — it knows
+ * nothing about whose wallet is being credited — so on its own it let an
+ * administrator of one school credit a student of another, an account on no
+ * roster at all, or their own personal account under another institution's name.
+ */
+async function isMemberOfSchool(uid, schoolId) {
+  if (!uid || !schoolId) return false;
+  const snap = await adminDb.collection('school_members')
+    .where('claimedByUid', '==', uid)
+    .where('schoolId', '==', schoolId)
+    .where('status', '==', 'active')
+    .limit(1)
+    .get();
+  return !snap.empty;
+}
+
+/**
  * GET /api/wallet
  * The signed-in user's own balance and recent transactions.
  */
@@ -83,11 +104,27 @@ customerWalletRouter.get('/:uid', authenticate, async (req, res) => {
 customerWalletRouter.post(
   '/:uid/credit',
   authenticate,
-  requireSchoolAdmin((req) => req.body?.schoolId || req.user?.schoolId),
+  // Resolved from the caller's own claim. Reading req.body.schoolId first let a
+  // request name the institution it was acting for, which requireSchoolAdmin
+  // then had to match against the same caller's claim anyway.
+  requireSchoolAdmin((req) => req.user?.schoolId),
   async (req, res) => {
     try {
       const { uid } = req.params;
       const { amountSatang, note = 'เติมเงินที่เคาน์เตอร์', idempotencyKey } = req.body;
+
+      // A platform administrator credits anyone; a school administrator credits
+      // the people on their own roster.
+      if (!isSuperAdmin(req.user)) {
+        const schoolId = req.user?.schoolId;
+        if (!(await isMemberOfSchool(uid, schoolId))) {
+          return res.status(403).json({
+            success: false,
+            error: 'NOT_YOUR_MEMBER',
+            message: 'เติมเงินได้เฉพาะสมาชิกในรายชื่อของสถานศึกษาที่คุณดูแลเท่านั้น'
+          });
+        }
+      }
 
       const amount = Number(amountSatang);
       if (!Number.isInteger(amount) || amount <= 0) {

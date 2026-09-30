@@ -85,6 +85,13 @@ async function seed() {
   await adminDb.collection('menu_items').doc('menu-wallet-1').set({
     id: 'menu-wallet-1', storeId: STORE, name: 'ก๋วยเตี๋ยวเรือหมู', price: 50, isAvailable: true
   });
+
+  // The student is on the school's roster, which is what makes them somebody the
+  // campus counter may top up: a school administrator credits their own members.
+  await adminDb.collection('school_members').doc(`member-${STUDENT}`).set({
+    id: `member-${STUDENT}`, schoolId: SCHOOL, email: `${STUDENT}@kku.ac.th`,
+    role: 'student', status: 'active', claimedByUid: STUDENT, isRegistered: true
+  });
 }
 
 async function runTests() {
@@ -101,6 +108,35 @@ async function runTests() {
     res = await request(baseUrl, `/api/wallet/${STUDENT}/credit`, 'POST',
       { amountSatang: 10000 }, as(OTHER));
     check(res.status === 403, 'A student cannot credit another wallet', `status ${res.status}`);
+
+    // A counter top-up creates spendable money, and a school administrator's
+    // authority stops at their own institution. Before this was checked, an
+    // administrator of any school could credit any account on the platform —
+    // another institution's students, or their own personal wallet.
+    res = await request(baseUrl, `/api/wallet/${STUDENT}/credit`, 'POST',
+      { amountSatang: 10000 }, as('counter-elsewhere', { role: 'admin', schoolId: 'OTHER-UNIVERSITY' }));
+    check(res.status === 403,
+      "Another institution's counter cannot credit this student",
+      `status ${res.status}, error ${res.data?.error}`);
+
+    res = await request(baseUrl, `/api/wallet/${STUDENT}/credit`, 'POST',
+      { amountSatang: 10000, schoolId: SCHOOL },
+      as('counter-elsewhere', { role: 'admin', schoolId: 'OTHER-UNIVERSITY' }));
+    check(res.status === 403,
+      'Nor by naming this school in the request body',
+      `status ${res.status}, error ${res.data?.error}`);
+
+    res = await request(baseUrl, `/api/wallet/uid-on-no-roster-${suffix}/credit`, 'POST',
+      { amountSatang: 10000 }, COUNTER);
+    check(res.status === 403 && res.data?.error === 'NOT_YOUR_MEMBER',
+      'And an account on no roster at all cannot be credited',
+      `status ${res.status}, error ${res.data?.error}`);
+
+    res = await request(baseUrl, `/api/wallet/${'campus-counter'}/credit`, 'POST',
+      { amountSatang: 10000 }, COUNTER);
+    check(res.status === 403 && res.data?.error === 'NOT_YOUR_MEMBER',
+      'A counter account not on the roster cannot credit itself either',
+      `status ${res.status}, error ${res.data?.error}`);
 
     res = await request(baseUrl, `/api/wallet/${STUDENT}/credit`, 'POST',
       { amountSatang: -5000 }, COUNTER);

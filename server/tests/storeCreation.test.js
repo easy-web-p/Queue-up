@@ -217,7 +217,7 @@ async function runTests() {
 
     // store.id has the order placed earlier in this suite.
     res = await api(`/api/stores/${store.id}`, 'DELETE', null,
-      as(`root-${suffix}`, { role: 'admin' }));
+      as(`root-${suffix}`, { role: 'super_admin' }));
     check(res.status === 409 && res.data?.error === 'STORE_HAS_ORDERS',
       'Not even an administrator erases a shop with order history',
       `${res.status} ${res.data?.error}`);
@@ -232,7 +232,7 @@ async function runTests() {
     const emptyMenuId = emptyRes.data?.menuItems?.[0]?.id;
 
     res = await api(`/api/stores/${emptyStore.id}`, 'DELETE', null,
-      as(`root-${suffix}`, { role: 'admin' }));
+      as(`root-${suffix}`, { role: 'super_admin' }));
     check(res.status === 200 && res.data?.deletedMenuItems === 1,
       'A shop with no orders is deleted, menu and all', `status ${res.status}`);
     check(!(await adminDb.collection('stores').doc(emptyStore.id).get()).exists,
@@ -241,7 +241,7 @@ async function runTests() {
       'Its menu items go with it rather than being orphaned');
 
     res = await api(`/api/stores/does-not-exist`, 'DELETE', null,
-      as(`root-${suffix}`, { role: 'admin' }));
+      as(`root-${suffix}`, { role: 'super_admin' }));
     check(res.status === 404, 'Deleting a shop that never existed is a 404', `status ${res.status}`);
 
     // --- A shop that does not exist is not a shop ---
@@ -260,7 +260,7 @@ async function runTests() {
       `${res.status} ${(res.data?.message || '').slice(0, 40)}`);
 
     res = await api(`/api/stores/${emptyStore.id}`, 'PATCH', { name: 'ผีร้าน' },
-      as(`root-${suffix}`, { role: 'admin' }));
+      as(`root-${suffix}`, { role: 'super_admin' }));
     check(res.status === 404,
       'And the shop just deleted cannot be edited back into existence',
       `status ${res.status}`);
