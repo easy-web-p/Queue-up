@@ -169,7 +169,15 @@ export async function recordPaymentException(adminDb, {
   now = new Date().toISOString()
 }) {
   const id = `pex_${orderId}_${reason}`.slice(0, 120);
-  await adminDb.collection('payment_exceptions').doc(id).set({
+  const ref = adminDb.collection('payment_exceptions').doc(id);
+
+  // The id is deterministic so a redelivered webhook updates the one row rather
+  // than filing another. That also means a blanket status: 'OPEN' reopened a
+  // case an operator had already worked through, every time Stripe retried.
+  const existing = await ref.get();
+  const status = existing.exists ? (existing.data().status || 'OPEN') : 'OPEN';
+
+  await ref.set({
     id,
     orderId,
     reason,
@@ -179,8 +187,8 @@ export async function recordPaymentException(adminDb, {
     amountSatang,
     expectedSatang,
     detail,
-    status: 'OPEN',
-    createdAt: now,
+    status,
+    createdAt: existing.exists ? (existing.data().createdAt || now) : now,
     updatedAt: now
   }, { merge: true });
   console.error(

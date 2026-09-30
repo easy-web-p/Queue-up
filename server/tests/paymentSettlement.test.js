@@ -360,6 +360,87 @@ async function runTests() {
       'The books are corrected without anyone in the app doing anything',
       `${books.count} group(s)`);
 
+    // --- A partial refund is not a refund of the whole order ---
+    //
+    // charge.refunded fires for a partial refund too, and amount_refunded is the
+    // running total on the charge. Ignoring it marked the order REFUNDED and
+    // reversed the entire order in the books, so a ฿10 refund on a ฿60 order took
+    // the merchant's whole credit.
+    console.log('\n--- charge.refunded for part of the order ---');
+    const partialOrder = await createOrder(1);
+    await sendEvent(checkoutEvent('checkout.session.completed', {
+      id: `evt_partpay_${suffix}`, orderId: partialOrder, amountTotal: 6000,
+      paymentStatus: 'paid', paymentIntent: `pi_part_${partialOrder}`
+    }));
+
+    const storeBalance = async () => (
+      await adminDb.collection('merchant_balances').doc(STORE).get()
+    ).data() || {};
+    const pendingBeforePartial = (await storeBalance()).pendingSatang || 0;
+
+    const partialRefundEvent = (eventId, amountRefunded) => ({
+      id: eventId,
+      type: 'charge.refunded',
+      livemode: false,
+      data: {
+        object: {
+          id: `ch_${partialOrder}`,
+          object: 'charge',
+          payment_intent: `pi_part_${partialOrder}`,
+          amount: 6000,
+          amount_refunded: amountRefunded,
+          refunds: { data: [{ id: `re_part_${amountRefunded}` }] }
+        }
+      }
+    });
+
+    await sendEvent(partialRefundEvent(`evt_partref_${suffix}`, 1000));
+    stored = await order(partialOrder);
+    check(stored.paymentStatus === 'PARTIALLY_REFUNDED',
+      'A partial refund is recorded as partial, not as a full refund',
+      `paymentStatus ${stored.paymentStatus}`);
+    check(stored.refundedSatang === 1000,
+      'The amount actually refunded is what is stored', `฿${(stored.refundedSatang || 0) / 100}`);
+    check(stored.settlementStatus !== 'REVERSED',
+      'The settlement is not reversed on a partial refund',
+      `settlementStatus ${stored.settlementStatus}`);
+    check((await storeBalance()).pendingSatang === pendingBeforePartial,
+      "The merchant keeps the credit that was not refunded",
+      `was ${pendingBeforePartial}, now ${(await storeBalance()).pendingSatang}`);
+
+    books = await ledgerGroups(partialOrder);
+    check(books.count === 1 && books.unbalanced === 0,
+      'No reversal is posted, and the payment group still balances',
+      `${books.count} group(s)`);
+
+    const partialException = await adminDb.collection('payment_exceptions')
+      .doc(`pex_${partialOrder}_PARTIAL_REFUND_NOT_POSTED`).get();
+    check(partialException.exists && partialException.data().status === 'OPEN',
+      'An operator is given the case rather than the books being guessed at',
+      `exists ${partialException.exists}`);
+
+    // An operator works the case; a redelivered event must not reopen it.
+    await adminDb.collection('payment_exceptions')
+      .doc(`pex_${partialOrder}_PARTIAL_REFUND_NOT_POSTED`)
+      .set({ status: 'RESOLVED' }, { merge: true });
+    await sendEvent(partialRefundEvent(`evt_partref_again_${suffix}`, 1000));
+    const reopened = await adminDb.collection('payment_exceptions')
+      .doc(`pex_${partialOrder}_PARTIAL_REFUND_NOT_POSTED`).get();
+    check(reopened.data().status === 'RESOLVED',
+      'A redelivered event does not reopen a case somebody already closed',
+      `status ${reopened.data().status}`);
+
+    // Refunding the rest afterwards is a full refund, and does reverse.
+    await sendEvent(partialRefundEvent(`evt_partref_rest_${suffix}`, 6000));
+    stored = await order(partialOrder);
+    check(stored.paymentStatus === 'REFUNDED' && stored.settlementStatus === 'REVERSED',
+      'Refunding the remainder afterwards reverses the order properly',
+      `${stored.paymentStatus} / ${stored.settlementStatus}`);
+    books = await ledgerGroups(partialOrder);
+    check(books.count === 2 && books.unbalanced === 0,
+      'And posts exactly one reversal group, balanced',
+      `${books.count} group(s)`);
+
     console.log('\n===============================================================');
     console.log(`📊 GATEWAY SETTLEMENT RESULTS: ${passed}/${total} Passed (${passed === total ? 'ALL PASSED' : 'FAILURES DETECTED'})`);
     console.log('===============================================================\n');
