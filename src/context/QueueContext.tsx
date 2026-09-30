@@ -227,6 +227,12 @@ interface QueueContextType {
   recordSearchQuery: (query: string) => void;
 }
 
+/**
+ * Most portions a single cart line may hold. Mirrors MAX_LINE_QUANTITY in
+ * server/routes/orderRoutes.js, which is where the bound is actually enforced.
+ */
+const MAX_CART_LINE_QUANTITY = 99;
+
 const QueueContext = createContext<QueueContextType | undefined>(undefined);
 
 export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -2495,12 +2501,28 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Cart operations
   const addToCart = (itemData: Omit<CartItem, 'cartItemId' | 'subtotal'>) => {
+    // The order endpoint refuses a line outside 1..MAX_CART_LINE_QUANTITY, so the
+    // cart keeps to the same bound and the customer hears about it here rather
+    // than being turned away at checkout.
+    const quantity = Math.min(
+      MAX_CART_LINE_QUANTITY,
+      Math.max(1, Math.round(Number(itemData.quantity) || 1))
+    );
+    if (quantity !== itemData.quantity) {
+      addToast(
+        'ปรับจำนวนแล้ว',
+        `สั่งได้ 1 ถึง ${MAX_CART_LINE_QUANTITY} ชิ้นต่อหนึ่งรายการ`,
+        'warning'
+      );
+    }
+
     const optionsCost = itemData.selectedOptions.reduce((acc, cur) => acc + cur.priceDelta, 0);
     const unitPrice = itemData.food.price + optionsCost;
-    const subtotal = unitPrice * itemData.quantity;
+    const subtotal = unitPrice * quantity;
 
     const newItem: CartItem = {
       ...itemData,
+      quantity,
       cartItemId: `cart-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
       subtotal
     };
@@ -2521,6 +2543,16 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const updateCartQuantity = (cartItemId: string, delta: number) => {
+    const target = cart.find(item => item.cartItemId === cartItemId);
+    if (target && delta > 0 && target.quantity + delta > MAX_CART_LINE_QUANTITY) {
+      addToast(
+        'ถึงจำนวนสูงสุดแล้ว',
+        `สั่งได้ไม่เกิน ${MAX_CART_LINE_QUANTITY} ชิ้นต่อหนึ่งรายการ`,
+        'warning'
+      );
+      return;
+    }
+
     setCart(prev => {
       return prev.map(item => {
         if (item.cartItemId === cartItemId) {

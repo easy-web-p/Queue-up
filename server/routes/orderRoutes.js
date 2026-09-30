@@ -11,6 +11,7 @@ import { requireSecret } from '../config/secrets.js';
 import { recordCustomerPayment, recordOrderFulfilled } from '../services/ledgerService.js';
 import { NotificationEngine } from '../services/notificationEngine.js';
 import { SlotTransactionService } from '../services/slotTransactionService.js';
+import { calculateWorkload } from '../services/capacityService.js';
 import { findMenuItem } from '../services/menuCatalog.js';
 import { computeFeeBreakdown, resolveOrderBreakdown } from '../services/orderPricing.js';
 import { applyWalletDelta, isWalletPayment } from '../services/customerWalletService.js';
@@ -20,6 +21,10 @@ import { MERCHANT_RESPONSE_WINDOW_MS } from '../services/paymentSettlement.js';
 export const orderRouter = Router();
 
 const HMAC_SECRET = requireSecret('HMAC_SECRET', 'dev-only-insecure-hmac-secret');
+
+/** Bounds on a single cart, so one request cannot price or cook an absurd order. */
+const MAX_LINE_QUANTITY = 99;
+const MAX_CART_LINES = 50;
 
 // State Machine Definition for Orders
 const VALID_TRANSITIONS = {
@@ -67,6 +72,48 @@ orderRouter.post('/', optionalAuthenticate, async (req, res) => {
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ success: false, error: 'EMPTY_CART', message: 'Cart items cannot be empty.' });
+    }
+
+    // Quantities are money. The line total was `unitTotalSatang * item.quantity`
+    // with whatever the request said in it, so a negative quantity subtracted
+    // from the bill: four steaks and a quantity of -100 on a ฿10 water came to a
+    // total of ฿0 and the order was accepted. A quantity of 1.5 billed one and a
+    // half steaks, and a quantity of 0 produced a free order the kitchen still
+    // had to cook. Every line is a whole, positive, bounded count before any
+    // price, discount or wallet debit is computed from it.
+    if (items.length > MAX_CART_LINES) {
+      return res.status(400).json({
+        success: false,
+        error: 'TOO_MANY_ITEMS',
+        message: `สั่งได้ไม่เกิน ${MAX_CART_LINES} รายการต่อหนึ่งออเดอร์`
+      });
+    }
+
+    const orderLines = [];
+    for (const item of items) {
+      if (!item || typeof item.menuItemId !== 'string' || !item.menuItemId.trim()) {
+        return res.status(400).json({
+          success: false,
+          error: 'INVALID_ITEM',
+          message: 'ทุกรายการต้องระบุรหัสเมนู (menuItemId)'
+        });
+      }
+
+      const quantity = Number(item.quantity);
+      if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_LINE_QUANTITY) {
+        return res.status(400).json({
+          success: false,
+          error: 'INVALID_QUANTITY',
+          message: `จำนวนของรายการ "${item.menuItemId}" ต้องเป็นจำนวนเต็ม 1 ถึง ${MAX_LINE_QUANTITY} ชิ้น`
+        });
+      }
+
+      orderLines.push({
+        menuItemId: item.menuItemId.trim(),
+        quantity,
+        selectedOptions: Array.isArray(item.selectedOptions) ? item.selectedOptions : [],
+        specialNote: typeof item.specialNote === 'string' ? item.specialNote : ''
+      });
     }
 
     const key = idempotencyKey || req.headers['x-idempotency-key'] || `idemp_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
@@ -134,7 +181,7 @@ orderRouter.post('/', optionalAuthenticate, async (req, res) => {
       const itemSnapshots = [];
       let calculatedSubtotalSatang = 0;
 
-      for (const item of items) {
+      for (const item of orderLines) {
         const found = await findMenuItem(adminDb, item.menuItemId, t);
 
         // Falling back to a request-supplied price would make the whole
@@ -171,7 +218,7 @@ orderRouter.post('/', optionalAuthenticate, async (req, res) => {
         // Option surcharges are priced from the menu item's own option groups,
         // not from the priceDelta the client sent alongside its choice.
         let optionsDeltaBaht = 0;
-        if (Array.isArray(item.selectedOptions)) {
+        {
           const groups = Array.isArray(itemData.optionGroups) ? itemData.optionGroups : [];
           for (const selected of item.selectedOptions) {
             const group = groups.find((g) => g.name === selected.groupName);
@@ -195,8 +242,8 @@ orderRouter.post('/', optionalAuthenticate, async (req, res) => {
           name: itemName,
           price: basePriceBaht,
           quantity: item.quantity,
-          selectedOptions: item.selectedOptions || [],
-          specialNote: item.specialNote || '',
+          selectedOptions: item.selectedOptions,
+          specialNote: item.specialNote,
           subtotal: lineTotalSatang / 100
         });
       }
@@ -224,6 +271,7 @@ orderRouter.post('/', optionalAuthenticate, async (req, res) => {
       // debit below is the first write, so the slot is read here.
       let slotRef = null;
       let slotUpdates = null;
+      let confirmedSlotWorkload = 0;
 
       if (req.body.slotId && reservationId) {
         const candidateRef = SlotTransactionService.getSlotRef(storeId, req.body.slotId);
@@ -235,6 +283,7 @@ orderRouter.post('/', optionalAuthenticate, async (req, res) => {
           if (foundIdx !== -1) {
             const targetRes = pending[foundIdx];
             slotRef = candidateRef;
+            confirmedSlotWorkload = Number(targetRes.workload) || 0;
             slotUpdates = {
               confirmedWorkload: (slotData.confirmedWorkload || 0) + targetRes.workload,
               confirmedOrders: (slotData.confirmedOrders || 0) + 1,
@@ -346,7 +395,13 @@ orderRouter.post('/', optionalAuthenticate, async (req, res) => {
         slotId: req.body.slotId || null,
         walletTransactionId,
         paidFromWallet,
-        workload: req.body.workload || (Array.isArray(items) ? items.reduce((s, it) => s + (it.quantity || 1), 0) : 1),
+        // What the kitchen is actually holding for this order, and exactly what
+        // a cancellation subtracts again. It used to be req.body.workload: a
+        // client could declare 999 and, on cancelling, wipe every other paid
+        // order's workload out of the slot, or declare -5 and inflate the slot
+        // so it never freed. Neither number ever belonged to the caller.
+        workload: confirmedSlotWorkload || calculateWorkload(orderLines),
+        slotConfirmedWorkload: confirmedSlotWorkload,
         version: 1,
         idempotencyKey: key,
         createdAt: now,

@@ -121,8 +121,27 @@ export async function readSlotRelease(t, adminDb, { order, now }) {
 
   const slotData = slotSnap.data();
   const currentConfirmed = slotData.confirmedWorkload ?? 0;
-  const orderWorkload = Number(order.workload)
-    || (Array.isArray(order.items) ? order.items.reduce((s, it) => s + (it.quantity || 1), 0) : 1);
+
+  // Release exactly what this order put into confirmedWorkload, which the order
+  // records when its hold is confirmed. Orders written before that field existed
+  // fall back to their own workload, bounded by the number of things they
+  // actually ordered: the figure used to come straight from the request body, so
+  // an unbounded one wiped every other paid order out of the slot and a negative
+  // one inflated the slot past its capacity so it never freed again.
+  const itemsWorkload = Array.isArray(order.items)
+    ? order.items.reduce((sum, it) => sum + Math.max(1, Math.round(Number(it.quantity) || 1)), 0)
+    : 1;
+  const recordedWorkload = Number(order.slotConfirmedWorkload);
+  const orderWorkload = Number.isFinite(recordedWorkload)
+    ? Math.max(0, Math.round(recordedWorkload))
+    : Math.min(itemsWorkload, Math.max(0, Math.round(Number(order.workload) || itemsWorkload)));
+
+  // Nothing of this order's was ever confirmed into the slot — for instance its
+  // hold had already been released — so there is nothing to give back. Taking
+  // the workload off anyway would be taking it off other orders.
+  if (orderWorkload === 0) {
+    return { slotRef: null, slotUpdates: null };
+  }
 
   return {
     slotRef,

@@ -273,6 +273,68 @@ async function runTests() {
       'An unknown menu item is refused instead of priced from the request',
       `message ${res.data?.message}`);
 
+    // A negative quantity used to subtract from the bill: an order of real food
+    // plus a large negative quantity of something cheap came out at zero and was
+    // accepted. The line total is money, so the count has to be a count.
+    res = await request(baseUrl, '/api/orders', 'POST', {
+      storeId: STORE,
+      items: [
+        { menuItemId: 'menu-alpha-1', quantity: 4 },
+        { menuItemId: 'menu-alpha-2', quantity: -100 }
+      ],
+      paymentMethod: 'cash',
+      idempotencyKey: `negative-qty-${Date.now()}`
+    }, as(CUSTOMER));
+    check(res.status === 400 && res.data?.error === 'INVALID_QUANTITY',
+      'A negative quantity cannot be used to discount an order to zero',
+      `status ${res.status}, error ${res.data?.error}, total ${res.data?.order?.totalSatang}`);
+
+    res = await request(baseUrl, '/api/orders', 'POST', {
+      storeId: STORE,
+      items: [{ menuItemId: 'menu-alpha-1', quantity: 0 }],
+      paymentMethod: 'cash',
+      idempotencyKey: `zero-qty-${Date.now()}`
+    }, as(CUSTOMER));
+    check(res.status === 400 && res.data?.error === 'INVALID_QUANTITY',
+      'A quantity of zero is refused rather than cooked for free',
+      `status ${res.status}, error ${res.data?.error}`);
+
+    res = await request(baseUrl, '/api/orders', 'POST', {
+      storeId: STORE,
+      items: [{ menuItemId: 'menu-alpha-1', quantity: 1.5 }],
+      paymentMethod: 'cash',
+      idempotencyKey: `fractional-qty-${Date.now()}`
+    }, as(CUSTOMER));
+    check(res.status === 400 && res.data?.error === 'INVALID_QUANTITY',
+      'A fractional quantity is refused rather than billed',
+      `status ${res.status}, error ${res.data?.error}`);
+
+    res = await request(baseUrl, '/api/orders', 'POST', {
+      storeId: STORE,
+      items: [{ menuItemId: 'menu-alpha-1', quantity: 100000 }],
+      paymentMethod: 'cash',
+      idempotencyKey: `huge-qty-${Date.now()}`
+    }, as(CUSTOMER));
+    check(res.status === 400 && res.data?.error === 'INVALID_QUANTITY',
+      'One line cannot order an unbounded number of portions',
+      `status ${res.status}, error ${res.data?.error}`);
+
+    // The kitchen workload on the order is what a cancellation subtracts from
+    // the slot again, so it is the kitchen's figure and never the caller's.
+    res = await request(baseUrl, '/api/orders', 'POST', {
+      storeId: STORE,
+      items: [{ menuItemId: 'menu-alpha-1', quantity: 2 }],
+      paymentMethod: 'cash',
+      workload: 999,
+      idempotencyKey: `declared-workload-${Date.now()}`
+    }, as(CUSTOMER));
+    const declaredWorkloadOrder = res.data?.order?.id
+      ? (await adminDb.collection('orders').doc(res.data.order.id).get()).data()
+      : null;
+    check(res.status === 201 && declaredWorkloadOrder?.workload === 2,
+      'A client-declared workload is ignored in favour of the server figure',
+      `status ${res.status}, stored workload ${declaredWorkloadOrder?.workload}`);
+
     console.log('\n===============================================================');
     console.log(`📊 AUTHORIZATION TEST RESULTS: ${passed}/${total} Passed (${passed === total ? 'ALL PASSED' : 'FAILURES DETECTED'})`);
     console.log('===============================================================\n');
